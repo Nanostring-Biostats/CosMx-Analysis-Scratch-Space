@@ -6,12 +6,12 @@ But ultimately, you don’t need amazing images, you need answers to biological 
 the most productive question-posing machine in molecular biology. 
 
 Data analysis begins with two fundamental pieces: a matrix of all cells’ gene expression, and their spatial locations:
-![image](https://github.com/patrickjdanaher/Cosmx-Analysis-Scratch-Space/assets/4357938/e9845abc-f97c-4f29-ba2d-cd3319127798)
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/cf82f6c2-5a6a-4fce-88a6-ed6e9b71cf9b)
 
 
 As with any single cell dataset, we begin by using the gene expression matrix to call cell types. Then, simply coloring our spatial map by cell type, we obtain an intricate picture of tissue structure. 
 
-![image](https://github.com/patrickjdanaher/Cosmx-Analysis-Scratch-Space/assets/4357938/b1fa6423-ffc3-4f0f-b6ef-e7779847b6d5)
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/74ee0893-c9d4-4bfc-8175-e5699dc6fae4)
 
 Even this simplistic analysis is valuable: most experts examining these plots come away with new insights and new questions. 
 
@@ -26,10 +26,15 @@ it’s the ability to do both of these at the same time. By simultaneously measu
 What can we say about a cell’s environment? Consider the below closeup of a PDAC tumor. “T-cell 1” is in a lymphoid structure, surrounded by B-cells and endothelial cells. These cells are expressing certain levels of ligands that bind receptors on T-cells. 
 In contrast, “T-cell 2” has invaded into the tumor bed and is mainly surrounded by tumor cells, plus a few macrophages, and these cells are signaling the T-cell with a different set of genes. 
 
-![image](https://github.com/patrickjdanaher/Cosmx-Analysis-Scratch-Space/assets/4357938/d2b908e3-0108-42a3-94b9-7d4fb402fea5)
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/9e287201-c16a-41e4-8ddc-0964c836318a)
 
 In short, we can trivially derive over 1000 variables describing each cell’s environment. And now, for every cell type, we can measure how every gene responds to every environmental variable. This amounts to roughly 20 * 1000 * 1000 = 20 million questions.
 Or, in a study across multiple tissues, we might ask these 20 million questions separately for each tissue. (Note that in a lower-plex technology, where a panel of ~300 genes might be devoted almost entirely to cell typing, 
 the number of interesting questions to be asked drops precipitously.) 
 
 In short, a standard analysis can lead to millions of hypothesis tests. Single-cell data without spatial information, and spatial data at larger-than-single-cell resolution, can't come close to this. 
+
+Questions on how phenotype responds to environment:
+-	How do tumor cells modulate gene expression in the face of T-cell attack?
+-	How do macrophages in the stroma differ from macrophages in the tumor interior?
+-	What genes do T-cells express when exposed to inflammatory cytokines?
