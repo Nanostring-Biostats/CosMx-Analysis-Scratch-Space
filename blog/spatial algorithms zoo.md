@@ -49,3 +49,20 @@ Methods:
 
 
 ### Measuring spatial correlation between two genes
+
+When two or more genes are spatially correlated it can be of high biological interest. 
+These genes might regulate each other, or they could be jointly regulated by some latent variable. 
+
+Methods for measuring spatial correlation between genes include:
+- Lee's L: another spatial statistics classic. 
+- [SpatialDE](https://github.com/Teichlab/SpatialDE)
+
+However, we have found methods like the above to be unsatisfying, since genes with cell-type-specific expression
+end up sharing strong spatial correlations. E.g. CD19 and MS4A1 are expressed mainly by B-cells, so if B-cells are 
+spatially clustered, then these genes will be spatially correlated, but for biologically trivial reasons. 
+To isolate more interesting spatial correlations, we developed [InSituCor](https://github.com/Nanostring-Biostats/insitucor). This is our recommended approach. 
+It can analyze hundreds of thousands of cells and thousands of genes in minutes. 
+
+
+
+
