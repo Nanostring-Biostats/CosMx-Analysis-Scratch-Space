@@ -22,7 +22,8 @@ The repo contains:
 ### Contributing
 
 - For questions or suggestions, write an Issue.
-- Contributions are welcome from the community - just reach out to get write permission. 
+- Contributions are welcome from the community - just reach out to get write permission.
+- Contributions must undergo code review before merging to Main. Also, consider if your contribution could be Intellectual Property. 
 
 
 ## Table of contents
