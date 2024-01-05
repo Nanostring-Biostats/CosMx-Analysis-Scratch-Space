@@ -47,7 +47,7 @@ Note:
 
 ### Cell typing
 - [Cell typing: what we've found to work](blog/cell%20typing%20basics.md)
-- [On the use of marker genes](blog/on cell typing with marker genes.md)
+- [On the use of marker genes](blog/on%20cell%20typing%20with%20marker%20genes.md)
 - [ ] Hierarchical ("plinko") cell typing
 - [ ] Cell typing with smoothed marker genes
 
