@@ -17,7 +17,6 @@ See the [table of contents](#table-of-contents) below.
 The repo contains:
 1. Blog posts of commentary & advice 
 2. Code, sometimes usable, sometimes just for use as a template
-3. CASSutils, a slowly-growing R package of useful functions (tbd)
 
 ### Contributing
 
