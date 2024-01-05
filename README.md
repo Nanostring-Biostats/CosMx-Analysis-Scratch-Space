@@ -1,5 +1,5 @@
 
-![image](https://github.com/patrickjdanaher/Cosmx-Analysis-Scratch-Space/assets/4357938/fae0bf00-1834-4608-9b73-8ca9df4b1595)
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/24ab79ab-e9c5-486e-9595-68f48797d757)
 
 # CosMx Analysis Scratch Space
 
