@@ -64,5 +64,24 @@ To isolate more interesting spatial correlations, we developed [InSituCor](https
 It can analyze hundreds of thousands of cells and thousands of genes in minutes. 
 
 
+### Counting occurrences within cell neighborhoods
+
+Analysts will often want to score cells for how often something occurs in their neighborhoods.
+For example, you might want to know how many T-cell neighbors each cell has, or 
+how many transcripts of a gene surround it. 
+
+The below code demonstrates how to use the spatstat::marktable function to do this. 
+
+```
+# "xy"" is a 2-column matrix of cell locations
+# "clust"" is a vector of cell type assignments
+# create a point process object:
+pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = range(xy[, 2]))
+marks(pp) <- clust
+marks(pp) <- as.factor(marks(pp))
+# count neighbors of each db cluster:
+mt05 <- marktable(X = pp, R = 0.05, N = NULL, exclude=TRUE, collapse=FALSE)
+rownames(mt05) <- names(which(use))
+```
 
 
