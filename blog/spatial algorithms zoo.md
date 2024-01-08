@@ -80,7 +80,7 @@ pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = ran
 marks(pp) <- clust
 marks(pp) <- as.factor(marks(pp))
 # count neighbors of each db cluster:
-mt05 <- marktable(X = pp, R = 0.05, N = NULL, exclude=TRUE, collapse=FALSE)
+mt05 <- spatstat::marktable(X = pp, R = 0.05, N = NULL, exclude=TRUE, collapse=FALSE)
 rownames(mt05) <- names(which(use))
 ```
 
