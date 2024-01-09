@@ -8,7 +8,7 @@ Here, for example, are FOVs collected from core needle biopsies, where the cells
 
 ![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/8d7c1716-c3a6-4d85-9f5f-79cc9374fe0f)
 
-As a partial solution, see the function consenseXY(), providing here: https://github.com/patrickjdanaher/Cosmx-Analysis-Scratch-Space/tree/main/code/condensing%20xy%20space
+As a partial solution, see the function consenseXY(), providing [here](code/condensing%20xy%20space)
 
 The main wrapper function contains an algorithm for pulling together FOVs from the same tissue, and an algorithm for tiling tissues across a plot. 
 
