@@ -24,23 +24,23 @@
 #' @param celltype Vector of cell type assignments to be updated
 #' @param counts Counts matrix (or dgCMatrix), cells * genes.
 #' @param neg Vector of mean negprobe counts per cell
-#' @param bg Expected background
 #' @param cohort Vector of cells' cohort memberships. Output of a spatial clustering algorithm makes for good cohorts. 
 #' @param altdata Matrix of cells' alternative data values
 #' @param xy 2-column matrix of cells' xy positions. 
 #' @param tissue Vector giving cells' tissue IDs. Used to separate tissue with overlapping xy coordinates.
 #' @param nb_size The size parameter to assume for the NB distribution.
 #' @param assay.type A string specifying which assay values to use.
-#' @importFrom InSituType Estep insitutype
-spatialUpdate <- function(celltype, counts, neg, bg = NULL, 
+#' @importFrom InSituType Estep insitutype fastCohorting
+#' @importFrom irlba irlba
+spatialUpdate <- function(celltype, counts, neg, 
                           cohort = NULL, altdata = NULL, xy = NULL, tissue = NULL,
                           nb_size = 10, assay.type = "rna") {
-  # check alternative data args:
+  ## check alternative data args:
   if ((is.null(cohort) * is.null(altdata)) & is.null(xy)) {
     stop("Must supply cohort, altdata or xy")
   }
 
-  # process alternative data:
+  ## process alternative data, obtaining cohort vector:
   if (is.null(cohort)) {
     if (!is.null(altdata)) {
       # make altdata from cells' neighborhoods:
@@ -55,10 +55,15 @@ spatialUpdate <- function(celltype, counts, neg, bg = NULL,
     }
     # cluster altdata to get cohort:
     cohort <- InSituType::fastCohorting(mat = altdata, n_cohorts = NULL, gaussian_transform = TRUE) 
-
   }
   
-    
+  ## derive reference profiles from initial cell type vector:
+  profiles <- InSituType:::Estep(counts = counts, clust = celltype, neg = neg)
+ 
+  ## Run supervised cell typing with InSituType
+  res <- InSituType::insitutype(x = counts, neg = neg, )
+  
+  return(res)
 }
 
 
