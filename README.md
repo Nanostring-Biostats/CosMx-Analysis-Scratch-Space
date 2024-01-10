@@ -50,6 +50,7 @@ Note:
 - [On the use of marker genes](blog/on%20cell%20typing%20with%20marker%20genes.md)
 - [ ] Hierarchical ("plinko") cell typing
 - [ ] Cell typing with smoothed marker genes
+- [ ] Integrating spatial information and/or cell images into existing cell typing results
 
 ### Tissue-specific solutions
 - [ ] A workflow for kidney samples: cell typing and glomerulus definitions
