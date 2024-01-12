@@ -1,9 +1,8 @@
-
 #' @title Update cell typing results with spatial context or other alternative data
 #' 
 #' @description
 #' Takes cell typing results, then updates it based on alternative data types, 
-#' e.g. spatial context, morphology, or proteomics. Existing cell typing results are 
+#' e.g. spatial context, morphology, or protein expression. Existing cell typing results are 
 #' put into Insitutype's likelihood framework, which then can use alternative data
 #' as a prior to be updated by the expression data to get a new posterior probability 
 #' of cell type.
