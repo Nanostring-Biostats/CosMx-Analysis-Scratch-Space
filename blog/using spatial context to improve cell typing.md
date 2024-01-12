@@ -48,3 +48,6 @@ Final caveat: be careful in analyses where you're calculating p-values about
  assignments under this approach, so the bias induced by this circularity is 
  usually ignorable. 
 
+### Code
+
+Find an R function for this approach [here](../code/spatialUpdate/).
