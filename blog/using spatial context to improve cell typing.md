@@ -31,7 +31,19 @@ The algorithm proceeds as follows:
   ([the Insitutype paper](https://www.biorxiv.org/content/10.1101/2022.10.19.512902v1) describes this logic in detail.)
 }
 
+The end result is cell type assignments driven mainly by your prior cell typing, 
+ but slightly updated to account for whatever information space and/or immunofluorescence 
+ data can offer. In practice, cells with high counts tend to be unaffected by this procedure,
+ since the information in a high-count expression profile overwhelms whatever evidence 
+ these alternative data types can offer. The main beneficiaries are cells with less informative
+ expression profiles, which are reclassified at higher rates. 
 
-
-
+We propose this method as a good idea for most applications where a non-spatial 
+ cell typing method has been employed. 
+ 
+Final caveat: be careful in analyses where you're calculating p-values about 
+ where cell types are localized. If you're using space to inform cell type assignments,
+ then you're biasing your downstream analyses of where cell types fall. 
+ In practice this is a small concern: space only lightly impacts the cell type 
+ assignments under this approach. 
 

@@ -53,14 +53,21 @@ spatialUpdate <- function(celltype, counts, neg,
       altdata <- temp$u %*% diag(temp$d)
     }
     # cluster altdata to get cohort:
-    cohort <- InSituType::fastCohorting(mat = altdata, n_cohorts = NULL, gaussian_transform = TRUE) 
+    cohort <- InSituType::fastCohorting(mat = altdata, 
+                                        n_cohorts = NULL, 
+                                        gaussian_transform = TRUE) 
   }
   
   ## derive reference profiles from initial cell type vector:
-  profiles <- InSituType:::Estep(counts = counts, clust = celltype, neg = neg)
+  profiles <- InSituType:::Estep(counts = counts, 
+                                 clust = celltype, 
+                                 neg = neg)
  
   ## Run supervised cell typing with InSituType
-  res <- InSituType::insitutype(x = counts, neg = neg, )
+  res <- InSituType::insitutype(x = counts, 
+                                neg = neg, 
+                                reference_profiles = profiles,
+                                update_reference_profiles = FALSE)
   
   return(res)
 }
