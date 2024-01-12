@@ -45,5 +45,6 @@ Final caveat: be careful in analyses where you're calculating p-values about
  where cell types are localized. If you're using space to inform cell type assignments,
  then you're biasing your downstream analyses of where cell types fall. 
  In practice this is a small concern: space only lightly impacts the cell type 
- assignments under this approach. 
+ assignments under this approach, so the bias induced by this circularity is 
+ usually ignorable. 
 
