@@ -23,10 +23,9 @@ Inputs:
  derive a matrix of neighborhood attributes. 
 
 The algorithm proceeds as follows:
-\enumerate{
- \item Step 1: Get the mean background-subtracted expression profile of each cell type.
- \item Step 2: Cluster the alternative data to assign cells to pre-clusters, or "cohorts" in Insitutype's phrasing.
- \item Step 3: Call Insitutype to reclassify the cells, assigning cells to whichever profile
+- Step 1: Get the mean background-subtracted expression profile of each cell type.
+- Step 2: Cluster the alternative data to assign cells to pre-clusters, or "cohorts" in Insitutype's phrasing.
+- Step 3: Call Insitutype to reclassify the cells, assigning cells to whichever profile
   best fits their data, while using the pre-clusters as an informative prior. 
   ([the Insitutype paper](https://www.biorxiv.org/content/10.1101/2022.10.19.512902v1) describes this logic in detail.)
 }
