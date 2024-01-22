@@ -38,6 +38,7 @@ Note:
 - [ ] A generally satisfying set of UMAP parameters for CosMx data
 - [ ] Quick & comprehensive searches for interesting trends with "Everything vs. everything DE"
 - [ ] Smoothing single cell gene expression for enhanced plotting
+- [ ] Approaches to ligand-receptor analysis
 
 
 ### Visualization
