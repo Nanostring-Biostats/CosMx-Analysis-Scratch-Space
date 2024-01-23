@@ -50,3 +50,13 @@ Final caveat: be careful in analyses where you're calculating p-values about
 ### Code
 
 Find an R function for this approach [here](../code/spatialUpdate/).
+
+### Demonstration
+
+Below are FOV excerpted from a kidney sample. Cell types are colored based on whether they're known to localize to glomeruli vs. to the tubulointerstitium. 
+Initial cell typing was performed using Seurat's label transfer function. These results were updated as described above, once without
+using spatial information ("without cohorts") and once with spatial information ("with cohorts"). Simply filtering the Seurat-derived profiles 
+through insitutype produces big improvements; using spatial context makes further small improvements. 
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/982b49b4-991e-4203-91b8-3ff9fdd0934a)
+
+
