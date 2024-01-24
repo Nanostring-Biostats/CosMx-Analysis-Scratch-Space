@@ -8,7 +8,7 @@ QC in CosMx is motivated by known error modes. Here's a list of major things tha
 - A cell might be undersampled, leading to excessively low counts (Either only a tip of it is in the slide, or detection efficiency is poor within it.) Solution: remove the cell. 
 - A cell might suffer extremely high background, either due to intrinsic tissue stickiness (e.g. associated with necrosis) or due to optical artifacts. Solution: remove the cell.
 - Errors in cell segmentation might assign multiple cells to the same "cell". Solution: remove these multiplets. 
-- A FOV might have low counts overall. This can be caused by imaging trouble, tissue peeling, and probably other causes. Solution: remove FOVs with klow quality data. (Removing low quality cells isn't good enough. If a bad FOV has half its cells removed, the spatial pattern implied by the remaining cells, those lucky enough to survive the cell QC, won't be representative.)
+- A FOV might have low counts overall. This can be caused by imaging trouble, tissue peeling, and probably other causes. Solution: remove FOVs with low quality data. (Removing low quality cells isn't good enough. If a bad FOV has half its cells removed, the spatial pattern implied by the remaining cells, those lucky enough to survive the cell QC, won't be representative.)
 - A FOV's expression profile can be distorted by image registration errors or by imaging artifacts, e.g. fluorescence hiding spots of one color. These FOVs can be analyzable if you're careful, but given the uncertainty they pose it's usually best to remove them. 
 
 
