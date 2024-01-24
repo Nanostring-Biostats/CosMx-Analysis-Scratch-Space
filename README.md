@@ -36,10 +36,11 @@ Note:
 
 ### Analysis strategies
 - [What is spatial data for?](blog/what%20is%20high%20plex%20spatial%20data%20for.md)
-- [ ] The impact of segmentation error on differential expression analyses
 - [QC and normalization of RNA data](blog/QC%20and%20normalization.md)
+- Batch correction
 - [The spatial algorithms zoo: recommended algorithms and efficient code](blog/spatial%20algorithms%20zoo.md)
 - [ ] A generally satisfying set of UMAP parameters for CosMx data
+- [ ] The impact of segmentation error on differential expression analyses
 - [ ] Quick & comprehensive searches for interesting trends with "Everything vs. everything DE"
 - [ ] Smoothing single cell gene expression for enhanced plotting
 - [ ] Approaches to ligand-receptor analysis
