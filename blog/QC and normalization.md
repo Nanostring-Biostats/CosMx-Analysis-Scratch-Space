@@ -17,11 +17,11 @@ QC logic would then proceed as follows:
 
 1. Remove cells with too few counts. For our 1000plex assay, we use a pretty generous threshold of 20 counts. A higher threshold would be reasonable. 
 
-\code{
+```
 # counts is the matrix of raw expression profiles, cells in rows, genes in columns
 totalcounts <- Matrix::rowSums(counts)  
 drop <- totalcounts < 20
-}
+```
 
 2. Remove cells with high outlier areas. You can use Grubb's test to detect outliers, 
 or you can draw a histogram of cell areas and choose a cutoff on your own. 
@@ -40,12 +40,12 @@ Unlike scRNA-seq data, where cells tend to have somewhat consistent expression l
 We make the reasonable assumption that a cell's detection efficiency is well-estimated by its total counts, which implies we can 
  scale each cell's profile by its total counts:
  
-\code{
- # counts is the matrix of raw expression profiles, cells in rows, genes in columns
+```
+# counts is the matrix of raw expression profiles, cells in rows, genes in columns
 totalcounts <- Matrix::rowSums(counts)  
 norm <- sweep(counts, 1, pmax(totalcounts, 20), "/")
-}
-...note the \code{pmax(totalcounts, 20)} term in the above. This puts a floor on how much we'll up-scale a cell. This prevents us 
+```
+...note the ```pmax(totalcounts, 20)``` term in the above. This puts a floor on how much we'll up-scale a cell. This prevents us 
 from taking cells with very few counts and drastically scaling them up, which gives them undeserved highly-distinct expression profiles.
 
 (Note: some authors have pointed out that there's information to be had in a cell's total counts. For example, cancer cells
