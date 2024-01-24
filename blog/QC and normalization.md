@@ -50,9 +50,13 @@ from taking cells with very few counts and drastically scaling them up, which gi
 
 (Note: some authors have pointed out that there's information to be had in a cell's total counts. For example, cancer cells
 tend to have high overall RNA expression. When we normalize, we lose this information. But we've usually found that a small price to 
-pay to control the variabilty in total counts that arises from unwanted technical sources.)
+pay to control the variability in total counts that arises from unwanted technical sources.)
 
+## Other transformations
 
+We generally do not perform non-linear transformations on our data. 
+
+Exception: UMAPs often look better when drawn from log- and sqrt-transformed data or from Pearson residuals.
 
  
 
