@@ -13,7 +13,7 @@ QC in CosMx is motivated by known error modes. Here's a list of major things tha
 
 
 
-QC logic would then proceed as follows:
+**QC logic would then proceed as follows:**
 
 1. Remove cells with too few counts. For our 1000plex assay, we use a pretty generous threshold of 20 counts. A higher threshold would be reasonable. 
 
