@@ -46,6 +46,7 @@ Note:
 - [ ] Approaches to ligand-receptor analysis
 - [ ] Best practices for huge datasets
 - [ ] Protein analysis basics
+- [ ] Why to distrust DE results with highly significant p-values by small effect sizes
 
 ### Visualization
 - [Functions for condensing FOVs and tissues to minimize whitespace](blog/condensing%20FOVs%20and%20tissues%20in%20XY%20space.md)
