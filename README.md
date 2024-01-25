@@ -30,26 +30,35 @@ The repo contains:
 Note:
 - [ ] Items with a checkbox like this are awaiting material. 
 - Items with links will take you to a .md writeup, which may in turn link to code.
- 
+
+### Data formats 
+- [ ] File structure output by the AtoMx export module
+
 ### Analysis strategies
 - [What is spatial data for?](blog/what%20is%20high%20plex%20spatial%20data%20for.md)
-- [ ] The impact of segmentation error on differential expression analyses
-- [Spatial statistics resources - fast nearest neighbors search etc](blog/spatial%20algorithms%20zoo.md)
+- [QC and normalization of RNA data](blog/QC%20and%20normalization.md)
+- Batch correction
+- [The spatial algorithms zoo: recommended algorithms and efficient code](blog/spatial%20algorithms%20zoo.md)
 - [ ] A generally satisfying set of UMAP parameters for CosMx data
+- [ ] The impact of segmentation error on differential expression analyses
 - [ ] Quick & comprehensive searches for interesting trends with "Everything vs. everything DE"
 - [ ] Smoothing single cell gene expression for enhanced plotting
-
+- [ ] Approaches to ligand-receptor analysis
+- [ ] Best practices for huge datasets
+- [ ] Protein analysis basics
 
 ### Visualization
 - [Functions for condensing FOVs and tissues to minimize whitespace](blog/condensing%20FOVs%20and%20tissues%20in%20XY%20space.md)
-- [ ] Inferring cell polygons from transcript locations
+- [Inferring cell polygons from transcript locations](blog/deriving%20cell%20polygons%20from%20transcript%20locations.md)
 - [ ] (For fun) Spatial transcriptomics plots in stained glass 
+- [Visualization of cellular neighborhood in gallery mode](blog/visualize%20cellular%20neighborhood%20in%20gallery%20mode.md)
 
 ### Cell typing
 - [Cell typing: what we've found to work](blog/cell%20typing%20basics.md)
 - [On the use of marker genes](blog/on%20cell%20typing%20with%20marker%20genes.md)
 - [ ] Hierarchical ("plinko") cell typing
 - [ ] Cell typing with smoothed marker genes
+- [ ] Integrating spatial information and/or cell images into existing cell typing results
 
 ### Tissue-specific solutions
 - [ ] A workflow for kidney samples: cell typing and glomerulus definitions

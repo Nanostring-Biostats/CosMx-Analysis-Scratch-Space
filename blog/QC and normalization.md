@@ -1,0 +1,62 @@
+# QC and normalization of CosMx RNA data
+
+We've tried a lot of options here, and we've settled on very simple procedures for most cases. 
+
+## QC
+
+QC in CosMx is motivated by known error modes. Here's a list of major things that can go wrong:
+- A cell might be undersampled, leading to excessively low counts (Either only a tip of it is in the slide, or detection efficiency is poor within it.) Solution: remove the cell. 
+- A cell might suffer extremely high background, either due to intrinsic tissue stickiness (e.g. associated with necrosis) or due to optical artifacts. Solution: remove the cell.
+- Errors in cell segmentation might assign multiple cells to the same "cell". Solution: remove these multiplets. 
+- A FOV might have low counts overall. This can be caused by imaging trouble, tissue peeling, and probably other causes. Solution: remove FOVs with low quality data. (Removing low quality cells isn't good enough. If a bad FOV has half its cells removed, the spatial pattern implied by the remaining cells, those lucky enough to survive the cell QC, won't be representative.)
+- A FOV's expression profile can be distorted by image registration errors or by imaging artifacts, e.g. fluorescence hiding spots of one color. These FOVs can be analyzable if you're careful, but given the uncertainty they pose it's usually best to remove them. 
+
+
+
+**QC logic would then proceed as follows:**
+
+1. Remove cells with too few counts. For our 1000plex assay, we use a pretty generous threshold of 20 counts. A higher threshold would be reasonable. 
+
+```
+# counts is the matrix of raw expression profiles, cells in rows, genes in columns
+totalcounts <- Matrix::rowSums(counts)  
+drop <- totalcounts < 20
+```
+
+2. Remove cells with high outlier areas. You can use Grubb's test to detect outliers, 
+or you can draw a histogram of cell areas and choose a cutoff on your own. 
+
+3. Remove FOVs with poor counts. AtoMx removes FOVs based on their mean count per cell, or by a user-specified quantile of counts per cell. Filtering on % of cells flagged by the above criteria would also be reasonable. 
+
+4. Flag FOVs with distorted expression profiles. AtoMx now flags FOVs where z-stack registration is highly unstable, but 
+ older runs won't benefit from this update, and other effects, namely background fluorescence, can still distort FOV expression profiles. 
+ Unfortunately, there's no easy automated way to flag outlier FOVs (yet). Fortunately, they do tend to stand out in spatial analyses. 
+ If you e.g. plot cell typing results in space, or plot spatial clustering results in space, outlier FOVs stand out strongly. They can then be manually flagged and removed. 
+ 
+## Normalization
+ 
+Unlike scRNA-seq data, where cells tend to have somewhat consistent expression levels, spatial platforms vary widely in how much 
+  of a cell's RNA they detect. Normalizing out this effect is important for some analyses. 
+We make the reasonable assumption that a cell's detection efficiency is well-estimated by its total counts, which implies we can 
+ scale each cell's profile by its total counts:
+ 
+```
+# counts is the matrix of raw expression profiles, cells in rows, genes in columns
+totalcounts <- Matrix::rowSums(counts)  
+norm <- sweep(counts, 1, pmax(totalcounts, 20), "/")
+```
+...note the ```pmax(totalcounts, 20)``` term in the above. This puts a floor on how much we'll up-scale a cell. This prevents us 
+from taking cells with very few counts and drastically scaling them up, which gives them undeserved highly-distinct expression profiles.
+
+(Note: some authors have pointed out that there's information to be had in a cell's total counts. For example, cancer cells
+tend to have high overall RNA expression. When we normalize, we lose this information. But we've usually found that a small price to 
+pay to control the variability in total counts that arises from unwanted technical sources.)
+
+## Other transformations
+
+We generally do not perform non-linear transformations on our data. 
+
+Exception: UMAPs often look better when drawn from log- and sqrt-transformed data or from Pearson residuals.
+
+ 
+
