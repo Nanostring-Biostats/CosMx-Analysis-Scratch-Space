@@ -27,3 +27,9 @@ When you do this, you're omitting an important term for contamination:
 Your model is underspecified, so its results are biased. As you measure more cells and gain statistical power, you only gain more confidence in your biased results. 
 
 ## Countermeasures
+
+We are preparing a manuscript detailing countermeasures to segmentation. Stay tuned for a link to it, or ask us for code if you can't wait. 
+For now, two pieces of advice:
+
+1. **Don't bother analyzing genes that are dominated by contamination.** If you're analyzing T-cells in tumors, then analyzing KRT9 is hopeless: T-cells barely express it, while the surrounding tumor cells will express it highly. Whatever expression you do see in T-cells will be dominated by contamination. A simple approach: if you're e.g. analyzing T-cells, then compare each gene's expression within T-cells to its expression in spatial neighbors of T-cells. The ratio between these numbers tells you how much of that gene's expression in T-cells is real vs. contamination. Apply a reasonable threshold, and don't even analyze genes with much higher expression around T-cells than inside T-cells.
+2. 
