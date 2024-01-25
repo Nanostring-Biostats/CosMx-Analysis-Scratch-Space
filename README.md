@@ -51,6 +51,7 @@ Note:
 - [Functions for condensing FOVs and tissues to minimize whitespace](blog/condensing%20FOVs%20and%20tissues%20in%20XY%20space.md)
 - [Inferring cell polygons from transcript locations](blog/deriving%20cell%20polygons%20from%20transcript%20locations.md)
 - [ ] (For fun) Spatial transcriptomics plots in stained glass 
+- [ ] Visualization of cellular neighborhood in gallery mode 
 
 ### Cell typing
 - [Cell typing: what we've found to work](blog/cell%20typing%20basics.md)
