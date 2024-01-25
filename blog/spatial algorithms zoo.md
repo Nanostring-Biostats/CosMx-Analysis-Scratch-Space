@@ -15,6 +15,7 @@ neighbors <- FNN::get.knnx(data = xy, # 2-column matrix of xy locations
 # returns 2 outputs: a matrix of each cell's nearest neighbor indices (including itself),
 #  and a matrix of distances to these neighbors.
 ```
+(This also works for neighbors in expression space - just input the top 20 PCs instead of xy locations.)
 
 #### Returning a sparse matrix of cells' K-nearest neighbors
 
