@@ -3,7 +3,7 @@
 A complete CosMx dataset will contain cell metadata, morphology/protein images and cell label results of cell segmentation. 
 We've created a toolkit for visualizing the neighborhood of query cells in terms of protein staining, cell segmentation border, numeric and categorical metadata. (Note: we are *not* performing cell typing or cell segmetnation here, just drawing boundaries from the existing cell label/segmetnation results.)
 
-You can find the package [here](code/NeighVizGallery). See the corresponding [tutorial](code/NeighVizGallery/vignettes/tutorial.R) inside the package for more details. 
+You can find the package [here](../code/NeighVizGallery). See the corresponding [tutorial](../code/NeighVizGallery/vignettes/tutorial.R) inside the package for more details. 
 
 The inputs required:
 
