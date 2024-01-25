@@ -15,6 +15,7 @@ neighbors <- FNN::get.knnx(data = xy, # 2-column matrix of xy locations
 # returns 2 outputs: a matrix of each cell's nearest neighbor indices (including itself),
 #  and a matrix of distances to these neighbors.
 ```
+(This also works for neighbors in expression space - just input the top 20 PCs instead of xy locations.)
 
 #### Returning a sparse matrix of cells' K-nearest neighbors
 
@@ -60,7 +61,9 @@ Methods for measuring spatial correlation between genes include:
 However, we have found methods like the above to be unsatisfying, since genes with cell-type-specific expression
 end up sharing strong spatial correlations. E.g. CD19 and MS4A1 are expressed mainly by B-cells, so if B-cells are 
 spatially clustered, then these genes will be spatially correlated, but for biologically trivial reasons. 
-To isolate more interesting spatial correlations, we developed [InSituCor](https://github.com/Nanostring-Biostats/insitucor). This is our recommended approach. 
+To isolate more interesting spatial correlations, we developed:
+- [InSituCor](https://github.com/Nanostring-Biostats/insitucor).
+This is our recommended approach. 
 It can analyze hundreds of thousands of cells and thousands of genes in minutes. 
 
 
