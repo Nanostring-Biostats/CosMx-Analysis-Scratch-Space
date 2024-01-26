@@ -54,9 +54,9 @@ Our workflow performs the below steps:
 
 First, the fundamentals:
 
+- [QC and normalization]()
 - [Custom tiling of tissues and FOVs in space]()
 - [Use transcript locations to assess/refine cell segmentation]()
-- [QC and normalization]()
 - [Dimension reduction (PCA and UMAP)]()
 - [Cell typing]()
 
