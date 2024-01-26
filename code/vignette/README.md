@@ -67,6 +67,11 @@ Then, we go after biology:
 - [Hypothesis-generating analyses: identifying spatially correlated genes with InSituCor]()
 
 
+## General analysis advice
+
+```list of topics here, some statements, some links to CASS articles```
+
+
 
 
 
