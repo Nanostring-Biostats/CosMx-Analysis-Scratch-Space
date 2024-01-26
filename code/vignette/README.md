@@ -54,17 +54,17 @@ Our workflow performs the below steps:
 
 First, the fundamentals:
 
-- Custom tiling of tissues and FOVs in space
-- Use transcript locations to assess/refine cell segmentation
-- QC and normalization
-- Dimension reduction (PCA and UMAP)
-- Cell typing
+- [Custom tiling of tissues and FOVs in space]()
+- [Use transcript locations to assess/refine cell segmentation]()
+- [QC and normalization]()
+- [Dimension reduction (PCA and UMAP)]()
+- [Cell typing]()
 
 Then, we go after biology:
 
-- Defining cells' spatial context
-- Hypothesis-driven analyses, i.e. differential expression: how do cells change behavior based on their spatial context?
-- Hypothesis-generating analyses: identifying spatially correlated genes with InSituCor.
+- [Defining cells' spatial context]()
+- [Hypothesis-driven analyses, i.e. differential expression: how do cells change behavior based on their spatial context?]()
+- [Hypothesis-generating analyses: identifying spatially correlated genes with InSituCor]()
 
 
 
