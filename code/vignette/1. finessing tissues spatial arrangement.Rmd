@@ -1,0 +1,71 @@
+---
+title: "Finessing tissues' spatial arrangement"
+output: 
+rmarkdown::html_vignette: 
+toc: true
+fig_width: 7 
+fig_height: 8 
+vignette: >
+  %\VignetteIndexEntry{Finessing tissues' spatial arrangement}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+<style>
+p.caption {
+  font-size: 1.5em;
+}
+</style>
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+Here we rearrange FOV's by hand to make for plots with less white space. 
+For an under-development toolkit to automate this process, see [here](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/blog/condensing%20FOVs%20and%20tissues%20in%20XY%20space.md).
+
+
+First, we load in only the data we need:
+
+```{r loadxy}
+xy <- readRDS("________")     # load cells' xy positions
+annot <- readRDS("_________") # load cell metadata
+```
+
+Now we make sure that no tissue overlaps another. 
+(In studies with multiple slides, xy positions can overlap.)
+The script utils/condenseTissues.R holds a useful function for automating 
+this process:
+
+```{r condensetissues}
+source("utils/condenseTissues.R")
+xy <- condenseTissues(xy = xy, 
+                      tissue = annot$tissue, 
+                      tissueorder = NULL,  # optional, specify the order tissues are tiled in
+                      buffer = 0.5, # space between tissues
+                      widthheightratio = 4/3) # desired shape of final xy locations 
+```
+
+
+Now let's see how our spatial plots look:
+
+```{r plotxy}
+# to avoid unnecessarily plotting all the cells, just show a subset:
+sub <- sample(1:nrow(xy), round(nrow(xy) / 20), replace = FALSE)
+cols <- c("#616161","#4285f4","#db4437","#f4b400","#0f9d58","#ab47bc",
+"#00acc1","#ff7043","#9e9d24","#5c6bc0","#f06292","#00796b","#c2185b","#7e57c2",
+"#03a9f4","#8bc34a","#fdd835","#fb8c00","#8d6e63","#9e9e9e","#607d8b")
+# plot:
+plot(xy[sub, ], pch = 16, cex = 0.2, 
+     asp = 1, # important: keep the true aspect ratio
+     col = cols[as.numeric(as.factor(annot$tissue)) %% length(cols) + 1])
+# label tissues:
+for (tiss in unique(annot$tissue)) {
+  text(median(xy[annot$tissue == tiss, 1]), max(xy[annot$tissue == tiss, 2]), tiss)
+}
+
+```
+
+
