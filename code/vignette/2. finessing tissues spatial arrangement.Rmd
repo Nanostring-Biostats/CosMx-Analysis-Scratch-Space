@@ -1,0 +1,96 @@
+---
+title: "Data preparation"
+output: 
+rmarkdown::html_vignette: 
+toc: true
+fig_width: 7 
+fig_height: 8 
+vignette: >
+  %\VignetteIndexEntry{Straightforward InSituCor run}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+<style>
+p.caption {
+  font-size: 1.5em;
+}
+</style>
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+We'll perform two basic tasks in this opening script: 
+
+1. Load in and format the flat files export by AtoMx
+2. (Optional) Rearrange FOV's xy positions by hand for plots with less white space
+
+## Loading and formatting flat files from AtoMx
+
+First, we'll load the packages we need. 
+Importantly, we'll load "Matrix", which handles *sparse matrices*. 
+When a matrix has mainly zeroes, which is generally the case for single cell data,
+storing it in sparse matrix format has huge memory savings. Given the size of CosMx
+data, it is vital to be memory-efficient. 
+
+```{r libraries}
+library(data.table) # for more memory efficent data frames
+library(fread)  # for efficient reading of very large flat files
+library(Matrix) # for sparse matrices like our counts matrix
+```
+
+Now we'll load in the flat files and format as we want:
+
+```{r loading}
+# load raw counts, save as sparse matrix:
+
+# load metadata, save as data frame:
+
+# load transcript locations, save as data table:
+
+# load ???
+
+```
+
+
+Now our data looks like this:
+
+<INSERT CARTOON> 
+
+
+Next we save the data as .RDS files. These files are smaller on disk (they 
+benefit from more compression than flat files do), and they're faster to read
+back into R.
+
+```{r saving}
+
+```
+
+Now we have data in 3 locations:
+
+- The RDS files we just created
+- The flat files we began with
+- The original data on AtoMx
+
+This is unnecessary duplication. Once you've confirmed this script has run successfully,
+you can safely delete the flat files - you won't be using them again. 
+If you do need to go back to them, you can always export them from AtoMx again:
+AtoMx acts as a persistent, authoritative source of unmodified data.
+
+### Note on data size
+
+A reasonably high-performance compute instance can generally handle a few slides of 
+ CosMx data using the scripts we use here. But once studies get to millions of cells, they
+ can overwhelm the memory available to most analysts. At this point, you have two options:
+
+1. Use data formats that store data on disk, not in memory, e.g. TileDB, SeuratDisk, hdf5... 
+These tools can be harder to use.
+2. Analyze your data one tissue at a time. Put all tissues through a standard analysis pipeline, then, for multi-tissue analyses, judiciously load in just the data you need
+for a given analysis. 
+
+Neither option is terribly convenient, but having millions or tens of millions of cells 
+to analyze is worth some hassle. 
+
+
