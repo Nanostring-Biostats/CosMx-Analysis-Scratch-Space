@@ -57,7 +57,7 @@ First, the fundamentals:
 - [Parse and format data export by AtoMx]()
 - [Custom tiling of tissues and FOVs in space]()
 - [QC and normalization]()
-- [Use transcript locations to assess/refine cell segmentation]()
+- xxx[Use transcript locations to assess/refine cell segmentation]()
 - [Dimension reduction (PCA and UMAP)]()
 - [Cell typing]()
 

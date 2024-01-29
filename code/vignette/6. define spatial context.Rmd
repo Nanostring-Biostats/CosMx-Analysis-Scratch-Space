@@ -59,12 +59,42 @@ and we cluster cells based on these values.
 
 
 ```{r spatialclust_by_celltype}
+## get neighborhood cell type abundance:
+# create a point process object:
+pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = range(xy[, 2]))
+marks(pp) <- celltype
+marks(pp) <- as.factor(marks(pp))
+# count neighbors of each db cluster:
+neighbormarks <- spatstat::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+rownames(neighbormarks) <- rownames(xy)
+head(neighbormarks)
 
+## cluster it: 
+nclust <- mclust::Mclust(neighbormarks, 
+                         G = 8, # 8 clusters
+                         modelNames = c("EVI")) 
+spatialclust <- nclust$classification
+
+## plot the results:
+# subset for faster plotting:
+sub <- sample(1:nrow(xy), round(nrow(xy) / 20), replace = FALSE)
+# color palette:
+cols <- c("#616161","#4285f4","#db4437","#f4b400","#0f9d58","#ab47bc",
+"#00acc1","#ff7043","#9e9d24","#5c6bc0","#f06292","#00796b","#c2185b","#7e57c2",
+"#03a9f4","#8bc34a","#fdd835","#fb8c00","#8d6e63","#9e9e9e","#607d8b")
+# plot:
+plot(xy[sub, ], pch = 16, cex = 0.2, 
+     asp = 1, 
+     col = cols[as.numeric(as.factor(spatialclust)) %% length(cols) + 1])
 ```
 
 Alternatively, we can cluster cells based on the mean expression profile of their neighborhoods:
 
 ```{r spatialclust_by_expression}
+
+
+
+
 
 ```
 
