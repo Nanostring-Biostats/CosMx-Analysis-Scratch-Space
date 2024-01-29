@@ -29,9 +29,63 @@ QC of CosMx data is mostly straightforward. Technical effects can be complex,
  but they manifest in limited ways:
  
 - Many individual cells can have low signal
+- Segmentation errors can create "cells" with bad data
 - Sporadic FOVs can have low signal
-- Sporaic FOVs can have distorted / outlier expression profiles
+- Spordaic FOVs can have distorted / outlier expression profiles
 
 
+First we'll flag cells with poor signal, then we'll flag FOVs. 
+When we're done, we'll delete everything we've flagged. 
+(The full original data will remain on AtoMx, so this step is not as drastic as it seems. 
+For smaller studies it could still be reasonable to hold on to the pre-QC .RDS files.)
 
 
+### Cell-level QC
+
+We'll check for two kinds of bad cells: those with too few transcripts to use, 
+and those that look to result from bad segmentation errors.
+
+We generally require 20 counts per cell in 1000plex data and 50 counts in 6000plex data:
+
+```{r countqc}
+# require 50 counts per cell 
+count_threshold <- 50
+annot$totalcounts <- Matrix::rowSums(counts)
+flag <- annot$totalcounts < count_threshold
+```
+
+Then we'll look for very large cells. You can run a Grubb's test to look for high outliers
+of cell area, or you can determine a reasonable threshold yourself:
+
+```{r areaqc}
+# what's the distribution of areas?
+hist(annot$area, breaks = 100, xlim = c(0, 0.5))
+# based on the above, set a threshold:
+area_threshold <- ___
+abline(v = area_threshold, col = "red")
+# flag cells based on area:
+flag <- flag | (annot$area > area_threshold)
+```
+
+### FOV-level QC:
+
+A spatial map of per-cell signal total counts usually makes poor FOVs quite obvious. 
+Even better, we can color cells by the average counts of their spatial neighbors 
+within their FOV:
+
+```{r smoothedtotalcounts}
+source("utils/spatial functions.R")
+# get cells' spatial neighbors (within their FOV):
+neighbors <- nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 20, subset = annot$FOV)
+# now get mean counts of neighbors:
+neighborcounts <- neighbor_mean(x = annot$totalcounts, neighbors = neighbors)
+# now plot it:
+plot(xy, pch = 16, cex = 0.2, 
+     asp = 1, # important: keep the true aspect ratio
+     col = viridis::viridis_pal(option = "B")(101)[
+       1 + round(100 * log2(neighborcounts) / max(log2(neighborcounts)))])
+# label FOVs:
+for (fov in unique(annot$FOV)) {
+  text(median(xy[annot$FOV == fov, 1]), median(xy[annot$FOV == fov, 2]), fov)
+}
+```
