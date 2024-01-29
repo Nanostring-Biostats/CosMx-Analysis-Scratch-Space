@@ -39,6 +39,14 @@ When we're done, we'll delete everything we've flagged.
 (The full original data will remain on AtoMx, so this step is not as drastic as it seems. 
 For smaller studies it could still be reasonable to hold on to the pre-QC .RDS files.)
 
+We start by loading the data we'll need:
+
+```{r loaddata}
+counts <- readRDS()
+annot <- readRDS()
+xy <- readRDS()
+xy0 <- readRDS()
+```
 
 ### Cell-level QC
 
@@ -95,8 +103,8 @@ We don't see any low-signal FOVs in this plot, but if we did, we could flag the 
 Note that first you'd want to confirm that their signal was truly poor and not just slightly attenuated vs. their neighbors. It's OK for signal to vary; it just seems prudent to remove true outliers.
 
 ```{r lowcountfovs}
-bad_fovs <- c("121", "259") 
-flag <- flag | is.element(annot$FOV, bad_fovs)
+low_count_fovs <- c("1121", "1259") 
+flag <- flag | is.element(annot$FOV, low_count_fovs)
 ```
 
 
@@ -127,6 +135,46 @@ plot(xy, pch = 16, cex = 0.2,
 for (fov in unique(annot$FOV)) {
   text(median(xy[annot$FOV == fov, 1]), median(xy[annot$FOV == fov, 2]), fov)
 }
+```
+
+
+Here we see that ________. 
+Now flag those FOVs:
+
+```{r flagdistortedfovs}
+distorted_fovs <- c("1549", "1432") 
+flag <- flag | is.element(annot$FOV, distorted_fovs)
+```
+
+### Remove flagged cells and FOVs
+
+Now that we've flagged cells we don't want to analyze, we remove them from all of our data objects. 
+To avoid risk of data misalignment, we'll use cell IDs to coordinate this operation. 
+
+```{r remove}
+# how many cells are we flagging?
+table(flag)
+# keep these cells:
+keepcells <- annot$cell_ID[!flag]
+# subset all data objects to only the cells to be kept:
+counts <- counts[keepcells, ]
+annot <- annot[keepcells, ]
+xy <- xy[keepcells, ]
+xy0 <- xy0[keepcells, ]
+# overwrite saved data with filtered data:
+saveRDS(counts, "______")
+saveRDS(annot, "______")
+saveRDS(xy, "______")
+saveRDS(xy0, "______")
+```
+
+## Normalization
+
+Normalization is straightforward: we just scale all cells to have the same total counts.
+
+```{r normalize}
+norm <- sweep(counts, 1, annot$totalcounts, "/")
+saveRDS(norm, "processed_data/norm.RDS")
 ```
 
 
