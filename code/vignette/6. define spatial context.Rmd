@@ -38,17 +38,36 @@ There are two general approaches we can employ:
 tumor cell, number of tumor cells in neighborhood, neighborhood expression level of a given cytokine, 
 in/out of a substructure (e.g. TLS in a tumor, glomeruli in kidneys...).
 
+```{r loading}
+# load data:
+norm <- readRDS("processed_data/norm.RDS")
+annot <- readRDS("processed_data/annot.RDS")
+celltype <- readRDS("processed_data/celltype.RDS")
+```
+
+The functions we need for spatial annotations are all here:
+```{r source}
+source("utils/spatial functions.R")
+```
+
 ## Spatial clustering
 
 Quite a few algorithms now exist for spatial clustering, many quite complex. 
 Be warned that some of these become computationally intractable with the very large datasets now routinely produced by spatial platforms. 
 We find that a simple, computationally quick approach works well: we record the cell type composition of each cell's neighborhood,
 and we cluster cells based on these values. 
-Alternatively, we can cluster cells based on the mean expression profile of their neighborhoods. 
 
-```{r spatialclust}
+
+```{r spatialclust_by_celltype}
 
 ```
+
+Alternatively, we can cluster cells based on the mean expression profile of their neighborhoods:
+
+```{r spatialclust_by_expression}
+
+```
+
 
 ## Hand-defining spatial context
 
@@ -59,4 +78,39 @@ Here we present three ways to annotate cells based on their spatial context:
 - Neighborhood expression of a gene
 
 
+```{r mindistance}
+# record IDs and ditances to nearest 50 neighbors:
+neighbors_dists <- FNN::get.knnx(data = xy, 
+                           query = xy[celltype == "tumor", ], 
+                           k = 5)
+str(neighbors_dists)
+# record distance to a cell type:
+annot$disttonearesttumor <- neighbor_dists[[___]][, 1]
+# record 3rd-closest distance to the cell type:
+annot$distto3rdnearesttumor <- neighbor_dists[[___]][, 3]
+```
+
+
+```{r countneighbors}
+# create a point process object:
+pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = range(xy[, 2]))
+marks(pp) <- celltype
+marks(pp) <- as.factor(marks(pp))
+# count neighbors of each db cluster:
+neighbormarks <- spatstat::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+rownames(neighbormarks) <- rownames(xy)
+head(neighbormarks)
+# save results for your desired cell type:
+annot$ntumorneighbors <- neighbormarks[, "tumor"]
+```
+
+
+```{r neighborhoodexpression}
+# get cells' nearest 50 spatial neighbors:
+neighbors_sparsematrix <- nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50, subset = annot$tissue)  
+str(neighbors_sparsematrix)
+# get neighborhood expression of a chosen gene:
+gene <- "C1QA"
+neighborhoodexpression <- neighbor_mean(x = norm[, gene], neighbors = neighbors_sparsematrix)
+```
 
