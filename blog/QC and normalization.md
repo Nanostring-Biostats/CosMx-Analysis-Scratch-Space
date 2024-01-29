@@ -56,7 +56,8 @@ pay to control the variability in total counts that arises from unwanted technic
 
 We generally do not perform non-linear transformations on our data. 
 
-Exception: UMAPs often look better when drawn from log- and sqrt-transformed data or from Pearson residuals.
+Exception: UMAPs often look better when drawn from log- and sqrt-transformed data or from Pearson residuals. 
+Pearson residuals are problematic for big datasets, however, since they convert your data from a sparse matrix to a dense matrix. 
 
  
 
