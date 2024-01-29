@@ -95,7 +95,7 @@ Alternatively, we can cluster cells based on the mean expression profile of thei
 
 
 
-
+   
 ```
 
 
@@ -103,10 +103,9 @@ Alternatively, we can cluster cells based on the mean expression profile of thei
 
 Here we present three ways to annotate cells based on their spatial context:
 
-- Distance to a cell type
-- Number of neighbors of a cell type
-- Neighborhood expression of a gene
+#### Distance to a given cell type:
 
+Example: you might categorize cells by how far they are from the nearest tumor cell:
 
 ```{r mindistance}
 # record IDs and ditances to nearest 50 neighbors:
@@ -115,11 +114,14 @@ neighbors_dists <- FNN::get.knnx(data = xy,
                            k = 5)
 str(neighbors_dists)
 # record distance to a cell type:
-annot$disttonearesttumor <- neighbor_dists[[___]][, 1]
+annot$disttonearesttumor <- neighbor_dists$nn.dist[, 1]
 # record 3rd-closest distance to the cell type:
-annot$distto3rdnearesttumor <- neighbor_dists[[___]][, 3]
+annot$distto3rdnearesttumor <- neighbor_dists$nn.dist[, 3]
 ```
 
+#### Number of neighbors of a cell type:
+
+Example: you might categorize cells by how many tumor cells are in their neighborhood:
 
 ```{r countneighbors}
 # create a point process object:
@@ -134,6 +136,10 @@ head(neighbormarks)
 annot$ntumorneighbors <- neighbormarks[, "tumor"]
 ```
 
+#### Neighborhood expression of a gene
+
+Example: immune cells respond to cytokine signaling, so you might want to see 
+how much of a given cytokine each cell is exposed to. 
 
 ```{r neighborhoodexpression}
 # get cells' nearest 50 spatial neighbors:
