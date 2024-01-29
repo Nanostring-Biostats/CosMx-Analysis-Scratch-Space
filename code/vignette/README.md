@@ -54,8 +54,9 @@ Our workflow performs the below steps:
 
 First, the fundamentals:
 
-- [QC and normalization]()
+- [Parse and format data export by AtoMx]()
 - [Custom tiling of tissues and FOVs in space]()
+- [QC and normalization]()
 - [Use transcript locations to assess/refine cell segmentation]()
 - [Dimension reduction (PCA and UMAP)]()
 - [Cell typing]()
