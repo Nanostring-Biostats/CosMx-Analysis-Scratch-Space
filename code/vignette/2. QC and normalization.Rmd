@@ -89,3 +89,44 @@ for (fov in unique(annot$FOV)) {
   text(median(xy[annot$FOV == fov, 1]), median(xy[annot$FOV == fov, 2]), fov)
 }
 ```
+
+
+We don't see any low-signal FOVs in this plot, but if we did, we could flag the cells in them as follows.
+Note that first you'd want to confirm that their signal was truly poor and not just slightly attenuated vs. their neighbors. It's OK for signal to vary; it just seems prudent to remove true outliers.
+
+```{r lowcountfovs}
+bad_fovs <- c("121", "259") 
+flag <- flag | is.element(annot$FOV, bad_fovs)
+```
+
+
+Next, we'll look for FOVs with distorted expression profiles. 
+Below we color cells by their neighborhood expression values, allowing for distorted FOVs to stand out.
+
+```{r distortedfovs}
+# operate on a subsample to save time:
+nsub <- length(unique(annot$fov)) * 200
+sub <- sample(1:nrow(annot), nsub)
+
+# get the mean expression profile around each cell:
+neighbormeanexpression <- neighbor_colMeans(x = counts[sub, ], neighbors = neighbors) 
+
+# project to 3 umap dimensions:
+temppc <- prcomp(neighbormeanexpression)$x[, 1:20]
+tempum <- uwot::umap(temppc, n_components = 3)
+# rescale on 0.05 - 0.95:
+tempum <- apply(tempum, 2, function(x) {
+  pmax(pmin((x - quantile(x, 0.05) / (quantile(x, 0.95) - quantile(x, 0.05))), .95), 0.05)
+})
+
+# color by 3 umap dimensions:
+plot(xy, pch = 16, cex = 0.2, 
+     asp = 1, # important: keep the true aspect ratio
+     col = rgb(tempum[, 1], tempum[, 2], tempum[, 3], 1))
+# label FOVs:
+for (fov in unique(annot$FOV)) {
+  text(median(xy[annot$FOV == fov, 1]), median(xy[annot$FOV == fov, 2]), fov)
+}
+```
+
+

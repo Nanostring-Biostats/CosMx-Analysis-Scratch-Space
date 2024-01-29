@@ -58,3 +58,15 @@ neighbor_mean <- function(x, neighbors) {
 }
 
 
+#' for each cell, get the colMeans of x over its neighbors:
+#' @param x A matrix
+#' @param neighbors A (probably sparse) adjacency matrix
+neighbor_colMeans <- function(x, neighbors) {
+  neighbors@x <- rep(1, length(neighbors@x))
+  #neighbors <- Matrix::Diagonal(x=1/Matrix::rowSums(neighbors),names=rownames(neighbors)) %*% neighbors
+  neighbors <- Matrix::Diagonal(x=1/Matrix::rowSums(neighbors)) %*% neighbors
+  neighbors@x[neighbors@x==0] <- 1
+  out <- neighbors %*% x
+  return(out)
+}
+
