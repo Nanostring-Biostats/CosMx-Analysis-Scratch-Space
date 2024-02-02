@@ -40,7 +40,7 @@ Note:
 - Batch correction
 - [The spatial algorithms zoo: recommended algorithms and efficient code](blog/spatial%20algorithms%20zoo.md)
 - [ ] A generally satisfying set of UMAP parameters for CosMx data
-- [ ] The impact of segmentation error on differential expression analyses
+- [The impact of segmentation error on differential expression analyses](blog/segmentation%20errors%20and%20DE.md)
 - [ ] Quick & comprehensive searches for interesting trends with "Everything vs. everything DE"
 - [ ] Smoothing single cell gene expression for enhanced plotting
 - [ ] Approaches to ligand-receptor analysis
