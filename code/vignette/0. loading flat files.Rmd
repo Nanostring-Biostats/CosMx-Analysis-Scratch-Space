@@ -29,25 +29,98 @@ When a matrix has mainly zeroes, which is generally the case for single cell dat
 storing it in sparse matrix format has huge memory savings. Given the size of CosMx
 data, it is vital to be memory-efficient. 
 
+Note: we'll store our count matrices with cells in rows and genes in columns. 
+Many protocols arrange their count matrix the other way around, 
+but our approach here will be more performant for most operations. 
+
 ```{r libraries}
 library(data.table) # for more memory efficient data frames
 library(fread)  # for efficient reading of very large flat files
 library(Matrix) # for sparse matrices like our counts matrix
 ```
 
+First let's see the files we have to work with:
+
+```{r files}
+# location of flat files:
+flatfiledir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/flat files"
+dir(flatfiledir)
+```
+So there are two slides, each with 4 files: an expression matrix, cell metadata, cell polygons, and a map of fov positions
+
 Now we'll load in the flat files and format as we want:
 
 ```{r loading}
-# load raw counts, save as sparse matrix:
+### automatically get slide names:
+filenames <- dir(flatfiledir)
+metadatafilenames <- filenames[grepl("metadata", filenames)]
+slidenames <- gsub("_metadata_file.csv.gz", "", metadatafilenames)
+slidenames
 
-# load metadata, save as data frame:
+#### load in metadata from each slide:
+metadatalist <- sapply(slidenames, function(slidename) {
+  tempdatatable <- data.table::fread(paste0(flatfiledir, "/", slidename, "_metadata_file.csv.gz"))
+  tempdatatable$slidename <- slidename
+  return(list(tempdatatable))
+})
 
-## metadata finessing: unique FOV IDs, create tissue ID:
+#### get column names shared by all metadata files:
+sharedcolumns <- colnames(metadatalist[[1]])
+if (length(metadatalist) > 1) {
+  for (i in 2:length(metadatalist)) {
+    sharedcolumns <- intersect(sharedcolumns, colnames(metadatalist[[i]]))
+  }
+}
+# reduce to only shared columns:
+for (i in 1:length(metadatalist)) {
+  metadatalist[[i]] <- metadatalist[[i]][, ..sharedcolumns]
+}
+
+### load in counts matrix from each slide:
+countlist <- sapply(slidenames, function(slidename) {
+  # load in counts as a data table:
+  countsdatatable <- data.table::fread(paste0(flatfiledir, "/", slidename, "_exprMat_file.csv.gz"))
+  return(list(countsdatatable))
+ 
+})
+
+#### get shared genes:
+sharedgenes <- colnames(countlist[[1]])
+if (length(countlist) > 1) {
+  for (i in 2:length(countlist)) {
+    sharedgenes <- intersect(sharedgenes, colnames(countlist[[i]]))
+  }
+}
+sharedgenes <- setdiff(sharedgenes, c("fov", "cell_ID"))
+
+#### align counts matrices to match metadata cell IDs, and convert to sparse matrices:
+for (i in 1:length(countlist)) {
+  # align:
+  metadata_cell_fov <- paste0(metadatalist[[i]]$fov, metadatalist[[i]]$cell_ID)
+  counts_cell_fov <- paste0(countlist[[i]]$fov, countlist[[i]]$cell_ID)
+  countlist[[i]] <- countlist[[i]][match(metadata_cell_fov, counts_cell_fov), ]
+  # trim redundant columns:
+  countlist[[i]] <- countlist[[i]][, ..sharedgenes]
+  # convert to sparse matrix:
+  triplets <- data.table::as.data.table(which(countlist[[i]] != 0, arr.ind = TRUE))
+  triplets$value <- countlist[[i]][triplets$row, triplets$col]
+  countlist[[i]] <- Matrix::sparseMatrix(i = triplets$row, j = triplets$col, x = triplets$value)
+}
+
+### condense metadata to a single data table:
+metadata <- c()
+counts <- c()
+
+for (i in 1:length(countlist)) {
+  counts <- rbind(counts, countlist[[i]])
+  metadata <- rbind(metadata, metadatalist[[i]])
+}
 
 
-# load transcript locations, save as data table:
+### metadata finessing: unique FOV IDs, create tissue ID:
 
-# load ???
+
+
 
 ```
 
