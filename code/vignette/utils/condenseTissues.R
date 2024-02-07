@@ -28,7 +28,7 @@ condenseTissues <- function(xy, tissue, tissueorder = NULL, buffer = 0.2, widthh
   
   # choose number of tissues for first shelf:
   tissuesperrow <- round(sqrt(nrow(tissdf)) * widthheightratio * mean(tissdf$height) / mean(tissdf$width))
-  targetwidth <- sum(tissdf$width[1:tissuesperrow]) + buffer * (tissuesperrow - 1)
+  targetwidth <- sum(tissdf$width[1:tissuesperrow], na.rm = TRUE) + buffer * (tissuesperrow - 1)
   
   # place tissues:
   tissdf$x <- NA
@@ -55,7 +55,6 @@ condenseTissues <- function(xy, tissue, tissueorder = NULL, buffer = 0.2, widthh
         tempshelfwidth <- 0
       }
     }
-    print(tissdf)
   }
   # now update xy:
   for (tiss in unique(tissue)) {

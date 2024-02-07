@@ -42,7 +42,9 @@ Then break out cells' xy positions in a distinct data object:
 xy <- as.matrix(metadata[, c("CenterX_global_px", "CenterY_global_px")])
 rownames(xy) <- metadata$cell_id
 # rescale to mm:
-#xy <- xy * ____
+thisinstrument_nanometers_per_pixel = 120.280945   # this is the value for most instruments. Your RunSummary file will give the value for your instrument. 
+xy <- xy * thisinstrument_nanometers_per_pixel / 1000000
+colnames(xy) <- paste0(c("x", "y"), "_mm")
 ```
 
 Now we make sure that no tissue overlaps another. 
@@ -73,6 +75,7 @@ for (slidename in unique(metadata$slidename)) {
   text(median(xy[metadata$slidename == slidename, 1]), max(xy[metadata$slidename == slidename, 2]), slidename)
 }
 ```
+
 ### Custom labeling of tissues
 
 In this dataset we have 2 tissues on each slide. AtoMx didn't know this, so we'll have to enter that information ourselves. 
@@ -80,7 +83,16 @@ Using code to record/define this information is simple enough and, more importan
 Here's example code for assigning cells the right tissue ID:
 
 ```{r definetissue}
-
+# manually assign tissue IDs:
+metadata$tissue <- NA
+metadata$tissue[(metadata$slidename == "SMI0016c_SP2219") & (xy[, 2] > 7)] <- "sample1"
+metadata$tissue[(metadata$slidename == "SMI0016c_SP2219") & (xy[, 2] < 7)] <- "sample2"
+metadata$tissue[(metadata$slidename == "SMI0016c_SP212319") & (xy[, 2] > 8)] <- "sample3"
+metadata$tissue[(metadata$slidename == "SMI0016c_SP212319") & (xy[, 2] < 8)] <- "sample4"
+# check for hiccups:
+if (any(is.na(metadata$tissue))) {
+  stop("some cells didn't get a tissue ID")
+}
 ```
 
 Now let's see how our spatial plots look:
@@ -95,7 +107,7 @@ cols <- c("#616161","#4285f4","#db4437","#f4b400","#0f9d58","#ab47bc",
 # plot:
 plot(xy[sub, ], pch = 16, cex = 0.2, 
      asp = 1, # important: keep the true aspect ratio
-     col = cols[as.numeric(as.factor(metadata$tissue)) %% length(cols) + 1])
+     col = cols[as.numeric(as.factor(metadata$tissue[sub])) %% length(cols) + 1])
 # label tissues:
 for (tiss in unique(metadata$tissue)) {
   text(median(xy[metadata$tissue == tiss, 1]), max(xy[metadata$tissue == tiss, 2]), tiss)
@@ -108,10 +120,10 @@ using tissue ID instead of slide ID as we did previously:
 ```{r condense2}
 # condense tissues:
 xy <- condenseTissues(xy = xy, 
-                      tissue = metadata$slidename, 
+                      tissue = metadata$tissue, 
                       tissueorder = NULL,  # optional, specify the order tissues are tiled in
-                      buffer = 0.5, # space between tissues
-                      widthheightratio = 4/3) # desired shape of final xy locations 
+                      buffer = 1, # space between tissues
+                      widthheightratio = 2) # desired shape of final xy locations 
 # now how do they look?
 # to avoid unnecessarily plotting all the cells, just show a subset:
 sub <- sample(1:nrow(xy), round(nrow(xy) / 20), replace = FALSE)
@@ -122,16 +134,26 @@ cols <- c("#616161","#4285f4","#db4437","#f4b400","#0f9d58","#ab47bc",
 # plot:
 plot(xy[sub, ], pch = 16, cex = 0.2, 
      asp = 1, # important: keep the true aspect ratio
-     col = cols[as.numeric(as.factor(metadata$tissue)) %% length(cols) + 1])
+     col = cols[as.numeric(as.factor(metadata$tissue[sub])) %% length(cols) + 1])
 # label tissues:
 for (tiss in unique(metadata$tissue)) {
   text(median(xy[metadata$tissue == tiss, 1]), max(xy[metadata$tissue == tiss, 2]), tiss)
 }
 ```
 
-Much better. 
+Much better. And if we aren't worried about preserving long-range distances, which is usually the case,
+we can consolidate sample 2 a little better:
 
-Now we save our new coordinate system and move on to the next module.
+```{r consolidate}
+isfarout <- xy[, 1] > 19
+xy[isfarout, 1] <- xy[isfarout, 1] - 6
+sub <- sample(1:nrow(xy), round(nrow(xy) / 20), replace = FALSE)
+plot(xy[sub, ], pch = 16, cex = 0.2, 
+     asp = 1, # important: keep the true aspect ratio
+     col = cols[as.numeric(as.factor(metadata$tissue[sub])) %% length(cols) + 1])
+```
+
+Finally, we save our new coordinate system and move on to the next module.
 
 ```{r savexy}
 saveRDS(xy, file = paste0(mydir, "/processed_data/xy.RDS"))
