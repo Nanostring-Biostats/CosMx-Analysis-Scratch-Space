@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 ```
 
 
-First, we'll load the packages we need. 
+First we'll load the packages we need. 
 Importantly, we'll load "Matrix", which handles *sparse matrices*. 
 When a matrix has mainly zeroes, which is generally the case for single cell data,
 storing it in sparse matrix format has huge memory savings. Given the size of CosMx
@@ -34,17 +34,19 @@ Many protocols arrange their count matrix the other way around,
 but our approach here will be more performant for most operations. 
 
 ```{r libraries}
+# necessary libraries
 library(data.table) # for more memory efficient data frames
-library(fread)  # for efficient reading of very large flat files
 library(Matrix) # for sparse matrices like our counts matrix
 ```
 
-First let's see the files we have to work with:
+Now let's see the files we have to work with:
 
 ```{r files}
 # location of flat files:
-flatfiledir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/flat files"
+flatfiledir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/flat files/"
 dir(flatfiledir)
+# where to write output:
+outdir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
 ```
 So there are two slides, each with 4 files: an expression matrix, cell metadata, cell polygons, and a map of fov positions
 
@@ -64,7 +66,8 @@ metadatalist <- sapply(slidenames, function(slidename) {
   return(list(tempdatatable))
 })
 
-#### get column names shared by all metadata files:
+### harmonize metadata column names:
+# get column names shared by all metadata files:
 sharedcolumns <- colnames(metadatalist[[1]])
 if (length(metadatalist) > 1) {
   for (i in 2:length(metadatalist)) {
@@ -84,7 +87,7 @@ countlist <- sapply(slidenames, function(slidename) {
  
 })
 
-#### get shared genes:
+### get shared genes:
 sharedgenes <- colnames(countlist[[1]])
 if (length(countlist) > 1) {
   for (i in 2:length(countlist)) {
@@ -115,12 +118,15 @@ for (i in 1:length(countlist)) {
   counts <- rbind(counts, countlist[[i]])
   metadata <- rbind(metadata, metadatalist[[i]])
 }
+# add cell IDs to counts:
+if(any(duplicated(metadata$cell_id))) {
+  stop("Found duplicated cell IDs, probably from different slides. Make sure they're all unique.")
+}
+rownames(counts) <- metadata$cell_id
 
-
-### metadata finessing: unique FOV IDs, create tissue ID:
-
-
-
+# add to metadata: replace slide-specific FOV ID with a unique FOV ID:
+metadata$FOV <- paste0(metadata$slidename, "_", metadata$fov)
+metadata$fov <- NULL
 
 ```
 
@@ -135,7 +141,8 @@ benefit from more compression than flat files do), and they're faster to read
 back into R.
 
 ```{r saving}
-
+saveRDS(counts, file = paste0(outdir, "/processed_data/counts.RDS"))
+saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
 ```
 
 Now we have data in 3 locations:
