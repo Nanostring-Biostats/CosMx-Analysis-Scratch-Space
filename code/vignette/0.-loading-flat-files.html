@@ -361,7 +361,7 @@ p.caption {
 font-size: 1.5em;
 }
 </style>
-<p>First, we’ll load the packages we need. Importantly, we’ll load
+<p>First we’ll load the packages we need. Importantly, we’ll load
 “Matrix”, which handles <em>sparse matrices</em>. When a matrix has
 mainly zeroes, which is generally the case for single cell data, storing
 it in sparse matrix format has huge memory savings. Given the size of
@@ -373,7 +373,7 @@ but our approach here will be more performant for most operations.</p>
 library(data.table) # for more memory efficient data frames
 library(Matrix) # for sparse matrices like our counts matrix
 #&gt; Warning: package &#39;Matrix&#39; was built under R version 4.2.3</code></pre>
-<p>First let’s see the files we have to work with:</p>
+<p>Now let’s see the files we have to work with:</p>
 <pre class="r"><code># location of flat files:
 flatfiledir &lt;- &quot;//nanostring.local/RND/analysis-files/pdanaher/vignette/flat files/&quot;
 dir(flatfiledir)
@@ -456,16 +456,33 @@ for (i in 1:length(countlist)) {
   counts &lt;- rbind(counts, countlist[[i]])
   metadata &lt;- rbind(metadata, metadatalist[[i]])
 }
+# add cell IDs to counts:
+if(any(duplicated(metadata$cell_id))) {
+  stop(&quot;Found duplicated cell IDs, probably from different slides. Make sure they&#39;re all unique.&quot;)
+}
+rownames(counts) &lt;- metadata$cell_id
+colnames(counts) &lt;- sharedgenes
 
 # add to metadata: replace slide-specific FOV ID with a unique FOV ID:
 metadata$FOV &lt;- paste0(metadata$slidename, &quot;_&quot;, metadata$fov)
 metadata$fov &lt;- NULL</code></pre>
+<p>Our counts data includes all readouts, including controls. We’ll
+split those out. They can be useful for deep QC explorations, but for
+most purposes we won’t need the full negative control count
+matrices.</p>
+<pre class="r"><code># isolate negative control matrices:
+negcounts &lt;- counts[, grepl(&quot;Negative&quot;, colnames(counts))]
+falsecounts &lt;- counts[, grepl(&quot;SystemControl&quot;, colnames(counts))]
+# reduce counts matrix to only genes:
+counts &lt;- counts[, !grepl(&quot;Negative&quot;, colnames(counts)) &amp; !grepl(&quot;SystemControl&quot;, colnames(counts))]</code></pre>
 <p>Now our data looks like this:</p>
 <p><INSERT CARTOON></p>
 <p>Next we save the data as .RDS files. These files are smaller on disk
 (they benefit from more compression than flat files do), and they’re
 faster to read back into R.</p>
 <pre class="r"><code>saveRDS(counts, file = paste0(outdir, &quot;/processed_data/counts.RDS&quot;))
+saveRDS(negcounts, file = paste0(outdir, &quot;/processed_data/negcounts.RDS&quot;))
+saveRDS(falsecounts, file = paste0(outdir, &quot;/processed_data/falsecounts.RDS&quot;))
 saveRDS(metadata, file = paste0(outdir, &quot;/processed_data/metadata.RDS&quot;))</code></pre>
 <p>Now we have data in 3 locations:</p>
 <ul>

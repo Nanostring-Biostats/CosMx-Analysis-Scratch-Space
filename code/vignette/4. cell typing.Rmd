@@ -1,0 +1,75 @@
+---
+title: "Cell typing"
+output: 
+rmarkdown::html_vignette: 
+toc: true
+fig_width: 7 
+fig_height: 8 
+vignette: >
+  %\VignetteIndexEntry{Cell typing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+<style>
+p.caption {
+  font-size: 1.5em;
+}
+</style>
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+## Introduction
+
+Cell typing is a crucial stage of analysis requiring careful attention. 
+Automated cell typing algorithms can work as desired out of the box, but often enough they do not. 
+So if you care about the integrity of your analyses, you'll spend time reviewing, and possibly refining, your cell typing results.
+
+Here we'll demonstrate a basic cell typing workflow using the Insitutype algorithm. 
+We'll show the core QC plots and walk through examples of how you can refine your cell typing results. 
+
+For more details on cell typing, see these resources:
+
+- [Short review of cell typing algorithms](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/blog/cell%20typing%20basics.md)
+- [Insitutype FAQs](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md)
+- [Insitutype preprint](https://www.biorxiv.org/content/10.1101/2022.10.19.512902v1)
+
+
+## Cell typing preparation
+
+Our example dataset is from human kidneys. Fortunately for us, previous investigators 
+have already run single cell experiments in kidneys and done the hard work of defining which
+cell types are present. 
+We could repeat their work and cluster our data de novo, but the easiest approach is to
+classify our cells based on this previous work. 
+The Insitutype algorithm compares cell's expression profiles to "reference profiles"
+derived from earlier datasets. We can easily derive these from our favorite single cell dataset,
+or even easier, pull one from resources NanoString has compiled:
+
+- [Cell profiles derived from scRNA-seq](https://github.com/Nanostring-Biostats/cellprofilelibrary)
+- [Cell profiles derived from CosMx](https://github.com/Nanostring-Biostats/CosMx-Cell-Profiles)
+
+The CosMx-derived profiles should be preferred when available, as they escape the 
+strong platform effects found between CosMx and scRNA-seq. 
+For now, the library of scRNA-seq profiles covers more tissue types.
+
+We'll download a reference profile from a previous CosMx experiment:
+
+```{r getreference}
+refprofiles <- read.csv("https://github.com/Nanostring-Biostats/CosMx-Cell-Profiles/Human/Kidney/Kidney.profiles.csv", row.names = 1, header = TRUE)
+pheatmap::pheatmap(sweep(refprofiles, 1, apply(refprofiles, 1, max), "/"), 
+                   col = colorRampPalette(c("white", "darkblue"))(100))
+```
+
+Next we'll use Insitutype to assign our cells to these previously-published cell types:
+
+```{r runinsitutype}
+res <- insitutype()
+```
+
+
+

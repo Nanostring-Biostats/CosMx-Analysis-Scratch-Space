@@ -123,11 +123,23 @@ if(any(duplicated(metadata$cell_id))) {
   stop("Found duplicated cell IDs, probably from different slides. Make sure they're all unique.")
 }
 rownames(counts) <- metadata$cell_id
+colnames(counts) <- sharedgenes
 
 # add to metadata: replace slide-specific FOV ID with a unique FOV ID:
 metadata$FOV <- paste0(metadata$slidename, "_", metadata$fov)
 metadata$fov <- NULL
 
+```
+
+Our counts data includes all readouts, including controls. 
+We'll split those out. They can be useful for deep QC explorations, but for most purposes we won't need the full negative control count matrices.
+
+```{r removeconttols}
+# isolate negative control matrices:
+negcounts <- counts[, grepl("Negative", colnames(counts))]
+falsecounts <- counts[, grepl("SystemControl", colnames(counts))]
+# reduce counts matrix to only genes:
+counts <- counts[, !grepl("Negative", colnames(counts)) & !grepl("SystemControl", colnames(counts))]
 ```
 
 
@@ -142,6 +154,8 @@ back into R.
 
 ```{r saving}
 saveRDS(counts, file = paste0(outdir, "/processed_data/counts.RDS"))
+saveRDS(negcounts, file = paste0(outdir, "/processed_data/negcounts.RDS"))
+saveRDS(falsecounts, file = paste0(outdir, "/processed_data/falsecounts.RDS"))
 saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
 ```
 
