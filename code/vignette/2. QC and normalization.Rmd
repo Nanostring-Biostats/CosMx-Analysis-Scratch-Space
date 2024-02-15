@@ -143,9 +143,9 @@ plot(xy[sub, ], pch = 16, cex = 0.2,
      col = rgb(tempum[, 1], tempum[, 2], tempum[, 3], 1),
      main = "Cellular neighborhoods colored by their UMAP projection")
 # label FOVs:
-for (fov in unique(metadata$FOV)) {
-  text(median(xy[metadata$FOV == fov, 1]), median(xy[metadata$FOV == fov, 2]), fov)
-}
+#for (fov in unique(metadata$FOV)) {
+#  text(median(xy[metadata$FOV == fov, 1]), median(xy[metadata$FOV == fov, 2]), fov)
+#}
 ```
 
 
@@ -188,7 +188,9 @@ saveRDS(xy, paste0(mydir, "/processed_data/xy.RDS"))
 
 ## Normalization
 
-Normalization is straightforward: we simply scale all cells to have the same total counts.
+Normalization is straightforward: we simply divide every cell's expression profile by its total counts.
+To put our counts back on a more natural scale, we then multiply all cells by the mean
+cell's total counts:
 
 ```{r normalize}
 norm <- sweep(counts, 1, metadata$totalcounts, "/") * mean(metadata$totalcounts)
