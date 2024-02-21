@@ -28,12 +28,12 @@
 #' @param xy 2-column matrix of cells' xy positions. 
 #' @param tissue Vector giving cells' tissue IDs. Used to separate tissue with overlapping xy coordinates.
 #' @param nb_size The size parameter to assume for the NB distribution.
-#' @param assay.type A string specifying which assay values to use.
+#' @param assay_type A string specifying which assay values to use.
 #' @importFrom InSituType Estep insitutype fastCohorting
 #' @importFrom irlba irlba
 spatialUpdate <- function(celltype, counts, neg, 
                           cohort = NULL, altdata = NULL, xy = NULL, tissue = NULL,
-                          nb_size = 10, assay.type = "rna") {
+                          nb_size = 10, assay_type = "rna") {
   ## check alternative data args:
   if ((is.null(cohort) * is.null(altdata)) & is.null(xy)) {
     stop("Must supply cohort, altdata or xy")
@@ -41,7 +41,7 @@ spatialUpdate <- function(celltype, counts, neg,
 
   ## process alternative data, obtaining cohort vector:
   if (is.null(cohort)) {
-    if (!is.null(altdata)) {
+    if (is.null(altdata)) {
       # make altdata from cells' neighborhoods:
       if (is.null(tissue)) {
         tissue = 1
@@ -61,7 +61,7 @@ spatialUpdate <- function(celltype, counts, neg,
   ## derive reference profiles from initial cell type vector:
   profiles <- InSituType:::Estep(counts = counts, 
                                  clust = celltype, 
-                                 neg = neg)
+                                 neg = neg, assay_type = assay_type)
  
   ## Run supervised cell typing with InSituType
   res <- InSituType::insitutype(x = counts, 
