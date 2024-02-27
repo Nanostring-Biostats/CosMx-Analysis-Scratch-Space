@@ -96,9 +96,10 @@ First we choose cell type colors. Doing this by hand is usually desirable later 
 our cell typing results, we can just use an automated approach.
 
 ```{r choosecolors}
-cols <- InSituType::colorCellTypes(freqs = table(res$clust))
+cols <- InSituType::colorCellTypes(freqs = table(res$clust), palette = "brewers")
 cols
 ```
+
 ## QC of cell typing results
 
 Now we enter the crucial QC phase. Below we'll print out a variety of QC plots and discuss their interpretation. 
@@ -109,15 +110,21 @@ They show the tendency of different cell types to be confused with each other.
 ```{r qcplots, fig.dim=c(8,8)}
 # flightpath
 flightpath <- flightpath_layout(logliks = res$logliks, profiles = res$profiles)
+par(mar = c(0,0,0,0))
 plot(flightpath$cellpos, pch = 16, cex = 0.1, col = cols[res$clust])
 text(flightpath$clustpos[, 1], flightpath$clustpos[, 2], rownames(flightpath$clustpos), cex = 0.7)
 
 # umap
-plot(um, pch = 16, cex = 0.1, col = cols[res$clust])
-for (cell in unique(res$clust)) {
-  text(median(um[res$clust == cell, 1]), median(um[res$clust == cell, 2]), cell, cex = 0.7)  
-}
+#plot(um, pch = 16, cex = 0.1, col = cols[res$clust])
+#for (cell in unique(res$clust)) {
+#  text(median(um[res$clust == cell, 1]), median(um[res$clust == cell, 2]), cell, cex = 0.7)  
+#}
+
+#plot(xy, pch = 16, cex = 0.1, col = cols[res$clust])
+
+
 ```
+
 Higher rates of confusion are seen between closely-related cell types, e.g. Distinct proximal tubule types A and B. 
 But for the most part this is a good result, with no indication that any clusters are irredeemably confused. 
 
@@ -127,18 +134,24 @@ which every gene name is visible.
 
 ```{r heatmap}
 # profiles heatmap
-pheatmap::pheatmap(sweep(refprofiles, 1, pmax(apply(refprofiles, 1, max), 0.2), "/"),  # the 0.2 prevents genes with very low signal in all cell types from appearing exciting
-                   col = colorRampPalette(c("white", "darkblue"))(100))
+#pdf(paste0(mydir, "/results/celltypeprofiles.pdf"), height = 20)
+pheatmap::pheatmap(sweep(res$profiles, 1, pmax(apply(res$profiles, 1, max), 0.2), "/")[apply(res$profiles, 1, max) > 0.2],  
+                   fontsize_row = 4,
+                   col = colorRampPalette(c("white", "darkblue"))(100))  
+#dev.off()
+# (the use of pmax(..., 0.2) prevents genes with very low signal in all cell types from appearing exciting)
 ```
 
 And finally, we'll want to see every cell type's spatial spread. Code like the below is good for this:
 
 ```{r spatialplots, eval = FALSE}
 for (cell in unique(res$clust)) {
-  png(paste0(mydir, "/results/celltypev1_", cell, ".png"), width = 10, height = 10, units = "in", res = 400)  # res of 400 is pretty good, though generally not publishable
+  png(paste0(mydir, "/results/celltypev1_", cell, ".png"), 
+      width = diff(range(xy[,1]))*.7, height = diff(range(xy[,2]))*.7, units = "in", 
+      res = 400)  # res of 400 is pretty good, though generally not publishable
   par(mar = c(0,0,0,0))
   plot(xy, pch = 16, col = "grey80", cex = 0.1,
-       xlab = "", ylab = "", xaxt = "", yaxt = "n")
+       xlab = "", ylab = "", xaxt = "n", yaxt = "n")
   points(xy[res$clest == cell, ], pch = 16, cex = 0.2, col = cols[cell])
   legend("top", legend = cell)
   dev.off()
@@ -146,3 +159,4 @@ for (cell in unique(res$clust)) {
 ```
 
 ## Refining cell type results
+

@@ -84,7 +84,6 @@ countlist <- sapply(slidenames, function(slidename) {
   # load in counts as a data table:
   countsdatatable <- data.table::fread(paste0(flatfiledir, "/", slidename, "_exprMat_file.csv.gz"))
   return(list(countsdatatable))
- 
 })
 
 ### get shared genes:
@@ -99,8 +98,8 @@ sharedgenes <- setdiff(sharedgenes, c("fov", "cell_ID"))
 #### align counts matrices to match metadata cell IDs, and convert to sparse matrices:
 for (i in 1:length(countlist)) {
   # align:
-  metadata_cell_fov <- paste0(metadatalist[[i]]$fov, metadatalist[[i]]$cell_ID)
-  counts_cell_fov <- paste0(countlist[[i]]$fov, countlist[[i]]$cell_ID)
+  metadata_cell_fov <- paste0(metadatalist[[i]]$fov, "_", metadatalist[[i]]$cell_ID)
+  counts_cell_fov <- paste0(countlist[[i]]$fov, "_", countlist[[i]]$cell_ID)
   countlist[[i]] <- countlist[[i]][match(metadata_cell_fov, counts_cell_fov), ]
   # trim redundant columns:
   countlist[[i]] <- countlist[[i]][, ..sharedgenes]
@@ -126,7 +125,7 @@ rownames(counts) <- metadata$cell_id
 colnames(counts) <- sharedgenes
 
 # add to metadata: replace slide-specific FOV ID with a unique FOV ID:
-metadata$FOV <- paste0(metadata$slidename, "_", metadata$fov)
+metadata$FOV <- paste0(metadata$slidename, "_FOV", metadata$fov)
 metadata$fov <- NULL
 
 ```
