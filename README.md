@@ -46,7 +46,7 @@ Note:
 - [ ] Approaches to ligand-receptor analysis
 - [ ] Best practices for huge datasets
 - [ ] Protein analysis basics
-- [ ] Why to distrust DE results with highly significant p-values by small effect sizes
+- [ ] Why to distrust DE results with highly significant p-values but small effect sizes
 
 ### Visualization
 - [ ] Making high-resolution plots without excessive file sizes
