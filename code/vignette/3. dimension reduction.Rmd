@@ -30,26 +30,25 @@ and we'll try UMAP under a few parameterizations to see what works best.
 
 ```{r prepforumap}
 # load data:
-norm <- readRDS("processed_data/norm.RDS")
+mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
+norm <- readRDS(paste0(mydir, "/processed_data/norm.RDS"))
 
 # run PCA:
-pca_result <- irlba::irlba(norm, nv = 25)
-# Get the top principal components (scores)
-pc <- pca_result$u %*% diag(pca_result$d)
+pc <- irlba::prcomp_irlba(norm, n = 25)$x
 
 # run UMAP:
-um <- uwot::umap(pc)
+um <- uwot::umap(pc, n_neighbors = 40, spread = 1, min_dist = 0.1, metric = "cosine")
 
 # plot it:
-par(mar= c(0,0,0,0))
+par(mar = c(0,0,0,0))
 plot(um, pch = 16, cex = 0.1, col = "dodgerblue4")
+rownames(um) <- rownames(norm)
 
 # save:
 saveRDS(um, paste0(mydir, "/processed_data/um.RDS"))
 ```
 
 
-## 
 
 
 

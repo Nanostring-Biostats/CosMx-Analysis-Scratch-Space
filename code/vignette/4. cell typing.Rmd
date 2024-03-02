@@ -66,6 +66,7 @@ mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
 metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS")) 
 counts <- readRDS(paste0(mydir, "/processed_data/counts.RDS")) 
 negcounts <- readRDS(paste0(mydir, "/processed_data/negcounts.RDS")) 
+um <- readRDS(paste0(mydir, "/processed_data/um.RDS"))
 xy <- readRDS(paste0(mydir, "/processed_data/xy.RDS"))
 
 
@@ -83,12 +84,18 @@ Next we'll use Insitutype to assign our cells to these previously-published cell
 
 ```{r runinsitutype}
 library(InSituType)
-res <- InSituType::insitutype(x = as.matrix(counts), 
+insitutypefileloc <- paste0(mydir, "/processed_data/insitutype_initial_results.RDS")
+if (!file.exists(insitutypefileloc)) {
+  res <- InSituType::insitutype(x = as.matrix(counts), 
                               neg = Matrix::rowMeans(negcounts), 
                               reference_profiles = refprofiles,
                               update_reference_profiles = FALSE,
                               n_clust = 0,  # don't fit any additional clusters
                               assay_type = "rna")
+  saveRDS(res, file = insitutypefileloc)
+} else {
+  res <- readRDS(insitutypefileloc)
+}
 ```
 
 
@@ -115,13 +122,24 @@ plot(flightpath$cellpos, pch = 16, cex = 0.1, col = cols[res$clust])
 text(flightpath$clustpos[, 1], flightpath$clustpos[, 2], rownames(flightpath$clustpos), cex = 0.7)
 
 # umap
-#plot(um, pch = 16, cex = 0.1, col = cols[res$clust])
-#for (cell in unique(res$clust)) {
-#  text(median(um[res$clust == cell, 1]), median(um[res$clust == cell, 2]), cell, cex = 0.7)  
-#}
+plot(um, pch = 16, cex = 0.1, col = cols[res$clust])
+for (cell in unique(res$clust)) {
+  text(median(um[res$clust == cell, 1]), median(um[res$clust == cell, 2]), cell, cex = 0.7)  
+}
 
-#plot(xy, pch = 16, cex = 0.1, col = cols[res$clust])
+# xy space:
+plot(xy, pch = 16, cex = 0.1, col = cols[res$clust],
+     xlim = c(9.5, 11.5), ylim = c(4, 6))   # zooming in for legibility. The full plot should be printed to a high-res .png.
 
+# print to a png to examine the full xy space:
+png(paste0(mydir, "/results/cell_type_map.png"), 
+      width = diff(range(xy[,1]))*.7, height = diff(range(xy[,2]))*.7, units = "in", 
+      res = 500)  # res of 400 is pretty good; 600 is publication-quality
+par(mar = c(0,0,0,0))
+plot(xy, pch = 16, col = cols[res$clust], cex = 0.1,
+     xlab = "", ylab = "", xaxt = "n", yaxt = "n", asp = 1)
+legend("topright", pch = 16, col = cols, legend = names(cols), cex = 0.5)
+dev.off()
 
 ```
 
@@ -142,13 +160,16 @@ pheatmap::pheatmap(sweep(res$profiles, 1, pmax(apply(res$profiles, 1, max), 0.2)
 # (the use of pmax(..., 0.2) prevents genes with very low signal in all cell types from appearing exciting)
 ```
 
-And finally, we'll want to see every cell type's spatial spread. Code like the below is good for this:
+And finally, we'll want to see every cell type's spatial spread. You generally need a pretty 
+big plot to actually resolve details, so you'll want to print the plot to a .png.
+(Don't use vector graphics like pdf or svg - they save the location of every cell and so turn into huge files.)
+Code like the below is good for this:
 
 ```{r spatialplots, eval = FALSE}
 for (cell in unique(res$clust)) {
   png(paste0(mydir, "/results/celltypev1_", cell, ".png"), 
       width = diff(range(xy[,1]))*.7, height = diff(range(xy[,2]))*.7, units = "in", 
-      res = 400)  # res of 400 is pretty good, though generally not publishable
+      res = 400)  # res of 400 is pretty good; 600 is publication-quality
   par(mar = c(0,0,0,0))
   plot(xy, pch = 16, col = "grey80", cex = 0.1,
        xlab = "", ylab = "", xaxt = "n", yaxt = "n")
@@ -160,3 +181,76 @@ for (cell in unique(res$clust)) {
 
 ## Refining cell type results
 
+Cell typing deserves careful attention: it's a complex process, and your entire analysis depends on its results. 
+Scrutinize the above QC plots for suspicious patterns. These could be:
+
+- Unlikely spatial distributions
+- Unlikely cell type abundances, e.g. a far too many immune cells, or not enough of a basic cell type (proximal tubules in our sample)
+- Implausible marker genes expressed at high levels
+- Biologically dissimilar cell types with similar expression profiles (near each other in UMAP space, confused with each other in the flightpath, showing similar profiles in the heatmap.)
+
+For a deep dive on this topic, see the [Insitutype FAQs](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md).
+
+Below is an example of how to refine cell typing results. 
+We use Insitutype's built-in function "refineClusters".
+Since nothing obviously suspicious emerges from casual examination of the above results, so we'll make arbitrary updates. 
+
+
+```{r refineclusters}
+res2 <- refineClusters(logliks = res$logliks, 
+                       counts = counts,
+                       neg = Matrix::rowMeans(negcounts), 
+                       merges = c("T.cell.CD4" = "T-cell",
+                                  "T.cell.CD8" = "T-cell"),       # merge CD4 and CD8 cells to a broader "T-cell" category
+                       to_delete = "",                            # delete this cluster and send its cells to their next-best fit
+                       subcluster = list("Proximal.tubule" = 3))  # subcluster proximal tubules into 3 new clusters
+str(res)   # same structure as the Insitutype output, but with new cell types
+```
+
+After running refineClusters, you'll want to re-run all the above QC plots.
+
+```{r qc2, eval=FALSE}
+# choose colors:
+cols2 <- InSituType::colorCellTypes(freqs = table(res2$clust), palette = "brewers")
+
+# heatmap of profiles:
+pheatmap::pheatmap(sweep(res2$profiles, 1, pmax(apply(res2$profiles, 1, max), 0.2), "/")[apply(res2$profiles, 1, max) > 0.2],  
+                   fontsize_row = 4,
+                   col = colorRampPalette(c("white", "darkblue"))(100))  
+
+# flightpath:
+flightpath2 <- flightpath_layout(logliks = res2$logliks, profiles = res2$profiles)
+par(mar = c(0,0,0,0))
+plot(flightpath2$cellpos, pch = 16, cex = 0.1, col = cols2[res2$clust])
+text(flightpath2$clustpos[, 1], flightpath2$clustpos[, 2], rownames(flightpath2$clustpos), cex = 0.7)
+
+# umap:
+plot(um, pch = 16, cex = 0.1, col = cols[res2$clust])
+for (cell in unique(res2$clust)) {
+  text(median(um[res2$clust == cell, 1]), median(um[res2$clust == cell, 2]), cell, cex = 0.7)  
+}
+
+# xy plots:
+for (cell in unique(res$clust)) {
+  png(paste0(mydir, "/results/celltypev1_", cell, ".png"), 
+      width = diff(range(xy[,1]))*.7, height = diff(range(xy[,2]))*.7, units = "in", 
+      res = 400)  # res of 400 is pretty good; 600 is publication-quality
+  par(mar = c(0,0,0,0))
+  plot(xy, pch = 16, col = "grey80", cex = 0.1,
+       xlab = "", ylab = "", xaxt = "n", yaxt = "n")
+  points(xy[res$clest == cell, ], pch = 16, cex = 0.2, col = cols[cell])
+  legend("top", legend = cell)
+  dev.off()
+}
+
+```
+
+Finally we'll save our results:
+
+```{r save}
+# save the whole insitutype result:
+saveRDS(res2, file = paste0(mydir, "/processed_data/insitutype_results.RDS"))
+
+# save the vector of cluster assignments:
+saveRDS(res2$clust, file = paste0(mydir, "/processed_data/clust.RDS"))
+```

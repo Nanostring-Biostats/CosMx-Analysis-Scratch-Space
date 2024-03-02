@@ -46,11 +46,11 @@ We start by loading the data we'll need:
 
 ```{r loaddata}
 mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
-metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS")) 
-counts <- readRDS(paste0(mydir, "/processed_data/counts.RDS")) 
-negcounts <- readRDS(paste0(mydir, "/processed_data/negcounts.RDS")) 
-falsecounts <- readRDS(paste0(mydir, "/processed_data/falsecounts.RDS")) 
-xy <- readRDS(paste0(mydir, "/processed_data/xy.RDS"))
+metadata <- readRDS(paste0(mydir, "/processed_data/metadata_unfiltered.RDS")) 
+counts <- readRDS(paste0(mydir, "/processed_data/counts_unfiltered.RDS")) 
+negcounts <- readRDS(paste0(mydir, "/processed_data/negcounts_unfiltered.RDS")) 
+falsecounts <- readRDS(paste0(mydir, "/processed_data/falsecounts_unfiltered.RDS")) 
+xy <- readRDS(paste0(mydir, "/processed_data/xy_unfiltered.RDS"))
 ```
 
 ### Cell-level QC
@@ -118,24 +118,30 @@ Next, we'll look for FOVs with distorted expression profiles.
 Below we color cells by their neighborhood expression values, allowing for distorted FOVs to stand out.
 
 ```{r distortedfovs, fig.dim = c(7, 7)}
+tempumapfileloc <- paste0(mydir, "/processed_data/neighborumap.RDS")
+if (!file.exists(tempumapfileloc)) {
+  # operate on a subsample to save time:
+  set.seed(0)
+  nsub <- length(unique(metadata$FOV)) * 100
+  sub <- sample(1:nrow(metadata), nsub)
 
-# operate on a subsample to save time:
-set.seed(0)
-nsub <- length(unique(metadata$FOV)) * 100
-sub <- sample(1:nrow(metadata), nsub)
+  # get the mean expression profile around each cell:
+  neighbormeanexpression <- neighbor_colMeans(x = counts, neighbors = neighbors[sub, ]) 
+  # normalize it:
+  neighbormeanexpression <- sweep(neighbormeanexpression, 1, Matrix::rowSums(neighbormeanexpression), "/")
 
-# get the mean expression profile around each cell:
-neighbormeanexpression <- neighbor_colMeans(x = counts, neighbors = neighbors[sub, ]) 
-# normalize it:
-neighbormeanexpression <- sweep(neighbormeanexpression, 1, Matrix::rowSums(neighbormeanexpression), "/")
+  # project to 3 umap dimensions:
+  temppc <- prcomp(neighbormeanexpression)$x[, 1:20]
+  tempum <- uwot::umap(temppc, n_components = 3) # Note: a common error in uwot::umap is resolved with: install.packages("Matrix", type = "source"); install.packages("irlba",   type = "source")
+  # rescale on 0.05 - 0.95:
+  tempum <- apply(tempum, 2, function(x) {
+    pmax(pmin((x - quantile(x, 0.05)) / (quantile(x, 0.95) - quantile(x, 0.05)), .95), 0.05)
+  })
+  saveRDS(tempum, file = tempumapfileloc)
+} else {
+  tempum <- readRDS(tempumapfileloc)
+}
 
-# project to 3 umap dimensions:
-temppc <- prcomp(neighbormeanexpression)$x[, 1:20]
-tempum <- uwot::umap(temppc, n_components = 3) # Note: a common error in uwot::umap is resolved with: install.packages("Matrix", type = "source"); install.packages("irlba", type = "source")
-# rescale on 0.05 - 0.95:
-tempum <- apply(tempum, 2, function(x) {
-  pmax(pmin((x - quantile(x, 0.05)) / (quantile(x, 0.95) - quantile(x, 0.05)), .95), 0.05)
-})
 
 # color by 3 umap dimensions:
 plot(xy[sub, ], pch = 16, cex = 0.2, 
@@ -154,6 +160,9 @@ Here we see two major drivers of spatial signal. First, small round glomeruli (t
  regions of the UMAP. 
 We're looking for a third effect: FOVs that are discordant from their peers. 
 These would suggest FOV-level artifacts, and we'd usually want to flag and remove those FOVs. 
+
+We do see what looks like an edge effect atop many FOVs (this was more common in very early datasets like this one.)
+It would be reasonable to remove cells in the top edge of these FOVs.
  
 Example for for flagging FOVs we pick out as discordant from the above plot:
 
