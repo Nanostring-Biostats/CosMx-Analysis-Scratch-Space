@@ -45,12 +45,8 @@ Note:
 - [ ] Quick & comprehensive searches for interesting trends with "Everything vs. everything DE"
 - [ ] Smoothing single cell gene expression for enhanced plotting
 - [ ] Approaches to ligand-receptor analysis
-- [ ] Best practices for huge datasets
-- [ ] Protein analysis basics
-- [ ] Why to distrust DE results with highly significant p-values but small effect sizes
-
-### Visualization
-- [ ] Making high-resolution plots without excessive file sizes
+- [Big datasets: strategies for memory-efficient analysis](blog/big%20data%20strategies.md)
+- lots without excessive file sizes
 - [Functions for condensing FOVs and tissues to minimize whitespace](blog/condensing%20FOVs%20and%20tissues%20in%20XY%20space.md)
 - [Inferring cell polygons from transcript locations](blog/deriving%20cell%20polygons%20from%20transcript%20locations.md)
 - [ ] (For fun) Spatial transcriptomics plots in stained glass 
