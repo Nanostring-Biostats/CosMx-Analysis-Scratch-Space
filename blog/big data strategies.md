@@ -4,6 +4,11 @@ CosMx data can be truly huge: millions of cells and thousands of genes.
 This prevents many typical analysis strategies. 
 Here we'll discuss ways to work with big datasets.
 
+## Strategy 1: be intentional about what data you bring into memory
+
+No analysis method uses all your data at once. So for any given analysis, pull in only what you need. 
+See below for a discussion of data types and how to handle them.
+
 ### Data types:
 
 CosMx data comes several varieties:
@@ -26,10 +31,25 @@ Examples of dense data:
   that are unnecessary for most analyses, you can also keep in memory only the columns you need for a given analysis. 
 - Principal components. Unavoidably large. To save memory, store only the top 20-50 PCs, throwing out the information-light remaining PCs.
 
-#### Small enough to not be a problem:
+#### Data small enough to not be a problem:
 - umap
 - xy locations
 
-Other data:
-- transcript locations (huge)
-- polygons (very big)
+#### Other data:
+- Transcript locations. This comes in an enormous data table. In most studies you'll want to handle this in chunks, e.g. one FOV / region at a time, or one gene.
+- Cell polygons. Another very large file. Since you can't resolve polygon shapes for tens of thousands of cells at once, this data is only useful for very zoomed-in plots, allowing you to only keep say thousands of cell polygons in memory at once.
+
+## Strategy 2: process each tissue / slide separately
+
+It doesn't take too many slides before you can no longer fit the raw count matrix on even a generous EC2 instance. 
+At this point, you're forced to work in batches. 
+One good approach is to run fundamental analyses - e.g. QC, normalization, dimension reduction and cell typing - one sample at a time, 
+saving your results to disk. 
+Then for study-wide analyzes you can load in only the data you need, e.g. xy positions and cell types, or normalized expression values from a single gene.
+
+## Strategy 3: use data objects that handle moving data between disk and memory
+
+Data formats do exist for this purpose, and they're developing rapidly. Consider:
+- TileDB / TileDBSC
+- SeuratDisk
+- Seurat v5 has some functionality for switching between disk and memory, but not yet enough to support a full spatial analysis.
