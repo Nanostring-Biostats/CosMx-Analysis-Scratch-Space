@@ -26,8 +26,8 @@ knitr::opts_chunk$set(
 ## Introduction
 
 Cell typing is a crucial stage of analysis requiring careful attention. 
-Automated cell typing algorithms can work as desired out of the box, but often enough they do not. 
-So if you care about the integrity of your analyses, you'll spend time reviewing, and possibly refining, your cell typing results.
+Automated cell typing algorithms sometimes work out of the box, but often enough they do not. 
+To ensure the integrity of your analyses, you must spend time reviewing, and possibly refining, your cell typing results.
 
 Here we'll demonstrate a basic cell typing workflow using the Insitutype algorithm. 
 We'll show the core QC plots and walk through examples of how you can refine your cell typing results. 
@@ -86,7 +86,7 @@ Next we'll use Insitutype to assign our cells to these previously-published cell
 library(InSituType)
 insitutypefileloc <- paste0(mydir, "/processed_data/insitutype_initial_results.RDS")
 if (!file.exists(insitutypefileloc)) {
-  res <- InSituType::insitutype(x = as.matrix(counts), 
+  res <- InSituType::insitutype(x = counts, 
                               neg = Matrix::rowMeans(negcounts), 
                               reference_profiles = refprofiles,
                               update_reference_profiles = FALSE,
@@ -128,7 +128,7 @@ for (cell in unique(res$clust)) {
 }
 
 # xy space:
-plot(xy, pch = 16, cex = 0.1, col = cols[res$clust],
+plot(xy, pch = 16, cex = 0.5, col = cols[res$clust],
      xlim = c(9.5, 11.5), ylim = c(4, 6))   # zooming in for legibility. The full plot should be printed to a high-res .png.
 
 # print to a png to examine the full xy space:
@@ -153,7 +153,7 @@ which every gene name is visible.
 ```{r heatmap}
 # profiles heatmap
 #pdf(paste0(mydir, "/results/celltypeprofiles.pdf"), height = 20)
-pheatmap::pheatmap(sweep(res$profiles, 1, pmax(apply(res$profiles, 1, max), 0.2), "/")[apply(res$profiles, 1, max) > 0.2],  
+pheatmap::pheatmap(sweep(res$profiles, 1, pmax(apply(res$profiles, 1, max), 0.2), "/")[apply(res$profiles, 1, max) > 0.2, ],  
                    fontsize_row = 4,
                    col = colorRampPalette(c("white", "darkblue"))(100))  
 #dev.off()
@@ -202,9 +202,9 @@ res2 <- refineClusters(logliks = res$logliks,
                        neg = Matrix::rowMeans(negcounts), 
                        merges = c("T.cell.CD4" = "T-cell",
                                   "T.cell.CD8" = "T-cell"),       # merge CD4 and CD8 cells to a broader "T-cell" category
-                       to_delete = "",                            # delete this cluster and send its cells to their next-best fit
+                       to_delete = "NKT.cell",                    # delete this cluster and send its cells to their next-best fit
                        subcluster = list("Proximal.tubule" = 3))  # subcluster proximal tubules into 3 new clusters
-str(res)   # same structure as the Insitutype output, but with new cell types
+str(res2)   # same structure as the Insitutype output, but with new cell types
 ```
 
 After running refineClusters, you'll want to re-run all the above QC plots.
@@ -234,7 +234,7 @@ for (cell in unique(res2$clust)) {
 for (cell in unique(res$clust)) {
   png(paste0(mydir, "/results/celltypev1_", cell, ".png"), 
       width = diff(range(xy[,1]))*.7, height = diff(range(xy[,2]))*.7, units = "in", 
-      res = 400)  # res of 400 is pretty good; 600 is publication-quality
+      res = 400)  # res of 400 to limit file size; 600 is publication-quality
   par(mar = c(0,0,0,0))
   plot(xy, pch = 16, col = "grey80", cex = 0.1,
        xlab = "", ylab = "", xaxt = "n", yaxt = "n")

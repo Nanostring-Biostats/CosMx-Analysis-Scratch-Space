@@ -422,7 +422,6 @@ countlist &lt;- sapply(slidenames, function(slidename) {
   # load in counts as a data table:
   countsdatatable &lt;- data.table::fread(paste0(flatfiledir, &quot;/&quot;, slidename, &quot;_exprMat_file.csv.gz&quot;))
   return(list(countsdatatable))
- 
 })
 
 ### get shared genes:
@@ -437,15 +436,13 @@ sharedgenes &lt;- setdiff(sharedgenes, c(&quot;fov&quot;, &quot;cell_ID&quot;))
 #### align counts matrices to match metadata cell IDs, and convert to sparse matrices:
 for (i in 1:length(countlist)) {
   # align:
-  metadata_cell_fov &lt;- paste0(metadatalist[[i]]$fov, metadatalist[[i]]$cell_ID)
-  counts_cell_fov &lt;- paste0(countlist[[i]]$fov, countlist[[i]]$cell_ID)
+  metadata_cell_fov &lt;- paste0(metadatalist[[i]]$fov, &quot;_&quot;, metadatalist[[i]]$cell_ID)
+  counts_cell_fov &lt;- paste0(countlist[[i]]$fov, &quot;_&quot;, countlist[[i]]$cell_ID)
   countlist[[i]] &lt;- countlist[[i]][match(metadata_cell_fov, counts_cell_fov), ]
   # trim redundant columns:
   countlist[[i]] &lt;- countlist[[i]][, ..sharedgenes]
   # convert to sparse matrix:
-  triplets &lt;- data.table::as.data.table(which(countlist[[i]] != 0, arr.ind = TRUE))
-  triplets$value &lt;- countlist[[i]][triplets$row, triplets$col]
-  countlist[[i]] &lt;- Matrix::sparseMatrix(i = triplets$row, j = triplets$col, x = triplets$value)
+  countlist[[i]] &lt;- as(countlist[[i]], &quot;sparseMatrix&quot;)
 }
 
 ### condense metadata to a single data table:
@@ -464,7 +461,7 @@ rownames(counts) &lt;- metadata$cell_id
 colnames(counts) &lt;- sharedgenes
 
 # add to metadata: replace slide-specific FOV ID with a unique FOV ID:
-metadata$FOV &lt;- paste0(metadata$slidename, &quot;_&quot;, metadata$fov)
+metadata$FOV &lt;- paste0(metadata$slidename, &quot;_FOV&quot;, metadata$fov)
 metadata$fov &lt;- NULL</code></pre>
 <p>Our counts data includes all readouts, including controls. We’ll
 split those out. They can be useful for deep QC explorations, but for
@@ -480,10 +477,10 @@ counts &lt;- counts[, !grepl(&quot;Negative&quot;, colnames(counts)) &amp; !grep
 <p>Next we save the data as .RDS files. These files are smaller on disk
 (they benefit from more compression than flat files do), and they’re
 faster to read back into R.</p>
-<pre class="r"><code>saveRDS(counts, file = paste0(outdir, &quot;/processed_data/counts.RDS&quot;))
-saveRDS(negcounts, file = paste0(outdir, &quot;/processed_data/negcounts.RDS&quot;))
-saveRDS(falsecounts, file = paste0(outdir, &quot;/processed_data/falsecounts.RDS&quot;))
-saveRDS(metadata, file = paste0(outdir, &quot;/processed_data/metadata.RDS&quot;))</code></pre>
+<pre class="r"><code>saveRDS(counts, file = paste0(outdir, &quot;/processed_data/counts_unfiltered.RDS&quot;))
+saveRDS(negcounts, file = paste0(outdir, &quot;/processed_data/negcounts_unfiltered.RDS&quot;))
+saveRDS(falsecounts, file = paste0(outdir, &quot;/processed_data/falsecounts_unfiltered.RDS&quot;))
+saveRDS(metadata, file = paste0(outdir, &quot;/processed_data/metadata_unfiltered.RDS&quot;))</code></pre>
 <p>Now we have data in 3 locations:</p>
 <ul>
 <li>The RDS files we just created</li>
