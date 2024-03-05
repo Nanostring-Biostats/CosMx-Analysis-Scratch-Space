@@ -1,0 +1,65 @@
+# Strategies for big datasets
+
+CosMx data can be truly huge, containing millions of cells and thousands of genes. 
+This prevents many typical analysis strategies, including many toolkits designed for scRNA-seq data. 
+Here we'll discuss ways to work with big datasets.
+
+## Strategy 1: be intentional about what data you bring into memory
+
+No analysis method uses all your data at once. So for any given analysis, pull in only what you need. 
+See below for a discussion of data types and how to handle them.
+
+### Data types:
+
+CosMx data comes several varieties:
+
+#### Large sparse matrices:
+These are matrices of cells * genes or cells * cells, populated mainly by 0 values. 
+Sparse matrix formats allow us to only store information for non-zero values, greatly reducing memory demands.
+When working with sparse matrices, try to use methods that can act on this data type. 
+
+Examples of sparse matrices:
+- raw counts (sparse matrix, integers)
+- norm counts (sparse, but now decimals. can round to 3 or 4 decimal places to control size a bit)
+- cells' neighbor relationships (e.g. 50 entries per cell for 50 nearest neighbors)
+
+#### Large dense datasets:
+Some data is inevitably dense. Ideally, only pull this data into memory when you need it.
+
+Examples of dense data:
+- Cell metadata. Storing as a data table is most efficient. Since this usually has dozens of variables
+  that are unnecessary for most analyses, you can also keep in memory only the columns you need for a given analysis. 
+- Principal components. Unavoidably large. To save memory, store only the top 20-50 PCs, throwing out the information-light remaining PCs.
+
+#### Data small enough to not be a problem:
+- umap
+- xy locations
+
+#### Other data:
+- Transcript locations. This comes in an enormous data table. In most studies you'll want to handle this in chunks, e.g. one FOV / region at a time, or one gene.
+- Cell polygons. Another very large file. Since you can't resolve polygon shapes for tens of thousands of cells at once, this data is only useful for very zoomed-in plots, allowing you to only keep say thousands of cell polygons in memory at once.
+
+## Strategy 2: process each tissue / slide separately
+
+It doesn't take too many slides before you can no longer fit the raw count matrix into R. 
+At this point, you're forced to work in batches. 
+One good approach is to run fundamental analyses - e.g. QC, normalization, dimension reduction and cell typing - one sample at a time, 
+saving your results to disk. 
+Then for study-wide analyzes you can load in only the data you need, e.g. xy positions and cell types, or normalized expression values from a single gene.
+
+## Strategy 3: use data objects that handle moving data between disk and memory
+
+Data formats do exist for this purpose, and they're developing rapidly. Consider:
+- TileDB / TileDBSOMA  TileDBsc
+- SeuratDisk
+- Seurat v5 has some functionality for switching between disk and memory, but not yet enough to support a full spatial analysis.
+
+## Strategy 4: efficient computing 
+
+Large datasets take time to analyze, there is no way around that, but some simple computation choices can make a big impact. 
+
+Ensure your data stays in sparse matrix format; watch out for dense coercions. The Matrix package is great to ensure sparsity.  
+
+Parallelization is your friend but be sure to understand how much data you are reading into memory in each core. While as fast as possible is always nice, hardware does have its limitations.  
+
+ 
