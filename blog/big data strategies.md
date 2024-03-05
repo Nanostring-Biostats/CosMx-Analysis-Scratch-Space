@@ -1,7 +1,7 @@
 # Strategies for big datasets
 
-CosMx data can be truly huge: millions of cells and thousands of genes. 
-This prevents many typical analysis strategies. 
+CosMx data can be truly huge, containing millions of cells and thousands of genes. 
+This prevents many typical analysis strategies, including many toolkits designed for scRNA-seq data. 
 Here we'll discuss ways to work with big datasets.
 
 ## Strategy 1: be intentional about what data you bring into memory
@@ -41,7 +41,7 @@ Examples of dense data:
 
 ## Strategy 2: process each tissue / slide separately
 
-It doesn't take too many slides before you can no longer fit the raw count matrix on even a generous EC2 instance. 
+It doesn't take too many slides before you can no longer fit the raw count matrix into R. 
 At this point, you're forced to work in batches. 
 One good approach is to run fundamental analyses - e.g. QC, normalization, dimension reduction and cell typing - one sample at a time, 
 saving your results to disk. 
@@ -50,6 +50,16 @@ Then for study-wide analyzes you can load in only the data you need, e.g. xy pos
 ## Strategy 3: use data objects that handle moving data between disk and memory
 
 Data formats do exist for this purpose, and they're developing rapidly. Consider:
-- TileDB / TileDBSC
+- TileDB / TileDBSOMA  TileDBsc
 - SeuratDisk
 - Seurat v5 has some functionality for switching between disk and memory, but not yet enough to support a full spatial analysis.
+
+## Strategy 4: efficient computing 
+
+Large datasets take time to analyze, there is no way around that, but some simple computation choices can make a big impact. 
+
+Ensure your data stays in sparse matrix format; watch out for dense coercions. The Matrix package is great to ensure sparsity.  
+
+Parallelization is your friend but be sure to understand how much data you are reading into memory in each core. While as fast as possible is always nice, hardware does have its limitations.  
+
+ 
