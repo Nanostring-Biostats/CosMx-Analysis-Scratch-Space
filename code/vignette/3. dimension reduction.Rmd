@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 ```
 
 
-## Introduction
+
 
 Our goal here is to produce an informative UMAP. To get there, we'll also use PCA to get a reduced-dimension dataset,
 and we'll try UMAP under a few parameterizations to see what works best.
@@ -32,11 +32,12 @@ and we'll try UMAP under a few parameterizations to see what works best.
 # load data:
 mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
 norm <- readRDS(paste0(mydir, "/processed_data/norm.RDS"))
+metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS"))
 
 tempumapfileloc <-  paste0(mydir, "/processed_data/um.RDS")
 if (!file.exists(tempumapfileloc)) {
   # run PCA:
-  pc <- irlba::prcomp_irlba(norm, n = 25)$x
+  pc <- irlba::prcomp_irlba(sqrt(norm), n = 25)$x
 
   # run UMAP:
   um <- uwot::umap(pc, n_neighbors = 40, spread = 1, min_dist = 0.1, metric = "cosine")
@@ -47,6 +48,8 @@ if (!file.exists(tempumapfileloc)) {
 } else {
   um <- readRDS(tempumapfileloc)
 }
+
+
 
 # plot it:
 par(mar = c(0,0,0,0))
