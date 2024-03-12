@@ -33,7 +33,7 @@ if (FALSE) {
   
   
   newxy = condenseXY(xy = xy, fov = fov, tissue = tissue, 
-                     condenseFOVs = TRUE, condensetissues = TRUE, # which operations to perform
+                     condensefovs = TRUE, condensetissues = TRUE, # which operations to perform
                      eps = 1.5, mindist = 0.1, fovbuffer = 0.2, # FOV condensing args
                      tissueorder = NULL, tissuebuffer = 0.2, widthheightratio = 4/3) # Tissue condensing args
   par(mfrow = c(1,2))
@@ -47,10 +47,10 @@ if (FALSE) {
 
 #' Wrapper for within- and between-tissue space condensing
 condenseXY <- function(xy, fov, tissue, 
-                       condenseFOVs = TRUE, condensetissues = TRUE, # which operations to perform
+                       condensefovs = TRUE, condensetissues = TRUE, # which operations to perform
                        eps = 1.5, mindist = 0.1, fovbuffer = 0.2, # FOV condensing args
                        tissueorder = NULL, tissuebuffer = 0.2, widthheightratio = 4/3) {  # Tissue condensing args
-  if (condenseFOVs) {
+  if (condensefovs) {
     xy <- condenseFOVs(xy = xy, fov = fov, tissue = tissue, eps = eps, mindist = mindist, buffer = fovbuffer) 
   }
   if (condensetissues) {
