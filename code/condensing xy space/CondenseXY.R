@@ -157,7 +157,7 @@ condenseFOVs_onetissue <- function(xy, fov, eps = 1.5, mindist = 0.1, buffer = 0
         xy[thisgroup, 1] <- xy[thisgroup, 1] + cos(theta) * pmax(movedist - buffer, 0)
         xy[thisgroup, 2] <- xy[thisgroup, 2] + sin(theta) * pmax(movedist - buffer, 0)
       }
-      plot(xy, col = cols[fov], asp = 1)
+      #plot(xy, col = cols[fov], asp = 1)
       
       center <- midpoint(xy)
       
