@@ -6,7 +6,7 @@ Here we recommend some toolkits we've found useful:
 
 ## Table of contents:
 1. [Fast nearest-neighbors search](#neighbors)
-2. [Measuring a gene's degree of spatial correlation](#correlation)
+2. [Measuring a gene's spatial autocorrelation](#correlation)
 2. [Measuring spatial correlation between two genes](#correlation2)
 2. [Counting occurrences within cell neighborhoods](#counting)
 
@@ -42,7 +42,7 @@ neighbors <- InSituCor:::radiusBasedGraph(x = xy[, 1], y = xy[, 2], R = 0.1)
 ```
 
 
-## Measuring a gene's degree of spatial correlation  <a name="correlation"></a>
+## Measuring a gene's spatial autocorrelation  <a name="correlation"></a>
 
 Our goal here is to measure how much a gene's expression depends on spatial location. 
 Genes with strong spatial dependence are presumably more interesting, deserving human attention. 
@@ -58,7 +58,8 @@ Methods:
 ## Measuring spatial correlation between two genes <a name="correlation2"></a>
 
 When two or more genes are spatially correlated it can be of high biological interest. 
-These genes might regulate each other, or they could be jointly regulated by some latent variable. 
+These genes might regulate each other via cell-cell communication, 
+or they could be jointly regulated by some latent variable in the microenvironment.
 
 Methods for measuring spatial correlation between genes include:
 - Lee's L: another spatial statistics classic. 
