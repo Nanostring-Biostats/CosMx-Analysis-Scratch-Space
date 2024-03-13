@@ -27,7 +27,7 @@ if (FALSE) {
   
   cols = c(brewer.pal(8, "Set3"), brewer.pal(8, "Set2"))
   par(mfrow = c(3,2))
-  par(mar = c(0,0,0,0))
+  par(mar = c(0,0,0,0)) 
   plot(xy, col = cols[as.numeric(as.factor(tissue))], asp = 1)
   plot(xy, col = cols[as.numeric(as.factor(fov))], asp = 1)
   
@@ -157,7 +157,7 @@ condenseFOVs_onetissue <- function(xy, fov, eps = 1.5, mindist = 0.1, buffer = 0
         xy[thisgroup, 1] <- xy[thisgroup, 1] + cos(theta) * pmax(movedist - buffer, 0)
         xy[thisgroup, 2] <- xy[thisgroup, 2] + sin(theta) * pmax(movedist - buffer, 0)
       }
-      plot(xy, col = cols[fov], asp = 1)
+      #plot(xy, col = cols[fov], asp = 1) # uncomment to watch the progress of iterations live
       
       center <- midpoint(xy)
       

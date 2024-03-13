@@ -4,8 +4,14 @@ Spatial statistics is a well-developed field, with deep statistical methodology 
 In CosMx data, where a single study can contain millions of cells, computational efficiency is vital. 
 Here we recommend some toolkits we've found useful:
 
+## Table of contents:
+1. [Fast nearest-neighbors search](#neighbors)
+2. [Measuring a gene's spatial autocorrelation](#correlation)
+2. [Measuring spatial correlation between two genes](#correlation2)
+2. [Counting occurrences within cell neighborhoods](#counting)
 
-### Fast nearest-neighbors search:
+
+## Fast nearest-neighbors search: <a name="neighbors"></a>
 
 #### Returning the indexes and distances to a cell's K-nearest neighbors:
 ```
@@ -36,7 +42,7 @@ neighbors <- InSituCor:::radiusBasedGraph(x = xy[, 1], y = xy[, 2], R = 0.1)
 ```
 
 
-### Measuring a gene's degree of spatial correlation
+## Measuring a gene's spatial autocorrelation  <a name="correlation"></a>
 
 Our goal here is to measure how much a gene's expression depends on spatial location. 
 Genes with strong spatial dependence are presumably more interesting, deserving human attention. 
@@ -49,10 +55,11 @@ Methods:
 - [SPARK-X](https://github.com/xzhoulab/SPARK): Runs at speed similar to Moran's I.
 
 
-### Measuring spatial correlation between two genes
+## Measuring spatial correlation between two genes <a name="correlation2"></a>
 
 When two or more genes are spatially correlated it can be of high biological interest. 
-These genes might regulate each other, or they could be jointly regulated by some latent variable. 
+These genes might regulate each other via cell-cell communication, 
+or they could be jointly regulated by some latent variable in the microenvironment.
 
 Methods for measuring spatial correlation between genes include:
 - Lee's L: another spatial statistics classic. 
@@ -67,7 +74,7 @@ This is our recommended approach.
 It can analyze hundreds of thousands of cells and thousands of genes in minutes. 
 
 
-### Counting occurrences within cell neighborhoods
+## Counting occurrences within cell neighborhoods  <a name="counting"></a>
 
 Analysts will often want to score cells for how often something occurs in their neighborhoods.
 For example, you might want to know how many T-cell neighbors each cell has, or 

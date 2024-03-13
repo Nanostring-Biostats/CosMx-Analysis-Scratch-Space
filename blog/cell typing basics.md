@@ -9,7 +9,7 @@ We cell type most studies using one of the following approaches:
 
 #### Insitutype: 
 We created Insitutype for cell typing in CosMx data. It can perform unsupervised clustering, supervised cell typing if given a matrix of reference profiles, 
-or semi-supervised cell typing to call pre-defined cell types alongside new clusters.
+or semi-supervised cell typing to call pre-defined cell types alongside new clusters. Insitutype's models the evidence provided by every gene in a cell's profile; this makes it excel in cells / datasets with less signal. 
 
 Insitutype resources:
 - https://github.com/Nanostring-Biostats/insitutype (see the [FAQs.md](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md) for detailed advice)
@@ -26,7 +26,7 @@ We have found Seurat's implementation to work in some studies.
 ## General cell typing notes
 
 - Leiden clustering and UMAP tend to see the world the same way - that is, they're both based on networks connecting similar cells.
-This makes Leiden results agree well with the UMAP, whether or not they are truly more accurate.
+This makes Leiden results agree well with the UMAP, whether or not they are truly more accurate. In other words, don't take the UMAP as an impartial arbiter of cell typing truth. 
 - Insitutype tends to be the most resistant to batch effects; methods that rely on PCs tend to be the most easily fooled by batch effects.
-- Most studies require careful scrutiny of cell typing results. Often clusters have to be merged or subclustered before results are satisfactory. See the Insitutype  [FAQs.md](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md) for a detailed discussion of how to QC & refine cell typing results.
+- Most studies require careful scrutiny of cell typing results. Often clusters have to be merged or subclustered before results are satisfactory. See the Insitutype  [FAQs.md](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md) for a detailed discussion of how to QC & refine cell typing results. Many of these QCs are useful for results of other methods. 
 
