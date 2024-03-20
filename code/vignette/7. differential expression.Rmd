@@ -56,6 +56,7 @@ errors. We recommend omitting these gene/cell type pairs from DE analysis.
 ```{r filter}
 
 
+analyzable <- xxxxxx
 ```
 
 
@@ -106,7 +107,46 @@ a more principled model than the simple linear models implemented below.
 
 
 ``` {r fastDE}
-##### CODE FROM WNV ANALYSIS TO BE REPURPOSED
+# subset on only podocytes:
+inds <- clusts == "Podocyte"
+
+# subset on only the analyzable genes \
+# (those expressed above contamination as calculated above)
+usegenes <- names(which([analyzable[, "Podocyte"]))
+length(usegenes)
+
+# get the design matrix to be used in every gene's model:
+templm = lm(norm[inds, 1] ~ metadata$n_mac_neighbors[inds] + metadata$n_glom_endo_neighbors[inds] + metadata$n_lymphoid_neighbors[inds] + metadata$spatialclust[inds])
+X = model.matrix(templm)
+
+# now use matrix algebra to run a lm for every gene at once:
+# get the estimates:
+beta <- solve(t(X) %*% X) %*% t(X) %*% norm[inds, usegenes]
+# get the SEs:
+resids <- norm[inds, usegenes] - X %*% beta
+rss <- colSums(resids^2)
+sigmasquared <- rss / (nrow(X) - ncol(X))
+ses <- sqrt(diag(solve(t(X) %*% X)) * sigmasquared)
+# and the p-value:
+ps <- 2 * (1 - pt(abs(beta) / ses, df = nrow(X) - ncol(X)))
+# convert from linear change in expression to a log2(fold-change):
+log2ratios <- log2((beta0s + ests11) / beta0s)
+
+
+## convince youself it reproduces lm():
+# basic lm results:
+summary(templm)$coef
+# our matrix algebra results:
+cbind(beta[, 1], ses[, 1], ps[, 1])
+
+
+## a nice way to look at results across several variables and all genes:
+## heatmap of only the significant effect sizes:
+
+
+
+if (FALSE) {
+  ##### CODE FROM WNV ANALYSIS TO BE REPURPOSED (kept in script for now as record of starting math, to use to debug the above)
 
 enoughcells = names(which(table(clust) > 200))
 
@@ -161,6 +201,7 @@ pheatmap(mat11[rowSums(abs(mat11) > 1) > 2, ], main = "day 11 vs. mock", fontsiz
 pheatmap(mat21[rowSums(abs(mat21) > 1) > 2, ], main = "day 21 vs. mock", fontsize_row = 6,
          col = colorRampPalette(c("blue", "white", "red"))(100), breaks = seq(-2,2, length.out = 101))
 dev.off()
+}
 
 ```
 

@@ -86,6 +86,8 @@ plot(xy[sub, ], pch = 16, cex = 0.2,
      asp = 1, 
      col = cols[as.numeric(as.factor(spatialclust)) %% length(cols) + 1])
    
+# add to metadata:
+metadata$spatialclust <- spatialclust
 ```
 
 Alternatively, we can cluster cells based on the cell type composition of their neighborhoods:
@@ -153,8 +155,11 @@ marks(pp) <- as.factor(marks(pp))
 neighbormarks <- spatstat::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
 rownames(neighbormarks) <- rownames(xy)
 head(neighbormarks)
-# save results for your desired cell type:
-metadata$ntumorneighbors <- neighbormarks[, "macrophage"]
+# save results for your desired cell types:
+metadata$n_mac_neighbors <- neighbormarks[, "macrophage"]
+metadata$n_glom_endo_neighbors <- neighbormarks[, "Glomerular.endothelium"]
+# save the sum of several related cell types:
+metadata$n_lymphoid_neighbors <- rowSums(neighbormarks[, c("T_CD4", "T_CD8", "Treg", "B-cell", "plasmablast")])
 ```
 
 #### Neighborhood expression of a gene
