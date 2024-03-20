@@ -36,10 +36,14 @@ Outline:
 
 
 ```{r loading}
+# packages:
+library(pheatmap)
+
 # load data:
-norm <- readRDS("processed_data/norm.RDS")
+mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
+norm <- readRDS(paste0(mydir, "processed_data/norm.RDS"))
 metadata <- readRDS(paste0(mydir, "/processed_data/metadata_with_spatialcontext.RDS")) 
-celltype <- readRDS("processed_data/celltype.RDS")
+celltype <- readRDS(paste0(mydir, "/processed_data/celltype.RDS"))
 xy <- readRDS(paste0(mydir, "/processed_data/xy.RDS"))
 ```
 
@@ -56,7 +60,8 @@ errors. We recommend omitting these gene/cell type pairs from DE analysis.
 ```{r filter}
 
 
-analyzable <- xxxxxx
+analyzable <- matrix(TRUE, nrow = ncol(norm), ncol = length(unique(celltype)),
+                     dimnames = list(colnames(norm), unique(celltype)))
 ```
 
 
@@ -65,7 +70,7 @@ analyzable <- xxxxxx
 Differential expression models let us ask, "how does a cell type respond to its environment?"
 A great many biological questions can be framed this way.
 
-For our example, we'll consider the question, "how do podocytes change gene expression
+For our example, we'll consider the question, "how do mesangial cells change gene expression
 in response to nearby macrophages?" 
 
 Formalizing this, we might write the model: *E(y) = f(number of nearby macrophages)*.
@@ -73,7 +78,7 @@ This says that expected expression of a gene in our cell type (*y*) is some func
 number of nearby macrophages. 
 
 We have a simple enough question, and a correspondingly simple model. 
-But we should remember that podocytes are probably responding to many factors in their environment, not just
+But we should remember that mesangial cells are probably responding to many factors in their environment, not just
 macrophages. If we omit any of these factors from our DE model, it will be incomplete,
 with the omitted variable acting as a unmodeled confounder, biasing our results.
 Biology is complex, and we'll never manage to specify a complete model for the local 
@@ -82,10 +87,13 @@ the major factors.
 
 So instead, we might try the following model:
 
-*E(y) = f(number of nearby macrophages, local expression of inflammatory cytokines, number of nearby mesangial cells)*.
+*E(y) = f(number of nearby macrophages, local expression of inflammatory cytokines, number of nearby mesangial cells, spatial cluster)*.
 
 This model accounts for other immune impacts on podocyte expression and for any impact
-of glomerulus composition on podocytes. (Podocytes live alongside mesangial cells in glomeruli.)
+of glomerulus composition on mesangial cells. (Mesangial cells live alongside podocytes and glomerular endothelial cells in glomeruli.)
+It also adjust for spatial cluster, which is reasonable to do whenever your variable of interest
+is largely uncorrelated with spatial cluster. In this example, if one of the spatial clusters was
+driven by local macrophage density, it would confuse interpretation of our results. 
 
 Finally, we have the disadvantage of not many tissues in our study, but 
 the benefit of many cells per tissue. In this setting, it becomes useful
@@ -95,7 +103,7 @@ gives us confidence that our findings aren't idiosyncratic to any single tissue.
 It also reveals interesting between-tissue heterogeneity. 
 
 
-## Very fast initial DE
+## Very fast exploratory DE
 
 The most accurate DE models can take a long time to run. 
 If you want to quickly explore a DE question, with imperfect accuracy, you
@@ -107,101 +115,66 @@ a more principled model than the simple linear models implemented below.
 
 
 ``` {r fastDE}
-# subset on only podocytes:
-inds <- clusts == "Podocyte"
+# subset on only mesangial cells:
+inds <- celltype == "Mesangial.cell"
 
 # subset on only the analyzable genes \
 # (those expressed above contamination as calculated above)
-usegenes <- names(which([analyzable[, "Podocyte"]))
+usegenes <- names(which(analyzable[, "Mesangial.cell"]))
 length(usegenes)
 
 # get the design matrix to be used in every gene's model:
-templm = lm(norm[inds, 1] ~ metadata$n_mac_neighbors[inds] + metadata$n_glom_endo_neighbors[inds] + metadata$n_lymphoid_neighbors[inds] + metadata$spatialclust[inds])
+templm = lm(norm[inds, 1] ~ metadata$n_mac_neighbors[inds] + metadata$n_glom_endo_neighbors[inds] + metadata$n_lymphoid_neighbors[inds] + as.factor(metadata$spatialclust[inds]))
 X = model.matrix(templm)
+head(X)
+# clean up column names in the design matrix:
+colnames(X) <- gsub("metadata\\$", "", colnames(X))
+colnames(X) <- gsub("\\[inds\\]", "", colnames(X))
+colnames(X) <- gsub("\\)", "", colnames(X))
+colnames(X) <- gsub("\\(", "", colnames(X))
+colnames(X) <- gsub("as.factor", "", colnames(X))
+colnames(X)
 
 # now use matrix algebra to run a lm for every gene at once:
 # get the estimates:
-beta <- solve(t(X) %*% X) %*% t(X) %*% norm[inds, usegenes]
+beta <- as.matrix(solve(t(X) %*% X) %*% t(X) %*% norm[inds, usegenes])
+beta[, 1:5]
 # get the SEs:
 resids <- norm[inds, usegenes] - X %*% beta
 rss <- colSums(resids^2)
 sigmasquared <- rss / (nrow(X) - ncol(X))
-ses <- sqrt(diag(solve(t(X) %*% X)) * sigmasquared)
+ses <- sqrt(t(t(diag(solve(t(X) %*% X)))) %*% sigmasquared)
 # and the p-value:
 ps <- 2 * (1 - pt(abs(beta) / ses, df = nrow(X) - ncol(X)))
-# convert from linear change in expression to a log2(fold-change):
-log2ratios <- log2((beta0s + ests11) / beta0s)
 
+if (FALSE) {   # THIS NEEDS REVISION
+  # convert from linear change in expression to a log2(fold-change):
+  binaryvariables = paste0("spatialclust", 2:6)
+  continuousvariables = c("n_mac_neighbors", "n_glom_endo_neighbors", "n_lymphoid_neighbors")
+  log2fc = beta * NA
+  # for binary variables, record the fold-change associated with the variable:
+  for (name in binaryvariables) {
+    log2fc[name, ] <- log2((beta[name, ] + beta["Intercept", ]) / beta["Intercept", ])
+  }
+  # for continuous variables, record the fold-change associated with a 1 SD increase in the variable:
+  for (name in binaryvariables) {
+    log2fc[name, ] <- log2((beta[name, ] * sd(X[, name]) +  beta["Intercept", ]) / beta["Intercept", ])
+  }
+}
 
-## convince youself it reproduces lm():
+## confirm it reproduces lm():
 # basic lm results:
-summary(templm)$coef
+summary(templm)$coef[, c("Estimate", "Std. Error", "Pr(>|t|)")]
 # our matrix algebra results:
 cbind(beta[, 1], ses[, 1], ps[, 1])
 
 
 ## a nice way to look at results across several variables and all genes:
 ## heatmap of only the significant effect sizes:
+pheatmap(beta * (ps < 1e-2), col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(100),
+         breaks = seq(-0.5, 0.5, length.out = 101))
 
 
-
-if (FALSE) {
-  ##### CODE FROM WNV ANALYSIS TO BE REPURPOSED (kept in script for now as record of starting math, to use to debug the above)
-
-enoughcells = names(which(table(clust) > 200))
-
-ests11 = ps11 = ses11 = ests21 = ps21 = ses21 = beta0s = matrix(NA, ncol(norm), length(enoughcells),
-                            dimnames = list(colnames(norm), enoughcells))
-
-for (cell in enoughcells) {
-  print(cell)
-  # which genes to use:
-  majorcell = map$Major_cell_type[map$Celltype_abb == cell]
-  usegenes = rownames(iscontam)[!iscontam[, majorcell]]
-  
-  # get design matrix:
-  inds = clust == cell
-  templm = lm(norm[inds, 1] ~ annot$disease[inds] + niche[inds])
-  X = model.matrix(templm)
-  # get the estimates:
-  beta <- solve(t(X) %*% X) %*% t(X) %*% norm[inds, usegenes]
-  est11 <- beta[2, ]
-  est21 <- beta[3, ]
-  # get the SEs:
-  resids <- norm[inds, usegenes] - X %*% beta
-  rss <- colSums(resids^2)
-  sigmasquared <- rss / (nrow(X) - ncol(X))
-  se11 <- sqrt(solve(t(X) %*% X)[2,2] * sigmasquared)
-  se21 <- sqrt(solve(t(X) %*% X)[3,3] * sigmasquared)
-  # and the p-value:
-  p11 <- 2 * (1 - pt(abs(est11) / se11, df = nrow(X) - ncol(X)))
-  p21 <- 2 * (1 - pt(abs(est21) / se21, df = nrow(X) - ncol(X)))
-  
-  ests11[usegenes, cell] = est11
-  ses11[usegenes, cell] = se11
-  ps11[usegenes, cell] = p11
-  ests21[usegenes, cell] = est21
-  ses21[usegenes, cell] = se21
-  ps21[usegenes, cell] = p21
-  beta0s[usegenes, cell] = beta[1, ]
-  
-}
-
-log2ratios11 = log2((beta0s + ests11) / beta0s)
-log2ratios21 = log2((beta0s + ests21) / beta0s)
-
-mat11 = log2ratios11 * (ps11 < 1e-4)
-mat21 = log2ratios21 * (ps21 < 1e-4)
-mat11 = replace(mat11, is.na(mat11), 0)
-mat21 = replace(mat21, is.na(mat21), 0)
-
-pdf("results/DE heatmaps - vs mock.pdf", height = 10)
-pheatmap(mat11[rowSums(abs(mat11) > 1) > 2, ], main = "day 11 vs. mock", fontsize_row = 6,
-         col = colorRampPalette(c("blue", "white", "red"))(100), breaks = seq(-2,2, length.out = 101))
-pheatmap(mat21[rowSums(abs(mat21) > 1) > 2, ], main = "day 21 vs. mock", fontsize_row = 6,
-         col = colorRampPalette(c("blue", "white", "red"))(100), breaks = seq(-2,2, length.out = 101))
-dev.off()
-}
 
 ```
 
@@ -220,7 +193,16 @@ For publishable results, we recommend this above the simple linear models implem
 
 ## Plotting and exploring DE results
 
+MORE NEEDED HERE
 
+```{r plotting}
+
+## a nice way to look at results across several variables and all genes:
+## heatmap of only the significant effect sizes:
+pheatmap(beta * (ps < 1e-2), col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(100),
+         breaks = seq(-0.5, 0.5, length.out = 101))
+
+```
 
 ## Notes on interpretation
 

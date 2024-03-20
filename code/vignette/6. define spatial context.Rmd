@@ -39,10 +39,16 @@ tumor cell, number of tumor cells in neighborhood, neighborhood expression level
 in/out of a substructure (e.g. TLS in a tumor, glomeruli in kidneys...).
 
 ```{r loading}
+# packages:
+library(mclust)
+library(irlba)
+library(spatstat)
+library(spatstat.geom)
 # load data:
-norm <- readRDS("processed_data/norm.RDS")
+mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
+norm <- readRDS(paste0(mydir, "processed_data/norm.RDS"))
 metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS")) 
-celltype <- readRDS("processed_data/celltype.RDS")
+celltype <- readRDS(paste0(mydir, "processed_data/celltype.RDS"))
 xy <- readRDS(paste0(mydir, "/processed_data/xy.RDS"))
 ```
 
@@ -62,29 +68,31 @@ expression in each cell's neighborhood, and and we cluster cells based on these 
 
 ```{r spatialclust_by_expression}
 # define neighbors:
-neighbors_sparsematrix <- nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50, subset = metadata$tissue)  
-str(neighbors_sparsematrix)
+neighbors_sparsematrix <- nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50, subset = metadata$tissue)
 
 # get matrix of mean expression in each cell's neighbors:
-neighborhoodexpression <- neighbor_colMeans(x = norm[, gene], neighbors = neighbors_sparsematrix)
+neighborhoodexpression <- neighbor_colMeans(x = norm, neighbors = neighbors_sparsematrix)
 
 # reduce the matrix to its top PCs:
-pca_result <- irlba::irlba(norm, nv = 25)
-pc <- pca_result$u %*% diag(pca_result$d)
+pc <- irlba::prcomp_irlba(neighborhoodexpression, n = 25)$x
 
 # cluster the top PCs:
-spatialclust <- mclust::Mclust(pc, 
-                         G = 8, # 8 clusters
-                         modelNames = c("EVI"))$classification
+temp <- mclust::Mclust(pc, 
+                       G = 6, # 6 clusters
+                       modelNames = c("EEI"))
+spatialclust <- temp$classification
 
 # plot the results:
 cols <- c("#616161","#4285f4","#db4437","#f4b400","#0f9d58","#ab47bc","#00acc1",
           "#ff7043","#9e9d24","#5c6bc0","#f06292","#00796b","#c2185b","#7e57c2",
           "#03a9f4","#8bc34a","#fdd835","#fb8c00","#8d6e63","#9e9e9e","#607d8b")
 # plot:
-plot(xy[sub, ], pch = 16, cex = 0.2, 
-     asp = 1, 
-     col = cols[as.numeric(as.factor(spatialclust)) %% length(cols) + 1])
+#sub <- sample(1:nrow(xy), 50000, replace = FALSE)
+sub = TRUE
+plot(xy[sub, ], pch = 16, cex = 0.8, 
+     asp = 1, xlab = "", ylab = "",
+     col = cols[as.numeric(as.factor(spatialclust[sub]))],
+     xlim = c(4.5,6.5), ylim =c (6,8))
    
 # add to metadata:
 metadata$spatialclust <- spatialclust
@@ -97,7 +105,7 @@ Alternatively, we can cluster cells based on the cell type composition of their 
 # create a point process object:
 pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = range(xy[, 2]))
 marks(pp) <- celltype
-marks(pp) <- as.factor(marks(pp))
+spatstat::marks(pp) <- as.factor(spatstat::marks(pp))
 # count neighbors of each db cluster:
 neighbormarks <- spatstat::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
 rownames(neighbormarks) <- rownames(xy)
@@ -149,17 +157,17 @@ Example: you might categorize cells by how many of a given cell type are in thei
 ```{r countneighbors}
 # create a point process object:
 pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = range(xy[, 2]))
-marks(pp) <- celltype
-marks(pp) <- as.factor(marks(pp))
+spatstat.geom::marks(pp) <- celltype
+spatstat.geom::marks(pp) <- as.factor(spatstat.geom::marks(pp))
 # count neighbors of each db cluster:
-neighbormarks <- spatstat::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+neighbormarks <- spatstat.explore::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
 rownames(neighbormarks) <- rownames(xy)
-head(neighbormarks)
+head(neighbormarks)[, 1:10]
 # save results for your desired cell types:
-metadata$n_mac_neighbors <- neighbormarks[, "macrophage"]
+metadata$n_mac_neighbors <- neighbormarks[, "Macrophage"]
 metadata$n_glom_endo_neighbors <- neighbormarks[, "Glomerular.endothelium"]
 # save the sum of several related cell types:
-metadata$n_lymphoid_neighbors <- rowSums(neighbormarks[, c("T_CD4", "T_CD8", "Treg", "B-cell", "plasmablast")])
+metadata$n_lymphoid_neighbors <- rowSums(neighbormarks[, c("T-cell", "B.cell", "NK.cell")])
 ```
 
 #### Neighborhood expression of a gene
@@ -170,14 +178,13 @@ how much of a given cytokine each cell is exposed to.
 ```{r neighborhoodexpression}
 # get cells' nearest 50 spatial neighbors:
 neighbors_sparsematrix <- nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50, subset = metadata$tissue)  
-str(neighbors_sparsematrix)
 # get neighborhood expression of a chosen gene:
 gene <- "C1QA"
-metadata$neighborhoodexpression <- neighbor_mean(x = norm[, gene], neighbors = neighbors_sparsematrix)
+metadata$neighborhood_C1QA_expression <- neighbor_mean(x = norm[, gene], neighbors = neighbors_sparsematrix)
 ```
 
 Save all these results for later:
 
 ```{r saving}
-saveRDS(metadata, file = "processed_data/metadata_with_spatialcontext.RDS")
+saveRDS(metadata, file = paste0(mydir, "/processed_data/metadata_with_spatialcontext.RDS"))
 ```
