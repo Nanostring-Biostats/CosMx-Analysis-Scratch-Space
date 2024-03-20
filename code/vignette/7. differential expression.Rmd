@@ -34,6 +34,15 @@ Outline:
 - comment on how you need a good effect size
 
 
+
+```{r loading}
+# load data:
+norm <- readRDS("processed_data/norm.RDS")
+metadata <- readRDS(paste0(mydir, "/processed_data/metadata_with_spatialcontext.RDS")) 
+celltype <- readRDS("processed_data/celltype.RDS")
+xy <- readRDS(paste0(mydir, "/processed_data/xy.RDS"))
+```
+
 ## Filtering for analyzeable genes 
 
 Because cell segmentation is imperfect, genes that have low expression in your cell type of interest -
@@ -49,6 +58,40 @@ errors. We recommend omitting these gene/cell type pairs from DE analysis.
 
 ```
 
+
+## Defining a DE question
+
+Differential expression models let us ask, "how does a cell type respond to its environment?"
+A great many biological questions can be framed this way.
+
+For our example, we'll consider the question, "how do podocytes change gene expression
+in response to nearby macrophages?" 
+
+Formalizing this, we might write the model: *E(y) = f(number of nearby macrophages)*.
+This says that expected expression of a gene in our cell type (*y*) is some function of the
+number of nearby macrophages. 
+
+We have a simple enough question, and a correspondingly simple model. 
+But we should remember that podocytes are probably responding to many factors in their environment, not just
+macrophages. If we omit any of these factors from our DE model, it will be incomplete,
+with the omitted variable acting as a unmodeled confounder, biasing our results.
+Biology is complex, and we'll never manage to specify a complete model for the local 
+factors acting on podocyte gene expression, but we should try our best to capture
+the major factors. 
+
+So instead, we might try the following model:
+
+*E(y) = f(number of nearby macrophages, local expression of inflammatory cytokines, number of nearby mesangial cells)*.
+
+This model accounts for other immune impacts on podocyte expression and for any impact
+of glomerulus composition on podocytes. (Podocytes live alongside mesangial cells in glomeruli.)
+
+Finally, we have the disadvantage of not many tissues in our study, but 
+the benefit of many cells per tissue. In this setting, it becomes useful
+to run our model separately for each tissue. Then we can see whether any 
+genes are consistently DE across tissues. This cross-tissue comparison 
+gives us confidence that our findings aren't idiosyncratic to any single tissue.
+It also reveals interesting between-tissue heterogeneity. 
 
 
 ## Very fast initial DE
@@ -128,10 +171,14 @@ Our upcoming DE R package and manuscript will provide an in-depth discussion of 
 For now, the below code performs slower but more optimal DE modeling. 
 For publishable results, we recommend this above the simple linear models implemented above. 
 
-```{r simplerde}
+```{r optimalde}
 
 
 ```
+
+
+## Plotting and exploring DE results
+
 
 
 ## Notes on interpretation
