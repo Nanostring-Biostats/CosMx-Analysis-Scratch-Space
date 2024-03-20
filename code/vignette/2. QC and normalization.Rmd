@@ -142,14 +142,10 @@ plot(xy[sub, ], pch = 16, cex = 0.2,
      asp = 1, # important: keep the true aspect ratio
      col = rgb(tempum[, 1], tempum[, 2], tempum[, 3], 1),
      main = "Cellular neighborhoods colored by their UMAP projection")
-# label FOVs:
-#for (fov in unique(metadata$FOV)) {
-#  text(median(xy[metadata$FOV == fov, 1]), median(xy[metadata$FOV == fov, 2]), fov)
-#}
 ```
 
 
-Here we see two major drivers of spatial signal. First, small round glomeruli (these are kidneys)
+Here we see two major drivers of spatial signal. First, small round glomeruli (these samples are kidneys)
  emerge as distinct from their surroundings. And second, different tissues are projected to different
  regions of the UMAP. 
 We're looking for a third effect: FOVs that are discordant from their peers. 
@@ -190,10 +186,16 @@ saveRDS(xy, paste0(mydir, "/processed_data/xy.RDS"))
 
 Normalization is straightforward: we simply divide every cell's expression profile by its total counts.
 To put our counts back on a more natural scale, we then multiply all cells by the mean
-cell's total counts:
+cell's total counts. 
+
 
 ```{r normalize}
 norm <- sweep(counts, 1, metadata$totalcounts, "/") * mean(metadata$totalcounts)
 saveRDS(norm, paste0(mydir, "/processed_data/norm.RDS"))
 ```
 
+Note: if you'll analyze many tissues using the same pipeline, then you should 
+replace the `mean(metadata$totalcounts)` term with some fixed value that is the 
+same for all samples. Mathematically all positive values are the same, but entering
+a value approximately equal to the average cell's total counts will put the data
+on an easily-interpretable scale. 

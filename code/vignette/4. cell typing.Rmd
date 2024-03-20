@@ -26,7 +26,6 @@ knitr::opts_chunk$set(
 ## Introduction
 
 Cell typing is a crucial stage of analysis requiring careful attention. 
-Automated cell typing algorithms sometimes work out of the box, but often enough they do not. 
 To ensure the integrity of your analyses, you must spend time reviewing, and possibly refining, your cell typing results.
 
 Here we'll demonstrate a basic cell typing workflow using the Insitutype algorithm. 
@@ -47,7 +46,7 @@ have already run single cell experiments in kidneys and done the hard work of de
 cell types are present. 
 We could repeat their work and cluster our data de novo, but the easiest approach is to
 classify our cells based on this previous work. 
-The Insitutype algorithm compares cell's expression profiles to "reference profiles"
+The Insitutype algorithm compares cells' expression profiles to "reference profiles"
 derived from earlier datasets. We can easily derive these from our favorite single cell dataset,
 or even easier, pull one from resources NanoString has compiled:
 
@@ -124,17 +123,14 @@ flightpath <- flightpath_layout(logliks = res$logliks, profiles = res$profiles)
 par(mar = c(0,0,0,0))
 plot(flightpath$cellpos, pch = 16, cex = 0.1, col = cols[res$clust])
 text(flightpath$clustpos[, 1], flightpath$clustpos[, 2], rownames(flightpath$clustpos), cex = 0.7)
-
 # umap
 plot(um, pch = 16, cex = 0.1, col = cols[res$clust])
 for (cell in unique(res$clust)) {
   text(median(um[res$clust == cell, 1]), median(um[res$clust == cell, 2]), cell, cex = 0.7)  
 }
-
 # xy space:
 plot(xy, pch = 16, cex = 0.5, col = cols[res$clust],
      xlim = c(9.5, 11.5), ylim = c(4, 6))   # zooming in for legibility. The full plot should be printed to a high-res .png.
-
 # print to a png to examine the full xy space:
 png(paste0(mydir, "/results/cell_type_map.png"), 
       width = diff(range(xy[,1]))*.7, height = diff(range(xy[,2]))*.7, units = "in", 
@@ -144,7 +140,6 @@ plot(xy, pch = 16, col = cols[res$clust], cex = 0.1,
      xlab = "", ylab = "", xaxt = "n", yaxt = "n", asp = 1)
 legend("topright", pch = 16, col = cols, legend = names(cols), cex = 0.5)
 dev.off()
-
 ```
 
 Higher rates of confusion are seen between closely-related cell types, e.g. Distinct proximal tubule types A and B. 
@@ -271,5 +266,5 @@ Finally we'll save our results:
 saveRDS(res2, file = paste0(mydir, "/processed_data/insitutype_results.RDS"))
 
 # save the vector of cluster assignments:
-saveRDS(res2$clust, file = paste0(mydir, "/processed_data/clust.RDS"))
+saveRDS(res2$clust, file = paste0(mydir, "/processed_data/celltype.RDS"))
 ```

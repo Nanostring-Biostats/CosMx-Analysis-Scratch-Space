@@ -28,7 +28,7 @@ We'll organize the files for this analysis as follows:
 
 Our flat file exports contain the following:
 
-```insert cartoon of initial data types```
+![](img/data_before.png)
 
 These contain:
 - Raw counts
@@ -39,7 +39,7 @@ These contain:
 
 Our analyses will append lots of new information to this starting point, ending here:
 
-```insert cartoon of all data types```
+![](img/data_after.png)
 
 New data types include:
 - UMAP coordinates
@@ -72,8 +72,9 @@ Then, we go after biology:
 
 ```list of topics here, some statements, some links to CASS articles```
 
-
-
+- For large experiments, [more advanced workflows](linktocassarticle) may be needed to avoid overwhelming your compute and/or memory. 
+- For studies across multiple flow cells, [batch correction](linktocurrentlynonexistentcassarticle) should be considered.
+- 
 
 
 
