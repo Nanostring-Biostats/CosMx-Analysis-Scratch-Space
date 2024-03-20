@@ -31,6 +31,7 @@ See the function [nearestNeighborGraph in the Insitucor package](https://github.
 # xy is a 2-column matrix of xy locations
 neighbors <- InSituCor:::nearestNeighborGraph(x = xy[, 1], y = xy[, 2], n=50)
 ```
+Note this matrix is populated by *distances*, not by simple 1/0 values.
 
 #### Returning a sparse matrix of cells' neighbors within a radius
 
@@ -40,7 +41,7 @@ See the function [radiusBasedGraph in the Insitucor package](https://github.com/
 # xy is a 2-column matrix of xy locations
 neighbors <- InSituCor:::radiusBasedGraph(x = xy[, 1], y = xy[, 2], R = 0.1)
 ```
-
+Note this matrix is populated by *distances*, not by simple 1/0 values.
 
 ## Measuring a gene's spatial autocorrelation  <a name="correlation"></a>
 
