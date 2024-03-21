@@ -28,7 +28,7 @@ We'll organize the files for this analysis as follows:
 
 Our flat file exports contain the following:
 
-![](img/data_before.png)
+![image](img/data_before.png)
 
 These contain:
 - Raw counts
@@ -39,7 +39,7 @@ These contain:
 
 Our analyses will append lots of new information to this starting point, ending here:
 
-![](img/data_after.png)
+![image](img/data_after.png)
 
 New data types include:
 - UMAP coordinates
