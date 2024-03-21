@@ -2,7 +2,6 @@
 title: "Differential expression"
 output: 
 rmarkdown::html_vignette: 
-toc: true
 fig_width: 7 
 fig_height: 8 
 vignette: >
@@ -25,23 +24,18 @@ knitr::opts_chunk$set(
 
 ## Introduction
 
-Outline:
 
-- gene screening
-- fast model
-- better: (describe basic recommendation of smiDE paper)
-- show volcano plots
-- comment on how you need a good effect size
 
 
 
 ```{r loading}
 # packages:
 library(pheatmap)
+library(Matrix)
 
 # load data:
 mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
-norm <- readRDS(paste0(mydir, "processed_data/norm.RDS"))
+norm <- readRDS(paste0(mydir, "/processed_data/norm.RDS"))
 metadata <- readRDS(paste0(mydir, "/processed_data/metadata_with_spatialcontext.RDS")) 
 celltype <- readRDS(paste0(mydir, "/processed_data/celltype.RDS"))
 xy <- readRDS(paste0(mydir, "/processed_data/xy.RDS"))
@@ -59,9 +53,10 @@ errors. We recommend omitting these gene/cell type pairs from DE analysis.
 
 ```{r filter}
 
-
+# NEED TO IMPLEMENT AN ACTUAL FILTER HERE
 analyzable <- matrix(TRUE, nrow = ncol(norm), ncol = length(unique(celltype)),
                      dimnames = list(colnames(norm), unique(celltype)))
+analyzable[1:10, 1:6]
 ```
 
 
@@ -82,14 +77,14 @@ But we should remember that mesangial cells are probably responding to many fact
 macrophages. If we omit any of these factors from our DE model, it will be incomplete,
 with the omitted variable acting as a unmodeled confounder, biasing our results.
 Biology is complex, and we'll never manage to specify a complete model for the local 
-factors acting on podocyte gene expression, but we should try our best to capture
+factors acting on Mesangial cell gene expression, but we should try our best to capture
 the major factors. 
 
 So instead, we might try the following model:
 
-*E(y) = f(number of nearby macrophages, local expression of inflammatory cytokines, number of nearby mesangial cells, spatial cluster)*.
+*E(y) = f(number of nearby macrophages, number of nearby glomerular endothelium cells, number of nearby lymphoid compartment cells, spatial cluster)*.
 
-This model accounts for other immune impacts on podocyte expression and for any impact
+This model accounts for other immune impacts on mesangial cell expression and for any impact
 of glomerulus composition on mesangial cells. (Mesangial cells live alongside podocytes and glomerular endothelial cells in glomeruli.)
 It also adjust for spatial cluster, which is reasonable to do whenever your variable of interest
 is largely uncorrelated with spatial cluster. In this example, if one of the spatial clusters was
@@ -126,14 +121,15 @@ length(usegenes)
 # get the design matrix to be used in every gene's model:
 templm = lm(norm[inds, 1] ~ metadata$n_mac_neighbors[inds] + metadata$n_glom_endo_neighbors[inds] + metadata$n_lymphoid_neighbors[inds] + as.factor(metadata$spatialclust[inds]))
 X = model.matrix(templm)
-head(X)
 # clean up column names in the design matrix:
+colnames(X)
 colnames(X) <- gsub("metadata\\$", "", colnames(X))
 colnames(X) <- gsub("\\[inds\\]", "", colnames(X))
 colnames(X) <- gsub("\\)", "", colnames(X))
 colnames(X) <- gsub("\\(", "", colnames(X))
 colnames(X) <- gsub("as.factor", "", colnames(X))
 colnames(X)
+head(X)
 
 # now use matrix algebra to run a lm for every gene at once:
 # get the estimates:
@@ -167,15 +163,6 @@ if (FALSE) {   # THIS NEEDS REVISION
 summary(templm)$coef[, c("Estimate", "Std. Error", "Pr(>|t|)")]
 # our matrix algebra results:
 cbind(beta[, 1], ses[, 1], ps[, 1])
-
-
-## a nice way to look at results across several variables and all genes:
-## heatmap of only the significant effect sizes:
-pheatmap(beta * (ps < 1e-2), col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(100),
-         breaks = seq(-0.5, 0.5, length.out = 101))
-
-
-
 ```
 
 
@@ -196,12 +183,10 @@ For publishable results, we recommend this above the simple linear models implem
 MORE NEEDED HERE
 
 ```{r plotting}
-
 ## a nice way to look at results across several variables and all genes:
 ## heatmap of only the significant effect sizes:
 pheatmap(beta * (ps < 1e-2), col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(100),
          breaks = seq(-0.5, 0.5, length.out = 101))
-
 ```
 
 ## Notes on interpretation
