@@ -26,16 +26,15 @@ We'll organize the files for this analysis as follows:
   
 ## Data structure
 
-Our flat file exports contain the following:
+Our flat file exports contain the following data types:
 
-![image](img/data_before.png)
-
-These contain:
 - Raw counts
 - Cell metadata: other attributes of cells, e.g. size, immunofluorescence values, tissue and FOV IDs,...
 - Spatial locations: xy locations given in mm. **Warning**: studies containing multiple slides may initially have overlapping xy locations.
 - Transcript data: for all RNA transcripts detected, location, gene ID, and cell ID. Most analyses use cell-level data, not this transcript-level data, but it can make compelling plots.
 - Tissue images. Not used by most analyses, but useful for Figures. 
+
+![image](img/data_before.png)
 
 Our analyses will append lots of new information to this starting point, ending here:
 
