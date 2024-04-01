@@ -1,8 +1,9 @@
 ## needed:
 # - plots: functions called on "res"
 # - flagging rule - own function, but called by runFOVQC
-
-
+# - one more output: sparse matrix of gene * FOV flags
+# - something for total counts? (not straightforward, should defer)
+# *- docs / example would be ideal
 
 #' FOV QC 
 #' 
@@ -11,8 +12,8 @@
 #' @param counts Counts matrix
 #' @param xy 2-column matrix of cells' xy positiong
 #' @param fov Vector of FOV IDs
-#' @param genes Vector of gene names (omit negprobes and falsecodes)
-#' @param barcodes Vector of gene barcodes, aligned to genes
+#' @param genes Vector of gene names, aligned to the \code{barcodes} argument (omit negprobes and falsecodes)
+#' @param barcodes Vector of gene barcodes, aligned to \code{genes} argument
 runFOVQC <- function(counts, xy, fov, genes, barcodes) {
   
   ## create a matrix of barcode bit expression over sub-FOV grids:
@@ -41,8 +42,56 @@ runFOVQC <- function(counts, xy, fov, genes, barcodes) {
   ## summarize bias per FOV:
   fovstats <- summarizeFOVBias(resid, gridinfo$gridfov)
   
-  return(list(fovstats = fovstats, resid = resid, gridinfo = gridinfo))
+  return(list(fovstats = fovstats, resid = resid, gridinfo = gridinfo, xy = xy))
 }
+
+
+
+#' Spatial plots of FOV effects:
+#' 
+#' @param res Results object created 
+#' @param outdir Directory to write results to
+#' @param plotwidth Width in inches of png plots
+#' @param plotheight Height in inches of png plots
+#' @return For each bit, draws a plot of estimated FOV effects
+FOVEffectsSpatialPlots <- function(res, xy, outdir, plotwidth = NULL, plotheight = NULL) {
+  
+  if (is.null(plotwidth)) {
+    plotwidth <- diff(range(res$xy[, 1])) * 1.2
+  }
+  if (is.null(plotheight)) {
+    plotheight <- diff(range(res$xy[, 1])) * 1.2
+  }
+  sapply(1:ncol(res$resid), function(i) {
+    png(paste0(outdir, make.names(colnames(res$redis)[i])), width = , height = 12, units = "in", res = 300)
+    plot(res$xy, cex = 0.2, asp = 1,
+         col = colorRampPalette(c("darkblue", "blue", "grey80", "red", "darkred"))(101)[
+           pmax(pmin(51 + resid[match(res$gridinfo$gridid, rownames(res$resid)), i] * 50, 101), 1)], main = bit)
+    dev.off()
+  })
+}
+
+
+#' Heatmap of estiamted bit bias across FOVs
+#' 
+#' @param res Results object created 
+#' @return Draws a heatmap
+FOVEffectsHeatmap <- function(res) {
+  pheatmap(fovstats$bias * (fovstats$p < 0.01) ,
+           col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(101),
+           breaks = seq(-1,1,length.out = 100))
+}
+
+
+#' Rule for flagging FOVs
+#' @param bias Matrix of bias estimates over FOVs x bits.
+#' @param p Matrix of p-values testing H0: no bias. Also over FOVs x bits.
+#' @param propagree Matrix of the proportion of each FOV's grid squares agreeing on the direction of bias. Also over FOVs x bits.
+#' @return A matrix of FOV * bit flagging calls
+flagFOVsFromStats<- function(bias, p) {
+  flag <- bas * (abs(bias) > log2(1.25)) * (p < 0.01)
+}
+
 
 
 # plots
@@ -177,15 +226,19 @@ genes2bits <- function(mat, genes, barcodes) {
 summarizeFOVBias <- function(resid, gridfov) {
   gridfov = gridfov[rownames(resid)]
   fovs = unique(gridfov)
-  bias <- p <- matrix(NA, length(fovs), ncol(resid),
+  bias <- p <- propagree <- matrix(NA, length(fovs), ncol(resid),
                       dimnames = list(fovs, colnames(resid)))
   
   for (bit in colnames(resid)) {
     mod = summary(lm(resid[, bit] ~ as.factor(gridfov) - 1))$coef
     bias[gsub("as.factor\\(gridfov\\)", "", rownames(mod)), bit] = mod[, "Estimate"]
     p[gsub("as.factor\\(gridfov\\)", "", rownames(mod)), bit] = mod[, "Pr(>|t|)"]
+    for (fov in fovs) {
+      inds <- gridfov == fov
+      propagree[fov, bit] <- mean(sign(resid[inds, bit]) == median(sign(resid[inds, bit])))
+    }
   }
   
-  return(list(bias = bias, p = p))
+  return(list(bias = bias, p = p, propagree = propagree))
 }
 
