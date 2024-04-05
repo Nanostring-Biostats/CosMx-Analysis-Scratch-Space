@@ -1,9 +1,30 @@
 ## needed:
-# - plots: functions called on "res"
-# - flagging rule - own function, but called by runFOVQC
-# - one more output: sparse matrix of gene * FOV flags
 # - something for total counts? (not straightforward, should defer)
-# *- docs / example would be ideal
+# *- docs / example would be ideal (put in function's "example" spot)
+
+
+# plots
+if (FALSE) {
+  pheatmap(resid[order(gridinfo$gridfov[rownames(resid)]), ], cluster_rows = F,
+           col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(101),
+           breaks = seq(-1,1,length.out = 100))
+  
+  bit = "c12B"
+  plotinds <- !is.na(gridinfo$gridid)
+  # plot expression:
+  plot(xy, cex = 0.2, asp = 1,
+       col = viridis_pal(option = "B")(121)[1 + pmin(bitcounts[match(gridinfo$gridid, rownames(resid)), bit], 120)], main = bit)
+  # plot resids:
+  plot(xy, cex = 0.2, asp = 1,
+       col = colorRampPalette(c("darkblue", "blue", "grey80", "red", "darkred"))(101)[
+         pmax(pmin(51 + resid[match(gridinfo$gridid, rownames(resid)), bit] * 50, 101), 1)], main = bit)
+  
+  pheatmap(fovstats$bias * (fovstats$p < 0.01),
+           col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(101),
+           breaks = seq(-1,1,length.out = 100))
+}
+
+
 
 #' FOV QC 
 #' 
@@ -14,6 +35,8 @@
 #' @param fov Vector of FOV IDs
 #' @param genes Vector of gene names, aligned to the \code{barcodes} argument (omit negprobes and falsecodes)
 #' @param barcodes Vector of gene barcodes, aligned to \code{genes} argument
+#' @example path.R
+#' @export
 runFOVQC <- function(counts, xy, fov, genes, barcodes) {
   
   ## create a matrix of barcode bit expression over sub-FOV grids:
@@ -42,7 +65,10 @@ runFOVQC <- function(counts, xy, fov, genes, barcodes) {
   ## summarize bias per FOV:
   fovstats <- summarizeFOVBias(resid, gridinfo$gridfov)
   
-  return(list(fovstats = fovstats, resid = resid, gridinfo = gridinfo, xy = xy))
+  # collate all flagged FOVs:
+  flaggedFOVs <- rownames(fovstats$flag)[rowSums(fovstats$flag) > 0]
+  
+  return(list(flaggedfovs = flaggedfovs, fovstats = fovstats, resid = resid, gridinfo = gridinfo, xy = xy))
 }
 
 
@@ -54,6 +80,7 @@ runFOVQC <- function(counts, xy, fov, genes, barcodes) {
 #' @param plotwidth Width in inches of png plots
 #' @param plotheight Height in inches of png plots
 #' @return For each bit, draws a plot of estimated FOV effects
+#' @export
 FOVEffectsSpatialPlots <- function(res, xy, outdir, plotwidth = NULL, plotheight = NULL) {
   
   if (is.null(plotwidth)) {
@@ -76,6 +103,7 @@ FOVEffectsSpatialPlots <- function(res, xy, outdir, plotwidth = NULL, plotheight
 #' 
 #' @param res Results object created 
 #' @return Draws a heatmap
+#' @export
 FOVEffectsHeatmap <- function(res) {
   pheatmap(fovstats$bias * (fovstats$p < 0.01) ,
            col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(101),
@@ -83,37 +111,6 @@ FOVEffectsHeatmap <- function(res) {
 }
 
 
-#' Rule for flagging FOVs
-#' @param bias Matrix of bias estimates over FOVs x bits.
-#' @param p Matrix of p-values testing H0: no bias. Also over FOVs x bits.
-#' @param propagree Matrix of the proportion of each FOV's grid squares agreeing on the direction of bias. Also over FOVs x bits.
-#' @return A matrix of FOV * bit flagging calls
-flagFOVsFromStats<- function(bias, p) {
-  flag <- bas * (abs(bias) > log2(1.25)) * (p < 0.01)
-}
-
-
-
-# plots
-if (FALSE) {
-  pheatmap(resid[order(gridinfo$gridfov[rownames(resid)]), ], cluster_rows = F,
-           col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(101),
-           breaks = seq(-1,1,length.out = 100))
-  
-  bit = "c12B"
-  plotinds <- !is.na(gridinfo$gridid)
-  # plot expression:
-  plot(xy, cex = 0.2, asp = 1,
-       col = viridis_pal(option = "B")(121)[1 + pmin(bitcounts[match(gridinfo$gridid, rownames(resid)), bit], 120)], main = bit)
-  # plot resids:
-  plot(xy, cex = 0.2, asp = 1,
-       col = colorRampPalette(c("darkblue", "blue", "grey80", "red", "darkred"))(101)[
-         pmax(pmin(51 + resid[match(gridinfo$gridid, rownames(resid)), bit] * 50, 101), 1)], main = bit)
-  
-  pheatmap(fovstats$bias * (fovstats$p < 0.01),
-           col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(101),
-           breaks = seq(-1,1,length.out = 100))
-}
 
 
 #' Get nearest neighbors, sampling diffusely across other FOVs. 
@@ -222,7 +219,11 @@ genes2bits <- function(mat, genes, barcodes) {
 
 #' Summarize bias in FOVs
 #' 
-#' For each bit, and each FOV, get the mean bias and a p-value
+#' @param resid Matrix of grid square x bit residuals
+#' @param gridfov Vector giving the FOV ID each grid square (rows of resid) belong to.
+#' For each bit, and each FOV, get 4 matrices:
+#' 1. a logical matrix of flags (TRUE = flagged), 2. the estimated per-fov bias,
+#' 3. p-values for those estimates, and 4. the proportion of each FOV's grid squares agreeing on the direction of bias.
 summarizeFOVBias <- function(resid, gridfov) {
   gridfov = gridfov[rownames(resid)]
   fovs = unique(gridfov)
@@ -239,6 +240,8 @@ summarizeFOVBias <- function(resid, gridfov) {
     }
   }
   
-  return(list(bias = bias, p = p, propagree = propagree))
+  # flagging rule:
+  flag <- (abs(bias) > log2(1.25)) * (p < 0.01) * (propagree > 0.04)
+  return(list(flaG = flag, bias = bias, p = p, propagree = propagree))
 }
 
