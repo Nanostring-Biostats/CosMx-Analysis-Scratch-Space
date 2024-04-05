@@ -1,47 +1,12 @@
 ## needed:
-# - something for total counts? (not straightforward, should defer)
-# *- docs / example would be ideal (put in function's "example" spot)
 # - test
-# - clean up comments
-# - barcodes should be a data frame, not 2 vectors
 # - build barcode files (confirm can be public)
-
-
-
-
-
-# plots
-if (FALSE) {
-  pheatmap(resid[order(gridinfo$gridfov[rownames(resid)]), ], cluster_rows = F,
-           col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(101),
-           breaks = seq(-1,1,length.out = 100))
-  
-  bit = "c12B"
-  plotinds <- !is.na(gridinfo$gridid)
-  # plot expression:
-  plot(xy, cex = 0.2, asp = 1,
-       col = viridis_pal(option = "B")(121)[1 + pmin(bitcounts[match(gridinfo$gridid, rownames(resid)), bit], 120)], main = bit)
-  # plot resids:
-  plot(xy, cex = 0.2, asp = 1,
-       col = colorRampPalette(c("darkblue", "blue", "grey80", "red", "darkred"))(101)[
-         pmax(pmin(51 + resid[match(gridinfo$gridid, rownames(resid)), bit] * 50, 101), 1)], main = bit)
-  
-  pheatmap(fovstats$bias * (fovstats$p < 0.01),
-           col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(101),
-           breaks = seq(-1,1,length.out = 100))
-}
-
-
-
-
-
-
 
 
 #' FOV QC 
 #' 
-#' Run the full FOV QC workflow:
-#' 
+#' Run the full FOV QC workflow: break each FOV into a 7x7 grid, compare grid squares 
+#' to similar squares in other FOVs, and look for bardode bits whose genes are losing signal.
 #' @param counts Raw counts matrix, cells in rows, genes in columns. Can be sparse or standard format.
 #' @param xy 2-column matrix of cells' xy positions, aligned to rows of counts.
 #' @param fov Vector of cells' FOV IDs, aligned to rows of counts.
