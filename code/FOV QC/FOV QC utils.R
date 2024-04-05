@@ -1,4 +1,5 @@
 ## needed:
+# - prep example data - subset the breast example
 # - test
 # - build barcode files (confirm can be public)
 
@@ -7,6 +8,7 @@
 #' 
 #' Run the full FOV QC workflow: break each FOV into a 7x7 grid, compare grid squares 
 #' to similar squares in other FOVs, and look for bardode bits whose genes are losing signal.
+#' Recommended to use this function for one tissue/slide at a time, not across multiple tissues.
 #' @param counts Raw counts matrix, cells in rows, genes in columns. Can be sparse or standard format.
 #' @param xy 2-column matrix of cells' xy positions, aligned to rows of counts.
 #' @param fov Vector of cells' FOV IDs, aligned to rows of counts.
