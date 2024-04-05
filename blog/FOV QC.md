@@ -49,6 +49,11 @@ expression in the square vs. in the average of the 10 most similar squares elsew
 For a given FOV and barcode bit, this gives us 49 constrasts. 
 WHen and FOV's grid squares consistently underexpress the relevant gene set, we flag the FOV.
 
+## Code
 
+Functions for FOV QC can be found [here](code/FOVQC/FOV%20QC/FOV%20QC%20utils.md). 
+
+This approach is new as of April 2024, and as-yet lightly tested. 
+Use thoughtfully. 
 
 
