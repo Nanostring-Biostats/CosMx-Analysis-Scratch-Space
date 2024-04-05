@@ -48,7 +48,7 @@ if (FALSE) {
 #' @param barcodemap Data frame with two columns: "gene" and "barcode". Download the barcodemap for your panel
 #' from https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/code/FOV%20QC.
 #' @export
-runFOVQC <- function(counts, xy, fov, genes, barcodes) {
+runFOVQC <- function(counts, xy, fov, barcodemap) {
   
   ## create a matrix of barcode bit expression over sub-FOV grids:
   # define grids, get per-square gene expression:
@@ -82,6 +82,12 @@ runFOVQC <- function(counts, xy, fov, genes, barcodes) {
   # collate all flagged FOVs:
   flaggedFOVs <- rownames(fovstats$flag)[rowSums(fovstats$flag) > 0]
   
+  if (length(flaggedFOVs) > 0) {
+    message(paste0("The following FOVs failed QC for one or more barcode positions: ",
+                   paste0(flaggedFOVs, collapse = ", ")))
+  } else {
+    message("All FOVs passed QC")
+  }
   return(list(flaggedfovs = flaggedfovs, fovstats = fovstats, resid = resid, gridinfo = gridinfo, xy = xy))
 }
 
@@ -93,9 +99,10 @@ runFOVQC <- function(counts, xy, fov, genes, barcodes) {
 #' @param outdir Directory to write results to
 #' @param plotwidth Width in inches of png plots
 #' @param plotheight Height in inches of png plots
+#' @param outdir Directory where png plots are printed.
 #' @return For each bit, draws a plot of estimated FOV effects
 #' @export
-FOVEffectsSpatialPlots <- function(res, xy, outdir, plotwidth = NULL, plotheight = NULL) {
+FOVEffectsSpatialPlots <- function(res, outdir = NULL, plotwidth = NULL, plotheight = NULL) {
   
   if (is.null(plotwidth)) {
     plotwidth <- diff(range(res$xy[, 1])) * 1.2
@@ -104,11 +111,15 @@ FOVEffectsSpatialPlots <- function(res, xy, outdir, plotwidth = NULL, plotheight
     plotheight <- diff(range(res$xy[, 1])) * 1.2
   }
   sapply(1:ncol(res$resid), function(i) {
-    png(paste0(outdir, make.names(colnames(res$redis)[i])), width = , height = 12, units = "in", res = 300)
+    if (!is.null(outdir)) {
+      png(paste0(outdir, make.names(colnames(res$redis)[i])), width = , height = 12, units = "in", res = 300)
+    }
     plot(res$xy, cex = 0.2, asp = 1,
          col = colorRampPalette(c("darkblue", "blue", "grey80", "red", "darkred"))(101)[
            pmax(pmin(51 + resid[match(res$gridinfo$gridid, rownames(res$resid)), i] * 50, 101), 1)], main = bit)
-    dev.off()
+    if (!is.null(outdir)) {
+      dev.off()
+    }
   })
 }
 
