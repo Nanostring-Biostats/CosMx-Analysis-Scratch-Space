@@ -18,7 +18,7 @@
 #' @param max_prop_change Maximum bias allowed. E.g., a value of "0.5" means all FOVs with bias >log2(1.5) or <log2(1/1.5) will be flagged.
 #' from https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/code/FOV%20QC.
 #' @export
-runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_change = 1.5) {
+runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_change = 0.5) {
   
   fov <- as.character(fov)
   ## create a matrix of barcode bit expression over sub-FOV grids:
