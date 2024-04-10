@@ -3,7 +3,14 @@
 ## source the necessary functions:
 source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/FOV-QC/code/FOV%20QC/FOV%20QC%20utils.R")
 
-## load example data:
+## load barcodes:
+allbarcodes <- readRDS(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/FOV-QC/code/FOV%20QC/barcodes_by_panel.RDS"))
+names(allbarcodes)
+# get the barcodes for the panel we want:
+barcodemap <- allbarcodes$Hs_6k
+head(barcodemap)
+
+## load example data: a subset of FOVs and genes from a 6k panel study of breast cancer:
 load(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/FOV-QC/code/FOV%20QC/FOV%20QC%20example%20data.RData"))
 
 # data structure:
@@ -27,6 +34,5 @@ head(res$flagged_fov_x_gene)
 FOVEffectsHeatmap(res) 
 
 # spatial plots of per-bit FOV effects:
-dir.create("FOV_QC_per_bit_plots")
-FOVEffectsSpatialPlots(res = res, outdir = "FOV_QC_per_bit_plots", bits = "flagged") 
+FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "flagged") 
 # now you can examine the plots for various bits, especially those highlighted in the above heatmap. 

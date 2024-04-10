@@ -112,7 +112,7 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged", plotwid
     par(mar = c(0,0,2,0))
     plot(res$xy, cex = 0.2, asp = 1, pch = 16,
          col = colorRampPalette(c("darkblue", "blue", "grey80", "red", "darkred"))(101)[
-           pmax(pmin(51 + resid[match(res$gridinfo$gridid, rownames(res$resid)), i] * 50, 101), 1)], main = colnames(res$resid)[i])
+           pmax(pmin(51 + res$resid[match(res$gridinfo$gridid, rownames(res$resid)), i] * 50, 101), 1)], main = colnames(res$resid)[i])
     for (f in unique(res$fov)) {
       inds <- res$fov == f
       rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]))
@@ -130,11 +130,7 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged", plotwid
 #' @return Draws a heatmap
 #' @export
 FOVEffectsHeatmap <- function(res) {
-  pheatmap(res$fovstats$bias * (res$fovstats$flag),
-           col = c("darkblue", "blue", "white","red", "darkred"),
-           breaks = c(-1,-0.5,-0.2,0.2,0.5,1))
-  
-  pheatmap(res$fovstats$bias * (res$fovstats$flag),
+  pheatmap::pheatmap(res$fovstats$bias * (res$fovstats$flag),
            col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(100),
            breaks = seq(-2,2,length.out = 101),
            main = "FOV bias: log2(fold-change) from comparable regions in other FOVs")
