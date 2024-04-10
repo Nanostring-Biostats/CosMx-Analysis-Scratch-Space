@@ -41,7 +41,7 @@ runFOVQC <- function(counts, xy, fov, barcodemap) {
   
   # get expected:
   yhat <- t(sapply(1:nrow(bitcounts), function(i) {
-    colMeans(bitcounts[comparators[i, ], ], na.rm = T)
+    colMeans(bitcounts[comparators[i, ], ], na.rm = TRUE)
   }))
   # get resids:
   resid = log2((bitcounts + 5) / (yhat + 5))

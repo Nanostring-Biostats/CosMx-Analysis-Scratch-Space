@@ -1,5 +1,8 @@
 #### simple demo of how to use FOV QC:
 
+# source the necessary functions:
+source("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/code/FOV%20QC/FOV%20QC%20utils.R")
+
 #### load necessary data:
 
 # load example data:
