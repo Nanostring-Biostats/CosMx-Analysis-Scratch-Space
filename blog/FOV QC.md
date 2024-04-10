@@ -22,7 +22,6 @@ Thus we see phenomena like the below, where genes with impacted bits are muted, 
 ![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/3e3dbed6-5469-4bab-885e-ad1534dba420)
 
 
-
 We have observed the below root causes of FOV artifacts:
 
 #### Registration failure: 
