@@ -113,7 +113,8 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged", plotwid
     par(mar = c(0,0,2,0))
     plot(res$xy, cex = 0.2, asp = 1, pch = 16,
          col = colorRampPalette(c("darkblue", "blue", "grey80", "red", "darkred"))(101)[
-           pmax(pmin(51 + res$resid[match(res$gridinfo$gridid, rownames(res$resid)), i] * 50, 101), 1)], main = colnames(res$resid)[i])
+           pmax(pmin(51 + res$resid[match(res$gridinfo$gridid, rownames(res$resid)), i] * 50, 101), 1)], 
+         main = paste0(colnames(res$resid)[i], ": log2(fold-change)\nfrom comparable regions elsewhere"))
     for (f in unique(res$fov)) {
       inds <- res$fov == f
       rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]))
