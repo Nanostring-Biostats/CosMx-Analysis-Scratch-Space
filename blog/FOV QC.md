@@ -19,6 +19,7 @@ that is, 4 "bits" of our color barcode are impacted, and in turn, so are all the
 
 Thus we see phenomena like the below, where genes with impacted bits are muted, while other genes behave normally:
 
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/3e3dbed6-5469-4bab-885e-ad1534dba420)
 
 
 
