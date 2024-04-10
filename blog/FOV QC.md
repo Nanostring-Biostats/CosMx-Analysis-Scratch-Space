@@ -13,7 +13,16 @@ impacted FOVs.
 
 ## FOV artifacts
 
-We have observed the below artifacts:
+All known FOV artifacts act by modulating our ability to detect reporter probes.
+Most commonly, we see a single reporter cycle in which all 4 colors of probes lose efficiency;
+that is, 4 "bits" of our color barcode are impacted, and in turn, so are all the genes sharing those barcode bits. 
+
+Thus we see phenomena like the below, where genes with impacted bits are muted, while other genes behave normally:
+
+
+
+
+We have observed the below root causes of FOV artifacts:
 
 #### Registration failure: 
 the images from each reporter cycle must be "registered", i.e. 
@@ -29,7 +38,9 @@ either a slight decrease or a total loss of signal for the impacted genes.
 #### Autofluorescence: 
 if the tissue in an FOV is autofluorescent, it can make fluorescent 
 signal from CosMx reporter probes harder to detect. When this happens, all genes with barcode
-bits in the impacted color will have lower expression.
+bits in the impacted color will be harder to detect. And at the same time, they will
+suffer higher rates of FalseCode style background events - i.e., their barcode will 
+more often be spuriously observed in the absense of hyb probes for the gene. 
 
 
 ## Approach to FOV QC
