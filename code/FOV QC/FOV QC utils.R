@@ -1,10 +1,9 @@
-## needed:
-# - prep example data - subset the breast example
-# - test
-# - build barcode files (confirm can be public)
-## status:
-# - still debugging example with mini data - down to final spatial plot function
-# - ideally mini data would show the misbehaving genes (just take all genes with bad bits from full data, plus some others)
+#### README:
+# This script: functions for performing FOV QC of CosMx data. 
+# See the vignette for details on how to run
+# The runFOVQC function is the entry point
+# Plotting functions: FOVEffectsHeatmap and FOVEffectsSpatialPlots
+
 
 
 #' FOV QC 
