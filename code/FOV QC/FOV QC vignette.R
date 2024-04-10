@@ -1,12 +1,10 @@
 #### simple demo of how to use FOV QC:
 
-# source the necessary functions:
-source("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/code/FOV%20QC/FOV%20QC%20utils.R")
+## source the necessary functions:
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/FOV-QC/code/FOV%20QC/FOV%20QC%20utils.R")
 
-#### load necessary data:
-
-# load example data:
-load("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/code/FOV%20QC/FOV%20QC%20example%20data.RData")
+## load example data:
+load(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/FOV-QC/code/FOV%20QC/FOV%20QC%20example%20data.RData"))
 
 # data structure:
 str(counts)
@@ -15,15 +13,19 @@ head(xy)
 head(fov)
 
 
-#### run QC pipeline
+#### run QC pipeline -------------------
 res <- runFOVQC(counts = counts, xy = xy, fov = fov, barcodemap = barcodemap)
 str(res)
+# which FOVs were flagged:
+res$flaggedfovs
+# which genes are involved in the flagged bits in those FOVs:
+head(res$flagged_fov_x_gene)
 
+#### Explore results: -----------------
 
-#### Explore results:
-
-# heatmap of FOV * bit results
+# heatmap of estimated bias suffered for each FOV * bit (flagged FOV * bits only):
 FOVEffectsHeatmap(res) 
+
 # spatial plots of per-bit FOV effects:
 dir.create("FOV_QC_per_bit_plots")
 FOVEffectsSpatialPlots(res = res, outdir = "FOV_QC_per_bit_plots", bits = "flagged") 
