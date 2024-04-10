@@ -62,7 +62,7 @@ WHen and FOV's grid squares consistently underexpress the relevant gene set, we 
 
 ## Code
 
-Functions for FOV QC can be found [here](code/FOVQC/FOV%20QC/FOV%20QC%20utils.md). 
+Functions for FOV QC can be found [here](../code/FOV%20QC). 
 
 We advise this approach be applied separately to each slide or tissue in a study. 
 
