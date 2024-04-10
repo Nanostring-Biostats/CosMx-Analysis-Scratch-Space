@@ -23,5 +23,5 @@ str(res)
 FOVEffectsHeatmap(res) 
 # spatial plots of per-bit FOV effects:
 dir.create("FOV_QC_per_bit_plots")
-FOVEffectsSpatialPlots(res = res, outdir = "FOV_QC_per_bit_plots") 
+FOVEffectsSpatialPlots(res = res, outdir = "FOV_QC_per_bit_plots", bits = "flagged") 
 # now you can examine the plots for various bits, especially those highlighted in the above heatmap. 
