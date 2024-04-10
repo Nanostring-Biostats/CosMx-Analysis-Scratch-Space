@@ -15,9 +15,10 @@
 #' @param xy 2-column matrix of cells' xy positions, aligned to rows of counts.
 #' @param fov Vector of cells' FOV IDs, aligned to rows of counts.
 #' @param barcodemap Data frame with two columns: "gene" and "barcode". Download the barcodemap for your panel
+#' @param max_prop_change Maximum bias allowed. E.g., a value of "0.5" means all FOVs with bias >log2(1.5) or <log2(1/1.5) will be flagged.
 #' from https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/code/FOV%20QC.
 #' @export
-runFOVQC <- function(counts, xy, fov, barcodemap) {
+runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_change = 1.5) {
   
   fov <- as.character(fov)
   ## create a matrix of barcode bit expression over sub-FOV grids:
@@ -47,7 +48,7 @@ runFOVQC <- function(counts, xy, fov, barcodemap) {
   rownames(resid) = rownames(bitcounts)
   
   ## summarize bias per FOV:
-  fovstats <- summarizeFOVBias(resid = resid, gridfov = gridinfo$gridfov)
+  fovstats <- summarizeFOVBias(resid = resid, gridfov = gridinfo$gridfov, max_prop_change = max_prop_change)
   
   # collate all flagged FOVs:
   flaggedfovs <- rownames(fovstats$flag)[rowSums(fovstats$flag) > 0]
@@ -247,11 +248,12 @@ genes2bits <- function(mat, genes, barcodes) {
 #' Summarize bias in FOVs
 #' 
 #' @param resid Matrix of grid square x bit residuals
-#' @param gridfov Vector giving the FOV ID each grid square (rows of resid) belong to.
+#' @param gridfov Vector giving the FOV ID each grid square (rows of resid) belong to.\
+#' @param max_prop_change Maximum bias allowed. E.g., a value of "0.5" means all FOVs with bias >log2(1.5) or <log2(1/1.5) will be flagged.
 #' For each bit, and each FOV, get 4 matrices:
 #' 1. a logical matrix of flags (TRUE = flagged), 2. the estimated per-fov bias,
 #' 3. p-values for those estimates, and 4. the proportion of each FOV's grid squares agreeing on the direction of bias.
-summarizeFOVBias <- function(resid, gridfov) {
+summarizeFOVBias <- function(resid, gridfov, max_prop_change) {
   gridfov = gridfov[rownames(resid)]
   fovs = unique(gridfov)
   bias <- p <- propagree <- matrix(NA, length(fovs), ncol(resid),
@@ -268,7 +270,7 @@ summarizeFOVBias <- function(resid, gridfov) {
   }
   
   # flagging rule:
-  flag <- (abs(bias) > log2(1.25)) * (p < 0.01) * (propagree >= 45/49)
+  flag <- (abs(bias) > log2(1 + max_prop_change)) * (p < 0.01) * (propagree >= 45/49)
   return(list(flag = flag, bias = bias, p = p, propagree = propagree))
 }
 
