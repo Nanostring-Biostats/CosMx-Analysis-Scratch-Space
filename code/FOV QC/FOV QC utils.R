@@ -2,6 +2,10 @@
 # - prep example data - subset the breast example
 # - test
 # - build barcode files (confirm can be public)
+## status:
+# - still debugging example with mini data - down to final spatial plot function
+# - ideally mini data would show the misbehaving genes (just take all genes with bad bits from full data, plus some others)
+
 
 
 #' FOV QC 
@@ -37,17 +41,17 @@ runFOVQC <- function(counts, xy, fov, barcodemap) {
   
   # get expected:
   yhat <- t(sapply(1:nrow(bitcounts), function(i) {
-    colMeans(bitcounts[comparators[i, ], ])
+    colMeans(bitcounts[comparators[i, ], ], na.rm = TRUE)
   }))
   # get resids:
   resid = log2((bitcounts + 5) / (yhat + 5))
   rownames(resid) = rownames(bitcounts)
   
   ## summarize bias per FOV:
-  fovstats <- summarizeFOVBias(resid, gridinfo$gridfov)
+  fovstats <- summarizeFOVBias(resid = resid, gridfov = gridinfo$gridfov)
   
   # collate all flagged FOVs:
-  flaggedFOVs <- rownames(fovstats$flag)[rowSums(fovstats$flag) > 0]
+  flaggedfovs <- rownames(fovstats$flag)[rowSums(fovstats$flag) > 0]
   
   if (length(flaggedFOVs) > 0) {
     message(paste0("The following FOVs failed QC for one or more barcode positions: ",
@@ -55,7 +59,7 @@ runFOVQC <- function(counts, xy, fov, barcodemap) {
   } else {
     message("All FOVs passed QC")
   }
-  return(list(flaggedfovs = flaggedfovs, fovstats = fovstats, resid = resid, gridinfo = gridinfo, xy = xy))
+  return(list(flaggedfovs = flaggedfovs, fovstats = fovstats, resid = resid, gridinfo = gridinfo, xy = xy, fov = fov))
 }
 
 
@@ -72,18 +76,23 @@ runFOVQC <- function(counts, xy, fov, barcodemap) {
 FOVEffectsSpatialPlots <- function(res, outdir = NULL, plotwidth = NULL, plotheight = NULL) {
   
   if (is.null(plotwidth)) {
-    plotwidth <- diff(range(res$xy[, 1])) * 1.2
+    plotwidth <- diff(range(res$xy[, 1])) * 1.5
   }
   if (is.null(plotheight)) {
-    plotheight <- diff(range(res$xy[, 1])) * 1.2
+    plotheight <- diff(range(res$xy[, 2])) * 1.5
   }
   sapply(1:ncol(res$resid), function(i) {
     if (!is.null(outdir)) {
-      png(paste0(outdir, make.names(colnames(res$redis)[i])), width = , height = 12, units = "in", res = 300)
+      png(paste0(outdir, "/", make.names(colnames(res$resid)[i]), ".png"), width = plotwidth, height = plotheight, units = "in", res = 300)
     }
-    plot(res$xy, cex = 0.2, asp = 1,
+    par(mar = c(0,0,2,0))
+    plot(res$xy, cex = 0.2, asp = 1, pch = 16,
          col = colorRampPalette(c("darkblue", "blue", "grey80", "red", "darkred"))(101)[
-           pmax(pmin(51 + resid[match(res$gridinfo$gridid, rownames(res$resid)), i] * 50, 101), 1)], main = bit)
+           pmax(pmin(51 + resid[match(res$gridinfo$gridid, rownames(res$resid)), i] * 50, 101), 1)], main = colnames(res$resid)[i])
+    for (f in unique(res$fov)) {
+      inds <- res$fov == f
+      rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]))
+    }
     if (!is.null(outdir)) {
       dev.off()
     }
@@ -97,9 +106,10 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, plotwidth = NULL, plothei
 #' @return Draws a heatmap
 #' @export
 FOVEffectsHeatmap <- function(res) {
-  pheatmap(fovstats$bias * (fovstats$p < 0.01) ,
+  pheatmap(res$fovstats$bias * (res$fovstats$flag),
            col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(101),
-           breaks = seq(-1,1,length.out = 100))
+           breaks = seq(-3,3,length.out = 100),
+           main = "FOV bias: log2(fold-change) from comparable regions in other FOVs")
 }
 
 
@@ -115,7 +125,7 @@ getNearestNeighborsByFOV <- function(x, fov, n_neighbors = 10) {
   # get nearest:
   topneighbors <- FNN::get.knnx(data = x, 
                                 query = x, 
-                                k = n_neighbors * 50)$nn.index
+                                k = min(n_neighbors * 50, nrow(x)))$nn.index
   # reduce neighbors: none from own FOV, max of max_per_fov from each other fov:
   reducedneighbors <- t(sapply(1:nrow(topneighbors), function(i) {
     tempneighbors <- topneighbors[i, ]
@@ -177,7 +187,8 @@ cellxgene2squarexbit <- function(counts, grid, genes, barcodes) {
     barcodehere <- substr(barcodes, barcodeposition, barcodeposition)
     for (col in c("B", "Y", "G", "R")) {
       tempgenes <- setdiff(genes[barcodehere == col], NA)
-      temptotal <- Matrix::rowSums(counts[, tempgenes])
+      tempgenes <- intersect(tempgenes, colnames(counts))
+      temptotal <- Matrix::rowSums(counts[, tempgenes, drop = FALSE])
       tempsquaretotal <- by(temptotal, grid, mean)
       bitmat[names(tempsquaretotal), paste0("c", i, col)] <- tempsquaretotal
     }
@@ -228,12 +239,12 @@ summarizeFOVBias <- function(resid, gridfov) {
     p[gsub("as.factor\\(gridfov\\)", "", rownames(mod)), bit] = mod[, "Pr(>|t|)"]
     for (fov in fovs) {
       inds <- gridfov == fov
-      propagree[fov, bit] <- mean(sign(resid[inds, bit]) == median(sign(resid[inds, bit])))
+      propagree[as.character(fov), bit] <- mean(sign(resid[inds, bit]) == median(sign(resid[inds, bit])))
     }
   }
   
   # flagging rule:
-  flag <- (abs(bias) > log2(1.25)) * (p < 0.01) * (propagree > 0.04)
-  return(list(flaG = flag, bias = bias, p = p, propagree = propagree))
+  flag <- (abs(bias) > log2(1.25)) * (p < 0.01) * (propagree > 47/49)
+  return(list(flag = flag, bias = bias, p = p, propagree = propagree))
 }
 
