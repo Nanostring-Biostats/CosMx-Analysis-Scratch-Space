@@ -21,7 +21,7 @@ head(fov)
 
 
 #### run QC pipeline -------------------
-res <- runFOVQC(counts = counts, xy = xy, fov = fov, barcodemap = barcodemap, max_prop_change = .25)
+res <- runFOVQC(counts = counts, xy = xy, fov = fov, barcodemap = barcodemap, max_prop_loss = 0.2)
 str(res)
 # which FOVs were flagged:
 res$flaggedfovs
