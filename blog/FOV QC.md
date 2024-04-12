@@ -52,13 +52,25 @@ underexpressed compared to comparable regions elsewhere.
 
 #### Technical details: 
 
-we place a 7x7 grid across each FOV. For each grid square, we find the 10 most similar squares
+We place a 7x7 grid across each FOV. For each grid square, we find the 10 most similar squares
 in other FOVs, with "similar" being based on the square's expression profile. (We also only accept one 
 neighbor per other FOV.)
 Then, for each barcode bit, we take the genes using the bit, and We contrast their 
 expression in the square vs. in the average of the 10 most similar squares elsewhere. 
-For a given FOV and barcode bit, this gives us 49 constrasts. 
-WHen and FOV's grid squares consistently underexpress the relevant gene set, we flag the FOV.
+For a given FOV and barcode bit, this gives us 49 contrasts. 
+When an FOV's grid squares consistently underexpress the relevant gene set, we flag the FOV.
+
+Below we demonstrate this approach, looking at a tissue with particularly dramatic FOV effects. 
+
+On the left, we plot expression of a single barcode bit impacted by FOV effects. 
+FOV 19 has almost entirely lost expression of the genes from this barcode bit,
+and FOV 16 looks as though it could be losing some expression. 
+
+On the right, we show the results of our FOV QC approach: for a 7x7 grid within 
+each FOV, we see estimated change in barcode bit expression compared to similar 
+grid squares in other FOVs. FOV 19 still stands out as an obvious failure. 
+In contrast, the low expression in FOV 16 is shown to be similar - sometimes higher, sometimes lower - 
+than biologically similar regions elsewhere in the tissue. 
 
 ## Code
 

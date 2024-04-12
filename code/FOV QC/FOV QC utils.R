@@ -122,9 +122,9 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged", plotwid
       inds <- res$fov == f
       rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]))
     }
-    legend("topright", pch = 16,
-           col = c("darkblue", "blue", "grey80", "red", "darkred"),
-           legend = c("< -1", -0.5, 0, 0.5, "> 1"))
+    legend("right", pch = 16,
+           col = rev(c("darkblue", "blue", "grey80", "red", "darkred")),
+           legend = rev(c("< -1", -0.5, 0, 0.5, "> 1")))
     if (!is.null(outdir)) {
       dev.off()
     }

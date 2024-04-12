@@ -34,5 +34,6 @@ head(res$flagged_fov_x_gene)
 FOVEffectsHeatmap(res) 
 
 # spatial plots of per-bit FOV effects:
+par(mar = c(1,1,3,1))
 FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "flagged") 
 # now you can examine the plots for various bits, especially those highlighted in the above heatmap. 
