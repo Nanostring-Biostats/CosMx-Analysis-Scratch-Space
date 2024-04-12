@@ -62,6 +62,8 @@ When an FOV's grid squares consistently underexpress the relevant gene set, we f
 
 Below we demonstrate this approach, looking at a tissue with particularly dramatic FOV effects. 
 
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/76c95e5d-9bef-4bea-9571-84b37cf9b988)
+
 On the left, we plot expression of a single barcode bit impacted by FOV effects. 
 FOV 19 has almost entirely lost expression of the genes from this barcode bit,
 and FOV 16 looks as though it could be losing some expression. 
@@ -71,6 +73,9 @@ each FOV, we see estimated change in barcode bit expression compared to similar
 grid squares in other FOVs. FOV 19 still stands out as an obvious failure. 
 In contrast, the low expression in FOV 16 is shown to be similar - sometimes higher, sometimes lower - 
 than biologically similar regions elsewhere in the tissue. 
+FOV 22 now stands out as having perhaps increased expression of the bit, but the high
+log2(fold-changes) (red squares) appear to follow spatially smooth biology and not the 
+sharp FOV borders, suggesting we needn't worry about technical artifacts in this FOV. 
 
 ## Code
 
