@@ -3,19 +3,22 @@
 #' Given a directory holding flat files exported by AtoMx, loads them in. 
 #' If flat files from multiple slides are present, merges them, preserving all shared genes and metadata variables.
 #' 
+#' Expected structure for flat files: exactly as exported by AtoMx: an overarching folder 
+#' holds a folder for each slide. Each slide's folder contains at a minimum: 
+#' an "exprMat" .csv file holding raw counts and a "metadata" .csv file holding cell metadata. 
+#' 
 #' @param dir Directory where flat files are located. 
 #' @return A list with 2 elements: \code{counts}, a sparse matrix of cell x gene count values, 
 #'  and \code{metadata}, a data table of cell metadata.
 loadAtoMxFlatFiles <- function(dir) {
   ### automatically get slide names:
-  filenames <- dir(flatfiledir)
-  metadatafilenames <- filenames[grepl("metadata", filenames)]
-  slidenames <- gsub("_metadata_file.csv.gz", "", metadatafilenames)
-  message(paste0("loading slides: ", paste0(slidenames, collapse = ", ")))
-  
+  slidenames <- dir(flatfiledir)
+
   #### load in metadata from each slide:
   metadatalist <- sapply(slidenames, function(slidename) {
-    tempdatatable <- data.table::fread(paste0(flatfiledir, "/", slidename, "_metadata_file.csv.gz"))
+    thisslidesfiles <- dir(paste0(flatfiledir, "/", slidename))
+    thisslidesmetadata <- thisslidesfiles[grepl("metadata\\_file", thisslidesfiles)]
+    tempdatatable <- data.table::fread(paste0(flatfiledir, "/", slidename, "/", thisslidesmetadata))
     tempdatatable$slidename <- slidename
     return(list(tempdatatable))
   })
@@ -35,8 +38,10 @@ loadAtoMxFlatFiles <- function(dir) {
   
   ### load in counts matrix from each slide:
   countlist <- sapply(slidenames, function(slidename) {
+    thisslidesfiles <- dir(paste0(flatfiledir, "/", slidename))
+    thisslidescounts <- thisslidesfiles[grepl("exprMat\\_file", thisslidesfiles)]
     # load in counts as a data table:
-    countsdatatable <- data.table::fread(paste0(flatfiledir, "/", slidename, "_exprMat_file.csv.gz"))
+    countsdatatable <- data.table::fread(paste0(flatfiledir, "/", slidename, "/", thisslidescounts))
     return(list(countsdatatable))
   })
   
@@ -77,8 +82,11 @@ loadAtoMxFlatFiles <- function(dir) {
   colnames(counts) <- sharedgenes
   
   # add to metadata: replace slide-specific FOV ID with a unique FOV ID:
-  metadata$FOV <- paste0(metadata$slidename, "_FOV", metadata$fov)
+  metadata$FOV <- paste0("s", as.numeric(as.factor(metadata$slidename)), "f", metadata$fov)
   metadata$fov <- NULL
+  
+  # remove cell_ID metadata column, which only identifies cell within slides, not across slides:
+  metadata$cell_ID <- NULL
   
   # isolate negative control matrices:
   negcounts <- counts[, grepl("Negative", colnames(counts))]

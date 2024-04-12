@@ -40,27 +40,32 @@ For more details on cell typing, see these resources:
 
 ## Cell typing preparation
 
-Our example dataset is from human kidneys. Fortunately for us, previous investigators 
-have already run single cell experiments in kidneys and done the hard work of defining which
-cell types are present. 
-We could repeat their work and cluster our data de novo, but the easiest approach is to
-classify our cells based on this previous work. 
-The Insitutype algorithm compares cells' expression profiles to "reference profiles"
-derived from earlier datasets. We can easily derive these from our favorite single cell dataset,
-or even easier, pull one from resources NanoString has compiled:
+Insitutype offers 3 approaches to cell typing:
+
+- Unsupervised clustering: discover cell types de novo without reference to prior data or biological knowledge. 
+- Supervised cell typing: start with "reference profiles" - a matrix of expected gene expression in each cell type - from prior data. Assign your cells to whichever reference cell type they resemble best.
+- Semi-supervised cell typing: assign cells to reference cell types as in supervised mode, but discover new clusters at the same time. 
+
+To obtain reference profiles, you can use pre-existing single cell or CosMx data, or you can 
+pull from resources NanoString has compiled:
 
 - [Cell profiles derived from scRNA-seq](https://github.com/Nanostring-Biostats/cellprofilelibrary)
 - [Cell profiles derived from CosMx](https://github.com/Nanostring-Biostats/CosMx-Cell-Profiles)
+
 
 The CosMx-derived profiles should be preferred when available, as they escape the 
 strong platform effects found between CosMx and scRNA-seq. 
 For now, the library of scRNA-seq profiles covers more tissue types.
 
-We'll download a reference profile from a previous CosMx experiment:
+Our example dataset is from melanoma samples. We don't have a reference profile for melanoma (and given the diversity of cancers, it's unclear that a reference from
+a different melanoma would work well), but we do have reference profiles for immune and stroma cells. 
+So we'll run in semi-supervised mode, looking for reference immune/stroma cells and using our de novo clusters to capture cancer cells.
+
+We'll download a reference profile matrix from a previous CosMx experiment:
 
 ```{r getreference}
 # load CosMx data:
-mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
+mydir <- "../"
 metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS")) 
 counts <- readRDS(paste0(mydir, "/processed_data/counts.RDS")) 
 negcounts <- readRDS(paste0(mydir, "/processed_data/negcounts.RDS")) 
@@ -68,12 +73,8 @@ um <- readRDS(paste0(mydir, "/processed_data/um.RDS"))
 xy <- readRDS(paste0(mydir, "/processed_data/xy.RDS"))
 
 
-#refprofiles <- read.csv("https://github.com/Nanostring-Biostats/CosMx-Cell-Profiles/Human/Kidney/Kidney.profiles.csv", row.names = 1, header = TRUE)
-mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
-#refprofiles <- as.matrix(read.csv(paste0(mydir, "/data/Kidney.profiles.csv"), row.names = 1, header = TRUE))
-refprofiles <- readRDS(paste0(mydir, "/data/Lake et al profiles.RDS"))
-refprofiles[1:5,1:5]
-dim(refprofiles)
+refprofiles <- read.csv("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Cell-Profiles/main/Human/IO/IO.profiles.csv", row.names = 1, header = TRUE)
+mydir <- "../"
 refprofiles <- refprofiles[is.element(rownames(refprofiles), colnames(counts)), ]
 pheatmap::pheatmap(sweep(refprofiles, 1, pmax(apply(refprofiles, 1, max), 0.2), "/"), 
                    col = colorRampPalette(c("white", "darkblue"))(100))
@@ -82,18 +83,20 @@ pheatmap::pheatmap(sweep(refprofiles, 1, pmax(apply(refprofiles, 1, max), 0.2), 
 
 ## Initial cell typing 
 
-Next we'll use Insitutype to assign our cells to these previously-published cell types:
+Next we'll use Insitutype to assign our cells to these previously-published cell types,
+while looking for 6 new clusters (it's usually advisable to overcluster at first):
 
 ```{r runinsitutype}
 library(InSituType)
 insitutypefileloc <- paste0(mydir, "/processed_data/insitutype_initial_results.RDS")
 if (!file.exists(insitutypefileloc)) {
+  set.seed(0)
   res <- InSituType::insitutype(x = counts, 
-                              neg = Matrix::rowMeans(negcounts), 
-                              reference_profiles = refprofiles,
-                              update_reference_profiles = FALSE,
-                              n_clust = 0,  # don't fit any additional clusters
-                              assay_type = "rna")
+                               neg = Matrix::rowMeans(negcounts), 
+                               reference_profiles = refprofiles,
+                               update_reference_profiles = FALSE,
+                               n_clust = 6,  
+                               assay_type = "rna")
   saveRDS(res, file = insitutypefileloc)
 } else {
   res <- readRDS(insitutypefileloc)
@@ -106,7 +109,8 @@ our cell typing results, we can just use an automated approach.
 
 ```{r choosecolors}
 cols <- InSituType::colorCellTypes(freqs = table(res$clust), palette = "brewers")
-cols
+str(cols)
+cols[c("Endothelial", "Fibroblast", "B.cell")]
 ```
 
 ## QC of cell typing results
@@ -116,11 +120,11 @@ We start with UMAP and "flightpath" plots. Flightpath plots are specific to meth
 They show the tendency of different cell types to be confused with each other. 
 
 
-```{r qcplots, fig.dim=c(8,8)}
+```{r qcplots, fig.dim=c(6,6)}
 # flightpath
 flightpath <- flightpath_layout(logliks = res$logliks, profiles = res$profiles)
 par(mar = c(0,0,0,0))
-plot(flightpath$cellpos, pch = 16, cex = 0.1, col = cols[res$clust])
+plot(flightpath$cellpos, pch = 16, cex = 0.2, col = cols[res$clust])
 text(flightpath$clustpos[, 1], flightpath$clustpos[, 2], rownames(flightpath$clustpos), cex = 0.7)
 # umap
 plot(um, pch = 16, cex = 0.1, col = cols[res$clust])
@@ -128,20 +132,21 @@ for (cell in unique(res$clust)) {
   text(median(um[res$clust == cell, 1]), median(um[res$clust == cell, 2]), cell, cex = 0.7)  
 }
 # xy space:
-plot(xy, pch = 16, cex = 0.5, col = cols[res$clust],
-     xlim = c(9.5, 11.5), ylim = c(4, 6))   # zooming in for legibility. The full plot should be printed to a high-res .png.
-# print to a png to examine the full xy space:
-png(paste0(mydir, "/results/cell_type_map.png"), 
+plot(xy, pch = 16, cex = 0.1, col = cols[res$clust], asp = 1)  
+# (to actually get a good look, print to a png to examine the full xy space in high res)
+if (FALSE) {
+  png(paste0(mydir, "/results/cell_type_map.png"), 
       width = diff(range(xy[,1]))*.7, height = diff(range(xy[,2]))*.7, units = "in", 
       res = 500)  # res of 400 is pretty good; 600 is publication-quality
-par(mar = c(0,0,0,0))
-plot(xy, pch = 16, col = cols[res$clust], cex = 0.1,
-     xlab = "", ylab = "", xaxt = "n", yaxt = "n", asp = 1)
-legend("topright", pch = 16, col = cols, legend = names(cols), cex = 0.5)
-dev.off()
+  par(mar = c(0,0,0,0))
+  plot(xy, pch = 16, col = cols[res$clust], cex = 0.1,
+       xlab = "", ylab = "", xaxt = "n", yaxt = "n", asp = 1)
+  legend("topright", pch = 16, col = cols, legend = names(cols), cex = 0.5)
+  dev.off()
+}
 ```
 
-Higher rates of confusion are seen between closely-related cell types, e.g. Distinct proximal tubule types A and B. 
+Higher rates of confusion are seen between closely-related cell types, e.g. T-cells or the (presumably tumor) clusters b, d, e and f. 
 But for the most part this is a good result, with no indication that any clusters are irredeemably confused. 
 
 Next we draw a heatmap of the cluster profiles. These are helpful for confirming that clusters have the expected marker genes,
@@ -169,9 +174,9 @@ for (cell in unique(res$clust)) {
       width = diff(range(xy[,1]))*.7, height = diff(range(xy[,2]))*.7, units = "in", 
       res = 400)  # res of 400 is pretty good; 600 is publication-quality
   par(mar = c(0,0,0,0))
-  plot(xy, pch = 16, col = "grey80", cex = 0.1,
+  plot(xy, pch = 16, col = scales::alpha(cols[res$clust], 0.3), cex = 0.1,
        xlab = "", ylab = "", xaxt = "n", yaxt = "n")
-  points(xy[res$clest == cell, ], pch = 16, cex = 0.2, col = cols[cell])
+  points(xy[res$clust == cell, ], pch = 16, cex = 0.1, col = "black")
   legend("top", legend = cell)
   dev.off()
 }
@@ -183,7 +188,7 @@ Cell typing deserves careful attention: it's a complex process, and your entire 
 Scrutinize the above QC plots for suspicious patterns. These could be:
 
 - Unlikely spatial distributions
-- Unlikely cell type abundances, e.g. a far too many immune cells, or not enough of a basic cell type (proximal tubules in our sample)
+- Unlikely cell type abundances, e.g. a far too many immune cells, or not enough of a basic cell type 
 - Implausible marker genes expressed at high levels
 - Biologically dissimilar cell types with similar expression profiles (near each other in UMAP space, confused with each other in the flightpath, showing similar profiles in the heatmap.)
 
@@ -192,21 +197,27 @@ For a deep dive on this topic, see the [Insitutype FAQs](https://github.com/Nano
 Below is an example of how to refine cell typing results. 
 We use Insitutype's built-in function "refineClusters".
 
-Here we see that the Neutrophil cluster has overrun the tissue. Since we expect vanishingly few neutrophils here,
-we'll delete this cluster and reassign its cells to their next-best fit.
-We'll also merge the two T-cell clusters for simplicity, and we'll subcluster podocytes to 
-see if any variability exists.
+Examining the QC plots above, we see that we have indeed overclustered a bit, resulting in novel clusters fitting the
+data better than our reference profiles and claiming cells that we'd like to call something else.
+Here, cluster "a" is stealing from stromal populations,
+and cluster "c" is stealing from diverse cell populations. 
+
+The solution is simple: we simply delete these clusters and force their cells to 
+go the the next-best cell type. 
+We'll use the refineClusters function to perform this operation.
+Using the same function, we'll also merge the T-cell clusters for simplicity, and, just for fun, we'll subcluster tumor cluster "d".
 
 ```{r refineclusters}
 refinedfileloc <- paste0(mydir, "/processed_data/insitutype_refined_results.RDS")
 if (!file.exists(refinedfileloc)) {
-    res2 <- refineClusters(logliks = res$logliks, 
-                           counts = counts,
-                           neg = Matrix::rowMeans(negcounts), 
-                           merges = c("T.cell.CD4" = "T-cell",
-                                      "T.cell.CD8" = "T-cell"),      # merge CD4 and CD8 cells to a broader "T-cell" category
-                          to_delete = "Neutrophil",                  # delete this cluster and send its cells to their next-best fit
-                          subcluster = list("Podocyte" = 2))         # subcluster podocytes into 2 new clusters
+    res2 <- refineClusters(
+      logliks = res$logliks, 
+      counts = counts,
+      neg = Matrix::rowMeans(negcounts), 
+      merges = c("T.cell.CD4" = "T-cell",
+                 "T.cell.CD8" = "T-cell"),  # merge Treg, CD4 and CD8 cells to a broader "T-cell" category
+      to_delete = c("a", "c"),               # delete this cluster and send its cells to their next-best fit
+      subcluster = list("d" = 2))            # subcluster cluster a into 2 new clusters
   saveRDS(res2, file = refinedfileloc)
 } else {
   res2 <- readRDS(refinedfileloc)
@@ -225,33 +236,27 @@ cols2 <- InSituType::colorCellTypes(freqs = table(res2$clust), palette = "brewer
 pheatmap::pheatmap(sweep(res2$profiles, 1, pmax(apply(res2$profiles, 1, max), 0.2), "/")[apply(res2$profiles, 1, max) > 0.2, ],  
                    fontsize_row = 4,
                    col = colorRampPalette(c("white", "darkblue"))(100))  
-
 # flightpath:
 flightpath2 <- flightpath_layout(logliks = res2$logliks, profiles = res2$profiles)
 par(mar = c(0,0,0,0))
 plot(flightpath2$cellpos, pch = 16, cex = 0.1, col = cols2[res2$clust])
 text(flightpath2$clustpos[, 1], flightpath2$clustpos[, 2], rownames(flightpath2$clustpos), cex = 0.7)
-
 # umap:
 plot(um, pch = 16, cex = 0.1, col = cols2[res2$clust])
 for (cell in unique(res2$clust)) {
   text(median(um[res2$clust == cell, 1]), median(um[res2$clust == cell, 2]), cell, cex = 0.7)  
 }
-
 # xy space:
-plot(xy, pch = 16, cex = 0.5, col = cols2[res2$clust],
-     xlim = c(9.5, 11.5), ylim = c(4, 6))   # zooming in for legibility. The full plot should be printed to a high-res .png.
-
-
-# xy plots:
-for (cell in unique(res$clust)) {
-  png(paste0(mydir, "/results/celltypev1_", cell, ".png"), 
+plot(xy, pch = 16, cex = 0.01, col = cols2[res2$clust], asp = 1)
+# xy plots highlighting individual cell types:
+for (cell in unique(res2$clust)) {
+  png(paste0(mydir, "/results/celltypev2_", cell, ".png"), 
       width = diff(range(xy[,1]))*.7, height = diff(range(xy[,2]))*.7, units = "in", 
       res = 400)  # res of 400 to limit file size; 600 is publication-quality
   par(mar = c(0,0,0,0))
-  plot(xy, pch = 16, col = "grey80", cex = 0.1,
+  plot(xy, pch = 16, col = scales::alpha(cols2[res2$clust], 0.3), cex = 0.1,
        xlab = "", ylab = "", xaxt = "n", yaxt = "n")
-  points(xy[res2$clust == cell, ], pch = 16, cex = 0.2, col = cols2[cell])
+  points(xy[res2$clust == cell, ], pch = 16, cex = 0.1, col = "black")
   legend("top", legend = cell)
   dev.off()
 }

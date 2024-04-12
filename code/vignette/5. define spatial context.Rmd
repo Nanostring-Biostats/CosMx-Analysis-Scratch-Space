@@ -44,7 +44,7 @@ library(irlba)
 library(spatstat)
 library(spatstat.geom)
 # load data:
-mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
+mydir <- "../"
 norm <- readRDS(paste0(mydir, "processed_data/norm.RDS"))
 metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS")) 
 celltype <- readRDS(paste0(mydir, "processed_data/celltype.RDS"))
@@ -86,13 +86,10 @@ cols <- c("#616161","#4285f4","#db4437","#f4b400","#0f9d58","#ab47bc","#00acc1",
           "#ff7043","#9e9d24","#5c6bc0","#f06292","#00796b","#c2185b","#7e57c2",
           "#03a9f4","#8bc34a","#fdd835","#fb8c00","#8d6e63","#9e9e9e","#607d8b")
 # plot:
-#sub <- sample(1:nrow(xy), 50000, replace = FALSE)
 sub = TRUE
-plot(xy[sub, ], pch = 16, cex = 0.8, 
+plot(xy[sub, ], pch = 16, cex = 0.1, 
      asp = 1, xlab = "", ylab = "",
-     col = cols[as.numeric(as.factor(spatialclust[sub]))],
-     xlim = c(4.5,6.5), ylim =c (6,8))
-   
+     col = cols[as.numeric(as.factor(spatialclust[sub]))])
 # add to metadata:
 metadata$spatialclust <- spatialclust
 ```
@@ -104,18 +101,16 @@ Alternatively, we can cluster cells based on the cell type composition of their 
 # create a point process object:
 pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = range(xy[, 2]))
 marks(pp) <- celltype
-spatstat::marks(pp) <- as.factor(spatstat::marks(pp))
+spatstat.geom::marks(pp) <- as.factor(spatstat.geom::marks(pp))
 # count neighbors of each db cluster:
-neighbormarks <- spatstat::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+neighbormarks <- spatstat.core::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+neighbormarks <- as.matrix(neighbormarks)
 rownames(neighbormarks) <- rownames(xy)
 head(neighbormarks)
-
 ## cluster it: 
-spatialclust <- mclust::Mclust(neighbormarks, 
-                         G = 8, # 8 clusters
-                         modelNames = c("EVI"))$classification
-
-
+spatialclust <- mclust::Mclust(neighbormarks, #sweep(neighbormarks, 1, rowSums(neighbormarks), "/"),
+                               G = 8, # 8 clusters
+                               modelNames = c("EEI"))$classification
 ## plot the results:
 # subset for faster plotting:
 sub <- sample(1:nrow(xy), round(nrow(xy) / 20), replace = FALSE)
@@ -126,7 +121,7 @@ cols <- c("#616161","#4285f4","#db4437","#f4b400","#0f9d58","#ab47bc","#00acc1",
 # plot:
 plot(xy[sub, ], pch = 16, cex = 0.2, 
      asp = 1, 
-     col = cols[as.numeric(as.factor(spatialclust)) %% length(cols) + 1])
+     col = cols[as.numeric(as.factor(spatialclust[sub])) %% length(cols) + 1])
 ```
 
 ## Hand-defining spatial context
@@ -138,15 +133,16 @@ Here we present three ways to annotate cells based on their spatial context:
 Example: you might categorize cells by how far they are from the nearest tumor cell:
 
 ```{r mindistance}
-# record IDs and ditances to nearest 50 neighbors:
-neighbors_dists <- FNN::get.knnx(data = xy, 
-                           query = xy[celltype == "tumor", ], 
+# record IDs and distances to nearest 50 neighbors:
+tumorcelltypes <- c("b", "e", "f", "d_1", "d_2")
+neighbors_dists <- FNN::get.knnx(data = xy[is.element(celltype, tumorcelltypes), ], 
+                           query = xy, 
                            k = 5)
 str(neighbors_dists)
 # record distance to a cell type:
-metadata$disttonearesttumor <- neighbor_dists$nn.dist[, 1]
+metadata$disttonearesttumor <- neighbors_dists$nn.dist[, 1]
 # record 3rd-closest distance to the cell type:
-metadata$distto3rdnearesttumor <- neighbor_dists$nn.dist[, 3]
+metadata$distto3rdnearesttumor <- neighbors_dists$nn.dist[, 3]
 ```
 
 #### Number of neighbors of a cell type:
@@ -156,17 +152,19 @@ Example: you might categorize cells by how many of a given cell type are in thei
 ```{r countneighbors}
 # create a point process object:
 pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = range(xy[, 2]))
+marks(pp) <- celltype
 spatstat.geom::marks(pp) <- celltype
 spatstat.geom::marks(pp) <- as.factor(spatstat.geom::marks(pp))
 # count neighbors of each db cluster:
-neighbormarks <- spatstat.explore::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+neighbormarks <- spatstat.core::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+neighbormarks <- as.matrix(neighbormarks)
 rownames(neighbormarks) <- rownames(xy)
 head(neighbormarks)[, 1:10]
 # save results for your desired cell types:
-metadata$n_mac_neighbors <- neighbormarks[, "Macrophage"]
-metadata$n_glom_endo_neighbors <- neighbormarks[, "Glomerular.endothelium"]
+metadata$n_tumor_neighbors <- rowSums(neighbormarks[, tumorcelltypes])
+metadata$n_fibroblast_neighbors <- neighbormarks[, "Fibroblast"]
 # save the sum of several related cell types:
-metadata$n_lymphoid_neighbors <- rowSums(neighbormarks[, c("T-cell", "B.cell", "NK.cell")])
+metadata$n_lymphoid_neighbors <- rowSums(neighbormarks[, c("T-cell", "T.cell.regulatory", "B.cell", "NK.cell", "Plasma", "Plasmablast")])
 ```
 
 #### Neighborhood expression of a gene

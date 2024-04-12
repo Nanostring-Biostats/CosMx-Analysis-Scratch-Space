@@ -44,12 +44,12 @@ We reimplement AtoMx QCs here to give you more granular control on how they're i
 We start by loading the data we'll need:
 
 ```{r loaddata}
-mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
-metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS")) 
-counts <- readRDS(paste0(mydir, "/processed_data/counts.RDS")) 
-negcounts <- readRDS(paste0(mydir, "/processed_data/negcounts.RDS")) 
-falsecounts <- readRDS(paste0(mydir, "/processed_data/falsecounts.RDS")) 
-xy <- readRDS(paste0(mydir, "/processed_data/xy.RDS"))
+mydir <- "../"
+metadata <- readRDS(paste0(mydir, "/processed_data/metadata_unfiltered.RDS")) 
+counts <- readRDS(paste0(mydir, "/processed_data/counts_unfiltered.RDS")) 
+negcounts <- readRDS(paste0(mydir, "/processed_data/negcounts_unfiltered.RDS")) 
+falsecounts <- readRDS(paste0(mydir, "/processed_data/falsecounts_unfiltered.RDS")) 
+xy <- readRDS(paste0(mydir, "/processed_data/xy_unfiltered.RDS"))
 ```
 
 ### Cell-level QC
@@ -61,9 +61,10 @@ We generally require 20 counts per cell in 1000plex data and 50 counts in 6000pl
 
 ```{r countqc}
 # require 50 counts per cell 
-count_threshold <- 50
+count_threshold <- 20
 metadata$totalcounts <- Matrix::rowSums(counts)
 flag <- metadata$totalcounts < count_threshold
+table(flag)
 ```
 
 Then we'll look for very large cells. You can run a Grubb's test to look for high outliers
@@ -73,13 +74,15 @@ of cell area, or you can determine a reasonable threshold yourself:
 # what's the distribution of areas?
 hist(metadata$Area, breaks = 100, xlab = "Cell Area", main = "")
 # based on the above, set a threshold:
-area_threshold <- 21000
+area_threshold <- 30000
 abline(v = area_threshold, col = "red")
 # flag cells based on area:
-flag <- flag | (metadata$area > area_threshold)
+flag <- flag | (metadata$Area > area_threshold)
+table(flag)
 ```
 
-### FOV-level QC:
+
+### FOV-level QC: low-signal FOVs: 
 
 A spatial map of per-cell signal total counts usually makes poor FOVs quite obvious. 
 Even better, we can color cells by the average counts of their spatial neighbors 
@@ -108,54 +111,51 @@ We don't see any low-signal FOVs in this plot, but if we did, we could flag the 
 Note that first you'd want to confirm that their signal was truly poor and not just slightly attenuated vs. their neighbors. It's OK for signal to vary; it just seems prudent to remove true outliers.
 
 ```{r lowcountfovs}
-low_count_fovs <- c("1121", "1259") 
+low_count_fovs <- c("exampleFOV101", "exampleFOV342") 
 flag <- flag | is.element(metadata$FOV, low_count_fovs)
+table(flag)
 ```
 
 
-Next, we'll look for FOVs with distorted expression profiles. 
-Below we color cells by their neighborhood expression values, allowing for distorted FOVs to stand out.
+### FOV-level QC: check for distorted gene expression profiles:
 
-```{r distortedfovs, fig.dim = c(7, 7)}
+Above we checked for FOVs with an overall loss in signal. 
+However, there are other, more subtle, FOV error modes that cause loss of counts in just subsets of genes. 
+Here we search for FOVs showing this behavior. 
 
-# operate on a subsample to save time:
-set.seed(0)
-nsub <- length(unique(metadata$FOV)) * 100
-sub <- sample(1:nrow(metadata), nsub)
+A new (as of April 2024) approach to FOV QC is available here: https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/code/FOV%20QC
 
-# get the mean expression profile around each cell:
-neighbormeanexpression <- neighbor_colMeans(x = counts, neighbors = neighbors[sub, ]) 
-# normalize it:
-neighbormeanexpression <- sweep(neighbormeanexpression, 1, Matrix::rowSums(neighbormeanexpression), "/")
+A description of the method is found here: https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/FOV-QC/blog/FOV%20QC.md
 
-# project to 3 umap dimensions:
-temppc <- prcomp(neighbormeanexpression)$x[, 1:20]
-tempum <- uwot::umap(temppc, n_components = 3) # Note: a common error in uwot::umap is resolved with: install.packages("Matrix", type = "source"); install.packages("irlba", type = "source")
-# rescale on 0.05 - 0.95:
-tempum <- apply(tempum, 2, function(x) {
-  pmax(pmin((x - quantile(x, 0.05)) / (quantile(x, 0.95) - quantile(x, 0.05)), .95), 0.05)
-})
+To summarize briefly: for each "bit" in our barcodes (e.g. red in reporter cycle 8), we look for FOVs where 
+genes using the bit are underexpressed. 
 
-# color by 3 umap dimensions:
-plot(xy[sub, ], pch = 16, cex = 0.2, 
-     asp = 1, # important: keep the true aspect ratio
-     col = rgb(tempum[, 1], tempum[, 2], tempum[, 3], 1),
-     main = "Cellular neighborhoods colored by their UMAP projection")
+```{r fovqc}
+# get the FOV QC utils code:
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/FOV-QC/code/FOV%20QC/FOV%20QC%20utils.R")
+
+# get barcode details for this panel:
+allbarcodes <- readRDS(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/FOV-QC/code/FOV%20QC/barcodes_by_panel.RDS"))
+names(allbarcodes)
+# get the barcodes for the panel we want:
+barcodemap <- allbarcodes$Hs_UCC
+head(barcodemap)
+
+# run the method:
+fovqc <- runFOVQC(counts = counts, xy = xy, fov = metadata$FOV, barcodemap = barcodemap, max_prop_loss = 0.33)
+# report flagged FOVs:
+fovqc$flaggedfovs
+
+# see how expression of genes with impacted bits changes:
+FOVEffectsSpatialPlots(fovqc, outdir = NULL, bits = "flagged") 
+
+# remove cells in those FOVs:
+flag <- flag | is.element(metadata$FOV, fovqc$flaggedfovs)
+table(flag)
 ```
 
 
-Here we see two major drivers of spatial signal. First, small round glomeruli (these samples are kidneys)
- emerge as distinct from their surroundings. And second, different tissues are projected to different
- regions of the UMAP. 
-We're looking for a third effect: FOVs that are discordant from their peers. 
-These would suggest FOV-level artifacts, and we'd usually want to flag and remove those FOVs. 
- 
-Example for for flagging FOVs we pick out as discordant from the above plot:
 
-```{r flagdistortedfovs}
-distorted_fovs <- c("1549", "1432") 
-flag <- flag | is.element(metadata$FOV, distorted_fovs)
-```
 
 ### Remove flagged cells and FOVs
 
@@ -165,14 +165,12 @@ To avoid risk of data misalignment, we'll use cell IDs to coordinate this operat
 ```{r remove}
 # how many cells are we flagging?
 table(flag)
-# keep these cells:
-keepcells <- metadata$cell_ID[!flag]
 # subset all data objects to only the cells to be kept:
-counts <- counts[keepcells, ]
-negcounts <- negcounts[keepcells, ]
-falsecounts <- falsecounts[keepcells, ]
-metadata <- metadata[keepcells, ]
-xy <- xy[keepcells, ]
+counts <- counts[!flag, ]
+negcounts <- negcounts[!flag, ]
+falsecounts <- falsecounts[!flag, ]
+metadata <- metadata[!flag, ]
+xy <- xy[!flag, ]
 # overwrite saved data with filtered data:
 saveRDS(counts, paste0(mydir, "/processed_data/counts.RDS"))
 saveRDS(negcounts, paste0(mydir, "/processed_data/negcounts.RDS"))

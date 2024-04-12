@@ -32,7 +32,7 @@ For an under-development toolkit to automate this process, see [here](https://gi
 First, we load in only the data we need:
 
 ```{r loadxy}
-mydir <- "//nanostring.local/RND/analysis-files/pdanaher/vignette/"
+mydir <- ".."
 metadata <- readRDS(paste0(mydir, "/processed_data/metadata_unfiltered.RDS")) # load cell metadata
 ```
 
@@ -59,7 +59,7 @@ set.seed(1)
 xy <- condenseTissues(xy = xy, 
                       tissue = metadata$slidename, 
                       tissueorder = NULL,  # optional, specify the order tissues are tiled in
-                      buffer = 0.5, # space between tissues
+                      buffer = 1, # space between tissues
                       widthheightratio = 4/3) # desired shape of final xy locations 
 ```
 
@@ -82,15 +82,18 @@ for (slidename in unique(metadata$slidename)) {
 
 In this dataset we have 2 tissues on each slide. AtoMx didn't know this, so we'll have to enter that information ourselves. 
 Using code to record/define this information is simple enough and, more importantly, reproducible.
-Here's example code for assigning cells the right tissue ID:
+Here's example code for assigning cells the right tissue ID. 
+To show a more complex example, we're pretending we have 2 tissues per slide.
 
 ```{r definetissue}
-# manually assign tissue IDs:
+# manually assign tissue IDs: 
+# (Use whatever logic you need here. In this example, slide and tissue are synonymous, though they often won't be.)
 metadata$tissue <- NA
-metadata$tissue[(metadata$slidename == "SMI0016c_SP2219") & (xy[, 2] > 8)] <- "sample1"
-metadata$tissue[(metadata$slidename == "SMI0016c_SP2219") & (xy[, 2] < 8)] <- "sample2"
-metadata$tissue[(metadata$slidename == "SMI0016c_SP212319") & (xy[, 2] > 8)] <- "sample3"
-metadata$tissue[(metadata$slidename == "SMI0016c_SP212319") & (xy[, 2] < 8)] <- "sample4"
+metadata$tissue[(metadata$slidename == "MAR19_SlideAge_SkinCancer_RT_CP_slide2") & (xy[, 2] < 9)] <- "sample1"
+metadata$tissue[(metadata$slidename == "MAR19_SlideAge_SkinCancer_RT_CP_slide2") & (xy[, 2] > 9)] <- "sample2"
+metadata$tissue[(metadata$slidename == "MAR19_SlideAge_SkinCancer_4C_CP_slide4") & (xy[, 2] < 5.3)] <- "sample3"
+metadata$tissue[(metadata$slidename == "MAR19_SlideAge_SkinCancer_4C_CP_slide4") & (xy[, 2] > 5.3)] <- "sample4"
+
 # check for hiccups:
 if (any(is.na(metadata$tissue))) {
   stop("some cells didn't get a tissue ID")
@@ -126,7 +129,7 @@ xy <- condenseTissues(xy = xy,
                       tissue = metadata$tissue, 
                       tissueorder = NULL,  # optional, specify the order tissues are tiled in
                       buffer = 1, # space between tissues
-                      widthheightratio = 2) # desired shape of final xy locations 
+                      widthheightratio = 1) # desired shape of final xy locations 
 # now how do they look?
 # to avoid unnecessarily plotting all the cells, just show a subset:
 sub <- sample(1:nrow(xy), round(nrow(xy) / 20), replace = FALSE)
@@ -148,8 +151,8 @@ Much better. And if we aren't worried about preserving long-range distances, whi
 we can consolidate sample 2 a little better:
 
 ```{r consolidate}
-isfarout <- xy[, 1] > 19
-xy[isfarout, 1] <- xy[isfarout, 1] - 6
+isfarout <- (metadata$tissue == "sample3") & (xy[, 2] > 11)
+xy[isfarout, 2] <- xy[isfarout, 2] - 2
 sub <- sample(1:nrow(xy), round(nrow(xy) / 20), replace = FALSE)
 plot(xy[sub, ], pch = 16, cex = 0.2, 
      asp = 1, # important: keep the true aspect ratio
