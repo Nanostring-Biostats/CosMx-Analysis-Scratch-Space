@@ -16,9 +16,13 @@ We'll organize the data for this analysis as follows:
 
 ![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/19fbb937-4d5a-414a-9c08-1577860c0225)
 
-- The "raw_data" folder holds the exports from AtoMx
+- The "data" folder holds the exports from AtoMx
 - "processed_data" holds data objects generated during analysis, meant to be used by later analyses. 
 - "results" holds results intended for human consumption.
+
+Inside the "data" folder, we'll place a folder names "falt_files", containing the AtoMx exports:
+
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/a29d3832-5d47-4179-a966-f7c6ef666b94)
 
 And we'll organize code as follows:
 
