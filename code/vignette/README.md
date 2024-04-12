@@ -5,7 +5,7 @@
 This directory contains a complete demo analysis of a CosMx dataset. 
 It's intended to be used as a template for other analyses to follow. 
 
-We'll be analyzing a 6000-plex dataset from a _______.
+We'll be analyzing a 1000-plex dataset from melanoma smaples.
 We begin with the files written by the AtoMx flat file export module. 
 The full dataset we've used is too big to be saved on Github. 
 To follow along, we recommend using your own data, also as output by the AtoMx flat file export module.
