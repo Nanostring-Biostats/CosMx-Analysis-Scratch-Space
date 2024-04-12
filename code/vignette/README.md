@@ -12,17 +12,21 @@ To follow along, we recommend using your own data, also as output by the AtoMx f
 
 ## File structure
 
-We'll organize the files for this analysis as follows:
+We'll organize the data for this analysis as follows:
 
-```insert snapshot of the folders```
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/19fbb937-4d5a-414a-9c08-1577860c0225)
 
 - The "raw_data" folder holds the exports from AtoMx
 - "processed_data" holds data objects generated during analysis, meant to be used by later analyses. 
-- "results" holds results intended for human consumption. 
-- analysis scripts are in the top-level directory
-- "utils" holds R scripts containing functions used by analyses
-- scripts are numbered by the order in which they should be run. 
-  Most scripts require output created by earlier scripts. 
+- "results" holds results intended for human consumption.
+
+And we'll organize code as follows:
+
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/effb200a-31db-4c0e-b0b0-d92d42eef459)
+
+- Analysis scripts are numbered by the order in which they should be run. Each creates data used by the downstream scripts. 
+- Scripts are meant to be run in the directory where they lie.
+- "utils" holds R scripts containing functions used by analyses.
   
 ## Data structure
 
