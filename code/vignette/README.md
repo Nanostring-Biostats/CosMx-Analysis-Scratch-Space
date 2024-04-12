@@ -57,26 +57,24 @@ Our workflow performs the below steps:
 
 First, the fundamentals:
 
-- [Parse and format data export by AtoMx]()
-- [Custom arranging of tissues and FOVs in space]()
-- [QC and normalization]()
-- [Dimension reduction (PCA and UMAP)]()
-- [Cell typing]()
+- [Parse and format data export by AtoMx](0.%20loading%20flat%20files.Rmd)
+- [Custom arranging of tissues and FOVs in space](1.%20finessing%20tissues%20spatial%20arrangement.Rmd)
+- [QC and normalization](2.%20QC%20and%20normalization.Rmd)
+- [Dimension reduction (PCA and UMAP)](3.%20dimension%20reduction.Rmd)
+- [Cell typing](4.%20cell%20typing.Rmd)
 
 Then, we go after biology:
 
-- [Defining cells' spatial context]()
-- [Hypothesis-driven analyses, i.e. differential expression: how do cells change behavior based on their spatial context?]()
-- [Hypothesis-generating analyses: identifying spatially correlated genes with InSituCor]()
+- [Defining cells' spatial context](5.%20define%20spatial%20context.Rmd)
+- Hypothesis-driven analyses, i.e. differential expression: how do cells change behavior based on their spatial context? (tbd)
+- Hypothesis-generating analyses: identifying spatially correlated genes with InSituCor (tbd)
 
 
 ## General analysis advice
 
-```list of topics here, some statements, some links to CASS articles```
-
-- For large experiments, [more advanced workflows](linktocassarticle) may be needed to avoid overwhelming your compute and/or memory. 
-- For studies across multiple flow cells, [batch correction](linktocurrentlynonexistentcassarticle) should be considered.
-- 
+- For large experiments, [more advanced workflows](../../blog/big%20data%20strategies.md) may be needed to avoid overwhelming your compute and/or memory. 
+- For studies across multiple flow cells, batch correction should be considered.
+  
 
 
 
