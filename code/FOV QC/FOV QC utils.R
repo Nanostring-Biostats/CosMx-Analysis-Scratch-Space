@@ -70,7 +70,7 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
     flaggedgenes <- c()
     for (bit in flaggedbits) {
       # get the position in the barcode string, and the color:
-      reporterposition <- as.numeric(substr(bit, 2, nchar(bit) - 1)) * 2
+      reporterposition <- as.numeric(substr(bit, 14, nchar(bit) - 1)) * 2
       reportercolor <- substr(bit, nchar(bit), nchar(bit))
       flaggedgenes <- barcodemap$gene[substr(barcodemap$barcode, reporterposition, reporterposition) == reportercolor]
       # add to growing list:
@@ -212,7 +212,7 @@ cellxgene2squarexbit <- function(counts, grid, genes, barcodes) {
   nbits <- nreportercycles * 4
   # parse barcodes:
   bitmat = matrix(0, length(setdiff(unique(grid), NA)), nbits)
-  colnames(bitmat) <- paste0("c", rep(seq_len(nreportercycles), each = 4), c("B", "G", 'Y', "R"))
+  colnames(bitmat) <- paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), c("B", "G", 'Y', "R"))
   rownames(bitmat) <- setdiff(unique(grid), NA)
   for (i in seq_len(nreportercycles)) {
     barcodeposition <- i*2
@@ -222,7 +222,7 @@ cellxgene2squarexbit <- function(counts, grid, genes, barcodes) {
       tempgenes <- intersect(tempgenes, colnames(counts))
       temptotal <- Matrix::rowSums(counts[, tempgenes, drop = FALSE])
       tempsquaretotal <- by(temptotal, grid, mean)
-      bitmat[names(tempsquaretotal), paste0("c", i, col)] <- tempsquaretotal
+      bitmat[names(tempsquaretotal), paste0("reportercycle", i, col)] <- tempsquaretotal
     }
   }
   return(bitmat)
@@ -239,13 +239,13 @@ genes2bits <- function(mat, genes, barcodes) {
   nbits <- nreportercycles * 4
   # parse barcodes:
   bitmat = matrix(0, nrow(mat), nbits)
-  colnames(bitmat) = paste0("c", rep(seq_len(nreportercycles), each = 4), c("B", "G", 'Y', "R"))
+  colnames(bitmat) = paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), c("B", "G", 'Y', "R"))
   for (i in seq_len(nreportercycles)) {
     barcodeposition <- i*2
     barcodehere <- substr(barcodes, barcodeposition, barcodeposition)
     for (col in c("B", "Y", "G", "R")) {
       tempgenes <- genes[barcodehere == col]
-      bitmat[, paste0("c", i, col)] = Matrix::rowSums(mat[, is.element(colnames(mat), tempgenes)])
+      bitmat[, paste0("reportercycle", i, col)] = Matrix::rowSums(mat[, is.element(colnames(mat), tempgenes)])
     }
   }
   rownames(bitmat) <- rownames(mat)
