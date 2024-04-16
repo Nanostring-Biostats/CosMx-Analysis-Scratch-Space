@@ -77,6 +77,15 @@ FOV 22 now stands out as having perhaps increased expression of the bit, but the
 log2(fold-changes) (red squares) appear to follow spatially smooth biology and not the 
 sharp FOV borders, suggesting we needn't worry about technical artifacts in this FOV. 
 
+Our tool summarize our output across FOVs x barcode bits with plots like the below:
+
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/1faead6b-1111-4133-9c4d-555ebde70c6b)
+
+In this example, 2 barcode bits from reporter cycle 12 were flagged, as was one bit from reporter cycle 18. 
+Because all known artifacts impact *reporter cycles*, not the individual colors within them, we only flag FOVs
+in which at least two bits/colors from a single reporter cycle appear anomalous. This rule helps avoid flagging
+FOVs due to biological variability. 
+
 ## Code
 
 Functions for FOV QC can be found [here](../code/FOV%20QC). 
