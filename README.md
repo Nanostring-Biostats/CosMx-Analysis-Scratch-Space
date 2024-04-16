@@ -33,6 +33,7 @@ Note:
  
 ### Analysis strategies
 - [What is spatial data for?](blog/what%20is%20high%20plex%20spatial%20data%20for.md)
+- [FOV QC](blog/FOV%20QC.md)
 - [ ] The impact of segmentation error on differential expression analyses
 - [ ] Spatial statistics resources - fast nearest neighbors search etc
 - [ ] A generally satisfying set of UMAP parameters for CosMx data
