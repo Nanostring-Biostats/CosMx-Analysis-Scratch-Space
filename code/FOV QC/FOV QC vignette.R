@@ -33,7 +33,12 @@ head(res$flagged_fov_x_gene)
 # heatmap of estimated bias suffered for each FOV * bit (flagged FOV * bits only):
 FOVEffectsHeatmap(res) 
 
-# spatial plots of per-bit FOV effects:
+## spatial plots of per-bit FOV effects:
 par(mar = c(1,1,3,1))
-FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "flagged") 
-# now you can examine the plots for various bits, especially those highlighted in the above heatmap. 
+# show all bits from flagged FOVs:
+par(mfrow = c(2,2))
+FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "flagged_reportercycles") 
+# show all bits that were flagged (only FOVs with >= 2 flagged bits get flagged):
+par(mfrow = c(2,2))
+FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "flagged_bits") 
+# we can see that one bit (reportercycle18R) was flagged in a different FOV, but it appears to be biology-driven, not artifactual

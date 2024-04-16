@@ -97,13 +97,13 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
 #' 
 #' @param res Results object created 
 #' @param outdir Directory to write results to
-#' @param bits Which bits to plot. Defaults to "flagged" bits, but can also plot "all".
+#' @param bits Which bits to plot. Defaults to "flagged_reportercycles" bits, but can also plot "all" or "flagged_bits".
 #' @param plotwidth Width in inches of png plots
 #' @param plotheight Height in inches of png plots
 #' @param outdir Directory where png plots are printed.
 #' @return For each bit, draws a plot of estimated FOV effects
 #' @export
-FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged", plotwidth = NULL, plotheight = NULL) {
+FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reportercycles", plotwidth = NULL, plotheight = NULL) {
   
   if (is.null(plotwidth)) {
     plotwidth <- diff(range(res$xy[, 1])) * 1.5
@@ -111,7 +111,12 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged", plotwid
   if (is.null(plotheight)) {
     plotheight <- diff(range(res$xy[, 2])) * 1.5
   }
-  if (bits == "flagged") {
+  if (bits == "flagged_reportercycles") {
+    flaggedreportercycles <- colnames(res$flags_per_fov_x_reportercycle)[colSums(res$flags_per_fov_x_reportercycle >= 0.5) > 0]
+    names_of_bits_to_plot  <- paste0(rep(flaggedreportercycles, each = 4), rep(c("B", "G", "R","Y"), length(flaggedreportercycles)))
+    bits_to_plot <- match(names_of_bits_to_plot, colnames(res$resid))
+  }
+  if (bits == "flagged_bits") {
     bits_to_plot  <- which(colSums(res$fovstats$flag) > 0)
   }
   if (bits == "all") {
