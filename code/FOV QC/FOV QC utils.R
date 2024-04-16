@@ -50,12 +50,21 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
   resid = log2((bitcounts + 5) / (yhat + 5))
   rownames(resid) = rownames(bitcounts)
   
-  ## summarize bias per FOV:
+  ## summarize bias per FOV * bit:
   fovstats <- summarizeFOVBias(resid = resid, gridfov = gridinfo$gridfov, max_prop_loss = max_prop_loss)
   
-  # collate all flagged FOVs:
-  flaggedfovs <- rownames(fovstats$flag)[rowSums(fovstats$flag) > 0]
+  # count flags per FOV * reportercycle:
+  flags_per_fov_x_reportercycle <- c()
+  reportercycle <- substr(colnames(fovstats$flag), 1, nchar(colnames(fovstats$flag)) - 1)
+  for (rc in unique(reportercycle)) {
+    flags_per_fov_x_reportercycle <- cbind(flags_per_fov_x_reportercycle, rowMeans(fovstats$flag[, reportercycle == rc]))
+  }
+  colnames(flags_per_fov_x_reportercycle) <- unique(reportercycle)
   
+  # collate all flagged FOVs:
+  flaggedfovs <- rownames(flags_per_fov_x_reportercycle)[rowSums(flags_per_fov_x_reportercycle >= 0.5) > 0]
+  
+  # report on flagged FOVs:
   if (length(flaggedfovs) > 0) {
     message(paste0("The following FOVs failed QC for one or more barcode positions: ",
                    paste0(flaggedfovs, collapse = ", ")))
@@ -66,13 +75,10 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
   # build a manifest of flagged gene/fov pairs:
   flagged_fov_x_gene <- c()
   for (f in flaggedfovs) {
-    flaggedbits <- colnames(fovstats$flag)[fovstats$flag[f, ] != 0 ]
-    flaggedgenes <- c()
-    for (bit in flaggedbits) {
-      # get the position in the barcode string, and the color:
-      reporterposition <- as.numeric(substr(bit, 14, nchar(bit) - 1)) * 2
-      reportercolor <- substr(bit, nchar(bit), nchar(bit))
-      flaggedgenes <- barcodemap$gene[substr(barcodemap$barcode, reporterposition, reporterposition) == reportercolor]
+    flaggedreportercycles <- names(which(flags_per_fov_x_reportercycle[f, ] >= 0.5))
+    for (rc in flaggedreportercycles) {
+      reporterposition <- as.numeric(substr(rc, 14, nchar(rc) - 1)) * 2
+      flaggedgenes <- barcodemap$gene[substr(barcodemap$barcode, reporterposition, reporterposition) != "."]
       # add to growing list:
       tempflags <- cbind(rep(f, length(flaggedgenes)), flaggedgenes)
       colnames(tempflags) <- c("fov", "gene")
@@ -80,7 +86,9 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
     }
   }
   
-  return(list(flaggedfovs = flaggedfovs, flagged_fov_x_gene = flagged_fov_x_gene, fovstats = fovstats, resid = resid, gridinfo = gridinfo, xy = xy, fov = fov))
+  return(list(flaggedfovs = flaggedfovs, flagged_fov_x_gene = flagged_fov_x_gene, 
+              flags_per_fov_x_reportercycle = flags_per_fov_x_reportercycle ,
+              fovstats = fovstats, resid = resid, gridinfo = gridinfo, xy = xy, fov = fov))
 }
 
 
@@ -139,9 +147,9 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged", plotwid
 #' @export
 FOVEffectsHeatmap <- function(res) {
   pheatmap::pheatmap(res$fovstats$bias * (res$fovstats$flag),
-           col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(100),
-           breaks = seq(-2,2,length.out = 101),
-           main = "FOV bias: log2(fold-change) from comparable regions in other FOVs")
+                     col = colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(100),
+                     breaks = seq(-2,2,length.out = 101),
+                     main = "FOV bias: log2(fold-change) from comparable regions in other FOVs")
 }
 
 
@@ -277,7 +285,7 @@ summarizeFOVBias <- function(resid, gridfov, max_prop_loss) {
   }
   
   # flagging rule:
-  flag <- (abs(bias) > abs(log2(1 - max_prop_loss))) * (p < 0.01) * (propagree >= 45/49)
+  flag <- (abs(bias) > abs(log2(1 - max_prop_loss))) * (p < 0.01) * (propagree >= 0.75)
   return(list(flag = flag, bias = bias, p = p, propagree = propagree))
 }
 
