@@ -13,11 +13,11 @@ impacted FOVs.
 
 ## FOV artifacts
 
-All known FOV artifacts act by modulating our ability to detect reporter probes.
-Most commonly, we see a single reporter cycle in which all 4 colors of probes lose efficiency;
+All known FOV artifacts act by modulating our ability to detect reporter probes. In CosMx SMI, the reporter probes contain a barcode that is read out across reporter cycles. At each reporter cycle, a given probe will either contain one of four colors or an empty slot.
+Among FOV artifacts, most commonly we see a single reporter cycle in which all 4 colors of probes lose efficiency;
 that is, 4 "bits" of our color barcode are impacted, and in turn, so are all the genes sharing those barcode bits. 
 
-Thus we see phenomena like the below, where genes with impacted bits are muted, while other genes behave normally:
+Thus we see phenomena like the below, where genes with impacted bits are muted in specific FOVs (top left), while other genes behave normally:
 
 ![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/3e3dbed6-5469-4bab-885e-ad1534dba420)
 
@@ -28,17 +28,17 @@ We have observed the below root causes of FOV artifacts:
 the images from each reporter cycle must be "registered", i.e. 
 aligned to the images from the other cycles, in both horizontal and vertical position. 
 This process can go wrong in various ways, but all with the same impact: the barcode bits 
-from that reporter cycle are assigned to the wrong positions, and they no longer be used
+from that reporter cycle are assigned to the wrong positions, and they can no longer be used
 to identify the RNA transcript they came from. This phenomenon drives down expression
 for all genes with a barcode bit in the impacted reporter cycle. 
-The CosMx instrument performs 8 "cycles" (as opposed to "reporter cycles") of data acquisition;
+The CosMx instrument performs 8 "cycles" (as opposed to "reporter cycles") of data acquisition for every reporter cycle and therefore barcode position;
 registration failure can impact a reporter cycle across one or all of these cycles, causing
 either a slight decrease or a total loss of signal for the impacted genes. 
 
 #### Autofluorescence: 
 if the tissue in an FOV is autofluorescent, it can make fluorescent 
 signal from CosMx reporter probes harder to detect. When this happens, all genes with barcode
-bits in the impacted color will be harder to detect. And at the same time, they will
+bits in the impacted color will be harder to detect. At the same time, they will
 suffer higher rates of FalseCode style background events - i.e., their barcode will 
 more often be spuriously observed in the absense of hyb probes for the gene. 
 
@@ -55,7 +55,7 @@ underexpressed compared to comparable regions elsewhere.
 We place a 7x7 grid across each FOV. For each grid square, we find the 10 most similar squares
 in other FOVs, with "similar" being based on the square's expression profile. (We also only accept one 
 neighbor per other FOV.)
-Then, for each barcode bit, we take the genes using the bit, and We contrast their 
+Then, for each barcode bit, we take the genes using the bit, and we contrast their 
 expression in the square vs. in the average of the 10 most similar squares elsewhere. 
 For a given FOV and barcode bit, this gives us 49 contrasts. 
 When an FOV's grid squares consistently underexpress the relevant gene set, we flag the FOV.
@@ -64,7 +64,7 @@ Below we demonstrate this approach, looking at a tissue with particularly dramat
 
 ![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/76c95e5d-9bef-4bea-9571-84b37cf9b988)
 
-On the left, we plot expression of a single barcode bit impacted by FOV effects. 
+On the left, we plot expression of a single barcode bit (c12B = reporter cycle 12, color Blue) impacted by FOV effects. 
 FOV 19 has almost entirely lost expression of the genes from this barcode bit,
 and FOV 16 looks as though it could be losing some expression. 
 
