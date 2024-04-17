@@ -15,8 +15,8 @@
 #' @param xy 2-column matrix of cells' xy positions, aligned to rows of counts.
 #' @param fov Vector of cells' FOV IDs, aligned to rows of counts.
 #' @param barcodemap Data frame with two columns: "gene" and "barcode". Download the barcodemap for your panel
-#' @param max_prop_loss Maximum loss of efficiency allowed for any bit. E.g., a value of "0.3" means all FOVs with bias <log2(1 - 0.3) will be flagged.
 #' from https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/code/FOV%20QC.
+#' @param max_prop_loss Maximum loss of efficiency allowed for any bit. E.g., a value of "0.3" means all FOVs with bias <log2(1 - 0.3) will be flagged.
 #' @export
 runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
   
@@ -95,12 +95,11 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
 
 #' Spatial plots of FOV effects:
 #' 
-#' @param res Results object created 
-#' @param outdir Directory to write results to
+#' @param res Results object created by runFOVQC
+#' @param outdir Directory where png plots are printed
 #' @param bits Which bits to plot. Defaults to "flagged_reportercycles" bits, but can also plot "all" or "flagged_bits".
 #' @param plotwidth Width in inches of png plots
 #' @param plotheight Height in inches of png plots
-#' @param outdir Directory where png plots are printed.
 #' @return For each bit, draws a plot of estimated FOV effects
 #' @export
 FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reportercycles", plotwidth = NULL, plotheight = NULL) {
@@ -145,9 +144,9 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reporterc
 }
 
 
-#' Heatmap of estiamted bit bias across FOVs
+#' Heatmap of estimated bit bias across FOVs
 #' 
-#' @param res Results object created 
+#' @param res Results object created by runFOVQC
 #' @return Draws a heatmap
 #' @export
 FOVEffectsHeatmap <- function(res) {
@@ -190,6 +189,8 @@ getNearestNeighborsByFOV <- function(x, fov, n_neighbors = 10) {
 #' @param mat Expression matrix, linear-scale
 #' @param xy 2-column matrix of xy locations
 #' @param fov Vector of FOV IDs
+#' @param squares_per_fov Number of squares to break fov into
+#' @param min_cells_per_square Fewest cells to keep a square
 #' @return A list: a matrix of expression in grid squares, a vector giving the grid square assignment of each cell.   
 makeGrid <- function(mat, xy, fov, squares_per_fov = 49, min_cells_per_square = 25) {
   
@@ -213,7 +214,7 @@ makeGrid <- function(mat, xy, fov, squares_per_fov = 49, min_cells_per_square = 
 }
 
 
-#' Convery cell x gene matrix to grid square * bit matrix
+#' Convert cell x gene matrix to grid square * bit matrix
 #' @param counts Counts matrix
 #' @param grid Vector assigning cells to squares, aligned to rows of counts
 #' @param genes Vector of gene names (omit negprobes and falsecodes)
