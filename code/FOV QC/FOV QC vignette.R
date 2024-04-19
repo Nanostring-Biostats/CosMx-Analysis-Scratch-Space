@@ -37,7 +37,8 @@ res$flagged_fov_x_gene[, "gene"]
 
 #### Explore results: -----------------
 
-# heatmap of estimated bias suffered for each FOV * bit (only flagged FOV * bits colored):
+# heatmap of estimated bias suffered for each FOV * barcode bit (only flagged FOV * bits are colored);
+# Use this to peek under the hood at the intermediate results used to flag individual FOVs.
 FOVEffectsHeatmap(res) 
 # We see 2 bits (colors) flagged from 1 reporter cycle in 1 FOV, and 1 bit flagged in another FOV.
 # Biological variability can cause single bits to be flagged, so we only flag FOVs where >=2
@@ -48,6 +49,7 @@ par(mar = c(1,1,3,1))
 # show all bits from flagged reporter cycles (only reporter cycles with >= 2 flagged bits in a single FOV get shown):
 # Here we divide the tissue into sub-FOV grids, and we color each grid square by its change
 # in a barcode bit's total gene expression from similar grid squares from other FOVs.
+# grid squares without enough information are omitted. 
 par(mfrow = c(2,2))
 FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "flagged_reportercycles") 
 # it's clear that all 4 bits from this reporter cycle are lost in the impacted FOV.
