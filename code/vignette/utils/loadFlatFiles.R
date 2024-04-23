@@ -14,43 +14,52 @@ loadAtoMxFlatFiles <- function(flatfiledir) {
   ### automatically get slide names:
   slidenames <- dir(flatfiledir)
 
-  #### load in metadata from each slide:
-  metadatalist <- sapply(slidenames, function(slidename) {
+
+  ### lists to collect the counts matrices and metadata, one per slide
+  countlist <- vector(mode='list', length=length(slidenames)) 
+  metadatalist <- vector(mode='list', length=length(slidenames)) 
+  
+  for(i in 1:length(slidenames)){
+     
+    slidename <- slidenames[i] 
+
+    msg <- paste0("Loading slide ", slidename, ", ", i, "/", length(slidenames), ".")
+    message(msg)    
+    # slide-specific files:
     thisslidesfiles <- dir(paste0(flatfiledir, "/", slidename))
+    
+    # load in metadata:
     thisslidesmetadata <- thisslidesfiles[grepl("metadata\\_file", thisslidesfiles)]
     tempdatatable <- data.table::fread(paste0(flatfiledir, "/", slidename, "/", thisslidesmetadata))
-    tempdatatable$slidename <- slidename
-    return(list(tempdatatable))
-  })
-  
-  ### harmonize metadata column names:
-  # get column names shared by all metadata files:
-  sharedcolumns <- colnames(metadatalist[[1]])
-  if (length(metadatalist) > 1) {
-    for (i in 2:length(metadatalist)) {
-      sharedcolumns <- intersect(sharedcolumns, colnames(metadatalist[[i]]))
-    }
-  }
-  # reduce to only shared columns:
-  for (i in 1:length(metadatalist)) {
-    metadatalist[[i]] <- metadatalist[[i]][, ..sharedcolumns]
-  }
-  
-  ### load in counts matrix from each slide:
-  countlist <- sapply(slidenames, function(slidename) {
-    thisslidesfiles <- dir(paste0(flatfiledir, "/", slidename))
-    thisslidescounts <- thisslidesfiles[grepl("exprMat\\_file", thisslidesfiles)]
+      
     # load in counts as a data table:
+    thisslidescounts <- thisslidesfiles[grepl("exprMat\\_file", thisslidesfiles)]
     countsdatatable <- data.table::fread(paste0(flatfiledir, "/", slidename, "/", thisslidescounts))
-    return(list(countsdatatable))
-  })
-  
-  ### get shared genes:
-  sharedgenes <- colnames(countlist[[1]])
-  if (length(countlist) > 1) {
-    for (i in 2:length(countlist)) {
-      sharedgenes <- intersect(sharedgenes, colnames(countlist[[i]]))
+   
+    # numeric slide ID 
+    slide_ID_numeric <- tempdatatable[1,]$slide_ID 
+    
+    # create cell ID 
+    slide_fov_cell_counts <- paste0("c_",slide_ID_numeric, "_", countsdatatable$fov, "_", countsdatatable$cell_ID)
+    counts_matrix <- as(countsdatatable[,-c("fov", "cell_ID"),with=FALSE], "sparseMatrix") 
+    rownames(counts_matrix) <- slide_fov_cell_counts
+ 
+    # ensure that cell-order in counts matches cell-order in metadata   
+    slide_fov_cell_metadata <- paste0("c_",slide_ID_numeric, "_", tempdatatable$fov, "_", tempdatatable$cell_ID)
+    counts_matrix <- counts_matrix[match(slide_fov_cell_metadata, rownames(counts_matrix)),] 
+   
+    metadatalist[[i]] <- tempdatatable 
+    countlist[[i]] <- counts_matrix 
+    
+    # track common genes and common metadata columns across slides
+    if(i==1){
+      sharedgenes <- colnames(counts_matrix) 
+      sharedcolumns <- colnames(tempdatatable)
+    }  else {
+      sharedgenes <- intersect(sharedgenes, colnames(counts_matrix))
+      sharedcolumns <- intersect(sharedcolumns, colnames(tempdatatable))
     }
+      
   }
   sharedgenes <- setdiff(sharedgenes, c("fov", "cell_ID"))
   
