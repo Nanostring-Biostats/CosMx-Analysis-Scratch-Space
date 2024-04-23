@@ -61,38 +61,18 @@ loadAtoMxFlatFiles <- function(flatfiledir) {
     }
       
   }
-  sharedgenes <- setdiff(sharedgenes, c("fov", "cell_ID"))
-  
-  #### align counts matrices to match metadata cell IDs, and convert to sparse matrices:
-  for (i in 1:length(countlist)) {
-    # align:
-    metadata_cell_fov <- paste0(metadatalist[[i]]$fov, "_", metadatalist[[i]]$cell_ID)
-    counts_cell_fov <- paste0(countlist[[i]]$fov, "_", countlist[[i]]$cell_ID)
-    countlist[[i]] <- countlist[[i]][match(metadata_cell_fov, counts_cell_fov), ]
-    # trim redundant columns:
-    countlist[[i]] <- countlist[[i]][, ..sharedgenes]
-    # convert to sparse matrix:
-    countlist[[i]] <- as(countlist[[i]], "sparseMatrix")
+
+  # reduce to shared metadata columns and shared genes
+  for(i in 1:length(slidenames)){
+    metadatalist[[i]] <- metadatalist[[i]][, ..sharedcolumns]
+    countlist[[i]] <- countlist[[i]][, sharedgenes]
   }
-  
-  ### condense metadata to a single data table:
-  metadata <- c()
-  counts <- c()
-  
-  for (i in 1:length(countlist)) {
-    counts <- rbind(counts, countlist[[i]])
-    metadata <- rbind(metadata, metadatalist[[i]])
-  }
-  # add cell IDs to counts:
-  if(any(duplicated(metadata$cell_id))) {
-    stop("Found duplicated cell IDs, probably from different slides. Make sure they're all unique.")
-  }
-  rownames(counts) <- metadata$cell_id
-  colnames(counts) <- sharedgenes
+   
+  counts <- do.call(rbind, countlist)
+  metadata <- rbindlist(metadatalist)
   
   # add to metadata: replace slide-specific FOV ID with a unique FOV ID:
-  metadata$FOV <- paste0("s", as.numeric(as.factor(metadata$slidename)), "f", metadata$fov)
-  metadata$fov <- NULL
+  metadata$globalFOV <- paste0("s", metadata$slide_ID, "f", metadata$fov)
   
   # remove cell_ID metadata column, which only identifies cell within slides, not across slides:
   metadata$cell_ID <- NULL
@@ -100,6 +80,7 @@ loadAtoMxFlatFiles <- function(flatfiledir) {
   # isolate negative control matrices:
   negcounts <- counts[, grepl("Negative", colnames(counts))]
   falsecounts <- counts[, grepl("SystemControl", colnames(counts))]
+  
   # reduce counts matrix to only genes:
   counts <- counts[, !grepl("Negative", colnames(counts)) & !grepl("SystemControl", colnames(counts))]
   
