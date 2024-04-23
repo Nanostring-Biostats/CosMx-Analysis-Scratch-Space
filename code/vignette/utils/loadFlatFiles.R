@@ -10,7 +10,7 @@
 #' @param dir Directory where flat files are located. 
 #' @return A list with 2 elements: \code{counts}, a sparse matrix of cell x gene count values, 
 #'  and \code{metadata}, a data table of cell metadata.
-loadAtoMxFlatFiles <- function(dir) {
+loadAtoMxFlatFiles <- function(flatfiledir) {
   ### automatically get slide names:
   slidenames <- dir(flatfiledir)
 
