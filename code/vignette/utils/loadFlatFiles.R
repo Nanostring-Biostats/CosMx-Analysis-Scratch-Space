@@ -143,8 +143,8 @@ loadAtoMxFlatFiles <- function(flatfiledir, countsflatfile_nonzero_elements_perc
   counts <- do.call(rbind, countlist)
   metadata <- rbindlist(metadatalist)
   
-  # add to metadata: replace slide-specific FOV ID with a unique FOV ID:
-  metadata$globalFOV <- paste0("s", metadata$slide_ID, "f", metadata$fov)
+  # add to metadata: add a global non-slide-specific FOV ID:
+  metadata$FOV <- paste0("s", metadata$slide_ID, "f", metadata$fov)
   
   # remove cell_ID metadata column, which only identifies cell within slides, not across slides:
   metadata$cell_ID <- NULL
