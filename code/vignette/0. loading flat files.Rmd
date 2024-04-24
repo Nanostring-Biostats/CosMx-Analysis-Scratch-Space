@@ -17,7 +17,8 @@ p.caption {
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  root.dir = "~/data/dan/scratch_space" 
 )
 ```
 
@@ -42,8 +43,9 @@ Now let's see the files we have to work with:
 
 ```{r files}
 # location of flat files:
-flatfiledir <- "../data/flatFiles/"
-dir(flatfiledir)
+message(getwd())
+myflatfiledir <- "../data/flatFiles"
+dir(myflatfiledir)
 # where to write output:
 outdir <- ".."
 ```
@@ -54,7 +56,7 @@ files can be found in the "utils" folder:
 
 ```{r loading}
 source("utils/loadFlatFiles.R")
-atomxdata <- loadAtoMxFlatFiles(dir = flatfiledir) 
+atomxdata <- loadAtoMxFlatFiles(flatfiledir = myflatfiledir) 
 str(atomxdata)
 ```
 
@@ -68,6 +70,9 @@ benefit from more compression than flat files do), and they're faster to read
 back into R.
 
 ```{r saving}
+if(!dir.exists(paste0(outdir, "/processed_data"))){
+  dir.create(paste0(outdir, "/processed_data"))
+}
 saveRDS(atomxdata$counts, file = paste0(outdir, "/processed_data/counts_unfiltered.RDS"))
 saveRDS(atomxdata$negcounts, file = paste0(outdir, "/processed_data/negcounts_unfiltered.RDS"))
 saveRDS(atomxdata$falsecounts, file = paste0(outdir, "/processed_data/falsecounts_unfiltered.RDS"))
