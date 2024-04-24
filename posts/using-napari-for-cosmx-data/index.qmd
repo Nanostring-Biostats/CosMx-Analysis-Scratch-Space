@@ -1,5 +1,5 @@
 ---
-title: "Using Napari to view and analyze CosMx data"
+title: "Getting Started with the `napari-cosmx` plugin"
 author:
   - name: Evelyn Metzger
     affiliations: 
@@ -48,7 +48,14 @@ to be downloaded. Still, how do we actually _view_ and interact with the images 
 
 This blog post is the first in our series on using our
 `napari-cosmx` plugin. Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html),
-the `napari-cosmx` plugin is experimental so the usual [caveats]() and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html) applies. 
+the `napari-cosmx` plugin is experimental so the usual [caveats]() and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html) applies.
+Future posts will do deep-dives into _using_ the `napari-cosmx` plugin. This post will
+show you how to:
+
+- Install napari and the `napari-cosmx` plugin {@sec-installing}
+- How to load a napari-ready slide {@sec-loading-slides}
+- How to create a napari-ready slide from AtoMx raw data export {@sec-stitching}
+- Minimum example of how to view cell-level metadata {@sec-adding-metadata}
 
 ::: {.callout-note}
 `napari-cosmx` is actively and continuously under development in the RnD groups at
@@ -79,7 +86,14 @@ Beyond the basic interactivity and viewing of napari, other posts in this series
 will provide examples of tips and tricks as well as more advanced analysis. See the 
 [series topics](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html) for what's coming ahead!
 
-> **to do** add some figures showing a few of the capabilities of the plugin. 
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-example-gif"
+#| fig-cap: "Example animation made with `napari-cosmx` showing ligand-receoptor interactions in a healthy prostate sampele. Cell types fill in the cell boundaries. When cells are transparent, one can see more easily see the spatial location of _S100A8_, _S100A9_ ligand RNA transcripts with the _TLR4_ receptor transcript. While animations are certainly not needed for all purposes, this one highlights that the plugin can color RNA transcripts (points layer), cell-level metadata like cell types, and cell boundaries. It can also visualize IF (not shown here; see @fig-pancreas for example of IF staining)." 
+
+knitr::include_graphics("./figures/prostate.gif")
+```
 
 
 # Using the `napari-cosmx` plugin 
@@ -92,7 +106,7 @@ capabilities of a standard laptop.
 :::
 
 
-## Installing `napari-cosmx`
+## Installing `napari-cosmx` {#sec-installing}
 
 The specific download instructions depend on your operating system (see tabs below)
 but the general procedure is the same: 1) installing napari 0.4.17 and 2) installing the `napari-cosmx` plugin
@@ -231,16 +245,26 @@ knitr::include_graphics("./figures/mac_plugin_command.png")
 The `napari-cosmx` plugin expects a single slide that has been prepared using the
 `stitching` (@sec-stitching) method within the plugin itself. If you do not already
 have a napari-ready slide, you can download a two-FOV example that we have created
-[here](){target="_blank"}. These two FOVs are derived from the coronal hippocampus and
-cortex public dataset. The full data download is not needed for this study but
-those interested in the analyzing the full dataset can see it  [here](https://nanostring.com/resources/coronal-hippocampus-and-cortex-raw-data-export/){target="_blank"}). 
+[here (to do: need to link the two-fov file)](){target="_blank"}. This two-FOV dataset
+was derived from the coronal hippocampus and
+cortex public dataset. The full data download is not needed for our current purposes but
+those interested in exploring the full data can download it  [here](https://nanostring.com/resources/coronal-hippocampus-and-cortex-raw-data-export/){target="_blank"}). 
 
-At the very minimum, this slide folder contains two elements: 
+At the very minimum, the napari-ready slide folder contains two elements: 
 
 1. `images` folder. Within the `images` folder, there are subfolders for each Immunofluorescence channel and one folder for the cell boundaries (`labels`). 
 2. `targets.hdf5` file that contains the RNA (or protein) targets. 
 
-**to do** make figure showing the layout. 
+And example can be see below (@fig-napari-ready-folder).
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-napari-ready-folder"
+#| fig-cap: "Example layout of a napari-ready folder. In this example, the 'parent folder' (_i.e._, the folder you would drag and drop into napari) is named `two_fovs_napari_files` and contains the `images` folder with subfolders containing various zarr files within and the `targets.hdf5` file."
+
+knitr::include_graphics("./figures/napari-ready-format.png")
+```
 
 We can also create a file named `_metadata.csv` that can be used for cell-level
 labeling. For more information on that, please see @sec-adding-metadata. 
@@ -251,9 +275,9 @@ To launch and view CosMx data with the `napari-cosmx`:
 
 1. Navigate to a napari-ready slide folder. If you need a minimum example, see @sec-napari-ready-files above.
 2. Open napari from the Start Menu (Windows) or the Application folder (Mac).
-3. Drag the parent directory of the slide into the the napari application. If you
-are using the two-fov example above, this would be the folder named `two_fovs`. 
-Otherwise, the napari-ready folder is whichever folder containing `images` and `targets.hdf5`.
+3. Drag the parent folder of the slide into the the napari application. If you
+are using the two-FOV example above, this would be the folder named `two_fovs_napari_files`. 
+Otherwise, the napari-ready folder is whichever folder containing `images` and `targets.hdf5` (see @sec-napari-ready-files).
 4. napari will ask if you would like to open via the `napari-cosmx` plugin or another
 method. Select the `napari-cosmx` plugin and press okay. 
 
@@ -408,7 +432,7 @@ into the application.
 #| eval: true
 #| echo: false
 #| label: "fig-stitch-widget5"
-#| fig-cap: "Select output folder."
+#| fig-cap: "Messages from a successfully completed stitching run."
 
 knitr::include_graphics("./figures/stitch-widget5.png")
 ```
@@ -417,6 +441,63 @@ knitr::include_graphics("./figures/stitch-widget5.png")
 
 ## Adding and viewing metadata {#sec-adding-metadata} 
 
+While we'll have dedicated posts that discuss tips and tricks for using the
+`napari-cosmx` plugin, here we'll discuss one of the most powerful uses: viewing 
+cells types. 
+
+While not needed for the basic stitching, the Seurat file that is downloaded
+from AtoMx can containing important cell-level information. For example, 
+if cell typing was performed in AtoMx, each cell will have a label with it's cell
+type. 
+
+In this section, I'll show you the basic principle for converting the meta data
+within the Seurat object in to a csv file that can be understood by `napari-cosmx`. 
+Users should have a basic understanding of R in order to use this feature. We'll
+also need to switch our example dataset since the minimal two-FOV example dataset
+was from raw data and not analyzed in AtoMx so we don't have any cell-level cell type
+information. Here, the specific columns will have the prefix `RNA_nbclust` and suffix
+`clusters`. In the code below, we'll change that name to simply `cell_types`. We'll
+also need a column named `cell_ID` in the metadata column. We need to write
+the metadata columns to a file specifically named `_metadata.csv` and have that
+file located in the napari-ready folder.  
+
+
+```{r}
+#| label: extracting-seurat-data
+#| echo: true
+#| eval: false
+#| message: true
+#| warning: false
+
+library(Seurat)
+library(plyr)
+library(dplyr)
+# sem_path will be wherever you downloaded
+sem_path <- "/Users/evelynmetzger/Documents/Projects/napari/how-tos/seuratObject.RDS"
+sem <- readRDS(sem_path)
+meta <- sem@meta.data
+meta <- meta %>% select(starts_with("RNA_nbclust")) %>% select(ends_with("clusters"))
+colnames(meta)[1] <- 'cell_types'
+meta$cell_ID <- row.names(meta) # adds cell_ID column
+rownames(meta) <- NULL
+meta <- meta %>% relocate(cell_ID) # moves cell_ID to first column position
+write.table(meta, file="/path/to/inside/napari-ready-folder/_metadata.csv", 
+            sep=",", col.names=TRUE, row.names=FALSE, quote=FALSE)
+```
+
+
+Now, when we drag and drop the napari-ready folder, the metadata that you extracted
+from Seurat
+will be available to view using the right-hand widget named `Color Cells` (@fig-color-cells). 
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-color-cells"
+#| fig-cap: "When metadata are available in the _metadata.csv file, it's possible to color cells based on a cell-level metadata value (_e.g._, cell types)."
+
+knitr::include_graphics("./figures/color-cells.png")
+```
 
 
 
