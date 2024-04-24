@@ -11,7 +11,7 @@ Check out our Quarto blog at [https://nanostring-biostats.github.io/CosMx-Analys
 
 ## Code
 
-Code and mini-packages can be found in the `_code` directory. Individual blog posts may also contain code snippets and code can be found in their respective folders located in the `_posts` folder. 
+Code and mini-packages can be found in the `_code` directory. Individual blog posts may also contain code snippets and code can be found in their respective folders located in the `posts` folder. 
 
 ## License
 
