@@ -22,14 +22,14 @@ number-depth: 4
 date: "2024-04-19"
 categories: [visualization, napari]
 draft: false
-image: figures/pancreas.png
+image: figures/prostate.gif
 ---
 
 ```{r}
 #| eval: true
 #| echo: false
 #| label: "fig-pancreas"
-#| fig-cap: "Nine Fields of View (FOVs) of the whole-transcriptome Pancreas dataset generated with the `napari-cosmx` plugin. DAPI and PanCK is shown in blue and green, respectively. Endocrine cells in the Islets of Langerhans can be idenified by their clusters of cells that express marker gene transcripts red (_GCG_; alpha cells), blue (_to do_; to do), and orange (_INS_; beta cells)."
+#| fig-cap: "Nine Fields of View (FOVs) of the whole-transcriptome Pancreas dataset generated with the `napari-cosmx` plugin. DAPI and PanCK is shown in blue and green, respectively. Endocrine cells in the Islets of Langerhans can be idenified by their transcript abundance (points) of marker genes. Red = _GCG_ (alpha cells), orange = _INS_ (beta cells)."
 
 knitr::include_graphics("./figures/pancreas.png")
 ```
@@ -43,7 +43,7 @@ web-based interface.
 
 For bespoke analyses, however, it can be useful to extract SMI image and transcript or 
 protein data from the SIP. Version 1.3 of the SIP introduced new exporting abilities that allow
-raw data and processed data in a variety of formats (_e.g._, Seurat, tiledb, "flat files) 
+raw data and processed data in a variety of formats (_e.g._, Seurat, tiledb, "flat files") 
 to be downloaded. Still, how do we actually _view_ and interact with the images from these downloads?
 
 This blog post is the first in our series on using our
@@ -52,10 +52,11 @@ the `napari-cosmx` plugin is experimental so the usual [caveats]() and [license]
 Future posts will do deep-dives into _using_ the `napari-cosmx` plugin. This post will
 show you how to:
 
-- Install napari and the `napari-cosmx` plugin {@sec-installing}
-- How to load a napari-ready slide {@sec-loading-slides}
-- How to create a napari-ready slide from AtoMx raw data export {@sec-stitching}
-- Minimum example of how to view cell-level metadata {@sec-adding-metadata}
+- @sec-installing Install napari and the `napari-cosmx` plugin 
+- @sec-napari-ready-files Describe what our "napari-ready" data format is 
+- @sec-loading-slides How to load a napari-ready slide 
+- @sec-stitching How to create a napari-ready slide from AtoMx raw data export 
+- @sec-adding-metadata Minimum example of how to view cell-level metadata 
 
 ::: {.callout-note}
 `napari-cosmx` is actively and continuously under development in the RnD groups at
@@ -67,8 +68,8 @@ to CosMx users as fast as possible.
 
 ## What is Napari?
 
-Stepping back for a second. What exacty _is_ Napari. [Napari](https://napari.org/)
-is an [open-source](https://github.com/napari/napari) Python project that runs a 
+Stepping back for a second. What exacty _is_ Napari. [Napari](https://napari.org/){target="_blank"}
+is an [open-source](https://github.com/napari/napari){target="_blank"} Python project that runs a 
 Qt-based desktop GUI for interactive visualization of scientific images. 
 The application has layers of different types, similar to what you might find
 in application like Photoshop or Procreate. 
@@ -80,11 +81,8 @@ in napari, and standard controls are available such as opacity, gamma, and contr
 limits. Protein results are also viewed as an image layer in napari. For CosMx 
 RNA experiments, the detected transcripts are viewed as a points layer in napari.
 Cell segmentation results are displayed as an image layer of the cell boundaries.
-The cell shapes can also be colored by metadata such as cell type.
-
-Beyond the basic interactivity and viewing of napari, other posts in this series
-will provide examples of tips and tricks as well as more advanced analysis. See the 
-[series topics](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html) for what's coming ahead!
+The cell shapes can also be colored by metadata such as cell type. @fig-example-gif
+shows some examples of these in an animated format. 
 
 ```{r}
 #| eval: true
@@ -94,6 +92,10 @@ will provide examples of tips and tricks as well as more advanced analysis. See 
 
 knitr::include_graphics("./figures/prostate.gif")
 ```
+
+Beyond the basic interactivity and viewing of napari, other posts in this series
+will provide examples of tips and tricks as well as more advanced analysis. See the 
+[series topics](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html) for what's coming ahead!
 
 
 # Using the `napari-cosmx` plugin 
@@ -113,8 +115,8 @@ but the general procedure is the same: 1) installing napari 0.4.17 and 2) instal
 
 ::: {.callout-note}
 The `napari-cosmx` plugin was developed with napari 0.4.17. There are some breaking
-changes that we have noticed if using the plugin with newer version of napari (_e.g.,
-0.4.18). Please make sure 
+changes that we have noticed if using the plugin with newer version of napari (_e.g._,
+0.4.18). At the time of writing this post, please make sure to install version 0.4.17. 
 
 :::
 
@@ -271,6 +273,16 @@ labeling. For more information on that, please see @sec-adding-metadata.
 
 ## Loading a slide into `napari-cosmx` {#sec-loading-slides}
 
+::: {.callout-note}
+You may have noticed that I put this section _before_ the section on how to 
+create (or 'stitch') napari-ready files. This is due to the current implimentation
+of the `napari-cosmx` codebase. Specifically, this is because the widget used
+for stitching is available once we launch the plugin. So in order to be able to
+stitch, we need to have _some_ pre-exisiting slide to load into the plugin. There
+are advanced ways that we could get around this limitation but that's an 
+advanced topic for another day.
+:::
+
 To launch and view CosMx data with the `napari-cosmx`: 
 
 1. Navigate to a napari-ready slide folder. If you need a minimum example, see @sec-napari-ready-files above.
@@ -303,7 +315,7 @@ fast I/O external hard drive may also be an option.
 
 ### 1. Export Raw Data {#sec-export-raw-data}
 
-In AtoMx SIP, in the `Study details` panel on the upper right, click `Export` (@fig-atomx-export1). 
+In AtoMx SIP, in the `Study details` panel on the upper left, click `Export` (@fig-atomx-export1). 
 
 ```{r}
 #| eval: true
@@ -323,7 +335,7 @@ files).
 #| eval: true
 #| echo: false
 #| label: "fig-atomx-export2"
-#| fig-cap: "Example configuration for exporting."
+#| fig-cap: "Example configuration for exporting. For more information on extracting cell-level metadata, see @sec-adding-metadata."
 
 knitr::include_graphics("./figures/export-fig2.png")
 ```
@@ -339,7 +351,7 @@ enter the URL, username, and your (AtoMx) password. Then click `Connect`. Exampl
 #| eval: true
 #| echo: false
 #| label: "fig-atomx-export3"
-#| fig-cap: "Example configuration for Cyberduck SFTP"
+#| fig-cap: "Example configuration for Cyberduck SFTP."
 
 knitr::include_graphics("./figures/export-fig3.png")
 ```
@@ -356,8 +368,6 @@ it on a networked drive but this is currently untested.
 
 knitr::include_graphics("./figures/export-fig4.png")
 ```
-
-Once downloaded and saved, follow the next step @sec-launch-napari-cosmx. 
 
 ### 2. Launch `napari-cosmx` {#sec-launch-napari-cosmx}
 
@@ -383,7 +393,7 @@ knitr::include_graphics("./figures/stitch-widget1.png")
 We need to tell `napari-cosmx` where the raw data is located. In the right-hand panel
 there is a `Stitch Images` widget. Click `Browse...` and navigate to the parent folder
 containing the slide's raw data. In our minimum example above with two FOVs, I have named
-the parent folder `two_fovs`. Your slide name will be labeled something else (@fig-stitch-widget2). 
+the parent folder `two_fovs` (@fig-stitch-widget2). Your slide name will be labeled something else. 
 Once you select `Open`, you should see the path to the raw data folder. If an unexpected format
 was detected, there will be an error message (_e.g._, @fig-stitch-widget3).
 
@@ -421,7 +431,9 @@ knitr::include_graphics("./figures/stitch-widget4.png")
 
 Finally, click `Stitch`. Note: currently there is no refreshing or printing of
 messages. Please do not click `Stitch` more than once. You may see napari become
-unresponse, see the "spinning beachball" (Mac), _etc._ Once complete, you should
+unresponse, see the "spinning beachball" (Mac), _etc._ Depending on the number 
+of FOVs, computer configuration, and analyte type, this can take several minutes. 
+Once complete, you should
 see messages that resemble that of @fig-stitch-widget5. If you see the last line
 `See output folder for results`, you successfully converted the raw data into napari-ready files!
 
@@ -455,7 +467,7 @@ within the Seurat object in to a csv file that can be understood by `napari-cosm
 Users should have a basic understanding of R in order to use this feature. We'll
 also need to switch our example dataset since the minimal two-FOV example dataset
 was from raw data and not analyzed in AtoMx so we don't have any cell-level cell type
-information. Here, the specific columns will have the prefix `RNA_nbclust` and suffix
+information. Here, the specific column of interest will have the prefix `RNA_nbclust` and suffix
 `clusters`. In the code below, we'll change that name to simply `cell_types`. We'll
 also need a column named `cell_ID` in the metadata column. We need to write
 the metadata columns to a file specifically named `_metadata.csv` and have that
@@ -469,11 +481,12 @@ file located in the napari-ready folder.
 #| message: true
 #| warning: false
 
+# This is R code
 library(Seurat)
 library(plyr)
 library(dplyr)
 # sem_path will be wherever you downloaded
-sem_path <- "/Users/evelynmetzger/Documents/Projects/napari/how-tos/seuratObject.RDS"
+sem_path <- "/path/to/your/seuratObject.RDS"
 sem <- readRDS(sem_path)
 meta <- sem@meta.data
 meta <- meta %>% select(starts_with("RNA_nbclust")) %>% select(ends_with("clusters"))
@@ -500,5 +513,13 @@ knitr::include_graphics("./figures/color-cells.png")
 ```
 
 
+# Conclusion
 
+In this post we introduced the `napari-cosmx` plugin, a tool that can be use to
+interact with exported CosMx SMI data from AtoMx SIP. Our focus was on installation
+and launching the application. In future posts we'll do deep-dives on usuage and
+share tips and tricks that we've learned along the way. If you would like to see
+a napari topic discussed, please create an issue or feature request on [github](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/labels/napari%20series){target="_blank"} using the `napari series` label. 
+
+--ERM
 
