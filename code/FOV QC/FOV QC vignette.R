@@ -26,7 +26,12 @@ head(fov)
 
 
 #### run QC pipeline -------------------
-res <- runFOVQC(counts = counts, xy = xy, fov = fov, barcodemap = barcodemap, max_prop_loss = 0.2)
+
+# note: the correct value of max_prop_loss is a judgment call. Here we use a 
+# small (conservative) value to produce the most instructive results; 
+# for most purposes, we recommend using the default value of 0.3, 
+# i.e. flagging FOVs where a bit has >30% signal loss.
+res <- runFOVQC(counts = counts, xy = xy, fov = fov, barcodemap = barcodemap, max_prop_loss = 0.2) 
 str(res)
 # which FOVs were flagged:
 res$flaggedfovs

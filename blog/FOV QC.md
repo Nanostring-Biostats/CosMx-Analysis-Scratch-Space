@@ -91,6 +91,7 @@ whereas FOV 18 would not be flagged since it had only one bit flagged in reporte
 ## Code
 
 Functions for FOV QC can be found [here](../code/FOV%20QC). 
+The gene-to-barcode mappings needed by this approach are [here](../code/FOV%20QC/barcodes_by_panel.RDS).
 
 We advise this approach be applied separately to each slide or tissue in a study. 
 
