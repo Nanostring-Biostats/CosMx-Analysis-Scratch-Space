@@ -85,6 +85,8 @@ In this example, 2 barcode bits from reporter cycle 12 were flagged, as was one 
 Because all known artifacts impact *reporter cycles*, not the individual colors within them, we only flag FOVs
 in which at least two bits/colors from a single reporter cycle appear anomalous. This rule helps avoid flagging
 FOVs due to biological variability. 
+So in this example, FOV 19 would be flagged since it had 2 bits flagged in reporter cycle 12,
+whereas FOV 18 would not be flagged since it had only one bit flagged in reporter cycle 18.
 
 ## Code
 

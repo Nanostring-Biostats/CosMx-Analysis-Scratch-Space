@@ -26,7 +26,7 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
   fov <- as.character(fov)
   ## create a matrix of barcode bit expression over sub-FOV grids:
   # define grids, get per-square gene expression:
-  gridinfo <- makeGrid(mat = counts, xy = xy, fov = fov, squares_per_fov = 49, min_cells_per_square = 25) 
+  gridinfo <- makeGrid(xy = xy, fov = fov, squares_per_fov = 49, min_cells_per_square = 25) 
   # convert to per-square barcode bit expression:
   bitcounts <- cellxgene2squarexbit(counts = counts, 
                                     grid = gridinfo$gridid, 
@@ -184,19 +184,19 @@ getNearestNeighborsByFOV <- function(x, fov, n_neighbors = 10) {
 }
 
 
-#' Get gridded expression within FOVs
+#' Define a grid across FOVs
 #' 
-#' @param mat Expression matrix, linear-scale
 #' @param xy 2-column matrix of xy locations
 #' @param fov Vector of FOV IDs
 #' @param squares_per_fov Number of squares to break fov into
 #' @param min_cells_per_square Fewest cells to keep a square
-#' @return A list: a matrix of expression in grid squares, a vector giving the grid square assignment of each cell.   
-makeGrid <- function(mat, xy, fov, squares_per_fov = 49, min_cells_per_square = 25) {
+#' @return A list: a vector giving the grid square assignment of each cell,
+#'             and a vector giving the FOV each grid square belongs to.   
+makeGrid <- function(xy, fov, squares_per_fov = 49, min_cells_per_square = 25) {
   
   # make grids:
   ncuts <- floor(sqrt(squares_per_fov))
-  grid <- rep(NA, nrow(mat))
+  grid <- rep(NA, nrow(xy))
   gridfov <- c()
   
   for (fovid in unique(fov)) {   
@@ -219,6 +219,7 @@ makeGrid <- function(mat, xy, fov, squares_per_fov = 49, min_cells_per_square = 
 #' @param grid Vector assigning cells to squares, aligned to rows of counts
 #' @param genes Vector of gene names (omit negprobes and falsecodes)
 #' @param barcodes Vector of gene barcodes, aligned to genes
+#' @return A matrix of total gene expression in gridsquares x barcode bits
 cellxgene2squarexbit <- function(counts, grid, genes, barcodes) {
   
   # number of bits:
@@ -246,6 +247,7 @@ cellxgene2squarexbit <- function(counts, grid, genes, barcodes) {
 #' @param mat Counts matrix
 #' @param genes Vector of gene names (omit negprobes and falsecodes)
 #' @param barcodes Vector of gene barcodes, aligned to genes
+#' @return A matrix of total gene expression in cells x barcode bits
 genes2bits <- function(mat, genes, barcodes) {
   
   # number of bits:
