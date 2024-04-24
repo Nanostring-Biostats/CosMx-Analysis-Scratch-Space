@@ -243,30 +243,7 @@ cellxgene2squarexbit <- function(counts, grid, genes, barcodes) {
   return(bitmat)
 }
 
-#' Convert gene counts to bit counts
-#' @param mat Counts matrix
-#' @param genes Vector of gene names (omit negprobes and falsecodes)
-#' @param barcodes Vector of gene barcodes, aligned to genes
-#' @return A matrix of total gene expression in cells x barcode bits
-genes2bits <- function(mat, genes, barcodes) {
-  
-  # number of bits:
-  nreportercycles <- nchar(barcodes[1]) / 2
-  nbits <- nreportercycles * 4
-  # parse barcodes:
-  bitmat = matrix(0, nrow(mat), nbits)
-  colnames(bitmat) = paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), c("B", "G", 'Y', "R"))
-  for (i in seq_len(nreportercycles)) {
-    barcodeposition <- i*2
-    barcodehere <- substr(barcodes, barcodeposition, barcodeposition)
-    for (col in c("B", "Y", "G", "R")) {
-      tempgenes <- genes[barcodehere == col]
-      bitmat[, paste0("reportercycle", i, col)] = Matrix::rowSums(mat[, is.element(colnames(mat), tempgenes)])
-    }
-  }
-  rownames(bitmat) <- rownames(mat)
-  return(bitmat)
-}
+
 
 #' Summarize bias in FOVs
 #' 
