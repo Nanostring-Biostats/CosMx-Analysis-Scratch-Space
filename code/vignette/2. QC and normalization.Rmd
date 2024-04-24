@@ -184,10 +184,11 @@ saveRDS(xy, paste0(mydir, "/processed_data/xy.RDS"))
 Normalization is straightforward: we simply divide every cell's expression profile by its total counts.
 To put our counts back on a more natural scale, we then multiply all cells by the mean
 cell's total counts. 
-
+This can be done efficiently using matrix multiplication, which avoids converting the sparse (memory-efficient) matrix into a dense matrix.
 
 ```{r normalize}
-norm <- sweep(counts, 1, metadata$totalcounts, "/") * mean(metadata$totalcounts)
+scaling_factor <- mean(metadata$totalcounts)
+norm <- Matrix::Diagonal(x = scaling_factor/metadata$totalcounts,names=colnames(counts)) %*% counts
 saveRDS(norm, paste0(mydir, "/processed_data/norm.RDS"))
 ```
 
