@@ -57,7 +57,7 @@ this process:
 source("utils/condenseTissues.R")
 set.seed(1)
 xy <- condenseTissues(xy = xy, 
-                      tissue = metadata$slidename, 
+                      tissue = metadata$Run_Tissue_name, 
                       tissueorder = NULL,  # optional, specify the order tissues are tiled in
                       buffer = 1, # space between tissues
                       widthheightratio = 4/3) # desired shape of final xy locations 
@@ -71,10 +71,10 @@ sub <- sample(1:nrow(xy), round(nrow(xy) / 20), replace = FALSE)
 # define a color palette (using a Google palette):
 plot(xy[sub, ], pch = 16, cex = 0.2, 
      asp = 1, # important: keep the true aspect ratio
-     col = as.numeric(as.factor(metadata$slidename[sub])))
+     col = as.numeric(as.factor(metadata$Run_Tissue_name[sub])))
 # label tissues:
-for (slidename in unique(metadata$slidename)) {
-  text(median(xy[metadata$slidename == slidename, 1]), max(xy[metadata$slidename == slidename, 2]), slidename)
+for (slidename in unique(metadata$Run_Tissue_name)) {
+  text(median(xy[metadata$Run_Tissue_name == slidename, 1]), max(xy[metadata$Run_Tissue_name == slidename, 2]), slidename)
 }
 ```
 
@@ -89,10 +89,10 @@ To show a more complex example, we're pretending we have 2 tissues per slide.
 # manually assign tissue IDs: 
 # (Use whatever logic you need here. In this example, slide and tissue are synonymous, though they often won't be.)
 metadata$tissue <- NA
-metadata$tissue[(metadata$slidename == "MAR19_SlideAge_SkinCancer_RT_CP_slide2") & (xy[, 2] < 9)] <- "sample1"
-metadata$tissue[(metadata$slidename == "MAR19_SlideAge_SkinCancer_RT_CP_slide2") & (xy[, 2] > 9)] <- "sample2"
-metadata$tissue[(metadata$slidename == "MAR19_SlideAge_SkinCancer_4C_CP_slide4") & (xy[, 2] < 5.3)] <- "sample3"
-metadata$tissue[(metadata$slidename == "MAR19_SlideAge_SkinCancer_4C_CP_slide4") & (xy[, 2] > 5.3)] <- "sample4"
+metadata$tissue[(metadata$Run_Tissue_name == "MAR19_SlideAge_SkinCancer_RT_CP_slide2") & (xy[, 2] < 9)] <- "sample1"
+metadata$tissue[(metadata$Run_Tissue_name == "MAR19_SlideAge_SkinCancer_RT_CP_slide2") & (xy[, 2] > 9)] <- "sample2"
+metadata$tissue[(metadata$Run_Tissue_name == "MAR19_SlideAge_SkinCancer_4C_CP_slide4") & (xy[, 2] < 5.3)] <- "sample3"
+metadata$tissue[(metadata$Run_Tissue_name == "MAR19_SlideAge_SkinCancer_4C_CP_slide4") & (xy[, 2] > 5.3)] <- "sample4"
 
 # check for hiccups:
 if (any(is.na(metadata$tissue))) {
