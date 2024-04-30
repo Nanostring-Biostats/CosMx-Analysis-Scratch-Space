@@ -1,3 +1,4 @@
+
 #### README:
 # This script: functions for performing FOV QC of CosMx data. 
 # See the vignette for details on how to run
@@ -26,7 +27,7 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
   fov <- as.character(fov)
   ## create a matrix of barcode bit expression over sub-FOV grids:
   # define grids, get per-square gene expression:
-  gridinfo <- makeGrid(xy = xy, fov = fov, squares_per_fov = 49, min_cells_per_square = 25) 
+  gridinfo <- makeGrid(xy = xy, fov = fov, squares_per_fov = 49, min_cells_per_square = 10) 
   # convert to per-square barcode bit expression:
   bitcounts <- cellxgene2squarexbit(counts = counts, 
                                     grid = gridinfo$gridid, 
@@ -39,7 +40,7 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
   ## for every grid square, match it to "control" squares from other FOVs, and get its residuals from them:
   # get neighbors:
   comparators <- getNearestNeighborsByFOV(x = bitcounts, 
-                                          fov = gridinfo$gridfov, 
+                                          gridfov = gridinfo$gridfov, 
                                           n_neighbors = 10)
   
   # get expected:
@@ -47,7 +48,7 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
     colMeans(bitcounts[comparators[i, ], ], na.rm = TRUE)
   }))
   # get resids:
-  resid = log2((bitcounts + 5) / (yhat + 5))
+  resid = log2((bitcounts + 1) / (yhat + 1))
   rownames(resid) = rownames(bitcounts)
   
   ## summarize bias per FOV * bit:
@@ -110,6 +111,7 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reporterc
   if (is.null(plotheight)) {
     plotheight <- diff(range(res$xy[, 2])) * 1.5
   }
+  bits_to_plot <- match(bits, colnames(res$fovstats$flag))
   if (bits == "flagged_reportercycles") {
     flaggedreportercycles <- colnames(res$flags_per_fov_x_reportercycle)[colSums(res$flags_per_fov_x_reportercycle >= 0.5) > 0]
     names_of_bits_to_plot  <- paste0(rep(flaggedreportercycles, each = 4), rep(c("B", "G", "R","Y"), length(flaggedreportercycles)))
@@ -162,10 +164,11 @@ FOVEffectsHeatmap <- function(res) {
 #' Get nearest neighbors, sampling diffusely across other FOVs. 
 #' 
 #' @param x Data matrix, obs in rows, variables in columns
-#' @param fov vector of FOV IDs, aligned to rows of x
+#' @param gridfov vector of FOV IDs, aligned to rows of x
 #' @param n_neighbors How many neighbors to record
 #' @return A matrix of dimension nrow(obs) * n_neighbors, giving the row IDs for each obs's selected neighbors.
-getNearestNeighborsByFOV <- function(x, fov, n_neighbors = 10) {
+getNearestNeighborsByFOV <- function(x, gridfov, n_neighbors = 10) {
+  gridfov <- gridfov[rownames(x)]
   # get nearest:
   topneighbors <- FNN::get.knnx(data = x, 
                                 query = x, 
@@ -174,9 +177,9 @@ getNearestNeighborsByFOV <- function(x, fov, n_neighbors = 10) {
   reducedneighbors <- t(sapply(1:nrow(topneighbors), function(i) {
     tempneighbors <- topneighbors[i, ]
     # only accept 1 per FOV
-    tempneighbors[duplicated(fov[topneighbors[i, ]])] <- NA
+    tempneighbors[duplicated(gridfov[topneighbors[i, ]])] <- NA
     # none from own FOV:
-    tempneighbors[fov[topneighbors[i, ]] == fov[i]] <- NA
+    tempneighbors[gridfov[topneighbors[i, ]] == gridfov[i]] <- NA
     return(tempneighbors[!is.na(tempneighbors)][1:n_neighbors])
   }))
   
@@ -270,7 +273,6 @@ summarizeFOVBias <- function(resid, gridfov, max_prop_loss) {
   }
   
   # flagging rule:
-  flag <- (abs(bias) > abs(log2(1 - max_prop_loss))) * (p < 0.01) * (propagree >= 0.75)
+  flag <- (bias < log2(1 - max_prop_loss)) * (p < 0.01) * (propagree >= 0.5)
   return(list(flag = flag, bias = bias, p = p, propagree = propagree))
 }
-
