@@ -23,6 +23,7 @@ date: "2024-04-19"
 categories: [visualization, napari]
 draft: false
 image: figures/prostate.gif
+code-fold: true
 ---
 
 ```{r}
@@ -113,7 +114,9 @@ capabilities of a standard laptop.
 ## Installing `napari-cosmx` {#sec-installing}
 
 The specific download instructions depend on your operating system (see tabs below)
-but the general procedure is the same: 1) installing Napari 0.4.17 and 2) installing the `napari-cosmx` plugin
+but the general procedure is the same: 1) installing Napari 0.4.17 and 2) installing the `napari-cosmx` plugin. 
+
+We have stored the `napari-cosmx` plugin `whl file` and license in [asests/napari-cosmx releases](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/napari-cosmx%20releases){target="_blank"}
 
 ::: {.callout-note}
 The `napari-cosmx` plugin was developed with Napari 0.4.17. There are some breaking
@@ -246,16 +249,17 @@ knitr::include_graphics("./figures/mac_plugin_command.png")
 
 ## Napari-ready slide folder {#sec-napari-ready-files}
 
-The `napari-cosmx` plugin expects a single slide that has been prepared using the
+The `napari-cosmx` plugin expects a slide that has been prepared using the
 `stitching` (@sec-stitching) method within the plugin itself. If you do not already
-have a napari-ready slide, you can download a two-FOV example that we have created
-[here (to do: need to link the two-fov file)](){target="_blank"}. This two-FOV dataset
+have a napari-ready slide, you can download a simple, single-FOV example that we have created
+[here)](https://nanostring.box.com/s/mzkiw0026bssm1a0wl2qx5pm2xtvoch4){target="_blank"}. This single-FOV dataset
 was derived from the mouse brain public dataset. The full data download is not needed for our current purposes but
 those interested in exploring the full data can download it  [here](https://nanostring.com/resources/coronal-hippocampus-and-cortex-raw-data-export/){target="_blank"}. 
 
-At the very minimum, the napari-ready slide folder contains two elements: 
+At the very minimum, the napari-ready slide folder contains two top-level elements: 
 
-1. `images` folder. Within the `images` folder, there are subfolders for each immunofluorescence channel and one folder for the cell boundaries (`labels`). 
+1. `images` folder. Within the `images` folder, there are subfolders for 
+each immunofluorescence channel and one folder for the cell boundaries (`labels`). 
 2. `targets.hdf5` file that contains the RNA (or protein) targets. 
 
 An example can be see below (@fig-napari-ready-folder).
@@ -264,10 +268,50 @@ An example can be see below (@fig-napari-ready-folder).
 #| eval: true
 #| echo: false
 #| label: "fig-napari-ready-folder"
-#| fig-cap: "Example layout of a napari-ready folder. In this example, the 'parent folder' (_i.e._, the folder you would drag and drop into napari) is named `two_fovs_napari_files` and contains the `images` folder with subfolders containing various zarr files within and the `targets.hdf5` file."
+#| fig-cap: "Example layout of a napari-ready folder. In this example, the 'parent folder' (_i.e._, the folder you would drag and drop into Napari) is named `single_fov_napari_example` and contains the `images` folder with subfolders containing various zarr files within and the `targets.hdf5` file."
 
 knitr::include_graphics("./figures/napari-ready-format.png")
 ```
+
+If you would like to see the details of the zarr file structure for the `images`
+folder in our single-FOV example, expand the code chunk blow.
+
+```{bash}
+#| eval: false
+#| label: tree
+
+$ tree -f
+.
+├── ./images
+│   ├── ./images/DNA
+│   │   ├── ./images/DNA/0
+│   │   │   └── ./images/DNA/0/0
+│   │   │       └── ./images/DNA/0/0/0
+│   │   ├── ./images/DNA/1
+│   │   │   └── ./images/DNA/1/0
+│   │   │       └── ./images/DNA/1/0/0
+│   │   ├── ./images/DNA/2
+│   │   │   └── ./images/DNA/2/0
+│   │   │       └── ./images/DNA/2/0/0
+│   │   └── ./images/DNA/3
+│   │       └── ./images/DNA/3/0
+│   │           └── ./images/DNA/3/0/0
+│   └── ./images/labels
+│       ├── ./images/labels/0
+│       │   └── ./images/labels/0/0
+│       │       └── ./images/labels/0/0/0
+│       ├── ./images/labels/1
+│       │   └── ./images/labels/1/0
+│       │       └── ./images/labels/1/0/0
+│       ├── ./images/labels/2
+│       │   └── ./images/labels/2/0
+│       │       └── ./images/labels/2/0/0
+│       └── ./images/labels/3
+│           └── ./images/labels/3/0
+│               └── ./images/labels/3/0/0
+└── ./targets.hdf5
+```
+
 
 We can also create a file named `_metadata.csv` that can be used for cell-level
 labeling. For more information on that, please see @sec-adding-metadata. 
@@ -277,9 +321,9 @@ labeling. For more information on that, please see @sec-adding-metadata.
 ::: {.callout-note}
 You may have noticed that I put this section _before_ the section on how to 
 create (or 'stitch') napari-ready files. This is due to the current implementation
-of the `napari-cosmx` codebase. Specifically, this is because the widget used
+of the `napari-cosmx` code base. Specifically, this is because the widget used
 for stitching is available once we launch the plugin. So in order to be able to
-stitch, we need to have _some_ pre-exisiting slide to load into the plugin. There
+stitch, we need to have _some_ pre-existing slide to load into the plugin. There
 are advanced ways that we could get around this limitation but that's an 
 advanced topic for another day.
 :::
@@ -289,7 +333,7 @@ To launch and view CosMx data with the `napari-cosmx` plugin:
 1. Navigate to a napari-ready slide folder. If you need a minimum example, see @sec-napari-ready-files above.
 2. Open Napari from the Start Menu (Windows) or the Application folder (Mac).
 3. Drag the parent folder of the slide into the the Napari application. If you
-are using the two-FOV example above, this would be the folder named `two_fovs_napari_files`. 
+are using the single-FOV example above, this would be the folder named `single_fov_napari_example`. 
 Otherwise, the napari-ready folder is whichever folder contains `images` and `targets.hdf5` (see @sec-napari-ready-files).
 4. Napari will ask if you would like to open via the `napari-cosmx` plugin or another
 method. Select the `napari-cosmx` plugin and press okay. 
@@ -374,7 +418,7 @@ knitr::include_graphics("./figures/export-fig4.png")
 
 In order to use the stitching widget in the plugin, we must first launch the 
 plugin. Currently, the only way to do that is to load an existing napari-ready 
-folder. This can be any Napari slide (_e.g._, a previous study or the two-FOV 
+folder. This can be any Napari slide (_e.g._, a previous study or the single-FOV 
 example described in @sec-napari-ready-files).
 
 ### 3. Stitching images {#sec-stitch-images}
@@ -391,18 +435,23 @@ panel (@fig-stitch-widget1).
 knitr::include_graphics("./figures/stitch-widget1.png")
 ```
 
-We need to tell `napari-cosmx` where the raw data are located. In the right-hand panel
+We need to tell `napari-cosmx` where the raw data that we exported are located 
+locally. In the right-hand panel
 there is a `Stitch Images` widget. Click `Browse...` and navigate to the parent folder
-containing the slide's raw data. In our minimum example above with two FOVs, I have named
-the parent folder `two_fovs` (@fig-stitch-widget2). Your slide name will be labeled something else. 
-Once you select `Open`, you should see the path to the raw data folder. If an unexpected format
+containing the slide's raw data. 
+
+Your downloaded raw data folder name will be unique to your slide and you can rename it to
+whatever makes sense for your workflow. For this example, 
+I renamed it `raw_data` (@fig-stitch-widget2). Click on the raw data folder and
+select `Open`. In the `Stitch Images` widget, you should see the path of 
+the raw data folder printed. If an unexpected format
 was detected, there will be an error message (_e.g._, @fig-stitch-widget3).
 
 ```{r}
 #| eval: true
 #| echo: false
 #| label: "fig-stitch-widget2"
-#| fig-cap: "Example showing a launched `napari-cosmx` plugin with a possibly-unrelated slide. To stitch, a new slide, Click `Browse...` in the `Stitch Images` widget located on the right-hand side of Napari."
+#| fig-cap: "Browsing to the location of the raw data that you want to stitched."
 
 knitr::include_graphics("./figures/stitch-widget2.png")
 ```
@@ -417,8 +466,8 @@ knitr::include_graphics("./figures/stitch-widget3.png")
 ```
 
 Next, select the location where you want the plugin to return the napari-ready files.
-It is recommend not to store it in the same location as the raw data. Here, I'm 
-pointing it to a location adjacent to the raw data that I named `two_fovs_napari_files`
+It is recommended not to store it in the same location as the raw data. Here, I'm 
+pointing it to a location adjacent to the raw data that I named `stitched_example`
 (@fig-stitch-widget4).
 
 ```{r}
@@ -432,7 +481,7 @@ knitr::include_graphics("./figures/stitch-widget4.png")
 
 Finally, click `Stitch`. Note: currently there is no refreshing or printing of
 messages. Please do not click `Stitch` more than once. You may see Napari become
-unresponse, see the "spinning beachball" (Mac), _etc._ Depending on the number 
+unresponsive, see the "spinning beach ball" (Mac), _etc._ Depending on the number 
 of FOVs, computer configuration, and analyte type, this can take several minutes. 
 Once complete, you should
 see messages that resemble that of @fig-stitch-widget5. If you see the last line
@@ -449,24 +498,24 @@ into the application.
 
 knitr::include_graphics("./figures/stitch-widget5.png")
 ```
-
-
+That's it! To view the newly stitched slide, close Napari, re-open it, and drag the
+folder into Napari. 
 
 ## Adding and viewing metadata {#sec-adding-metadata} 
 
-While we'll have dedicated posts that discuss tips and tricks for using the
-`napari-cosmx` plugin, here we'll discuss one of the most powerful uses: viewing 
+While there will be dedicated posts that discuss tips and tricks for using the
+`napari-cosmx` plugin, here I'll discuss one of the most powerful uses: viewing 
 cell types. 
 
 While not needed for the basic stitching, the Seurat file that is downloaded
-from AtoMx can containing important cell-level information. For example, 
+from AtoMx SIP can contain important cell-level information. For example, 
 if cell typing was performed in AtoMx, each cell will have a label with its cell
 type. 
 
 In this section, I'll show you the basic principle for converting the meta data
-within the Seurat object into a csv file that can be understood by `napari-cosmx`. 
-Users should have a basic understanding of R in order to use this feature. We'll
-also need to switch our example dataset since the minimal two-FOV example dataset
+within the Seurat object into a csv file that can be understood by the `napari-cosmx` plugin. 
+Users should have a basic understanding of R in order to use this feature. I'll
+also need to switch our example dataset since the minimal single-FOV example dataset
 was from raw data and not analyzed in AtoMx so we don't have any cell-level cell type
 information. Here, the specific column of interest will have the prefix `RNA_nbclust` and suffix
 `clusters`. In the code below, we'll change that name to simply `cell_types`. We'll
