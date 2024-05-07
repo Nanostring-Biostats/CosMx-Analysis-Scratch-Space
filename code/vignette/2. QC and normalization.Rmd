@@ -94,21 +94,23 @@ source("utils/spatial functions.R")
 neighbors <- 1 * (nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 20, subset = metadata$FOV) != 0)
 # now get mean counts of neighbors:
 neighborcounts <- neighbor_mean(x = metadata$totalcounts, neighbors = neighbors)
-lowerlimit <- max(log2(1000), min(log2(neighborcounts)))
+lowerlimit <- max(log2(50), min(log2(neighborcounts)))
 # now plot it:
 plot(xy, pch = 16, cex = 0.1, 
      asp = 1, # important: keep the true aspect ratio
      col = viridis::viridis_pal(option = "B")(101)[
        pmax(pmin(1 + round(100 * (log2(neighborcounts) - lowerlimit) / (max(log2(neighborcounts)) - lowerlimit)), 101), 1)])
+legend("topright", pch = 16, col = c(NA, viridis::viridis_pal(option = "B")(101)[c(1,50,101)]),
+       legend = c("Mean neighborhood counts per cell:", round(c(2^lowerlimit, 2^mean(c(lowerlimit, max(log2(neighborcounts)))), max(neighborcounts)))))
 # label FOVs:
 #for (fov in unique(metadata$FOV)) {
 #  text(median(xy[metadata$FOV == fov, 1]), median(xy[metadata$FOV == fov, 2]), fov)
 #}
 ```
 
-
-We don't see any low-signal FOVs in this plot, but if we did, we could flag the cells in them as follows.
-Note that first you'd want to confirm that their signal was truly poor and not just slightly attenuated vs. their neighbors. It's OK for signal to vary; it just seems prudent to remove true outliers.
+We do see regions of low signal, but they appear to vary smoothly over space, tracing tissue biology, not FOV borders.
+If we did see FOVs where signal dropped, we could flag the cells in them as follows.
+Note that first you'd want to confirm that their signal was truly poor and not just slightly attenuated vs. their neighbors. It's OK for signal to vary; only true outliers need to be removed.
 
 ```{r lowcountfovs}
 low_count_fovs <- c("exampleFOV101", "exampleFOV342") 
