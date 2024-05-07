@@ -9,8 +9,7 @@ An R package for extracting and visualizing the neighborhood of query cells in g
 
 ### Installation
 ```
-git clone https://github.com/Nanostring-Biostats/NeighVizGallery.git
-devtools::install()
+devtools::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space/_code/NeighVizGallery@Main")
 ```
 
 
