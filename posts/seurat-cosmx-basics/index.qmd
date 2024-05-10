@@ -11,7 +11,7 @@ affiliations:
     city: Seattle
     state: WA
   - id: crwilliams11
-    name: "Github: [@crwilliams11](https://github.com/crwilliams11)"
+    name: "Github: [@crwilliams11](https://github.com/crwilliams11){target='_blank'}"
 toc: true
 toc-title: Contents
 toc-depth: 3
@@ -21,16 +21,18 @@ number-sections: true
 number-depth: 4
 date: "2024-05-10"
 date-modified: last-modified
-categories: [visualization]
+categories: [visualization, Seurat]
+image: figures/plot_oneCosMxFOV-1.png
+description: "Recommendations for spatial plots in Seurat"
 draft: false
 ---
 
 # Introduction 
 
-This is a non-comprehensive vignette to introduce the use of the Seurat package to visualize and work with data generated from the CosMx&#8482; Spatial Molecular Imager (SMI). This vignette does not cover analysis of data in Seurat but rather tries to address frequently asked questions we've received from customers on getting started with their data in Seurat. As additional resources, please see vignettes on the Seurat website: [Spatial Vignette](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2.html#human-lung-nanostring-cosmx-spatial-molecular-imager) and
-[Clustering Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial). Also see additional blog posts on our [scratch space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html).
+One of the most exciting aspects of CosMx&#8482; Spatial Molecular Imager (SMI) data is the ability to directly observe gene expression in its spatial context at the single cell level. This is a great technological leap from previous single cell transcriptomics methods that lost spatial context while retrieving cells. For analysts looking to perform spatial data analysis, the [Seurat R package](https://satijalab.org/seurat/){target="_blank"} has continually added features to support CosMx data. Readers are encouraged to take a look at previous vignettes by the Seurat group ([Spatial Vignette](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2.html#human-lung-nanostring-cosmx-spatial-molecular-imager){target="_blank"} and
+[Clustering Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial){target="_blank"}) as well as blog posts we've provided previously ([scratch space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"}). The blog post herein supplements these and provides you with some of the plotting configurations we find most helpful as you explore your CosMx data. This vignette does not cover analysis of data in Seurat but rather tries to address frequently asked questions we've received from customers on getting started with their data in Seurat. 
 
-For this vignette, we use a Seurat object made from the mouse brain public data set and assembled in the structure used by the Technology Access Program [TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/); similar outputs are available from the AtoMx&#8482; Spatial Informatics Portal (SIP). To download raw data for this dataset, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/). 
+For this vignette, we use a Seurat object made from the mouse brain public data set and assembled in the structure used by the Technology Access Program [TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/); similar outputs are available from the AtoMx&#8482; Spatial Informatics Portal (SIP). To download raw data for this dataset, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="_blank"}. 
 
 Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
 the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
@@ -40,6 +42,7 @@ This post will show you how to:
 - @sec-data-structure Find important data in Seurat object
 - @sec-spatial-plotting Plot CosMx data in space
 - @sec-dim-reduction-plots Visualize dimension reduction data 
+- @sec-conclusions Concluding thoughts
 
 
 
@@ -47,34 +50,73 @@ This post will show you how to:
 # Data Loading {#sec-loading}
 Here we start from a Seurat object containing CosMx data and analysis stored in an rds file. To start from raw data instead, see the Seurat Spatial Vignette above.
 
+::: {.callout-note}
+Many of the below functions require that you are working with [Seurat v5](https://satijalab.org/seurat/){target="_blank"} and may not work in earlier versions. Additionally, if you are exporting a Seurat object from AtoMx (v1.3+), be sure to export the Seurat object with polygon coordinates and transcripts included to access all of the functionality below.
+:::
+
 First, load needed libraries:
 ```{r load_libraries, message=FALSE, eval = FALSE}
 library(Seurat)
 library(ggplot2)
 ```
 
-Load in the Seurat object, available on Box.com [here](https://nanostring.box.com/s/y7ielc54qw1g1f5x98hxczdo8tezobbg).
+
+Load in the Seurat object, available on Box.com [here](https://nanostring.box.com/s/y7ielc54qw1g1f5x98hxczdo8tezobbg){target="_blank"}.
 ```{r load_seuratObject, message=FALSE, eval = FALSE}
 seu.obj <- readRDS("seurat_object.Rds")
 ```
 
 # Data Structure {#sec-data-structure}
 Here we'll show where various key data are stored in the Seurat object.
-```{r view_data, eval = FALSE}
+
+```{r eval = TRUE, echo = FALSE}
+# Read in stored results
+results_obj <- readRDS("./assets/results_obj.rds")
+```
+
+```{r eval = FALSE}
 # Cell metadata
 head(seu.obj@meta.data)
+```
 
+```{r eval = TRUE, echo = FALSE}
+results_obj$meta.data.head
+```
+
+```{r eval = FALSE}
 # Transcript counts. Here, transcripts counts are in the 'Nanostring' assay but in other objects they may be stored in an 'RNA' assay.
 seu.obj@assays$Nanostring$counts[1:5, 1:5]
+```
 
+```{r eval = TRUE, echo = FALSE}
+results_obj$transcript.counts
+```
+
+```{r eval = FALSE}
 # UMAP positions
 seu.obj@reductions$umap@cell.embeddings[1:10,]
+```
 
+```{r eval = TRUE, echo = FALSE}
+results_obj$umap.positions
+```
+
+```{r eval = FALSE}
 # Image names. Each slide is stored as a separate image within the object.
 Images(seu.obj)
+```
 
+```{r eval = TRUE, echo = FALSE}
+results_obj$images
+```
+
+```{r eval = FALSE}
 # Positions in space, here shown for one image / slide
 seu.obj@images[[Images(seu.obj)[1]]]$centroids@coords[1:10,] # In this object, this is equivalent to: seu.obj@images$Run1000.S1.Half$centroids@coords[1:10,]
+```
+
+```{r eval = TRUE, echo = FALSE}
+results_obj$cell.centroids
 ```
 
 # Plot data in space {#sec-spatial-plotting}
@@ -240,5 +282,9 @@ FeaturePlot(seu.obj,
 
 knitr::include_graphics("./figures/plot_umapTranscriptExpression-1.png")
 ```
+
+# Conclusions {#sec-conclusions}
+
+This vignette serves as an introduction to exploring CosMx data in Seurat, with a primary focus on visualization. Mix and match the functions and options from above to generate new customized visualizations with your data. Once you're comfortable visualizing your spatial data, you may want to proceed to [refining your cell typing](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/index.html){target="_blank"}, [performing differential expression](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/index.html){target="_blank"}, [finding spatially correlated genes](https://github.com/Nanostring-Biostats/InSituCor){target="_blank"}, or countless other analysis paths. 
 
 
