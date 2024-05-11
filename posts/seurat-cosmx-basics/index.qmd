@@ -1,0 +1,290 @@
+---
+title: "Introduction to visualizing CosMx data in Seurat"
+author:
+  - name: Claire Williams
+    affiliations:
+      - ref: nstg
+      - ref: crwilliams11
+affiliations:
+  - id: nstg
+    name: NanoString Technologies, Inc.
+    city: Seattle
+    state: WA
+  - id: crwilliams11
+    name: "Github: [@crwilliams11](https://github.com/crwilliams11){target='_blank'}"
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+number-sections: true
+number-depth: 4
+date: "2024-05-10"
+date-modified: last-modified
+categories: [visualization, Seurat]
+image: figures/plot_oneCosMxFOV-1.png
+description: "Recommendations for spatial plots in Seurat"
+draft: false
+---
+
+# Introduction 
+
+One of the most exciting aspects of CosMx&#8482; Spatial Molecular Imager (SMI) data is the ability to directly observe gene expression in its spatial context at the single cell level. This is a great technological leap from previous single cell transcriptomics methods that lost spatial context while retrieving cells. For analysts looking to perform spatial data analysis, the [Seurat R package](https://satijalab.org/seurat/){target="_blank"} has continually added features to support CosMx data. Readers are encouraged to take a look at previous vignettes by the Seurat group ([Spatial Vignette](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2.html#human-lung-nanostring-cosmx-spatial-molecular-imager){target="_blank"} and
+[Clustering Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial){target="_blank"}) as well as blog posts we've provided previously ([scratch space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"}). The blog post herein supplements these and provides you with some of the plotting configurations we find most helpful as you explore your CosMx data. This vignette does not cover analysis of data in Seurat but rather tries to address frequently asked questions we've received from customers on getting started with their data in Seurat. 
+
+For this vignette, we use a Seurat object made from the mouse brain public data set and assembled in the structure used by the Technology Access Program [TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/); similar outputs are available from the AtoMx&#8482; Spatial Informatics Portal (SIP). To download raw data for this dataset, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="_blank"}. 
+
+Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
+the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
+This post will show you how to:
+
+- @sec-loading Load needed libraries and example dataset
+- @sec-data-structure Find important data in Seurat object
+- @sec-spatial-plotting Plot CosMx data in space
+- @sec-dim-reduction-plots Visualize dimension reduction data 
+- @sec-conclusions Concluding thoughts
+
+
+
+
+# Data Loading {#sec-loading}
+Here we start from a Seurat object containing CosMx data and analysis stored in an rds file. To start from raw data instead, see the Seurat Spatial Vignette above.
+
+::: {.callout-note}
+Many of the below functions require that you are working with [Seurat v5](https://satijalab.org/seurat/){target="_blank"} and may not work in earlier versions. Additionally, if you are exporting a Seurat object from AtoMx (v1.3+), be sure to export the Seurat object with polygon coordinates and transcripts included to access all of the functionality below.
+:::
+
+First, load needed libraries:
+```{r load_libraries, message=FALSE, eval = FALSE}
+library(Seurat)
+library(ggplot2)
+```
+
+
+Load in the Seurat object, available on Box.com [here](https://nanostring.box.com/s/y7ielc54qw1g1f5x98hxczdo8tezobbg){target="_blank"}.
+```{r load_seuratObject, message=FALSE, eval = FALSE}
+seu.obj <- readRDS("seurat_object.Rds")
+```
+
+# Data Structure {#sec-data-structure}
+Here we'll show where various key data are stored in the Seurat object.
+
+```{r eval = TRUE, echo = FALSE}
+# Read in stored results
+results_obj <- readRDS("./assets/results_obj.rds")
+```
+
+```{r eval = FALSE}
+# Cell metadata
+head(seu.obj@meta.data)
+```
+
+```{r eval = TRUE, echo = FALSE}
+results_obj$meta.data.head
+```
+
+```{r eval = FALSE}
+# Transcript counts. Here, transcript counts are in the 'Nanostring' assay but in other objects they may be stored in an 'RNA' assay.
+seu.obj@assays$Nanostring$counts[1:5, 1:5]
+```
+
+```{r eval = TRUE, echo = FALSE}
+results_obj$transcript.counts
+```
+
+```{r eval = FALSE}
+# UMAP positions
+seu.obj@reductions$umap@cell.embeddings[1:10,]
+```
+
+```{r eval = TRUE, echo = FALSE}
+results_obj$umap.positions
+```
+
+```{r eval = FALSE}
+# Image names. Each slide is stored as a separate image within the object.
+Images(seu.obj)
+```
+
+```{r eval = TRUE, echo = FALSE}
+results_obj$images
+```
+
+```{r eval = FALSE}
+# Positions in space, here shown for one image / slide
+seu.obj@images[[Images(seu.obj)[1]]]$centroids@coords[1:10,] # In this object, this is equivalent to: seu.obj@images$Run1000.S1.Half$centroids@coords[1:10,]
+```
+
+```{r eval = TRUE, echo = FALSE}
+results_obj$cell.centroids
+```
+
+# Plot data in space {#sec-spatial-plotting}
+Within the Seurat object, each slide is stored as a separate 'image' or 'fov'. This is an unfortunate naming convention difference between CosMx nomenclature and the Seurat package. What Seurat refers to as an ‘fov’ is what NanoString refers to as a slide. When plotting cells in space, you need to specify the Seurat 'fov' to plot, and this is equivalent to choosing which CosMx slide to plot.
+
+Plot all cells on one slide in space, coloring by cell type.
+```{r plot_allCellsInSpace, eval = FALSE, fig.dim = c(12, 8)}
+# Get name of the first image
+image1 <- Images(seu.obj)[1]
+
+# Plot all cells.
+# We recommend setting the border color to 'NA' as the default 'white' often masks all cells when zoomed out, leading to a fully white plot.
+ImageDimPlot(seu.obj, fov = image1, axes = TRUE, border.color = NA)
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/plot_allCellsInSpace-1.png")
+```
+
+Plot the location of individual transcripts with the 'molecules' option.
+```{r plot_genesOnImage, fig.dim = c(12,8), eval = FALSE}
+ImageDimPlot(seu.obj,
+             fov = Images(seu.obj)[1],
+             border.color = "black",
+             alpha = 0.5, # Reduce alpha of cell fills to better visualize the overlaying molcules
+             molecules = c("Slc17a7", "Gad1", "Plp1"),
+             mols.size = 0.2,
+             nmols = 100000, # Set the total number of molecules to visualize
+             axes = FALSE)
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/plot_genesOnImage-1.png")
+```
+
+
+Plot one CosMx FOV. To do this, we set the cells we'd like to plot to be all those in our target FOV. A similar strategy could be used to plot a subset of FOVs or a subset of cells of interest.
+```{r plot_oneCosMxFOV, fig.dim = c(12,8), eval = FALSE}
+ImageDimPlot(seu.obj,
+             fov = Images(seu.obj)[1],
+             border.color = "black",
+             cells = row.names(seu.obj@meta.data)[which(seu.obj@meta.data$fov == 99)])
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/plot_oneCosMxFOV-1.png")
+```
+
+
+By default, cells are colored by the 'Identity' set in the Seurat object. We can change this by selecting another column to color by. Here we show coloring by leiden cluster, which we treat as a factor rather than an integer. 
+```{r plot_FOVleiden, fig.dim = c(12,8), eval = FALSE}
+# Check the default identities
+head(Idents(seu.obj))
+
+# Plot by leiden cluster using the 'group.by' option
+ImageDimPlot(seu.obj,
+             fov = Images(seu.obj)[1],
+             border.color = "black",
+             group.by = "leiden_clus",
+             cols = "glasbey", # Option to use a different palette for cell colors
+             cells = row.names(seu.obj@meta.data)[which(seu.obj@meta.data$fov == 99)])
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/plot_FOVleiden-1.png")
+```
+
+To color cells by a continuous value, such as the log10totalcounts, or by the expression of a transcript of interest, such as *Slc17a7*, we use the function 'ImageFeaturePlot'.
+```{r plot_imageContinuousVariable, eval = FALSE}
+# Color cells by log10totalcounts
+ImageFeaturePlot(seu.obj,
+             fov = Images(seu.obj)[1],
+             border.color = NA,
+            features = "log10totalcounts")
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/plot_imageContinuousVariable-1.png")
+```
+
+```{r plot_imageContinuousVariable_gene, eval = FALSE}
+# Color cells by the expression of a gene of interest, Slc17a7
+ImageFeaturePlot(seu.obj,
+             fov = Images(seu.obj)[1],
+             border.color = NA,
+            features = "Slc17a7")
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/plot_imageContinuousVariable_gene-1.png")
+```
+
+Seurat can plot cells with either cell shapes shown ('segmentation') or with a single point at the center of where they're located ('centroids'). Here we show the switch to plotting centroids for one FOV.
+```{r plot_centroids, eval = FALSE}
+# Check what the current default boundary is
+DefaultBoundary(seu.obj@images[[Images(seu.obj)[1]]])
+
+# Change the default boundaries for the first slide
+DefaultBoundary(seu.obj@images[[Images(seu.obj)[1]]]) <- "centroids"
+
+# Plot one FOV from this slide. Note that cell shapes are no longer shown
+ImageDimPlot(seu.obj,
+             fov = Images(seu.obj)[1],
+             size = 5,
+             shuffle.cols = TRUE, # Option to randomly shuffle colors within the palette
+             cells = row.names(seu.obj@meta.data)[which(seu.obj@meta.data$fov == 99)])
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/plot_centroids-1.png")
+```
+
+# Dimension reduction plots {#sec-dim-reduction-plots}
+The CosMx Seurat object contains coordinates for each cell for UMAP dimensional reduction.
+
+Here, we color cells by cell type and overlay cell type labels.
+```{r plot_umapCellTypes, eval = FALSE}
+DimPlot(seu.obj, 
+        group.by = "nb_clus",
+        label = TRUE) +
+  theme(legend.position = "none") # Suppress the legend since labels are plotted on top of UMAP
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/plot_umapCellTypes-1.png")
+```
+
+Here, we color cells by a continuous value, using transcript expression for a transcript of interest.
+```{r plot_umapTranscriptExpression, eval = FALSE}
+FeaturePlot(seu.obj, 
+        features = "Slc17a7",
+        order = TRUE) # plots cells in order of expression
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/plot_umapTranscriptExpression-1.png")
+```
+
+# Conclusions {#sec-conclusions}
+
+This vignette serves as an introduction to exploring CosMx data in Seurat, with a primary focus on visualization. Mix and match the functions and options from above to generate new customized visualizations with your data. Once you're comfortable visualizing your spatial data, you may want to proceed to [refining your cell typing](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/index.html){target="_blank"}, [performing differential expression](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/index.html){target="_blank"}, [finding spatially correlated genes](https://github.com/Nanostring-Biostats/InSituCor){target="_blank"}, or countless other analysis paths. 
+
+
