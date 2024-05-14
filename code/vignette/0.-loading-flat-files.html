@@ -378,27 +378,144 @@ dir(myflatfiledir)
 # where to write output:
 outdir &lt;- &quot;..&quot;</code></pre>
 <p>So there are two slides, each with 4 files: an expression matrix,
-cell metadata, cell polygons, and a map of fov positions</p>
-<p>Now we’ll load in the flat files and format as we want. A function
-for parsing flat files can be found in the “utils” folder:</p>
-<pre class="r"><code>source(&quot;utils/loadFlatFiles.R&quot;)
-atomxdata &lt;- loadAtoMxFlatFiles(flatfiledir = myflatfiledir) 
+cell metadata, cell polygons, and a map of fov positions.</p>
+<p>Now we’ll load in the flat files and format as we want.</p>
+<p>Trying to load an entire matrix into memory at once, may cause
+out-of-memory issues for large files.<br />
+Here’s some code below which gives an example of loading in the counts
+matrices in chunks.<br />
+* First, we’ll use <code>data.table::fread</code> function which can
+directly read gzipped files, and determine how many rows and columns
+we’re working with.<br />
+* Then, we’ll read each chunk of data in, and convert it to a low-memory
+sparse matrix format before moving onto the next chunk.<br />
+* At the end, we’ll combine our sparse matrices together.</p>
+<pre class="r"><code>### automatically get slide names:
+slidenames &lt;- dir(myflatfiledir)
+
+### lists to collect the counts matrices and metadata, one per slide
+countlist &lt;- vector(mode=&#39;list&#39;, length=length(slidenames)) 
+metadatalist &lt;- vector(mode=&#39;list&#39;, length=length(slidenames)) 
+
+for(i in 1:length(slidenames)){
+   
+  slidename &lt;- slidenames[i] 
+
+  msg &lt;- paste0(&quot;Loading slide &quot;, slidename, &quot;, &quot;, i, &quot;/&quot;, length(slidenames), &quot;.&quot;)
+  message(msg)    
+  # slide-specific files:
+  thisslidesfiles &lt;- dir(paste0(myflatfiledir, &quot;/&quot;, slidename))
+  
+  # load in metadata:
+  thisslidesmetadata &lt;- thisslidesfiles[grepl(&quot;metadata\\_file&quot;, thisslidesfiles)]
+  tempdatatable &lt;- data.table::fread(paste0(myflatfiledir, &quot;/&quot;, slidename, &quot;/&quot;, thisslidesmetadata))
+  
+  # numeric slide ID 
+  slide_ID_numeric &lt;- tempdatatable[1,]$slide_ID 
+    
+  # load in counts as a data table:
+  thisslidescounts &lt;- thisslidesfiles[grepl(&quot;exprMat\\_file&quot;, thisslidesfiles)]
+  
+  countsfile &lt;- paste0(myflatfiledir, &quot;/&quot;, slidename, &quot;/&quot;, thisslidescounts)
+  nonzero_elements_perchunk &lt;- 5*10**7
+  ### Safely read in the dense (0-filled ) counts matrices in chunks.
+  ### Note: the file is gzip compressed, so we don&#39;t know a priori the number of chunks needed.
+  lastchunk &lt;- FALSE 
+  skiprows &lt;- 0
+  chunkid &lt;- 1
+  
+  required_cols &lt;- fread(countsfile, select=c(&quot;fov&quot;, &quot;cell_ID&quot;))
+  stopifnot(&quot;columns &#39;fov&#39; and &#39;cell_ID&#39; are required, but not found in the counts file&quot; = 
+              all(c(&quot;cell_ID&quot;, &quot;fov&quot;) %in% colnames(required_cols)))
+  number_of_cells &lt;- nrow(required_cols)
+  
+  number_of_cols &lt;-  ncol(fread(countsfile, nrows = 2))
+  number_of_chunks &lt;- ceiling(number_of_cols * number_of_cells / (nonzero_elements_perchunk))
+  chunk_size &lt;- floor(number_of_cells / number_of_chunks)
+  sub_counts_matrix &lt;- vector(mode=&#39;list&#39;, length=number_of_chunks)
+   
+  pb &lt;- txtProgressBar(min = 0, max = number_of_chunks, initial = 0, char = &quot;=&quot;,
+                       width = NA, title, label, style = 3, file = &quot;&quot;)
+  cellcount &lt;- 0
+  while(lastchunk==FALSE){
+    read_header &lt;- FALSE
+    if(chunkid==1){
+      read_header &lt;- TRUE
+    }
+    
+    countsdatatable &lt;- data.table::fread(countsfile
+                                         ,nrows=chunk_size
+                                         ,skip=skiprows + (chunkid &gt; 1)
+                                         ,header=read_header
+                                         )
+    if(chunkid == 1){
+      header &lt;- colnames(countsdatatable)
+    } else {
+      colnames(countsdatatable) &lt;- header
+    }
+     
+    cellcount &lt;- nrow(countsdatatable) + cellcount     
+    if(cellcount == number_of_cells) lastchunk &lt;- TRUE
+    skiprows &lt;- skiprows + chunk_size
+    slide_fov_cell_counts &lt;- paste0(&quot;c_&quot;,slide_ID_numeric, &quot;_&quot;, countsdatatable$fov, &quot;_&quot;, countsdatatable$cell_ID)
+    sub_counts_matrix[[chunkid]] &lt;- as(countsdatatable[,-c(&quot;fov&quot;, &quot;cell_ID&quot;),with=FALSE], &quot;sparseMatrix&quot;) 
+    rownames(sub_counts_matrix[[chunkid]]) &lt;- slide_fov_cell_counts 
+    setTxtProgressBar(pb, chunkid)
+    chunkid &lt;- chunkid + 1
+  }
+  
+  close(pb)   
+  
+  countlist[[i]] &lt;- do.call(rbind, sub_counts_matrix) 
+  
+  # ensure that cell-order in counts matches cell-order in metadata   
+  slide_fov_cell_metadata &lt;- paste0(&quot;c_&quot;,slide_ID_numeric, &quot;_&quot;, tempdatatable$fov, &quot;_&quot;, tempdatatable$cell_ID)
+  countlist[[i]] &lt;- countlist[[i]][match(slide_fov_cell_metadata, rownames(countlist[[i]])),] 
+  metadatalist[[i]] &lt;- tempdatatable 
+  
+  # track common genes and common metadata columns across slides
+  if(i==1){
+    sharedgenes &lt;- colnames(countlist[[i]]) 
+    sharedcolumns &lt;- colnames(tempdatatable)
+  }  else {
+    sharedgenes &lt;- intersect(sharedgenes, colnames(countlist[[i]]))
+    sharedcolumns &lt;- intersect(sharedcolumns, colnames(tempdatatable))
+  }
+    
+}
 #&gt; Loading slide MAR19_SlideAge_SkinCancer_4C_CP_slide4, 1/2.
-#&gt; 
-  |                                                                            
-  |                                                                      |   0%
-  |                                                                            
-  |===================================                                   |  50%
-  |                                                                            
-  |======================================================================| 100%
+#&gt;   |                                                                              |                                                                      |   0%  |                                                                              |===================================                                   |  50%  |                                                                              |======================================================================| 100%
 #&gt; Loading slide MAR19_SlideAge_SkinCancer_RT_CP_slide2, 2/2.
-#&gt; 
-  |                                                                            
-  |                                                                      |   0%
-  |                                                                            
-  |===================================                                   |  50%
-  |                                                                            
-  |======================================================================| 100%
+#&gt;   |                                                                              |                                                                      |   0%  |                                                                              |===================================                                   |  50%  |                                                                              |======================================================================| 100%
+
+# reduce to shared metadata columns and shared genes
+for(i in 1:length(slidenames)){
+  metadatalist[[i]] &lt;- metadatalist[[i]][, ..sharedcolumns]
+  countlist[[i]] &lt;- countlist[[i]][, sharedgenes]
+}
+ 
+counts &lt;- do.call(rbind, countlist)
+metadata &lt;- rbindlist(metadatalist)
+
+# add to metadata: add a global non-slide-specific FOV ID:
+metadata$FOV &lt;- paste0(&quot;s&quot;, metadata$slide_ID, &quot;f&quot;, metadata$fov)
+
+# remove cell_ID metadata column, which only identifies cell within slides, not across slides:
+metadata$cell_ID &lt;- NULL
+
+# isolate negative control matrices:
+negcounts &lt;- counts[, grepl(&quot;Negative&quot;, colnames(counts))]
+falsecounts &lt;- counts[, grepl(&quot;SystemControl&quot;, colnames(counts))]
+
+# reduce counts matrix to only genes:
+counts &lt;- counts[, !grepl(&quot;Negative&quot;, colnames(counts)) &amp; !grepl(&quot;SystemControl&quot;, colnames(counts))]
+</code></pre>
+<p>Lets take a look at the structure of the dataset we’ve assembled:</p>
+<pre class="r"><code>atomxdata &lt;- list(counts = counts
+                  ,metadata = metadata
+                  ,negcounts = negcounts
+                  ,falsecounts = falsecounts
+                  )
 str(atomxdata)
 #&gt; List of 4
 #&gt;  $ counts     :Formal class &#39;dgCMatrix&#39; [package &quot;Matrix&quot;] with 6 slots
@@ -472,6 +589,8 @@ str(atomxdata)
 <p>Next we save the data as .RDS files. These files are smaller on disk
 (they benefit from more compression than flat files do), and they’re
 faster to read back into R.</p>
+<p><strong>Please note that these are intermediate results, and not
+official file formats supported by NanoString.</strong></p>
 <pre class="r"><code>if(!dir.exists(paste0(outdir, &quot;/processed_data&quot;))){
   dir.create(paste0(outdir, &quot;/processed_data&quot;))
 }
