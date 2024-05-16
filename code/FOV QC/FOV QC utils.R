@@ -248,7 +248,7 @@ mapFlaggedFOVs <- function(res, shownames = TRUE, outdir = NULL, plotwidth = NUL
     inds <- res$fov == f
     rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), col = scales::alpha("red", 0.5))
     if (shownames) {
-      text(median(range(xy[inds, 1])), median(range(xy[inds, 2])), f)
+      text(median(range(xy[inds, 1])), median(range(xy[inds, 2])), f, col = "green")
     }
   }
   if (!is.null(outdir)) {
