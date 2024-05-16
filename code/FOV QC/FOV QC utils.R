@@ -134,7 +134,11 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reporterc
          main = paste0(colnames(res$resid)[i], ": log2(fold-change)\nfrom comparable regions elsewhere"))
     for (f in unique(res$fov)) {
       inds <- res$fov == f
-      rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]))
+      rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), border = "black")
+    }
+    for (f in rownames(res$fovstats$flag)[res$fovstats$flag[, i] > 0]) {
+      inds <- res$fov == f
+      rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), lwd = 2, border = "yellow")
     }
     legend("right", pch = 16,
            col = rev(c("darkblue", "blue", "grey80", "red", "darkred")),
@@ -143,6 +147,47 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reporterc
       dev.off()
     }
   })
+}
+
+
+#' Map of which FOVs were flagged:
+#' 
+#' @param res Results object created by runFOVQC
+#' @param shownames Logical for whether to display FOV names
+#' @param outdir Directory where png plots are printed
+#' @param plotwidth Width in inches of png plots
+#' @param plotheight Height in inches of png plots
+#' @return For each bit, draws a plot of estimated FOV effects
+#' @export
+mapFlaggedFOVs <- function(res, shownames = TRUE, outdir = NULL, plotwidth = NULL, plotheight = NULL) {
+  
+  if (!is.null(outdir)) {
+    png(paste0(outdir, "/flagged FOVs.png"), width = plotwidth, height = plotheight, units = "in", res = 300)
+  }
+  if (is.null(plotwidth)) {
+    plotwidth <- diff(range(res$xy[, 1])) * 1.5
+  }
+  if (is.null(plotheight)) {
+    plotheight <- diff(range(res$xy[, 2])) * 1.5
+  }
+  
+  plot(res$xy, cex = 0.2, asp = 1, pch = 16,
+       col = "black", 
+       main = "Flagged FOVs")
+  for (f in unique(res$fov)) {
+    inds <- res$fov == f
+    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), col = scales::alpha("dodgerblue2", 0.25))
+  }
+  for (f in res$flaggedfovs) {
+    inds <- res$fov == f
+    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), col = scales::alpha("red", 0.5))
+    if (shownames) {
+      text(median(range(xy[inds, 1])), median(range(xy[inds, 2])), f)
+    }
+  }
+  if (!is.null(outdir)) {
+    dev.off()
+  }
 }
 
 
@@ -268,7 +313,8 @@ summarizeFOVBias <- function(resid, gridfov, max_prop_loss) {
     p[gsub("as.factor\\(gridfov\\)", "", rownames(mod)), bit] = mod[, "Pr(>|t|)"]
     for (fov in fovs) {
       inds <- gridfov == fov
-      propagree[as.character(fov), bit] <- mean(sign(resid[inds, bit]) == median(sign(resid[inds, bit])))
+      #propagree[as.character(fov), bit] <- mean(sign(resid[inds, bit]) == median(sign(resid[inds, bit])))
+      propagree[as.character(fov), bit] <- mean(resid[inds, bit] < log2(1 - max_prop_loss) / 3)
     }
   }
   

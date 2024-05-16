@@ -31,7 +31,7 @@ head(fov)
 # small (conservative) value to produce the most instructive results; 
 # for most purposes, we recommend using the default value of 0.3, 
 # i.e. flagging FOVs where a bit has >30% signal loss.
-res <- runFOVQC(counts = counts, xy = xy, fov = fov, barcodemap = barcodemap, max_prop_loss = 0.2) 
+res <- runFOVQC(counts = counts, xy = xy, fov = fov, barcodemap = barcodemap, max_prop_loss = 0.3) 
 str(res)
 # which FOVs were flagged:
 res$flaggedfovs
@@ -45,22 +45,31 @@ res$flagged_fov_x_gene[, "gene"]
 # heatmap of estimated bias suffered for each FOV * barcode bit (only flagged FOV * bits are colored);
 # Use this to peek under the hood at the intermediate results used to flag individual FOVs.
 FOVEffectsHeatmap(res) 
-# We see 2 bits (colors) flagged from 1 reporter cycle in 1 FOV, and 1 bit flagged in another FOV.
+# We see FOV 19 has many flagged bits, though most are from just one color from a reporter cycle.
 # Biological variability can cause single bits to be flagged, so we only flag FOVs where >=2
-# bits from a single reporter cycle are flagged.
+# However, all 4 bits of reporter cycle 12 are flagged in FOV 19, so we fail that FOV.
+# Similarly, we fail FOV 17 for having 3 failed bits in both reporter cycle 18 and 27,
+# and FOV 18 for failing all 4 bits of reporter cycle 18.
+# FOVs 17 and 14 have sporadic bits flagged, but not consistently within a reporter cycle, so we pass them. 
+
+# map of which FOVs were flagged:
+mapFlaggedFOVs(res)
 
 ## spatial plots of per-bit FOV effects:
-par(mar = c(1,1,3,1))
-# show all bits from flagged reporter cycles (only reporter cycles with >= 2 flagged bits in a single FOV get shown):
+# These plots show all bits from flagged reporter cycles (only reporter cycles 
+# with >= 2 flagged bits in a single FOV get shown):
 # Here we divide the tissue into sub-FOV grids, and we color each grid square by its change
 # in a barcode bit's total gene expression from similar grid squares from other FOVs.
-# grid squares without enough information are omitted. 
+# FOVs flagged for the bit are highlighted yellow.
+# Grid squares without enough information are omitted. 
 par(mfrow = c(2,2))
 FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "flagged_reportercycles") 
-# it's clear that all 4 bits from this reporter cycle are lost in the impacted FOV.
+# Failures tend to be unambiguous: it's very clear when all 4 bits from a reporter
+# cycle are lost in an impacted FOV.
 
-# show all bits that were flagged:
-par(mfrow = c(2,2))
-FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "flagged_bits") 
-# we can see that one bit (reportercycle18R) was flagged in a different FOV, but 
-#  it appears to be biology-driven, not a FOV-level technical artifact
+# Below, see an example of a flagged bit that appears more driven by spatial biology than by FOV artifacts.
+# No other bits from this reporter cycle have been flagged, so this result did not cause any FOVs to fail.
+par(mfrow = c(1,1))
+FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "reportercycle22R") 
+
+

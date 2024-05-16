@@ -11,6 +11,11 @@ we almost always recommend they should be excluded.
 Here we'll describe known FOV-level artifacts, and we'll show use of R code for detecting 
 impacted FOVs.
 
+
+*Important note:* this approach, which looks only at gene expression data, compliments
+a tool we've developed for detecting FOVs with registration failures. 
+This other tool is available ~[here]().
+
 ## FOV artifacts
 
 All known FOV artifacts act by modulating our ability to detect reporter probes. In CosMx SMI, the reporter probes contain a barcode that is read out across reporter cycles. At each reporter cycle, a given probe will either contain one of four colors or an empty slot.
