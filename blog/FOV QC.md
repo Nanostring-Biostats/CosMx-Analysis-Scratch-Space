@@ -30,7 +30,7 @@ Thus we see phenomena like the below, where genes with impacted bits are muted i
 We have observed the below root causes of FOV artifacts:
 
 #### Registration failure: 
-the images from each reporter cycle must be "registered", i.e. 
+The images from each reporter cycle must be "registered", i.e. 
 aligned to the images from the other cycles, in both horizontal and vertical position. 
 This process can go wrong in various ways, but all with the same impact: the barcode bits 
 from that reporter cycle are assigned to the wrong positions, and they can no longer be used
@@ -41,28 +41,42 @@ registration failure can impact a reporter cycle across one or all of these cycl
 either a slight decrease or a total loss of signal for the impacted genes. 
 
 #### Autofluorescence: 
-if the tissue in an FOV is autofluorescent, it can make fluorescent 
+If the tissue in an FOV is autofluorescent, it can make fluorescent 
 signal from CosMx reporter probes harder to detect. When this happens, all genes with barcode
 bits in the impacted color will be harder to detect. At the same time, they will
 suffer higher rates of FalseCode style background events - i.e., their barcode will 
 more often be spuriously observed in the absense of hyb probes for the gene. 
 
+#### Loss of signal:
+An FOV with unusually low signal is an indicator of something having gone wrong with data collection. 
+To be cautious, we recommend removing FOVs with any substantial loss of signal.
 
 ## Approach to FOV QC
 
-Because all the above artifacts impact *bits*, i.e. reporter cycle/color pairs, 
+First, we'll apply a permissive look at FOV's signal strength, throwing out FOVs with >30% 
+loss of signal across most of their spatial span. 
+
+Then we'll look for FOVs with biased gene expresssion profiles.
+Because all known artifacts impact *reporter cycles* (each containing 4 "bits"", i.e. reporter cycle/color pairs), 
 we will look for artifacts at the level of bits, not genes. 
 Specifically, for each barcode bit, we'll look for FOVs where genes using the bit are
 underexpressed compared to comparable regions elsewhere. 
+And we'll fail reporter cycles where multiple bits look bad.
 
 #### Technical details: 
 
 We place a 7x7 grid across each FOV. For each grid square, we find the 10 most similar squares
 in other FOVs, with "similar" being based on the square's expression profile. (We also only accept one 
 neighbor per other FOV.)
-Then, for each barcode bit, we take the genes using the bit, and we contrast their 
+
+Then we score FOVs for signal loss. For each square, we compare its total counts to its comparator squares. 
+For each barcode bit, this gives us 49 contrasts. 
+If most (75%) of an FOV's squares have low total counts compared to comparators, we flag the FOV.
+
+
+To score FOVs for bias, we use a similar approach. 
+For each barcode bit, we take the genes using the bit, and we contrast their 
 expression in the square vs. in the average of the 10 most similar squares elsewhere. 
-For a given FOV and barcode bit, this gives us 49 contrasts. 
 When an FOV's grid squares consistently underexpress the relevant gene set, we flag the FOV.
 
 Below we demonstrate this approach, looking at a tissue with particularly dramatic FOV effects. 

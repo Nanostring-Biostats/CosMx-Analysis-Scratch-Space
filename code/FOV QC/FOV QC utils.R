@@ -18,8 +18,9 @@
 #' @param barcodemap Data frame with two columns: "gene" and "barcode". Download the barcodemap for your panel
 #' from https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/code/FOV%20QC.
 #' @param max_prop_loss Maximum loss of efficiency allowed for any bit. E.g., a value of "0.3" means all FOVs with bias <log2(1 - 0.3) will be flagged.
+#' @param max_totalcounts_loss Maximum loss of total expression allowed for any FOV. E.g., a value of "0.5" means all FOVs with total counts <50% of comparable spatial regions will be flagged.
 #' @export
-runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
+runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3, max_totalcounts_loss = 0.3) {
   
   if ((max_prop_loss > 1) | (max_prop_loss < 0)) {
     stop("max_prop_loss must fall in range of 0-1.")
@@ -43,12 +44,28 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
                                           gridfov = gridinfo$gridfov, 
                                           n_neighbors = 10)
   
+  
+  ## Search for FOVs with low outlier total counts:
+  totalcounts <- Matrix::rowSums(counts)
+  totalcountsgrid <- by(totalcounts, gridinfo$gridid, mean)[rownames(bitcounts)]
+  # get expected total counts:
+  totalcountshat <- sapply(1:length(totalcountsgrid), function(i) {
+    mean(totalcountsgrid[comparators[i, ]], na.rm = TRUE)
+  })
+  # resids of total counts:
+  totalcountsresids <- log2(totalcountsgrid / totalcountshat)
+  # flag FOVs:
+  flaggedgrids <- totalcountsresids < log2(1 - max_totalcounts_loss)
+  flaggedgridsperfov <- by(as.vector(1*flaggedgrids), gridinfo$gridfov[names(flaggedgrids)], mean)
+  flaggedfovs_fortotalcounts <- names(which(flaggedgridsperfov > 0.75))
+  
+  ## Search for failed reporter cycles:
   # get expected:
   yhat <- t(sapply(1:nrow(bitcounts), function(i) {
     colMeans(bitcounts[comparators[i, ], ], na.rm = TRUE)
   }))
   # get resids:
-  resid = log2((bitcounts + 1) / (yhat + 1))
+  resid <- log2((bitcounts + 1) / (yhat + 1))
   rownames(resid) = rownames(bitcounts)
   
   ## summarize bias per FOV * bit:
@@ -63,7 +80,8 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
   colnames(flags_per_fov_x_reportercycle) <- unique(reportercycle)
   
   # collate all flagged FOVs:
-  flaggedfovs <- rownames(flags_per_fov_x_reportercycle)[rowSums(flags_per_fov_x_reportercycle >= 0.5) > 0]
+  flaggedfovs_forbias <- rownames(flags_per_fov_x_reportercycle)[rowSums(flags_per_fov_x_reportercycle >= 0.5) > 0]
+  flaggedfovs <- union(flaggedfovs_fortotalcounts, flaggedfovs_forbias)
   
   # report on flagged FOVs:
   if (length(flaggedfovs) > 0) {
@@ -87,9 +105,13 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3) {
     }
   }
   
-  return(list(flaggedfovs = flaggedfovs, flagged_fov_x_gene = flagged_fov_x_gene, 
+  return(list(flaggedfovs = flaggedfovs, 
+              flaggedfovs_fortotalcounts = flaggedfovs_fortotalcounts, 
+              flaggedfovs_forbias = flaggedfovs_forbias,
+              flagged_fov_x_gene = flagged_fov_x_gene, 
               flags_per_fov_x_reportercycle = flags_per_fov_x_reportercycle ,
-              fovstats = fovstats, resid = resid, gridinfo = gridinfo, xy = xy, fov = fov))
+              fovstats = fovstats, resid = resid, totalcountsresids = totalcountsresids, 
+              gridinfo = gridinfo, xy = xy, fov = fov))
 }
 
 
@@ -149,6 +171,50 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reporterc
   })
 }
 
+
+#' Spatial plot of loss in signal strength compared to similar regions:
+#' 
+#' @param res Results object created by runFOVQC
+#' @param shownames Logical for whether to display FOV names
+#' @param outdir Directory where png plots are printed
+#' @param plotwidth Width in inches of png plots
+#' @param plotheight Height in inches of png plots
+#' @return For each bit, draws a plot of estimated FOV effects
+#' @export
+FOVSignalLossSpatialPlot <- function(res, shownames = TRUE, outdir = NULL, plotwidth = NULL, plotheight = NULL) {
+  
+  if (!is.null(outdir)) {
+    png(paste0(outdir, "/signal loss.png"), width = plotwidth, height = plotheight, units = "in", res = 300)
+  }
+  if (is.null(plotwidth)) {
+    plotwidth <- diff(range(res$xy[, 1])) * 1.5
+  }
+  if (is.null(plotheight)) {
+    plotheight <- diff(range(res$xy[, 2])) * 1.5
+  }
+  
+  plot(res$xy, cex = 0.2, asp = 1, pch = 16,
+       col = colorRampPalette(c("darkblue", "blue", "grey80", "red", "darkred"))(101)[
+         pmax(pmin(51 + res$totalcountsresids[match(res$gridinfo$gridid, names(res$totalcountsresids))] * 100, 101), 1)], 
+       main = "Log2 fold-change in total counts compared to similar regions")
+  for (f in unique(res$fov)) {
+    inds <- res$fov == f
+    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), border = "black")
+  }
+  for (f in res$flaggedfovs_fortotalcounts) {
+    inds <- res$fov == f
+    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), border = "yellow", lwd = 2)
+    if (shownames) {
+      text(median(range(xy[inds, 1])), median(range(xy[inds, 2])), f, col = "green")
+    }
+  }
+  legend("right", pch = 16,
+         col = rev(c("darkblue", "blue", "grey80", "red", "darkred")),
+         legend = rev(c("< -1", -0.5, 0, 0.5, "> 1")))
+  if (!is.null(outdir)) {
+    dev.off()
+  }
+}
 
 #' Map of which FOVs were flagged:
 #' 

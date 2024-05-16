@@ -42,6 +42,14 @@ res$flagged_fov_x_gene[, "gene"]
 
 #### Explore results: -----------------
 
+# Show which FOVs have been flagged:
+mapFlaggedFOVs(res)
+
+# Now let's dissect the causes of FOV flags. 
+# First and more simply, look for loss in total signal strength:
+FOVSignalLossSpatialPlot(res, shownames = TRUE) 
+# Two FOVs with clear signal loss have been flagged; another with more marginal signal loss has passed. 
+
 # heatmap of estimated bias suffered for each FOV * barcode bit (only flagged FOV * bits are colored);
 # Use this to peek under the hood at the intermediate results used to flag individual FOVs.
 FOVEffectsHeatmap(res) 
@@ -52,8 +60,6 @@ FOVEffectsHeatmap(res)
 # and FOV 18 for failing all 4 bits of reporter cycle 18.
 # FOVs 17 and 14 have sporadic bits flagged, but not consistently within a reporter cycle, so we pass them. 
 
-# map of which FOVs were flagged:
-mapFlaggedFOVs(res)
 
 ## spatial plots of per-bit FOV effects:
 # These plots show all bits from flagged reporter cycles (only reporter cycles 
