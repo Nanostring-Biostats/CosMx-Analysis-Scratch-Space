@@ -1,0 +1,2175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss  xmlns:atom="http://www.w3.org/2005/Atom" 
+      xmlns:media="http://search.yahoo.com/mrss/" 
+      xmlns:content="http://purl.org/rss/1.0/modules/content/" 
+      xmlns:dc="http://purl.org/dc/elements/1.1/" 
+      version="2.0">
+<channel>
+<title>Blog</title>
+<link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/</link>
+<atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
+<description>NanoString&#39;s CosMx Analysis Scratch Space</description>
+<generator>quarto-1.4.554</generator>
+<lastBuildDate>Fri, 10 May 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Introduction to visualizing CosMx data in Seurat</title>
+  <dc:creator>Claire Williams</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>One of the most exciting aspects of CosMx™ Spatial Molecular Imager (SMI) data is the ability to directly observe gene expression in its spatial context at the single cell level. This is a great technological leap from previous single cell transcriptomics methods that lost spatial context while retrieving cells. For analysts looking to perform spatial data analysis, the <a href="https://satijalab.org/seurat/" target="_blank">Seurat R package</a> has continually added features to support CosMx data. Readers are encouraged to take a look at previous vignettes by the Seurat group (<a href="https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2.html#human-lung-nanostring-cosmx-spatial-molecular-imager" target="_blank">Spatial Vignette</a> and <a href="https://satijalab.org/seurat/articles/pbmc3k_tutorial" target="_blank">Clustering Tutorial</a>) as well as blog posts we’ve provided previously (<a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">scratch space</a>). The blog post herein supplements these and provides you with some of the plotting configurations we find most helpful as you explore your CosMx data. This vignette does not cover analysis of data in Seurat but rather tries to address frequently asked questions we’ve received from customers on getting started with their data in Seurat.</p>
+<p>For this vignette, we use a Seurat object made from the mouse brain public data set and assembled in the structure used by the Technology Access Program <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/">TAP</a>; similar outputs are available from the AtoMx™ Spatial Informatics Portal (SIP). To download raw data for this dataset, go <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="_blank">here</a>.</p>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies. This post will show you how to:</p>
+<ul>
+<li>Section&nbsp;2 Load needed libraries and example dataset</li>
+<li>Section&nbsp;3 Find important data in Seurat object</li>
+<li>Section&nbsp;4 Plot CosMx data in space</li>
+<li>Section&nbsp;5 Visualize dimension reduction data</li>
+<li>Section&nbsp;6 Concluding thoughts</li>
+</ul>
+</section>
+<section id="sec-loading" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Data Loading</h1>
+<p>Here we start from a Seurat object containing CosMx data and analysis stored in an rds file. To start from raw data instead, see the Seurat Spatial Vignette above.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Many of the below functions require that you are working with <a href="https://satijalab.org/seurat/" target="_blank">Seurat v5</a> and may not work in earlier versions. Additionally, if you are exporting a Seurat object from AtoMx (v1.3+), be sure to export the Seurat object with polygon coordinates and transcripts included to access all of the functionality below.</p>
+</div>
+</div>
+<p>First, load needed libraries:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(Seurat)</span>
+<span id="cb1-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(ggplot2)</span></code></pre></div>
+</div>
+<p>Adjust globals option to avoid an error exceeding max allowed size. We’ve found this is necessary even with relatively small CosMx datasets (30 - 40 FOVs).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">options</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">future.globals.maxSize =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8000</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1024</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">^</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span></code></pre></div>
+</div>
+<p>Load in the Seurat object, available on Box.com <a href="https://nanostring.box.com/s/y7ielc54qw1g1f5x98hxczdo8tezobbg" target="_blank">here</a>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1">seu.obj <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">readRDS</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"seurat_object.Rds"</span>)</span></code></pre></div>
+</div>
+</section>
+<section id="sec-data-structure" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Data Structure</h1>
+<p>Here we’ll show where various key data are stored in the Seurat object.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Cell metadata</span></span>
+<span id="cb4-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">head</span>(seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>                       orig.ident nCount_Nanostring nFeature_Nanostring cell_ID
+Run1000.S1.Half_1_1 SeuratProject               216                  95 c_2_1_1
+Run1000.S1.Half_2_1 SeuratProject               325                 118 c_2_1_2
+Run1000.S1.Half_3_1 SeuratProject               503                 284 c_2_1_3
+Run1000.S1.Half_4_1 SeuratProject              1085                 329 c_2_1_4
+Run1000.S1.Half_5_1 SeuratProject               935                 349 c_2_1_5
+Run1000.S1.Half_6_1 SeuratProject              1705                 487 c_2_1_6
+                    fov  Area AspectRatio Width Height Mean.Histone Max.Histone
+Run1000.S1.Half_1_1   1  6073        0.47    66    141         7095       42463
+Run1000.S1.Half_2_1   1  5675        0.72   101    140         9220       39045
+Run1000.S1.Half_3_1   1 12896        1.26   153    121        16993       45967
+Run1000.S1.Half_4_1   1  8234        0.51    81    160        12720       31967
+Run1000.S1.Half_5_1   1  9852        0.88   117    133        11177       38479
+Run1000.S1.Half_6_1   1 13372        0.90   171    191         6009       17648
+                    Mean.Blank Max.Blank Mean.rRNA Max.rRNA Mean.GFAP Max.GFAP
+Run1000.S1.Half_1_1         70      4044       376     2871        42     3313
+Run1000.S1.Half_2_1         82       296       642     1486        36      527
+Run1000.S1.Half_3_1         78      1652       109     1538        37     1797
+Run1000.S1.Half_4_1        121      3074       664     3284        71     3625
+Run1000.S1.Half_5_1         99      3173       444     2946        82     2957
+Run1000.S1.Half_6_1        215      2482       687     2429      2775    35102
+                    Mean.DAPI Max.DAPI Run_name Slide_name ISH.concentration
+Run1000.S1.Half_1_1        65      233  Run1000 Run1000_S1               1nM
+Run1000.S1.Half_2_1        88      287  Run1000 Run1000_S1               1nM
+Run1000.S1.Half_3_1        35      249  Run1000 Run1000_S1               1nM
+Run1000.S1.Half_4_1       219      540  Run1000 Run1000_S1               1nM
+Run1000.S1.Half_5_1       251      628  Run1000 Run1000_S1               1nM
+Run1000.S1.Half_6_1       255      702  Run1000 Run1000_S1               1nM
+                    Beta tissue slide_ID_numeric Run_Tissue_name
+Run1000.S1.Half_1_1   12   Half                2 Run1000_S1_Half
+Run1000.S1.Half_2_1   12   Half                2 Run1000_S1_Half
+Run1000.S1.Half_3_1   12   Half                2 Run1000_S1_Half
+Run1000.S1.Half_4_1   12   Half                2 Run1000_S1_Half
+Run1000.S1.Half_5_1   12   Half                2 Run1000_S1_Half
+Run1000.S1.Half_6_1   12   Half                2 Run1000_S1_Half
+                    log10totalcounts   IFcolor nb_clus leiden_clus
+Run1000.S1.Half_1_1         2.334454 #BC077CFF     PVM           2
+Run1000.S1.Half_2_1         2.511883 #FF06A1FF    VLMC           2
+Run1000.S1.Half_3_1         2.705008 #3706FFFF    OLPC          19
+Run1000.S1.Half_4_1         3.035430 #FF0CDEFF    VLMC           2
+Run1000.S1.Half_5_1         2.970347 #DE0DC3FF    VSMC           2
+Run1000.S1.Half_6_1         3.231470 #FFFF69FF     NGF           8
+                    nb_clus_final                  id
+Run1000.S1.Half_1_1          VLMC Run1000.S1.Half_1_1
+Run1000.S1.Half_2_1          VLMC Run1000.S1.Half_2_1
+Run1000.S1.Half_3_1          OLPC Run1000.S1.Half_3_1
+Run1000.S1.Half_4_1          VLMC Run1000.S1.Half_4_1
+Run1000.S1.Half_5_1          VSMC Run1000.S1.Half_5_1
+Run1000.S1.Half_6_1           NGF Run1000.S1.Half_6_1</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Transcript counts. Here, transcript counts are in the 'Nanostring' assay but in other objects they may be stored in an 'RNA' assay.</span></span>
+<span id="cb6-2">seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>assays<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>Nanostring<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>counts[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>]</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: Matrix</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>5 x 5 sparse Matrix of class "dgCMatrix"
+       Run1000.S1.Half_1_1 Run1000.S1.Half_2_1 Run1000.S1.Half_3_1
+Slc6a1                   .                   .                   1
+Cd109                    .                   .                   .
+Ldha                     .                   .                   1
+Aldoc                    .                   .                   2
+Drd1                     .                   .                   .
+       Run1000.S1.Half_4_1 Run1000.S1.Half_5_1
+Slc6a1                   1                   .
+Cd109                    .                   .
+Ldha                     1                   2
+Aldoc                    .                   2
+Drd1                     .                   .</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># UMAP positions</span></span>
+<span id="cb9-2">seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>reductions<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>umap<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>cell.embeddings[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>,]</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>                        umap_1     umap_2
+Run1000.S1.Half_1_1  -6.179202 -22.688357
+Run1000.S1.Half_2_1  -6.470077 -23.498900
+Run1000.S1.Half_3_1  -7.297677   4.227824
+Run1000.S1.Half_4_1  -6.037831 -23.252535
+Run1000.S1.Half_5_1  -2.250786 -21.083180
+Run1000.S1.Half_6_1  14.308562  27.765420
+Run1000.S1.Half_7_1  -6.235466 -22.308980
+Run1000.S1.Half_8_1  -6.485635 -22.782622
+Run1000.S1.Half_9_1  -7.263406 -21.322018
+Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Image names. Each slide is stored as a separate image within the object.</span></span>
+<span id="cb11-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "Run1000.S1.Half"    "Run5642.S3.Quarter"</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Positions in space, here shown for one image / slide</span></span>
+<span id="cb13-2">seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>images[[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>centroids<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>coords[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>,] <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># In this object, this is equivalent to: seu.obj@images$Run1000.S1.Half$centroids@coords[1:10,]</span></span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>              x     y
+ [1,] -494161.3 10541
+ [2,] -494201.3 10413
+ [3,] -496227.3 10339
+ [4,] -494275.3 10083
+ [5,] -494221.3  9981
+ [6,] -494216.3  9776
+ [7,] -494375.3  9591
+ [8,] -494697.3  9149
+ [9,] -494748.3  8939
+[10,] -494669.3  8799</code></pre>
+</div>
+</div>
+</section>
+<section id="sec-spatial-plotting" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Plot data in space</h1>
+<p>Within the Seurat object, each slide is stored as a separate ‘image’ or ‘fov’. This is an unfortunate naming convention difference between CosMx nomenclature and the Seurat package. What Seurat refers to as an ‘fov’ is what NanoString refers to as a slide. When plotting cells in space, you need to specify the Seurat ‘fov’ to plot, and this is equivalent to choosing which CosMx slide to plot.</p>
+<p>Plot all cells on one slide in space, coloring by cell type.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Get name of the first image</span></span>
+<span id="cb15-2">image1 <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]</span>
+<span id="cb15-3"></span>
+<span id="cb15-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Plot all cells.</span></span>
+<span id="cb15-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># We recommend setting the border color to 'NA' as the default 'white' often masks all cells when zoomed out, leading to a fully white plot.</span></span>
+<span id="cb15-6"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ImageDimPlot</span>(seu.obj, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fov =</span> image1, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">axes =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">border.color =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NA</span>)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_allCellsInSpace-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Plot the location of individual transcripts with the ‘molecules’ option.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ImageDimPlot</span>(seu.obj,</span>
+<span id="cb16-2">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fov =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],</span>
+<span id="cb16-3">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">border.color =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"black"</span>,</span>
+<span id="cb16-4">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Reduce alpha of cell fills to better visualize the overlaying molcules</span></span>
+<span id="cb16-5">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">molecules =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Slc17a7"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Gad1"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Plp1"</span>),</span>
+<span id="cb16-6">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">mols.size =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span>,</span>
+<span id="cb16-7">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">nmols =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100000</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Set the total number of molecules to visualize</span></span>
+<span id="cb16-8">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">axes =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">FALSE</span>)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_genesOnImage-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Plot one CosMx FOV. To do this, we set the cells we’d like to plot to be all those in our target FOV. A similar strategy could be used to plot a subset of FOVs or a subset of cells of interest.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ImageDimPlot</span>(seu.obj,</span>
+<span id="cb17-2">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fov =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],</span>
+<span id="cb17-3">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">border.color =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"black"</span>,</span>
+<span id="cb17-4">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cells =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">row.names</span>(seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data)[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">which</span>(seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>fov <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">99</span>)])</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_oneCosMxFOV-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>By default, cells are colored by the ‘Identity’ set in the Seurat object. We can change this by selecting another column to color by. Here we show coloring by leiden cluster, which we treat as a factor rather than an integer.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Check the default identities</span></span>
+<span id="cb18-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">head</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Idents</span>(seu.obj))</span>
+<span id="cb18-3"></span>
+<span id="cb18-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Plot by leiden cluster using the 'group.by' option</span></span>
+<span id="cb18-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ImageDimPlot</span>(seu.obj,</span>
+<span id="cb18-6">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fov =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],</span>
+<span id="cb18-7">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">border.color =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"black"</span>,</span>
+<span id="cb18-8">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">group.by =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"leiden_clus"</span>,</span>
+<span id="cb18-9">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cols =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"glasbey"</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Option to use a different palette for cell colors</span></span>
+<span id="cb18-10">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cells =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">row.names</span>(seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data)[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">which</span>(seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>fov <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">99</span>)])</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_FOVleiden-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>To color cells by a continuous value, such as the log10totalcounts, or by the expression of a transcript of interest, such as <em>Slc17a7</em>, we use the function ‘ImageFeaturePlot’.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Color cells by log10totalcounts</span></span>
+<span id="cb19-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ImageFeaturePlot</span>(seu.obj,</span>
+<span id="cb19-3">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fov =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],</span>
+<span id="cb19-4">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">border.color =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NA</span>,</span>
+<span id="cb19-5">            <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">features =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"log10totalcounts"</span>)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_imageContinuousVariable-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Color cells by the expression of a gene of interest, Slc17a7</span></span>
+<span id="cb20-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ImageFeaturePlot</span>(seu.obj,</span>
+<span id="cb20-3">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fov =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],</span>
+<span id="cb20-4">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">border.color =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NA</span>,</span>
+<span id="cb20-5">            <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">features =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Slc17a7"</span>)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_imageContinuousVariable_gene-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Seurat can plot cells with either cell shapes shown (‘segmentation’) or with a single point at the center of where they’re located (‘centroids’). Here we show the switch to plotting centroids for one FOV.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Check what the current default boundary is</span></span>
+<span id="cb21-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">DefaultBoundary</span>(seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>images[[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]]])</span>
+<span id="cb21-3"></span>
+<span id="cb21-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Change the default boundaries for the first slide</span></span>
+<span id="cb21-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">DefaultBoundary</span>(seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>images[[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]]]) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"centroids"</span></span>
+<span id="cb21-6"></span>
+<span id="cb21-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Plot one FOV from this slide. Note that cell shapes are no longer shown</span></span>
+<span id="cb21-8"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ImageDimPlot</span>(seu.obj,</span>
+<span id="cb21-9">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fov =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Images</span>(seu.obj)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>],</span>
+<span id="cb21-10">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>,</span>
+<span id="cb21-11">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">shuffle.cols =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Option to randomly shuffle colors within the palette</span></span>
+<span id="cb21-12">             <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cells =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">row.names</span>(seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data)[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">which</span>(seu.obj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>fov <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">99</span>)])</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_centroids-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-dim-reduction-plots" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Dimension reduction plots</h1>
+<p>The CosMx Seurat object contains coordinates for each cell for UMAP dimensional reduction.</p>
+<p>Here, we color cells by cell type and overlay cell type labels.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">DimPlot</span>(seu.obj, </span>
+<span id="cb22-2">        <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">group.by =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"nb_clus"</span>,</span>
+<span id="cb22-3">        <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">label =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb22-4">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">legend.position =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"none"</span>) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Suppress the legend since labels are plotted on top of UMAP</span></span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_umapCellTypes-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Here, we color cells by a continuous value, using transcript expression for a transcript of interest.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">FeaturePlot</span>(seu.obj, </span>
+<span id="cb23-2">        <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">features =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Slc17a7"</span>,</span>
+<span id="cb23-3">        <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">order =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># plots cells in order of expression</span></span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_umapTranscriptExpression-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-conclusions" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Conclusions</h1>
+<p>This vignette serves as an introduction to exploring CosMx data in Seurat, with a primary focus on visualization. Mix and match the functions and options from above to generate new customized visualizations with your data. Once you’re comfortable visualizing your spatial data, you may want to proceed to <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/index.html" target="_blank">refining your cell typing</a>, <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/index.html" target="_blank">performing differential expression</a>, <a href="https://github.com/Nanostring-Biostats/InSituCor" target="_blank">finding spatially correlated genes</a>, or countless other analysis paths.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>visualization</category>
+  <category>Seurat</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/</guid>
+  <pubDate>Fri, 10 May 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_oneCosMxFOV-1.png" medium="image" type="image/png" height="96" width="144"/>
+</item>
+<item>
+  <title>Getting Started with the napari-cosmx plugin</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-pancreas" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-pancreas-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/pancreas.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-pancreas-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Nine Fields of View (FOVs) of a whole-transcriptome Pancreas dataset visualized with the <code>napari-cosmx</code> plugin. DAPI and PanCK are shown in blue and green, respectively. Endocrine cells in the Islets of Langerhans can be identified by their transcript abundance of marker genes (points). Red = <em>GCG</em> (alpha cells), orange = <em>INS</em> (beta cells), cyan = <em>SST</em> (delta cells).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>The AtoMx™ Spatial Informatics Portal (SIP) is an excellent solution for analyzing multi-omics spatial data generated on the CosMx™ Spatial Molecular Imager (SMI). It offers seamless integration of data analysis with a data viewer in an intuitive web-based interface.</p>
+<p>For bespoke analyses, however, it can be useful to extract SMI image and transcript or protein data from the SIP. Version 1.3 of the SIP introduced new exporting abilities that allow raw data and processed data in a variety of formats (<em>e.g.</em>, Seurat, tiledb, “flat files”) to be downloaded. Still, how do we actually <em>view</em> and interact with the images from these downloads?</p>
+<p>This blog post is the first in our series on using our <code>napari-cosmx</code> plugin. Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the <code>napari-cosmx</code> plugin is experimental so the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies. Future posts will do deep-dives into <em>using</em> the <code>napari-cosmx</code> plugin. This post will show you how to:</p>
+<ul>
+<li>Section&nbsp;2.1 Install Napari and the <code>napari-cosmx</code> plugin</li>
+<li>Section&nbsp;2.2 Describe what our “napari-ready” data format is</li>
+<li>Section&nbsp;2.3 How to load a napari-ready slide</li>
+<li>Section&nbsp;2.4 How to create a napari-ready slide from AtoMx raw data export</li>
+<li>Section&nbsp;2.5 Minimum example of how to view cell-level metadata</li>
+</ul>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>napari-cosmx</code> is actively and continuously under development in the RnD groups at NanoString. We do not (yet) have the source code for <code>napari-cosmx</code> opened-sourced. Please be aware that there may be bugs and that it has not gone through the regular level of quality and testing. Our goal here is to bring the capabilities of napari to CosMx users as fast as possible.</p>
+</div>
+</div>
+<section id="what-is-napari" class="level2" data-number="1.1">
+<h2 data-number="1.1" class="anchored" data-anchor-id="what-is-napari"><span class="header-section-number">1.1</span> What is Napari?</h2>
+<p>Stepping back for a second. What exacty <em>is</em> Napari? <a href="https://napari.org/" target="_blank">Napari</a> is an <a href="https://github.com/napari/napari" target="_blank">open-source</a> Python project that runs a Qt-based desktop GUI for interactive visualization of scientific images. The application has layers of different types, similar to what you might find in application like Photoshop or Procreate.</p>
+</section>
+<section id="what-is-the-napari-cosmx-plugin" class="level2" data-number="1.2">
+<h2 data-number="1.2" class="anchored" data-anchor-id="what-is-the-napari-cosmx-plugin"><span class="header-section-number">1.2</span> What is the <code>napari-cosmx</code> plugin?</h2>
+<p>The napari-cosmx plugin enables viewing of data generated by the CosMx SMI platform in Napari. Tissue morphology layers generated by CosMx SMI are stored as <a href="https://zarr.readthedocs.io/en/stable/" target="_blank">zarr files</a> and displayed as image layers and standard controls such as opacity, gamma, and contrast limits can be use to interact with the tissue. Protein results are also viewed as an image layer in Napari. For CosMx RNA experiments, the detected transcripts are viewed as a points layer in Napari. Cell segmentation results are displayed as an image layer of the cell boundaries. The cell shapes can also be colored by metadata such as cell type. Figure&nbsp;2 shows some examples of these in an animated format.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-example-gif" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-example-gif-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/prostate.gif" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-example-gif-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Example animation made with <code>napari-cosmx</code> showing ligand-receptor interactions in a healthy prostate sample. Cell types fill in the cell boundaries. When cells are transparent, one can see more easily see the spatial location of <em>S100A8</em> and <em>S100A9</em> ligand RNA transcripts with the <em>TLR4</em> receptor transcript. While animations are certainly not needed for all purposes, this one highlights that the plugin can color RNA transcripts (points layer), cell-level metadata like cell types (labels layer), and cell boundaries (image layer). It can also visualize IF image layers (not shown here; see Figure&nbsp;1 for example of IF staining).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Beyond the basic interactivity and viewing of napari, other posts in this series will provide examples of tips and tricks as well as more advanced analysis. See the <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html">series topics</a> for what’s coming ahead!</p>
+</section>
+</section>
+<section id="using-the-napari-cosmx-plugin" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Using the <code>napari-cosmx</code> plugin</h1>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>While Napari and the <code>napari-cosmx</code> can be installed on many systems, CosMx data can be quite large. A slide with a large number of FOVs may very well exceed the capabilities of a standard laptop.</p>
+</div>
+</div>
+<section id="sec-installing" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="sec-installing"><span class="header-section-number">2.1</span> Installing <code>napari-cosmx</code></h2>
+<p>The specific download instructions depend on your operating system (see tabs below) but the general procedure is the same: 1) installing Napari 0.4.17 and 2) installing the <code>napari-cosmx</code> plugin.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>napari-cosmx</code> plugin was developed with Napari 0.4.17. There are some breaking changes that we have noticed if using the plugin with newer version of Napari (<em>e.g.</em>, 0.4.18). At the time of writing this post, please make sure to install version 0.4.17.</p>
+</div>
+</div>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true">Windows Install</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">MacOS/Unix Install</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Depending on your browser and security settings you may get warnings when downloading or running some of the links below.</p>
+</div>
+</div>
+<section id="part-1-installing-napari" class="level4" data-number="2.1.0.1">
+<h4 data-number="2.1.0.1" class="anchored" data-anchor-id="part-1-installing-napari"><span class="header-section-number">2.1.0.1</span> Part 1: Installing Napari</h4>
+<div class="columns">
+<div class="column" style="width:45%;">
+<p>The Napari project contains platform-specific bundled apps for each release that don’t require you to first install a Python environment. You simply run the installer and a link will be added to your Start Menu as with a typical app installation. The napari-CosMx plugin currently expects Napari 0.4.17.</p>
+<p><a href="https://github.com/napari/napari/releases/download/v0.4.17/napari-0.4.17-Windows-x86_64.exe">Click to download the Windows Installer</a></p>
+</div><div class="column" style="width:5%;">
+<!-- empty column to create gap -->
+</div><div class="column" style="width:40%;">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-windows-installer" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-windows-installer-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/windows_installer.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-windows-installer-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: The Windows Installer.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div><section id="part-2-installing-napari-cosmx" class="level4" data-number="2.1.0.2">
+<h4 data-number="2.1.0.2" class="anchored" data-anchor-id="part-2-installing-napari-cosmx"><span class="header-section-number">2.1.0.2</span> Part 2: Installing <code>napari-cosmx</code></h4>
+<ol type="1">
+<li>Download the <code>whl</code> file and license in <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/napari-cosmx%20releases" target="_blank">asests/napari-cosmx releases</a>.</li>
+<li>Go to the folder where the <code>whl</code> file is in your File Explorer and choose <code>Copy as Path</code>.</li>
+<li>Now launch Napari from the Start menu in Windows.</li>
+</ol>
+<blockquote class="blockquote">
+<p>Pro tip: If launching for the first time, the application may take a moment to appear. Avoid launching multiple instances.</p>
+</blockquote>
+<ol start="3" type="1">
+<li>In napari, open up the <code>&gt;_</code> button that is located on the bottom left (see Figure&nbsp;4 for example).</li>
+<li>Type <code>pip install</code> into the console (<em>i.e.</em>, with a single space after the word ‘install’).</li>
+<li>Paste the location of the <code>whl</code> file</li>
+<li>Press enter to execute</li>
+<li>You should receive a message in the console that several packages were successfully installed including the <code>napari-cosmx</code> package.</li>
+<li><strong>Close and re-start napari</strong></li>
+</ol>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-windows-plugin-command" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-windows-plugin-command-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/windows_plugin_command.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-windows-plugin-command-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Example showing how to install the <code>napari-cosmx</code> file. Your file name and path will look different. Yellow circle shows the location of the &gt;_ ipython prompt.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</div>
+</section>
+</div>
+<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Depending on your browser and security settings you may get warnings when downloading or running some of the links below.</p>
+</div>
+</div>
+<section id="part-1-installing-napari-1" class="level4" data-number="2.1.0.3">
+<h4 data-number="2.1.0.3" class="anchored" data-anchor-id="part-1-installing-napari-1"><span class="header-section-number">2.1.0.3</span> Part 1: Installing Napari</h4>
+<p>Visit the Napari <a href="https://github.com/napari/napari/releases/tag/v0.4.17" target="_blank">0.4.17 release page</a>. Scroll all the way to the bottom and expand the section that says “Assets” (Figure&nbsp;5). Download the <code>pkg</code> file that is appropriate for your operating system (<em>i.e.</em>, <code>napari-0.4.17-macOS-x86_64.pkg</code> for Mac). Open the downloaded file and install via the instructions on screen (you can accept the defaults). When finished, launch Napari via the Applications folder.</p>
+<blockquote class="blockquote">
+<p>Pro tip: If launching for the first time, the application may take a moment to appear. Avoid launching multiple instances.</p>
+</blockquote>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-mac-pkg-download" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-mac-pkg-download-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/mac_install_pkg.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-mac-pkg-download-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Screenshot of Napari packages. Blue highlighted package is appropriate for Mac. Other operating systems’ packages are also available but untested.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="part-2-installing-napari-cosmx-1" class="level4" data-number="2.1.0.4">
+<h4 data-number="2.1.0.4" class="anchored" data-anchor-id="part-2-installing-napari-cosmx-1"><span class="header-section-number">2.1.0.4</span> Part 2: Installing <code>napari-cosmx</code></h4>
+<ol type="1">
+<li>Download the <code>whl</code> file and license in <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/napari-cosmx%20releases" target="_blank">asests/napari-cosmx releases</a>.</li>
+<li>In Napari, open up the <code>&gt;_</code> button that is located on the bottom left (see Figure&nbsp;6 for example).</li>
+<li>Type <code>pip install</code> into the console (<em>i.e.</em>, with a single space after the word ‘install’).</li>
+<li>Paste the location of the <code>whl</code> file</li>
+<li>Press enter to execute</li>
+<li>You should receive a message in the console that several packages were successfully installed including the <code>napari-cosmx</code> package.</li>
+<li><strong>Close and re-start napari</strong></li>
+</ol>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-mac-plugin-command" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-mac-plugin-command-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/mac_plugin_command.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-mac-plugin-command-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Example showing how to install the <code>napari-cosmx</code> file. Your file name and path will look different. Yellow circle shows the location of the &gt;_ ipython prompt.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-napari-ready-files" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="sec-napari-ready-files"><span class="header-section-number">2.2</span> Napari-ready slide folder</h2>
+<p>The <code>napari-cosmx</code> plugin expects a slide that has been prepared using the <code>stitching</code> (Section&nbsp;2.4) method within the plugin itself. If you do not already have a napari-ready slide, you can download a simple, single-FOV example that we have created <a href="https://nanostring.box.com/s/vewpiiic0e3xk88kamxi358butsw9isc" target="_blank">here)</a>. This single-FOV dataset was derived from the mouse brain public dataset. The full data download is not needed for our current purposes but those interested in exploring the full data can download it <a href="https://nanostring.com/resources/coronal-hippocampus-and-cortex-raw-data-export/" target="_blank">here</a>.</p>
+<p>At the very minimum, the napari-ready slide folder contains two top-level elements:</p>
+<ol type="1">
+<li><code>images</code> folder. Within the <code>images</code> folder, there are subfolders for each immunofluorescence channel and one folder for the cell boundaries (<code>labels</code>).</li>
+<li><code>targets.hdf5</code> file that contains the RNA (or protein) targets.</li>
+</ol>
+<p>An example can be see below (Figure&nbsp;7).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-napari-ready-folder" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-napari-ready-folder-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/napari-ready-format.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-napari-ready-folder-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Example layout of a napari-ready folder. In this example, the ‘parent folder’ (<em>i.e.</em>, the folder you would drag and drop into Napari) is named <code>single_fov_napari_example</code> and contains the <code>images</code> folder with subfolders containing various zarr files within and the <code>targets.hdf5</code> file.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>If you would like to see the details of the zarr file structure for the <code>images</code> folder in our single-FOV example, expand the code chunk blow.</p>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">$</span> tree <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-f</span></span>
+<span id="cb1-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">.</span></span>
+<span id="cb1-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> ./images</span>
+<span id="cb1-4"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> ├── ./images/DNA</span>
+<span id="cb1-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp; ├── ./images/DNA/0</span>
+<span id="cb1-6"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp; │&nbsp;&nbsp; └── ./images/DNA/0/0</span>
+<span id="cb1-7"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp; │&nbsp;&nbsp;     └── ./images/DNA/0/0/0</span>
+<span id="cb1-8"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp; ├── ./images/DNA/1</span>
+<span id="cb1-9"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp; │&nbsp;&nbsp; └── ./images/DNA/1/0</span>
+<span id="cb1-10"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp; │&nbsp;&nbsp;     └── ./images/DNA/1/0/0</span>
+<span id="cb1-11"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp; ├── ./images/DNA/2</span>
+<span id="cb1-12"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp; │&nbsp;&nbsp; └── ./images/DNA/2/0</span>
+<span id="cb1-13"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp; │&nbsp;&nbsp;     └── ./images/DNA/2/0/0</span>
+<span id="cb1-14"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp; └── ./images/DNA/3</span>
+<span id="cb1-15"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp;     └── ./images/DNA/3/0</span>
+<span id="cb1-16"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> │&nbsp;&nbsp;         └── ./images/DNA/3/0/0</span>
+<span id="cb1-17"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span> └── ./images/labels</span>
+<span id="cb1-18"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>     ├── ./images/labels/0</span>
+<span id="cb1-19"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>     │&nbsp;&nbsp; └── ./images/labels/0/0</span>
+<span id="cb1-20"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>     │&nbsp;&nbsp;     └── ./images/labels/0/0/0</span>
+<span id="cb1-21"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>     ├── ./images/labels/1</span>
+<span id="cb1-22"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>     │&nbsp;&nbsp; └── ./images/labels/1/0</span>
+<span id="cb1-23"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>     │&nbsp;&nbsp;     └── ./images/labels/1/0/0</span>
+<span id="cb1-24"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>     ├── ./images/labels/2</span>
+<span id="cb1-25"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>     │&nbsp;&nbsp; └── ./images/labels/2/0</span>
+<span id="cb1-26"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>     │&nbsp;&nbsp;     └── ./images/labels/2/0/0</span>
+<span id="cb1-27"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>     └── ./images/labels/3</span>
+<span id="cb1-28"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>         └── ./images/labels/3/0</span>
+<span id="cb1-29"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│&nbsp;&nbsp;</span>             └── ./images/labels/3/0/0</span>
+<span id="cb1-30"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">└──</span> ./targets.hdf5</span></code></pre></div>
+</details>
+</div>
+<p>We can also create a file named <code>_metadata.csv</code> that can be used for cell-level labeling. For more information on that, please see Section&nbsp;2.5.</p>
+</section>
+<section id="sec-loading-slides" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="sec-loading-slides"><span class="header-section-number">2.3</span> Loading a slide into <code>napari-cosmx</code></h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>You may have noticed that I put this section <em>before</em> the section on how to create (or ‘stitch’) napari-ready files. This is due to the current implementation of the <code>napari-cosmx</code> code base. Specifically, this is because the widget used for stitching is available once we launch the plugin. So in order to be able to stitch, we need to have <em>some</em> pre-existing slide to load into the plugin. There are advanced ways that we could get around this limitation but that’s an advanced topic for another day.</p>
+</div>
+</div>
+<p>To launch and view CosMx data with the <code>napari-cosmx</code> plugin:</p>
+<ol type="1">
+<li>Navigate to a napari-ready slide folder. If you need a minimum example, see Section&nbsp;2.2 above.</li>
+<li>Open Napari from the Start Menu (Windows) or the Application folder (Mac).</li>
+<li>Drag the parent folder of the slide into the the Napari application. If you are using the single-FOV example above, this would be the folder named <code>single_fov_napari_example</code>. Otherwise, the napari-ready folder is whichever folder contains <code>images</code> and <code>targets.hdf5</code> (see Section&nbsp;2.2).</li>
+<li>Napari will ask if you would like to open via the <code>napari-cosmx</code> plugin or another method. Select the <code>napari-cosmx</code> plugin and press okay.</li>
+</ol>
+</section>
+<section id="sec-stitching" class="level2" data-number="2.4">
+<h2 data-number="2.4" class="anchored" data-anchor-id="sec-stitching"><span class="header-section-number">2.4</span> How to create slides from Raw data</h2>
+<p>At the time of writing, the process to <em>create</em> Napari ready files follows this framework:</p>
+<ol type="1">
+<li>Export Raw data from AtoMx SIP (v1.3+) (Section&nbsp;2.4.1)</li>
+<li>Launch <code>napari-cosmx</code> within Napari (Section&nbsp;2.4.2)</li>
+<li>Use the stitch widget to create napari-ready slide from raw data (Section&nbsp;2.4.3)</li>
+</ol>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>One of the main advantages of AtoMx SIP is that the data are stored for you. However, <code>napari-cosmx</code> currently requires the raw data downloaded and stored <strong>locally</strong>. Raw data can be quite large (100s of GBs per slide). It is possible to store the data on a networked drive but we have noticed that stitching performance is slower, depending on your network speed. Storing the data on a high-capacity and fast I/O external hard drive may also be an option.</p>
+</div>
+</div>
+<section id="sec-export-raw-data" class="level3" data-number="2.4.1">
+<h3 data-number="2.4.1" class="anchored" data-anchor-id="sec-export-raw-data"><span class="header-section-number">2.4.1</span> 1. Export Raw Data</h3>
+<p>In AtoMx SIP, in the <code>Study details</code> panel on the upper left, click <code>Export</code> (Figure&nbsp;8).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-atomx-export1" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-atomx-export1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/export-fig1.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-atomx-export1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;8: Click <code>Export</code> (available in AtoMx SIP version 1.3+).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Configure your export with the options indicated in Figure&nbsp;9 and click <code>EXPORT</code>. If you would like to view metadata (optional). You can go ahead and download the Seurat data now or as a separate step (<em>i.e.</em>, Seurat data is not needed for stitching napari files).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-atomx-export2" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-atomx-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/export-fig2.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-atomx-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;9: Example configuration for exporting. For more information on extracting cell-level metadata, see Section&nbsp;2.5.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>When the export is ready, download the data. You can do this over the sftp protocol in a variety of application. Here, I’m using <a href="https://cyberduck.io/" target="_blank">Cyberduck</a> but you can use other programs.</p>
+<p>In Cyberduck, click <code>Open Connection</code>. In the dropdown menu, select <code>SFTP</code> and enter the URL, username, and your (AtoMx) password. Then click <code>Connect</code>. Example: Figure&nbsp;10.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-atomx-export3" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-atomx-export3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/export-fig3.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-atomx-export3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;10: Example configuration for Cyberduck SFTP.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Once connected, find the relevant folder, right click, and select <code>Download As...</code> (Figure&nbsp;11). Choose the location on your computer to store the data. You may be able to store it on a networked drive but this is currently untested.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-atomx-export4" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-atomx-export4-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/export-fig4.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-atomx-export4-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;11: Download raw data somewhere on your desktop.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-launch-napari-cosmx" class="level3" data-number="2.4.2">
+<h3 data-number="2.4.2" class="anchored" data-anchor-id="sec-launch-napari-cosmx"><span class="header-section-number">2.4.2</span> 2. Launch <code>napari-cosmx</code></h3>
+<p>In order to use the stitching widget in the plugin, we must first launch the plugin. Currently, the only way to do that is to load an existing napari-ready folder. This can be any Napari slide (<em>e.g.</em>, a previous study or the single-FOV example described in Section&nbsp;2.2).</p>
+</section>
+<section id="sec-stitch-images" class="level3" data-number="2.4.3">
+<h3 data-number="2.4.3" class="anchored" data-anchor-id="sec-stitch-images"><span class="header-section-number">2.4.3</span> 3. Stitching images</h3>
+<p>Once <code>napari-cosmx</code> is launched, the stitching widget is located on the right-hand panel (Figure&nbsp;12).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-stitch-widget1" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-stitch-widget1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/stitch-widget1.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;12: Example showing a launched <code>napari-cosmx</code> plugin with a possibly-unrelated slide. To stitch, a new slide, Click <code>Browse...</code> in the <code>Stitch Images</code> widget located on the right-hand side of Napari.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>We need to tell <code>napari-cosmx</code> where the raw data that we exported are located locally. In the right-hand panel there is a <code>Stitch Images</code> widget. Click <code>Browse...</code> and navigate to the parent folder containing the slide’s raw data.</p>
+<p>Your downloaded raw data folder name will be unique to your slide and you can rename it to whatever makes sense for your workflow. For this example, I renamed it <code>raw_data</code> (Figure&nbsp;13). Click on the raw data folder and select <code>Open</code>. In the <code>Stitch Images</code> widget, you should see the path of the raw data folder printed. If an unexpected format was detected, there will be an error message (<em>e.g.</em>, Figure&nbsp;14).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-stitch-widget2" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-stitch-widget2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/stitch-widget2.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;13: Browsing to the location of the raw data that you want to stitched.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-stitch-widget3" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-stitch-widget3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/stitch-widget3.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;14: Stitching widget prints the path to the correctly formatted raw data (left) or provides an error message if not formatted correctly (right). Note that only the correctly formatted location can proceed to the next step (choosing otuput folder).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Next, select the location where you want the plugin to return the napari-ready files. It is recommended not to store it in the same location as the raw data. Here, I’m pointing it to a location adjacent to the raw data that I named <code>stitched_example</code> (Figure&nbsp;15).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-stitch-widget4" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-stitch-widget4-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/stitch-widget4.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget4-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;15: Select output folder.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Finally, click <code>Stitch</code>. Note: currently there is no refreshing or printing of messages. Please do not click <code>Stitch</code> more than once. You may see Napari become unresponsive, see the “spinning beach ball” (Mac), <em>etc.</em> Depending on the number of FOVs, computer configuration, and analyte type, this can take several minutes. Once complete, you should see messages that resemble that of Figure&nbsp;16. If you see the last line <code>See output folder for results</code>, you successfully converted the raw data into napari-ready files!</p>
+<p>To view the results, simply close napari, reopen it, and drag your newly created results into the application.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-stitch-widget5" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-stitch-widget5-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/stitch-widget5.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget5-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;16: Messages from a successfully completed stitching run.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>That’s it! To view the newly stitched slide, close Napari, re-open it, and drag the folder into Napari.</p>
+</section>
+</section>
+<section id="sec-adding-metadata" class="level2" data-number="2.5">
+<h2 data-number="2.5" class="anchored" data-anchor-id="sec-adding-metadata"><span class="header-section-number">2.5</span> Adding and viewing metadata</h2>
+<p>While there will be dedicated posts that discuss tips and tricks for using the <code>napari-cosmx</code> plugin, here I’ll discuss one of the most powerful uses: viewing cell types.</p>
+<p>While not needed for the basic stitching, the Seurat file that is downloaded from AtoMx SIP can contain important cell-level information. For example, if cell typing was performed in AtoMx, each cell will have a label with its cell type.</p>
+<p>In this section, I’ll show you the basic principle for converting the meta data within the Seurat object into a csv file that can be understood by the <code>napari-cosmx</code> plugin. Users should have a basic understanding of R in order to use this feature. I’ll also need to switch our example dataset since the minimal single-FOV example dataset was from raw data and not analyzed in AtoMx so we don’t have any cell-level cell type information. Here, the specific column of interest will have the prefix <code>RNA_nbclust</code> and suffix <code>clusters</code>. In the code below, we’ll change that name to simply <code>cell_types</code>. We’ll also need a column named <code>cell_ID</code> in the metadata. We need to write the metadata columns to a file specifically named <code>_metadata.csv</code> and have that file located in the napari-ready folder.</p>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># This is R code</span></span>
+<span id="cb2-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(Seurat)</span>
+<span id="cb2-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(plyr)</span>
+<span id="cb2-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(dplyr)</span>
+<span id="cb2-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># sem_path will be wherever you downloaded your Seurat object</span></span>
+<span id="cb2-6">sem_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/path/to/your/seuratObject.RDS"</span></span>
+<span id="cb2-7">sem <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">readRDS</span>(sem_path)</span>
+<span id="cb2-8">meta <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> sem<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data</span>
+<span id="cb2-9">meta <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> meta <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%&gt;%</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">select</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">starts_with</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"RNA_nbclust"</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%&gt;%</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">select</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ends_with</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"clusters"</span>))</span>
+<span id="cb2-10"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(meta)[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cell_types'</span></span>
+<span id="cb2-11">meta<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>cell_ID <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">row.names</span>(meta) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># adds cell_ID column</span></span>
+<span id="cb2-12"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(meta) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span></span>
+<span id="cb2-13">meta <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> meta <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%&gt;%</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">relocate</span>(cell_ID) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># moves cell_ID to first column position</span></span>
+<span id="cb2-14"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">write.table</span>(meta, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">file=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/path/to/inside/napari-ready-folder/_metadata.csv"</span>, </span>
+<span id="cb2-15">            <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">sep=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">","</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">col.names=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">row.names=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">FALSE</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">quote=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">FALSE</span>)</span></code></pre></div>
+</details>
+</div>
+<p>Now, when we drag and drop the napari-ready folder, the metadata that you extracted from Seurat will be available to view using the right-hand widget named <code>Color Cells</code> (Figure&nbsp;17).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-color-cells" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-color-cells-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/color-cells.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-color-cells-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;17: When metadata are available in the _metadata.csv file, it’s possible to color cells based on a cell-level metadata value (<em>e.g.</em>, cell types).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="conclusion" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Conclusion</h1>
+<p>In this post we introduced the <code>napari-cosmx</code> plugin, a tool that can be used to interact with exported CosMx SMI data from AtoMx SIP. Our focus was on installation and launching the application. In future posts we’ll do deep-dives on usage and share tips and tricks that we’ve learned along the way. If you would like to see a Napari topic discussed, please create an issue or feature request on <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/labels/napari%20series" target="_blank">github</a> using the <code>Napari series</code> label.</p>
+<p>–ERM</p>
+
+
+</section>
+
+ ]]></description>
+  <category>visualization</category>
+  <category>napari</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/</guid>
+  <pubDate>Wed, 01 May 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/prostate.gif" medium="image" type="image/gif"/>
+</item>
+<item>
+  <title>The spatial algorithms zoo: recommended algorithms and efficient code</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/spatial-algorithm-zoo/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="recommended-algorithms-for-spatial-biology" class="level1">
+<h1>Recommended algorithms for spatial biology</h1>
+<p>Spatial statistics is a well-developed field, with deep statistical methodology and highly efficient open-source tools. In CosMx data, where a single study can contain millions of cells, computational efficiency is vital. Here we recommend some toolkits we’ve found useful:</p>
+<section id="table-of-contents" class="level2">
+<h2 class="anchored" data-anchor-id="table-of-contents">Table of contents:</h2>
+<ol type="1">
+<li>Fast nearest-neighbors search</li>
+<li>Measuring a gene’s spatial autocorrelation</li>
+<li>Measuring spatial correlation between two genes</li>
+<li>Counting occurrences within cell neighborhoods</li>
+</ol>
+</section>
+<section id="fast-nearest-neighbors-search" class="level2">
+<h2 class="anchored" data-anchor-id="fast-nearest-neighbors-search">Fast nearest-neighbors search: <a name="neighbors"></a></h2>
+<section id="returning-the-indexes-and-distances-to-a-cells-k-nearest-neighbors" class="level4">
+<h4 class="anchored" data-anchor-id="returning-the-indexes-and-distances-to-a-cells-k-nearest-neighbors">Returning the indexes and distances to a cell’s K-nearest neighbors:</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1">neighbors <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> FNN<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">get.knnx</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">data =</span> xy, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 2-column matrix of xy locations</span></span>
+<span id="cb1-2">                           <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">query =</span> xy, </span>
+<span id="cb1-3">                           <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">k =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span>
+<span id="cb1-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># returns 2 outputs: a matrix of each cell's nearest neighbor indices (including itself),</span></span>
+<span id="cb1-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#  and a matrix of distances to these neighbors.</span></span></code></pre></div>
+</div>
+<p>(This also works for neighbors in expression space - just input the top 20 PCs instead of xy locations.)</p>
+</section>
+<section id="returning-a-sparse-matrix-of-cells-k-nearest-neighbors" class="level4">
+<h4 class="anchored" data-anchor-id="returning-a-sparse-matrix-of-cells-k-nearest-neighbors">Returning a sparse matrix of cells’ K-nearest neighbors</h4>
+<p>See the function <a href="https://github.com/Nanostring-Biostats/InSituCor/blob/main/R/NeighborhoodCalculations.R">nearestNeighborGraph in the Insitucor package</a></p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># xy is a 2-column matrix of xy locations</span></span>
+<span id="cb2-2">neighbors <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> InSituCor<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">nearestNeighborGraph</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">n=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span></code></pre></div>
+</div>
+<p>Note this matrix is populated by <em>distances</em>, not by simple 1/0 values.</p>
+</section>
+<section id="returning-a-sparse-matrix-of-cells-neighbors-within-a-radius" class="level4">
+<h4 class="anchored" data-anchor-id="returning-a-sparse-matrix-of-cells-neighbors-within-a-radius">Returning a sparse matrix of cells’ neighbors within a radius</h4>
+<p>See the function <a href="https://github.com/Nanostring-Biostats/InSituCor/blob/main/R/NeighborhoodCalculations.R">radiusBasedGraph in the Insitucor package</a></p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># xy is a 2-column matrix of xy locations</span></span>
+<span id="cb3-2">neighbors <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> InSituCor<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">radiusBasedGraph</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">R =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span>)</span></code></pre></div>
+</div>
+<p>Note this matrix is populated by <em>distances</em>, not by simple 1/0 values.</p>
+</section>
+</section>
+<section id="measuring-a-genes-spatial-autocorrelation" class="level2">
+<h2 class="anchored" data-anchor-id="measuring-a-genes-spatial-autocorrelation">Measuring a gene’s spatial autocorrelation <a name="correlation"></a></h2>
+<p>Our goal here is to measure how much a gene’s expression depends on spatial location. Genes with strong spatial dependence are presumably more interesting, deserving human attention. A much-less-than-comprehensive list of methods is below.</p>
+<p>Methods:</p>
+<ul>
+<li>Moran’s I statistic: This is a time-honored method in spatial statistics, published in 1950. Using the analytical rather than the permutation p-value speeds it up greatly, and we find their performance to be similar.</li>
+<li><a href="https://github.com/Teichlab/SpatialDE">SpatialDE</a>: the first attempt to measure spatial autocorrelation in spatial transcriptomics. Can be slow.</li>
+<li><a href="https://github.com/dcjones/maxspin">Maxspin</a>: A more recent method using machine learning and information theory to get performance improvements. Can be slow.</li>
+<li><a href="https://github.com/xzhoulab/SPARK">SPARK-X</a>: Runs at speed similar to Moran’s I.</li>
+</ul>
+</section>
+<section id="measuring-spatial-correlation-between-two-genes" class="level2">
+<h2 class="anchored" data-anchor-id="measuring-spatial-correlation-between-two-genes">Measuring spatial correlation between two genes <a name="correlation2"></a></h2>
+<p>When two or more genes are spatially correlated it can be of high biological interest. These genes might regulate each other via cell-cell communication, or they could be jointly regulated by some latent variable in the microenvironment.</p>
+<p>Methods for measuring spatial correlation between genes include:</p>
+<ul>
+<li>Lee’s L: another spatial statistics classic.</li>
+<li><a href="https://github.com/Teichlab/SpatialDE">SpatialDE</a></li>
+</ul>
+<p>However, we have found methods like the above to be unsatisfying, since genes with cell-type-specific expression end up sharing strong spatial correlations. E.g. CD19 and MS4A1 are expressed mainly by B-cells, so if B-cells are spatially clustered, then these genes will be spatially correlated, but for biologically trivial reasons. To isolate more interesting spatial correlations, we developed: - <a href="https://github.com/Nanostring-Biostats/insitucor">InSituCor</a>. This is our recommended approach. It can analyze hundreds of thousands of cells and thousands of genes in minutes.</p>
+</section>
+<section id="counting-occurrences-within-cell-neighborhoods" class="level2">
+<h2 class="anchored" data-anchor-id="counting-occurrences-within-cell-neighborhoods">Counting occurrences within cell neighborhoods <a name="counting"></a></h2>
+<p>Analysts will often want to score cells for how often something occurs in their neighborhoods. For example, you might want to know how many T-cell neighbors each cell has, or how many transcripts of a gene surround it.</p>
+<p>The below code demonstrates how to use the spatstat::marktable function to do this.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># "xy"" is a 2-column matrix of cell locations</span></span>
+<span id="cb4-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># "clust"" is a vector of cell type assignments</span></span>
+<span id="cb4-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># create a point process object:</span></span>
+<span id="cb4-4">pp <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> spatstat.geom<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ppp</span>(xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>], xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">xrange =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">range</span>(xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">yrange =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">range</span>(xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>]))</span>
+<span id="cb4-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">marks</span>(pp) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> clust</span>
+<span id="cb4-6"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">marks</span>(pp) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.factor</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">marks</span>(pp))</span>
+<span id="cb4-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># count neighbors of each db cluster:</span></span>
+<span id="cb4-8">mt05 <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> spatstat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">marktable</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">X =</span> pp, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">R =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.05</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">N =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">exclude=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">collapse=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">FALSE</span>)</span>
+<span id="cb4-9"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(mt05) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">names</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">which</span>(use))</span></code></pre></div>
+</div>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>algorithms</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/spatial-algorithm-zoo/</guid>
+  <pubDate>Wed, 20 Mar 2024 00:00:00 GMT</pubDate>
+</item>
+<item>
+  <title>On the use of marker genes</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="on-cell-typing-with-marker-genes" class="level1">
+<h1>On cell typing with marker genes</h1>
+<p>Our basic recommendation is this: relying on a few marker genes alone will not produce successful cell typing.</p>
+<p>Spatial transcriptomics data has two features that make marker genes challenging to use.</p>
+<ol type="1">
+<li><p>Background: cells’ expression profiles can include two kinds of false counts: these platforms sometimes see transcripts that aren’t present (false detections), and errors in cell segmentation lead transcripts from one cell to be assigned to its neighbor. Both these phenomena lead to marker genes being counted in cells where they aren’t truly present.</p></li>
+<li><p>Variable signal strength / false negative detection: tissues and cells vary widely in how efficiently existing RNA molecules are read. Thus genes with low expression are easily missed in many cells.</p></li>
+</ol>
+<p>Applying the above phenomena to FOXP3, the canonical marker for Treg cells, we can envision non-Treg cells with spurious FOXP3 coming from false detections or contamination from a neighboring Treg (error mode 1 above), and we can imagine Treg cells where FOXP3 isn’t detected (error mode 2 above). A cell typing regime that applied an expression threshold to FOXP3 would be unacceptably error-prone.</p>
+<p>Instead of using marker genes, we recommend cell typing using most or all of cells’ expression profiles. The data for a single gene in a single cell is noisy, but the evidence from a complete expression profile is much more stable. Given clusters derived from all or most of your panel, marker genes are useful for annotating clusters. E.g., if a cluster is enriched in FOXP3, you can safely label it Tregs.</p>
+<p>As an advanced approach, we have had success cell typing using <em>smoothed</em> expression of marker genes. We replace each cell’s observed profile with the average profile of the 20+ cells that have the most similar expression profiles to it. This essentially performs a variance-bias tradeoff: we bias a cell to look like its neighbors in expression space, but we greatly cut down the noise in the expression level. Cell typing based on marker genes in this smoothed data can be successful.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>cell typing</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/</guid>
+  <pubDate>Tue, 12 Mar 2024 00:00:00 GMT</pubDate>
+</item>
+<item>
+  <title>Cell typing: what we’ve found to work</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="cell-typing-basics" class="level1">
+<h1>Cell typing basics</h1>
+<section id="choice-of-cell-typing-algorithm" class="level2">
+<h2 class="anchored" data-anchor-id="choice-of-cell-typing-algorithm">Choice of cell typing algorithm</h2>
+<p>We cell type most studies using one of the following approaches:</p>
+<ol type="1">
+<li>Insitutype</li>
+<li>Leiden clustering</li>
+<li>Seurat’s label transfer algorithm</li>
+</ol>
+<section id="insitutype" class="level4">
+<h4 class="anchored" data-anchor-id="insitutype">Insitutype:</h4>
+<p>We created Insitutype for cell typing in CosMx data. It can perform unsupervised clustering, supervised cell typing if given a matrix of reference profiles, or semi-supervised cell typing to call pre-defined cell types alongside new clusters. Insitutype’s models the evidence provided by every gene in a cell’s profile; this makes it excel in cells / datasets with less signal.</p>
+<p>Insitutype resources:</p>
+<ul>
+<li>https://github.com/Nanostring-Biostats/insitutype (see the <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">FAQs.md</a> for detailed advice)</li>
+<li><a href="https://www.biorxiv.org/content/10.1101/2022.10.19.512902v1">https://www.biorxiv.org/content/10.1101/2022.10.19.512902v1</a></li>
+<li>A collection of cell profile reference matrices will be posted on https://github.com/Nanostring-Biostats in early 2024.</li>
+</ul>
+</section>
+<section id="leiden-clustering" class="level4">
+<h4 class="anchored" data-anchor-id="leiden-clustering">Leiden clustering:</h4>
+<p>A single-cell clustering mainstay. Unsupervised clustering only. Often run from principal components of the expression data. Seurat, Giotto and igraph all have convenient implementations.</p>
+</section>
+<section id="label-transfer-algorithms" class="level4">
+<h4 class="anchored" data-anchor-id="label-transfer-algorithms">Label transfer algorithms</h4>
+<p>If a full scRNA-seq reference dataset is available, and if no new cell types are expected in the CosMx data, then these algorithms can work well. We have found Seurat’s implementation to work in some studies.</p>
+</section>
+</section>
+<section id="general-cell-typing-notes" class="level2">
+<h2 class="anchored" data-anchor-id="general-cell-typing-notes">General cell typing notes</h2>
+<ul>
+<li>Leiden clustering and UMAP tend to see the world the same way - that is, they’re both based on networks connecting similar cells. This makes Leiden results agree well with the UMAP, whether or not they are truly more accurate. In other words, don’t take the UMAP as an impartial arbiter of cell typing truth.</li>
+<li>Insitutype tends to be the most resistant to batch effects; methods that rely on PCs tend to be the most easily fooled by batch effects.</li>
+<li>Most studies require careful scrutiny of cell typing results. Often clusters have to be merged or subclustered before results are satisfactory. See the Insitutype <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">FAQs.md</a> for a detailed discussion of how to QC &amp; refine cell typing results. Many of these QCs are useful for results of other methods.</li>
+</ul>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>cell typing</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/</guid>
+  <pubDate>Tue, 12 Mar 2024 00:00:00 GMT</pubDate>
+</item>
+<item>
+  <title>Big datasets: strategies for memory-efficient analysis</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/big-data/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="strategies-for-big-datasets" class="level1">
+<h1>Strategies for big datasets</h1>
+<p>CosMx data can be truly huge, containing millions of cells and thousands of genes. This prevents many typical analysis strategies, including many toolkits designed for scRNA-seq data. Here we’ll discuss ways to work with big datasets.</p>
+<section id="strategy-1-be-intentional-about-what-data-you-bring-into-memory" class="level2">
+<h2 class="anchored" data-anchor-id="strategy-1-be-intentional-about-what-data-you-bring-into-memory">Strategy 1: be intentional about what data you bring into memory</h2>
+<p>No analysis method uses all your data at once. So for any given analysis, pull in only what you need. See below for a discussion of data types and how to handle them.</p>
+<section id="data-types" class="level3">
+<h3 class="anchored" data-anchor-id="data-types">Data types:</h3>
+<p>CosMx data comes several varieties:</p>
+<section id="large-sparse-matrices" class="level4">
+<h4 class="anchored" data-anchor-id="large-sparse-matrices">Large sparse matrices:</h4>
+<p>These are matrices of cells * genes or cells * cells, populated mainly by 0 values. Sparse matrix formats allow us to only store information for non-zero values, greatly reducing memory demands. When working with sparse matrices, try to use methods that can act on this data type.</p>
+<p>Examples of sparse matrices:</p>
+<ul>
+<li>raw counts (sparse matrix, integers)</li>
+<li>norm counts (sparse, but now decimals. can round to 3 or 4 decimal places to control size a bit)</li>
+<li>cells’ neighbor relationships (e.g.&nbsp;50 entries per cell for 50 nearest neighbors)</li>
+</ul>
+</section>
+<section id="large-dense-datasets" class="level4">
+<h4 class="anchored" data-anchor-id="large-dense-datasets">Large dense datasets:</h4>
+<p>Some data is inevitably dense. Ideally, only pull this data into memory when you need it.</p>
+<p>Examples of dense data:</p>
+<ul>
+<li>Cell metadata. Storing as a data table is most efficient. Since this usually has dozens of variables that are unnecessary for most analyses, you can also keep in memory only the columns you need for a given analysis.</li>
+<li>Principal components. Unavoidably large. To save memory, store only the top 20-50 PCs, throwing out the information-light remaining PCs.</li>
+</ul>
+</section>
+<section id="data-small-enough-to-not-be-a-problem" class="level4">
+<h4 class="anchored" data-anchor-id="data-small-enough-to-not-be-a-problem">Data small enough to not be a problem:</h4>
+<ul>
+<li>umap</li>
+<li>xy locations</li>
+</ul>
+</section>
+<section id="other-data" class="level4">
+<h4 class="anchored" data-anchor-id="other-data">Other data:</h4>
+<ul>
+<li>Transcript locations. This comes in an enormous data table. In most studies you’ll want to handle this in chunks, e.g.&nbsp;one FOV / region at a time, or one gene.</li>
+<li>Cell polygons. Another very large file. Since you can’t resolve polygon shapes for tens of thousands of cells at once, this data is only useful for very zoomed-in plots, allowing you to only keep say thousands of cell polygons in memory at once.</li>
+</ul>
+</section>
+</section>
+</section>
+<section id="strategy-2-process-each-tissue-slide-separately" class="level2">
+<h2 class="anchored" data-anchor-id="strategy-2-process-each-tissue-slide-separately">Strategy 2: process each tissue / slide separately</h2>
+<p>It doesn’t take too many slides before you can no longer fit the raw count matrix into R. At this point, you’re forced to work in batches. One good approach is to run fundamental analyses - e.g.&nbsp;QC, normalization, dimension reduction and cell typing - one sample at a time, saving your results to disk. Then for study-wide analyzes you can load in only the data you need, e.g.&nbsp;xy positions and cell types, or normalized expression values from a single gene.</p>
+</section>
+<section id="strategy-3-use-data-objects-that-handle-moving-data-between-disk-and-memory" class="level2">
+<h2 class="anchored" data-anchor-id="strategy-3-use-data-objects-that-handle-moving-data-between-disk-and-memory">Strategy 3: use data objects that handle moving data between disk and memory</h2>
+<p>Data formats do exist for this purpose, and they’re developing rapidly. Consider:</p>
+<ul>
+<li>TileDB / TileDBSOMA TileDBsc</li>
+<li>SeuratDisk</li>
+<li>Seurat v5 has some functionality for switching between disk and memory, but not yet enough to support a full spatial analysis.</li>
+</ul>
+</section>
+<section id="strategy-4-efficient-computing" class="level2">
+<h2 class="anchored" data-anchor-id="strategy-4-efficient-computing">Strategy 4: efficient computing</h2>
+<p>Large datasets take time to analyze, there is no way around that, but some simple computation choices can make a big impact.</p>
+<p>Ensure your data stays in sparse matrix format; watch out for dense coercions. The Matrix package is great to ensure sparsity.</p>
+<p>Parallelization is your friend but be sure to understand how much data you are reading into memory in each core. While as fast as possible is always nice, hardware does have its limitations.</p>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>big data</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/big-data/</guid>
+  <pubDate>Mon, 04 Mar 2024 00:00:00 GMT</pubDate>
+</item>
+<item>
+  <title>QC and normalization of RNA data</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/normalization/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<div class="cell">
+<style type="text/css">
+.center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 50%;
+}
+
+</style>
+</div>
+<section id="qc-and-normalization-of-cosmx-rna-data" class="level1">
+<h1>QC and normalization of CosMx RNA data</h1>
+<p>We’ve tried a lot of options here, and we’ve settled on very simple procedures for most cases.</p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/normalization/figures/puzzle.png" class="center"> <!-- ![](figures/puzzle.png =250x) --></p>
+<section id="qc" class="level2">
+<h2 class="anchored" data-anchor-id="qc">QC</h2>
+<p>QC in CosMx is motivated by known error modes. Here’s a list of major things that can go wrong:</p>
+<ul>
+<li>A cell might be undersampled, leading to excessively low counts (Either only a tip of it is in the slide, or detection efficiency is poor within it.) Solution: remove the cell.</li>
+<li>A cell might suffer extremely high background, either due to intrinsic tissue stickiness (e.g.&nbsp;associated with necrosis) or due to optical artifacts. Solution: remove the cell.</li>
+<li>Errors in cell segmentation might assign multiple cells to the same “cell”. Solution: remove these multiplets.</li>
+<li>A FOV might have low counts overall. This can be caused by imaging trouble, tissue peeling, and probably other causes. Solution: remove FOVs with low quality data. (Removing low quality cells isn’t good enough. If a bad FOV has half its cells removed, the spatial pattern implied by the remaining cells, those lucky enough to survive the cell QC, won’t be representative.)</li>
+<li>A FOV’s expression profile can be distorted by image registration errors or by imaging artifacts, e.g.&nbsp;fluorescence hiding spots of one color. These FOVs can be analyzable if you’re careful, but given the uncertainty they pose it’s usually best to remove them.</li>
+</ul>
+<p><strong>QC logic would then proceed as follows:</strong></p>
+<ol type="1">
+<li>Remove cells with too few counts. For our 1000plex assay, we use a pretty generous threshold of 20 counts. A higher threshold would be reasonable.</li>
+</ol>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># counts is the matrix of raw expression profiles, cells in rows, genes in columns</span></span>
+<span id="cb1-2">totalcounts <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rowSums</span>(counts)  </span>
+<span id="cb1-3">drop <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> totalcounts <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span></span></code></pre></div>
+</div>
+<ol start="2" type="1">
+<li><p>Remove cells with high outlier areas. You can use Grubb’s test to detect outliers, or you can draw a histogram of cell areas and choose a cutoff on your own.</p></li>
+<li><p>Remove FOVs with poor counts. AtoMx removes FOVs based on their mean count per cell, or by a user-specified quantile of counts per cell. Filtering on % of cells flagged by the above criteria would also be reasonable.</p></li>
+<li><p>Flag FOVs with distorted expression profiles. AtoMx now flags FOVs where z-stack registration is highly unstable, but older runs won’t benefit from this update, and other effects, namely background fluorescence, can still distort FOV expression profiles. Unfortunately, there’s no easy automated way to flag outlier FOVs (yet). Fortunately, they do tend to stand out in spatial analyses. If you e.g.&nbsp;plot cell typing results in space, or plot spatial clustering results in space, outlier FOVs stand out strongly. They can then be manually flagged and removed.</p></li>
+</ol>
+</section>
+<section id="normalization" class="level2">
+<h2 class="anchored" data-anchor-id="normalization">Normalization</h2>
+<p>Unlike scRNA-seq data, where cells tend to have somewhat consistent expression levels, spatial platforms vary widely in how much of a cell’s RNA they detect. Normalizing out this effect is important for some analyses. We make the reasonable assumption that a cell’s detection efficiency is well-estimated by its total counts, which implies we can scale each cell’s profile by its total counts:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># counts is the matrix of raw expression profiles, cells in rows, genes in columns</span></span>
+<span id="cb2-2">totalcounts <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rowSums</span>(counts)  </span>
+<span id="cb2-3">norm <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sweep</span>(counts, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">pmax</span>(totalcounts, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>), <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/"</span>)</span></code></pre></div>
+</div>
+<p>…note the <code>pmax(totalcounts, 20)</code> term in the above. This puts a floor on how much we’ll up-scale a cell. This prevents us from taking cells with very few counts and drastically scaling them up, which gives them undeserved highly-distinct expression profiles.</p>
+<p>(Note: some authors have pointed out that there’s information to be had in a cell’s total counts. For example, cancer cells tend to have high overall RNA expression. When we normalize, we lose this information. But we’ve usually found that a small price to pay to control the variability in total counts that arises from unwanted technical sources.)</p>
+</section>
+<section id="other-transformations" class="level2">
+<h2 class="anchored" data-anchor-id="other-transformations">Other transformations</h2>
+<p>We generally do not perform non-linear transformations on our data.</p>
+<p>Exception: UMAPs often look better when drawn from log- and sqrt-transformed data or from Pearson residuals. Pearson residuals are problematic for big datasets, however, since they convert your data from a sparse matrix to a dense matrix.</p>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>quality control</category>
+  <category>normalization</category>
+  <category>pre-processing</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/normalization/</guid>
+  <pubDate>Mon, 29 Jan 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/normalization/figures/puzzle.png" medium="image" type="image/png" height="145" width="144"/>
+</item>
+<item>
+  <title>Functions for condensing FOVs and tissues to minimize whitespace</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="condensing-cells-in-xy-space-for-better-plotting" class="level2">
+<h2 class="anchored" data-anchor-id="condensing-cells-in-xy-space-for-better-plotting">Condensing cells in xy space for better plotting</h2>
+<p>Minimizing whitespace while plotting cells in xy space is a constant challenge. A single tissue will often have discontinuous FOVs, and aligning multiple tissues in a sensible way can be onerous.</p>
+<p>Here, for example, are FOVs collected from core needle biopsies, where the cells can barely be seen against the vast expanse of white space.</p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/figures/fig1.png" class="img-fluid"></p>
+<p>As a partial solution, see the function consenseXY(), provided <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/condensing%20xy%20space/CondenseXY.R" target="_blank">here</a>.</p>
+<p>The main wrapper function contains an algorithm for pulling together FOVs from the same tissue, and an algorithm for tiling tissues across a plot.</p>
+<p>Here’s a toy example of FOV groups from two tissues before and after the algorithm (color denotes tissue ID):</p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/figures/fig2.png" class="img-fluid"></p>
+<p>It’s not perfect, but it’s an improvement on the original spacing with no thought or manual labor.</p>
+<p>Warning: the FOV condensing code is inefficiently written and takes longer than it should, though it’s still faster than working by hand.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>visualization</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/</guid>
+  <pubDate>Fri, 26 Jan 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/figures/fig2.png" medium="image" type="image/png" height="88" width="144"/>
+</item>
+<item>
+  <title>The impact of segmentation error on differential expression analyses</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="impact-of-segmentation-errors-on-de" class="level1">
+<h1>Impact of segmentation errors on DE</h1>
+<p>Cell segmentation is always imperfect, leaving some cells’ expression profiles contaminated with transcripts properly belonging to other cells. For many analyses, this is a largely ignorable source of noise. But for differential expression (DE) analyses, it’s reliably confounding (both statistically and emotionally).</p>
+<section id="the-problem" class="level2">
+<h2 class="anchored" data-anchor-id="the-problem">The problem:</h2>
+<p>For an example, see the below cartoon, where a T-cell’s expression profile is contaminated with transcripts from the tumor cells surrounding it:</p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/figures/fig1.png" class="img-fluid"></p>
+<p>Now say we want to compare T-cells in the tumor bed vs.&nbsp;T-cells in the stroma. We’ll find that T-cells in the tumor bed are enriched in genes expressed by cancer cells (e.g.&nbsp;keratins), and similarly, T-cells in the stroma will be enriched in genes expressed by stroma cells (e.g.&nbsp;collagens). In practice, spurious findings like these are often the most significant genes emerging from a DE analysis.</p>
+</section>
+<section id="how-to-think-about-segmentation-error" class="level2">
+<h2 class="anchored" data-anchor-id="how-to-think-about-segmentation-error">How to think about segmentation error:</h2>
+<p>Segmentation error can be considered a missing term in a differential expression model. Say you’re answering the above T-cell question by fitting the below model on T-cells:</p>
+<p><em>E(observed KRT9 expression) = B0 + B1 </em> (in_tumor)*</p>
+<p>When you do this, you’re omitting an important term for contamination:</p>
+<p><em>E(observed KRT9 expression) = B0 + B1 </em> (in_tumor) + (<strong>N_contaminating_transcripts</strong>)*</p>
+<p>Your model is underspecified, so its results are biased. As you measure more cells and gain statistical power, you only gain more confidence in your biased results.</p>
+</section>
+<section id="countermeasures" class="level2">
+<h2 class="anchored" data-anchor-id="countermeasures">Countermeasures</h2>
+<p>We are preparing a manuscript detailing countermeasures to segmentation. Stay tuned for a link to it, or ask us for code if you can’t wait. For now, two pieces of advice:</p>
+<ol type="1">
+<li><strong>Don’t bother analyzing genes that are dominated by contamination.</strong> If you’re analyzing T-cells in tumors, then analyzing KRT9 is hopeless: T-cells barely express it, while the surrounding tumor cells will express it highly. Whatever expression you do see in T-cells will be dominated by contamination. A simple approach: if you’re e.g.&nbsp;analyzing T-cells, then compare each gene’s expression within T-cells to its expression in spatial neighbors of T-cells. The ratio between these numbers tells you how much of that gene’s expression in T-cells is real vs.&nbsp;contamination. Apply a reasonable threshold, and don’t even analyze genes with much higher expression around T-cells than inside T-cells.</li>
+<li><strong>Estimate each cell’s contamination, and adjust for it in your models.</strong> Adding e.g.&nbsp;a term holding a gene’s expression in each cell’s neighbors achieves this well; more complex transformations of this term can be more optimal (see our upcoming paper). However, this only ameliorates, not solves, the bias from contamination. Because your estimated contamination term is a noisy approximation to true contamination, your models will estimate an attenuated effect size for the contamination term, and it won’t remove all the bias.</li>
+</ol>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>segmentation</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/</guid>
+  <pubDate>Wed, 24 Jan 2024 00:00:00 GMT</pubDate>
+</item>
+<item>
+  <title>Visualize cellular neighborhood in gallery mode</title>
+  <dc:creator>Lidan Wu</dc:creator>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="visualize-cellular-neighborhood-in-gallery-mode" class="level2">
+<h2 class="anchored" data-anchor-id="visualize-cellular-neighborhood-in-gallery-mode">Visualize cellular neighborhood in gallery mode</h2>
+<p>A complete CosMx dataset will contain cell metadata, morphology/protein images and cell label results of cell segmentation. We’ve created a toolkit for visualizing the neighborhood of query cells in terms of protein staining, cell segmentation border, numeric and categorical metadata. (Note: we are <em>not</em> performing cell typing or cell segmetnation here, just drawing boundaries from the existing cell label/segmetnation results.)</p>
+<p>You can find the package <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/NeighVizGallery" target="_blank">here</a>. See the corresponding <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/NeighVizGallery/vignettes/tutorial.R" target="_blank">tutorial</a> inside the package for more details.</p>
+<p>The inputs required:</p>
+<ul>
+<li><p>cell metadata with unique cell_ID in format of <code>c_[slide]_[fov]__[CellId]</code>.</p></li>
+<li><p>Either file path to <code>CellStatsDir</code> that contains per FOV level of cell label images, morphology C902 images and optional <code>ProteinDir</code> that contains per FOV level of protein images.</p></li>
+<li><p>Or file path to <code>napari-cosmx</code> dataset which contains stitched images for cell label, morphology and optional protein images of entire slide.</p></li>
+</ul>
+<p>This code expects the file format output generated by CosMx Single Molecular Imager (SMI) and <code>napari-cosMx</code> plugin. Here are the example data/folder structure of the required input files.</p>
+<ul>
+<li>Example cell metadata:</li>
+</ul>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig1.png" class="img-fluid"></p>
+<ul>
+<li><p>Example <code>CellStatsDir</code> and <code>ProteinDir</code> under raw data folder of given slide.</p>
+<ol type="1">
+<li>Each FOV subfolder under <code>CellStatsDir</code> contains cell label images of given FOV.</li>
+</ol></li>
+</ul>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig2.png" class="img-fluid"></p>
+<ol start="2" type="1">
+<li><code>Morphology2D</code> subfolder under <code>CellStatsDir</code> contains multi-channel morphology images of each FOV.</li>
+</ol>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig3.png" class="img-fluid"></p>
+<ol start="3" type="1">
+<li>Each FOV subfolder under <code>ProteinDir</code> contains a folder called <code>ProteinImages</code>, which has single-channel images for all the protein profiled for the given FOV.</li>
+</ol>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig4.png" class="img-fluid"></p>
+<ul>
+<li>Example <code>napari-cosmx</code> dataset with stitched images: <code>labels</code> for cell labels, <code>protein/[proteinName]</code> for single-channel protein images, other folders (e.g.&nbsp;<code>DNA</code>) for single-channel morphology images.</li>
+</ul>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig5.png" class="img-fluid"></p>
+<p>Below are the example outputs of plotting query cells’ neighborhood:</p>
+<ul>
+<li>Plotting morphology images and cell borers of query cells’s neighborhood</li>
+</ul>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig6.png" class="img-fluid"></p>
+<ul>
+<li>Plotting numeric and categorical metadata of query cells’ neighborhood</li>
+</ul>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig7.png" class="img-fluid"></p>
+
+
+</section>
+
+ ]]></description>
+  <category>visualization</category>
+  <category>napari</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/</guid>
+  <pubDate>Wed, 24 Jan 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig6.png" medium="image" type="image/png" height="188" width="144"/>
+</item>
+<item>
+  <title>What is high-plex spatial transcriptomics for?</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="what-is-high-plex-spatial-transcriptomics-for" class="level1">
+<h1>What is high-plex spatial transcriptomics for?</h1>
+<p>High-plex single cell spatial transcriptomics data is a little awe-inspiring: even a perfunctory analysis of a single run produces a terabyte of data, gorgeous images, and spatial relationships from the scale of centimeters to micrometers that you could spend weeks exploring.</p>
+<p>But ultimately, you don’t need amazing images, you need answers to biological questions. Here I’ll lay out questions typically asked with spatial transcriptomics, and I’ll suggest a more expansive approach that reveals spatial single-cell data to be perhaps the most productive question-posing machine in molecular biology.</p>
+<p>Data analysis begins with two fundamental pieces: a matrix of all cells’ gene expression, and their spatial locations: <img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/figures/fig1.png" class="img-fluid"></p>
+<p>As with any single cell dataset, we begin by using the gene expression matrix to call cell types. Then, simply coloring our spatial map by cell type, we obtain an intricate picture of tissue structure.</p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/figures/fig2.png" class="img-fluid"></p>
+<p>Even this simplistic analysis is valuable: most experts examining these plots come away with new insights and new questions.</p>
+<p>Questions answered with cell type + location:</p>
+<ul>
+<li>How is each immune cell type spread through this tumor? Where are the inflammatory vs.&nbsp;the suppressive macrophages trafficking?</li>
+<li>Do we see more memory T-cell invasion in post-treatment samples?</li>
+<li>What immune cell types tend to physically interact with each other?</li>
+</ul>
+<p>Most early analyses of spatial transcriptomic data stop here. They wrap questions like the above in formal statistics (“spatial clustering” / “niche analysis”, “cell proximity analysis”), and publish what is usually already a compelling story. But if we take this analysis just a little farther, we can begin to ask a staggering number of questions. The power of this data isn’t its ability to get single cell expression profiles, nor its ability to describe spatial variation: it’s the ability to do both of these at the same time. By simultaneously measuring single cells’ phenotypes (gene expression) and environments (the phenotypes of surrounding cells), we can interrogate how phenotype responds to environment. What can we say about a cell’s environment? Consider the below closeup of a PDAC tumor. “T-cell 1” is in a lymphoid structure, surrounded by B-cells and endothelial cells. These cells are expressing certain levels of ligands that bind receptors on T-cells. In contrast, “T-cell 2” has invaded into the tumor bed and is mainly surrounded by tumor cells, plus a few macrophages, and these cells are signaling the T-cell with a different set of genes.</p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/figures/fig3.png" class="img-fluid"></p>
+<p>In short, we can trivially derive over 1000 variables describing each cell’s environment. And now, for every cell type, we can measure how every gene responds to every environmental variable. This amounts to roughly 20 * 1000 * 1000 = 20 million questions. Or, in a study across multiple tissues, we might ask these 20 million questions separately for each tissue. (Note that in a lower-plex technology, where a panel of ~300 genes might be devoted almost entirely to cell typing, the number of interesting questions to be asked drops precipitously.)</p>
+<p>In short, a standard analysis can lead to millions of hypothesis tests. Single-cell data without spatial information, and spatial data at larger-than-single-cell resolution, can’t come close to this.</p>
+<p>Questions on how phenotype responds to environment:</p>
+<ul>
+<li>How do tumor cells modulate gene expression in the face of T-cell attack?</li>
+<li>How do macrophages in the stroma differ from macrophages in the tumor interior?</li>
+<li>What genes do T-cells express when exposed to inflammatory cytokines?</li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>overview</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/</guid>
+  <pubDate>Fri, 05 Jan 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/figures/fig3.png" medium="image" type="image/png" height="55" width="144"/>
+</item>
+<item>
+  <title>Inferring cell polygons from transcript locations</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/deriving-cell-polygons-from-transcript-locations/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="deriving-cell-polygons-for-plotting" class="level2">
+<h2 class="anchored" data-anchor-id="deriving-cell-polygons-for-plotting">Deriving cell polygons for plotting</h2>
+<p>A complete CosMx dataset will contain polygonal boundaries for each cell for use in plotting. In practice, especially with earlier datasets or with datasets passed between collaborators, this data can be missing. We’ve created a toolkit for deriving these polygons from cells’ transcript locations. (Note: we are <em>not</em> performing cell segmentation here, just drawing boundaries around transcripts already assigned to cells.)</p>
+<p>You can find the package <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cellPoly" target="_blank">here</a>.</p>
+<p>Plotting cells as polygons looks better in zoomed-in views, and it allows for plotting of individual transcripts as in the below: <img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/deriving-cell-polygons-from-transcript-locations/figures/fig1.png" class="img-fluid"></p>
+
+
+</section>
+
+ ]]></description>
+  <category>visualization</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/deriving-cell-polygons-from-transcript-locations/</guid>
+  <pubDate>Fri, 05 Jan 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/deriving-cell-polygons-from-transcript-locations/figures/fig1.png" medium="image" type="image/png" height="100" width="144"/>
+</item>
+</channel>
+</rss>
