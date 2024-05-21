@@ -266,7 +266,7 @@ FastReseg::plotSpatialScoreMultiCells(chosen_cells = names(cells_to_plot),
 ![](figures/fig_plotFlagCells-1.png)
 
 
-You can see that cells with large `lrtest_nlog10P` value exhibited strong spatial dependency in their transcript score profiles under their best fitted cell type (i.e. `score_tLLR_maxCellType`). Below we would zoom in to one of the flagged cells (`c_1_51_238` with `lrtest_nlog10P = 10.91`) and visualize its transcript score profiles in 3D. 
+You can see that cells with large `lrtest_nlog10P` value exhibited strong spatial dependency in their transcript score profiles under their best fitted cell type (i.e. `score_tLLR_maxCellType`). Below we would zoom in to one of the flagged cells (`c_1_51_1211` with `lrtest_nlog10P = 49.82`) and visualize its transcript score profiles in 3D. 
 ```{ojs}
 //| echo: false
 data = FileAttachment("assets/chosenCell_flagged_transDF.csv").csv({ typed: true })
@@ -282,17 +282,17 @@ viewof colorColumn = Inputs.select(
 )
 
 viewof lowerLimit = Inputs.range(
-  [Math.min(...data.map(d => d[colorColumn])), Math.max(...data.map(d => d[colorColumn]))], 
+  [-10, 0], 
   { label: 'Lower Limit', 
-    value: Math.min(...data.map(d => d[colorColumn])), 
+    value: -10, 
     step: 0.1
   }
 )
 
 viewof upperLimit = Inputs.range(
-  [Math.min(...data.map(d => d[colorColumn])), Math.max(0.0, Math.max(...data.map(d => d[colorColumn])))], 
+  [-10, 0], 
   { label: 'Upper Limit', 
-    value: Math.max(0.0, Math.max(...data.map(d => d[colorColumn]))), 
+    value: 0, 
     step: 0.1
   }
 )
@@ -312,7 +312,7 @@ plotDiv = {
 function createPlot(data, colorColumn, lowerLimit, upperLimit, div) {
   div=div||DOM.element('div')
   div.id="plotlyDiv"
-
+  
   var trace = {
     x:data.map(d => d.x),
     y:data.map(d => d.y),
@@ -321,10 +321,30 @@ function createPlot(data, colorColumn, lowerLimit, upperLimit, div) {
      marker: {
         size: 3,
         color: data.map(d => d[colorColumn]),
-        colorscale: 'Viridis',
+        colorscale: [
+          [0.000, "rgb(252, 253, 191)"], 
+          [0.056, "rgb(252, 236, 173)"],
+          [0.111, "rgb(253, 218, 156)"],
+          [0.167, "rgb(254, 201, 141)"],
+          [0.222,"rgb(254, 183, 126)"],
+          [0.278, "rgb(254, 167, 114)"],
+          [0.333, "rgb(253, 149, 103)"],
+          [0.389, "rgb(251, 131, 95)"],
+          [0.444,"rgb(247, 113, 92)"],
+          [0.500, "rgb(241, 96, 93)"],
+          [0.556, "rgb(232, 83, 98)"],
+          [0.611, "rgb(219, 71, 106)"],
+          [0.667, "rgb(205, 64, 113)"],
+          [0.722, "rgb(189, 57, 119)"],
+          [0.778, "rgb(174, 52, 123)"],
+          [0.833, "rgb(159, 47, 127)"],
+          [0.889, "rgb(0, 149, 175)"],
+          [0.944, "rgb(0, 93, 158)"], 
+          [1.000, "rgb(38, 24, 95)"]
+        ],
         showscale: true,
-        cmin: lowerLimit,
-        cmax: upperLimit, 
+        cmin: Math.min(lowerLimit, upperLimit), 
+        cmax: Math.max(lowerLimit, upperLimit), 
         colorbar: { title: colorColumn }
       },
     type: 'scatter3d',
