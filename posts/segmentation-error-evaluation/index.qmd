@@ -7,7 +7,7 @@ author:
       - ref: lidanwu
 affiliations:
   - id: nstg
-    name: NanoString Technologies, Inc.
+    name: NanoString, a Bruker Company
     city: Seattle
     state: WA
   - id: lidanwu
@@ -31,7 +31,7 @@ draft: false
 
 Accurate cell segmentation that assigns transcripts to cell locations is critical to data quality of spatial transcriptomics assays, but very challenging for tissue sections where cells are tightly packaged with shared, 3D boundaries and uneven morphology staining. 
 
-The [FastReseg R package](https://github.com/Nanostring-Biostats/FastReseg/tree/main) offers a rapid way to evaluate the performance of existing cell segmentation and to perform refinement given the spatial transcriptional profiles. 
+The [FastReseg R package](https://github.com/Nanostring-Biostats/FastReseg/) offers a rapid way to evaluate the performance of existing cell segmentation and to perform refinement given the spatial transcriptional profiles. 
 
 1. The evaluation process starts with a cluster-specific reference expression profiles that are either derived from cell typing of query spatial data set given its current image-based cell segmentation or from external non-spatial data sets, like scRNA-seq. 
 2. Given the provided reference profiles, FastReseg algorithm scores individual transcripts for the goodness-of-fit within their respective cells based on the probability of each gene belonging to each cell type. 
@@ -43,10 +43,10 @@ The [FastReseg R package](https://github.com/Nanostring-Biostats/FastReseg/tree/
 ![Schematic of FastReseg workflow](figures/Fig1-FastReseg-workflow.png){#fig-FastReseg-workflow}
 
 
-You can find the FastReseg package [here](https://github.com/Nanostring-Biostats/FastReseg/tree/main){target="_blank"}. See the corresponding [tutorial](https://github.com/Nanostring-Biostats/FastReseg/blob/main/vignettes/tutorial.html){target="_blank"} inside the package for more details. 
+You can find the FastReseg package [here](https://github.com/Nanostring-Biostats/FastReseg/){target="_blank"}. See the corresponding [tutorial](https://github.com/Nanostring-Biostats/FastReseg/blob/master/vignettes/tutorial.html){target="_blank"} inside the package for more details. 
 
 
-The required inputs for [FastReseg](https://github.com/Nanostring-Biostats/FastReseg/tree/main){target="_blank"} include:
+The required inputs for [FastReseg](https://github.com/Nanostring-Biostats/FastReseg/){target="_blank"} include:
 
 * `counts`:  a cell-by-gene counts matrix for entire dataset. 
 
@@ -58,7 +58,7 @@ The required inputs for [FastReseg](https://github.com/Nanostring-Biostats/FastR
    + when `NULL`, use the transcript data.frame `transcript_df` directly.
 
 
-This post will show you how to prepare your inputs if you have data assembled in the structure used by the Technology Access Program [TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/); similar outputs are available from the AtoMx^TM^ Spatial Informatics Portal (SIP). You can download an example public dataset from [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/){target="_blank"}. The [ReadMe](./assets/Pancreas-CosMx-ReadMe.html) associated with this example data set on pancreas shows the data structures of each file used in this post.
+This post will show you how to prepare your inputs if you have data assembled in the structure used by the Technology Access Program ([TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/)); similar outputs are available from the AtoMx&#8482; Spatial Informatics Portal (SIP). You can download an example public dataset from [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/){target="_blank"}. The [ReadMe](./assets/Pancreas-CosMx-ReadMe.html) associated with this example data set on pancreas shows the data structures of each file used in this post.
 
 - @sec-loading-flatFiles Prepare inputs from basic data files
 - @sec-FastReseg-flagging Run segmentation evaluation 
@@ -72,7 +72,7 @@ the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch
 
 # Prepare inputs from basic data files {#sec-loading-flatFiles}
 
-Here we start from the basic data files exported from AtoMx^TM^ SIP. 
+Here we start from the basic data files exported from AtoMx&#8482; SIP. 
 
 While one can use cluster-specific expression profiles from other studies as `refProfiles`, here we take advantages of the existing cell typing derived from current cell segmentation in this data set and use it as `clust`. 
 ```{r readCellType, message=FALSE, eval = FALSE}
@@ -142,7 +142,7 @@ transDF_fileInfo <- lapply(allFOVs, function(fovId){
 transDF_fileInfo <- do.call(rbind, transDF_fileInfo)
 ```
 
-`FastReseg` evaluates segmentation in physical space and thus it's preferred to convert all 3D coordinates into same unit. The relevant default parameters of `FastReseg` are set with respect to micrometer in coordinate unit. According to the  [ReadMe](./assets/Pancreas-CosMx-ReadMe.html), the pixel size for this data set is 0.12028 um per pixel and the z step size is 0.8um per z slice. We would pass this information to `FastReseg` functions to do the coordinate conversion. If your data is already in micrometer unit, you can use `1` for pixel size and z step to disable the conversion. 
+`FastReseg` evaluates segmentation in physical space and thus it's preferred to convert all 3D coordinates into same unit. The relevant default parameters of `FastReseg` are set with respect to micrometer in coordinate unit. According to the  [ReadMe](./assets/Pancreas-CosMx-ReadMe.html), the pixel size for this data set is 0.12028 µm per pixel and the z step size is 0.8 µm per z slice. We would pass this information to `FastReseg` functions to do the coordinate conversion. If your data is already in micrometer unit, you can use `1` for pixel size and z step to disable the conversion. 
 
 ```{r pxUnit, message=FALSE, eval = TRUE}
 pixel_size <- 0.12028
@@ -430,7 +430,15 @@ refineAll_res <- FastReseg::fastReseg_full_pipeline(
 )
 ```
 
-There are several parameters one can adjust to tune the identification of wrongly segmented transcript groups and the rules used for cell segmentation correction. Please refer to [FastReseg tutorial](https://github.com/Nanostring-Biostats/FastReseg/blob/main/vignettes/tutorial.html){target="_blank"}, `Modular functions for individual tasks` section, for more details. 
 
+# Conclusions {#sec-conclusions}
 
+This vignette serves as a quick-start guide to use [FastReseg](https://github.com/Nanostring-Biostats/FastReseg/){target="_blank"} package on spatial transcriptomic data set. The package has several parameters one can adjust to tune the identification of wrongly segmented transcript groups and the rules used for cell segmentation correction. These include
 
+- cutoffs for spatial model evaluation and flagging for poor-fit cells & transcripts: `flagModel_TransNum_cutoff`, `flagCell_lrtest_cutoff`, `svmClass_score_cutoff`;
+- distance cutoffs used to define neighborhood: `molecular_distance_cutoff`,`cellular_distance_cutoff`;
+- method and rules used for grouping and separating poor-fit transcripts in space:`svm_args`, `groupTranscripts_method`, `config_spatNW_transcript`;
+- cutoffs and rules used for segmentation correction: `score_baseline`, `lowerCutoff_transNum`, `higherCutoff_transNum`
+- additional spatial constraint on merging event during error correction: `spatialMergeCheck_method`, `cutoff_spatialMerge`
+
+Many of those parameters have reasonable defaults for most spatial data sets and could be derived from your data using `FastReseg::runPreprocess()` function. For new user or new sample type, it's recommended to process one per-FOV transcript using `FastReseg::fastReseg_perFOV_full_process()` functions first and check out the impact of the parameters chosen. Please refer to [FastReseg tutorial](https://github.com/Nanostring-Biostats/FastReseg/blob/master/vignettes/tutorial.html){target="_blank"}, `Modular functions for individual tasks` section, for more details. 
