@@ -40,7 +40,7 @@ The [FastReseg R package](https://github.com/Nanostring-Biostats/FastReseg/tree/
 5. A set of heuristic rules on neighborhood cell typing and transcript number are then applied to the identified transcript groups to decide on the re-segmentation actions, like merging, splitting and trimming. The re-segmented results show no significant spatial dependency on transcript score of individual cells, suggesting the successful correction of poorly segmented cells.
 
 
-![](figures/Fig1-FastReseg-workflow.png)
+![Schematic of FastReseg workflow](figures/Fig1-FastReseg-workflow.png){#fig-FastReseg-workflow}
 
 
 You can find the FastReseg package [here](https://github.com/Nanostring-Biostats/FastReseg/tree/main){target="_blank"}. See the corresponding [tutorial](https://github.com/Nanostring-Biostats/FastReseg/blob/main/vignettes/tutorial.html){target="_blank"} inside the package for more details. 
@@ -94,7 +94,8 @@ counts <- data.table::fread("Pancreas_exprMat_file.csv")
 cell_ids <- paste0('c_1_', counts[['fov']], '_', counts[['cell_ID']])
 
 # get valid gene names
-all_rnas <- grep("fov|cell_ID|Negative|SystemControl", colnames(counts), value = TRUE, invert = TRUE)
+all_rnas <- grep("fov|cell_ID|Negative|SystemControl", 
+                 colnames(counts), value = TRUE, invert = TRUE)
 
 counts <- as.matrix(counts[, .SD, .SDcols = all_rnas])
 rownames(counts) <- cell_ids
@@ -103,7 +104,7 @@ counts <- as(counts[validCells, , drop = FALSE], "sparseMatrix")
 
 ```
 
-We then load the transcript file which contains all molecules' coordinates and cell segmentation information. For faster processing in downstream `FastReseg` pipeline which is paralleled by input transcript files, we recommend to split the full transcript data into multiple files by FOV and export those per-FOV transcript information as individual csv files. We would pass their file paths to FastReseg function through `transDF_fileInfo` data.frame. 
+We then load the transcript file which contains all molecules' coordinates and cell segmentation information. For faster processing in downstream `FastReseg` pipeline that is paralleled by input transcript files for different spatial regions, we recommend to split the full transcript data into multiple files by FOV (Field of View) and export those per-FOV transcript information as individual csv files. We would pass their file paths to `FastReseg` functions through `transDF_fileInfo` data.frame. 
 
 ```{r readTxFile, message=FALSE, eval = FALSE}
 fullTx <- data.table::fread("Pancreas_tx_file.csv")
@@ -115,7 +116,8 @@ fullTx[['transcript_id']] <- seq_len(nrow(fullTx))
 fullTx <- fullTx[cell_ID !=0, ]
 
 # keep only the necessary info
-fullTx <- fullTx[, .SD, .SDcols = c('transcript_id', 'cell', 'x_global_px', 'y_global_px', 'z', 'target', 'fov')]
+fullTx <- fullTx[, .SD, .SDcols = c('transcript_id', 'cell', 'x_global_px', 
+                                    'y_global_px', 'z', 'target', 'fov')]
 
 # split by FOV and export as per FOV csv file
 txDir <- "perFOV_txFile"
@@ -127,7 +129,8 @@ transDF_fileInfo <- lapply(allFOVs, function(fovId){
   perFOV_filePath <- fs::path(txDir, paste0('fov_', fovId, '_tx_data.csv'))
   data.table::fwrite(fullTx[fov == fovId, ], file = perFOV_filePath)
   
-  # since global coordinates of each molecule are available, use 0 for stage coordinates to disable convertion of local to global coordinates
+  # since global coordinates of each molecule are available
+  # use 0 for stage coordinates to disable conversion of local to global coordinates
   df <- data.frame(file_path = perFOV_filePath, 
                    slide = 1, 
                    fov = fovId, 
@@ -213,9 +216,10 @@ modStats_ToFlagCells <- flagAll_res[['combined_modStats_ToFlagCells']]
 ```
 
 The function above returns the statistics for evaluating each cell for spatial dependent model against null model. Based on the P value, `lrtest_Pr` or the negative log10 value `lrtest_nlog10P`, one can select for cells with strong spatial dependency in transcript score profile. Those cells are likely to contain contaminating transcripts for neighbor cells.
-```{r loadModStats, message=FALSE, eval = TRUE, echo=FALSE}
+```{r loadModStats, message=FALSE, eval = TRUE, echo=FALSE, results ='asis'}
 modStats_ToFlagCells <- read.csv("assets/Pancreas_flagAll_modStats.csv")
 outDir_flagErrors <- "assets"
+knitr::kable(head(modStats_ToFlagCells))
 ```
 ```{r plotModStats, message=FALSE, eval = TRUE}
 # histogram for spatial dependency in all cells
@@ -252,7 +256,8 @@ names(cells_to_plot) <- flagged_cells
 cells_to_plot <- cells_to_plot[flagged_cells %in% transcript_df[["UMI_cellID"]]]
 
 cells_to_plot <- cells_to_plot[order(cells_to_plot, decreasing = T)]
-cells_to_plot <- cells_to_plot[seq(1, length(cells_to_plot), by = ceiling(length(cells_to_plot)/25))]
+cells_to_plot <- cells_to_plot[seq(1, length(cells_to_plot), 
+                                   by = ceiling(length(cells_to_plot)/25))]
 
 FastReseg::plotSpatialScoreMultiCells(chosen_cells = names(cells_to_plot), 
                                       cell_labels = round(cells_to_plot, 2), 
