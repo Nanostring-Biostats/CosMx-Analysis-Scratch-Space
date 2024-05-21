@@ -59,7 +59,14 @@ that is, 4 "bits" of our color barcode are impacted, and in turn, so are all the
 
 Thus we see phenomena like the below, where genes with impacted bits are muted in specific FOVs (top left), while other genes behave normally:
 
-![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/3e3dbed6-5469-4bab-885e-ad1534dba420)
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/example1.png")
+#![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/3e3dbed6-5469-4bab-885e-ad1534dba420)
+```
+
 
 
 We have observed the below root causes of FOV artifacts:
@@ -91,8 +98,8 @@ To be cautious, we recommend removing FOVs with any substantial loss of signal.
 First, we'll apply a permissive look at FOV's signal strength, throwing out FOVs with >30% 
 loss of signal across most of their spatial span. 
 
-Then we'll look for FOVs with biased gene expresssion profiles.
-Because all known artifacts impact *reporter cycles* (each containing 4 "bits"", i.e. reporter cycle/color pairs), 
+Then we'll look for FOVs with biased gene expression profiles.
+Because all known artifacts impact *reporter cycles* (each containing 4 "bits", i.e. reporter cycle/color pairs), 
 we will look for artifacts at the level of bits, not genes. 
 Specifically, for each barcode bit, we'll look for FOVs where genes using the bit are
 underexpressed compared to comparable regions elsewhere. 
@@ -116,7 +123,14 @@ When an FOV's grid squares consistently underexpress the relevant gene set, we f
 
 Below we demonstrate this approach, looking at a tissue with particularly dramatic FOV effects. 
 
-![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/76c95e5d-9bef-4bea-9571-84b37cf9b988)
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/example2.png")
+#![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/76c95e5d-9bef-4bea-9571-84b37cf9b988)
+```
 
 On the left, we plot expression of a single barcode bit (c12B = reporter cycle 12, color Blue) impacted by FOV effects. 
 FOV 19 has almost entirely lost expression of the genes from this barcode bit,
@@ -133,7 +147,15 @@ sharp FOV borders, suggesting we needn't worry about technical artifacts in this
 
 Our tool summarize our output across FOVs x barcode bits with plots like the below:
 
-![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/1faead6b-1111-4133-9c4d-555ebde70c6b)
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/exampleheatmap.png")
+#![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/1faead6b-1111-4133-9c4d-555ebde70c6b)
+```
+
 
 In this example, 2 barcode bits from reporter cycle 12 were flagged, as was one bit from reporter cycle 18. 
 Because all known artifacts impact *reporter cycles*, not the individual colors within them, we only flag FOVs
@@ -144,8 +166,9 @@ whereas FOV 18 would not be flagged since it had only one bit flagged in reporte
 
 ## Code
 
-Functions for FOV QC can be found [here](../code/FOV%20QC). 
-The gene-to-barcode mappings needed by this approach are [here](../code/FOV%20QC/barcodes_by_panel.RDS).
+Functions for FOV QC can be found [here](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC){target="_blank"}.
+The gene-to-barcode mappings needed by this approach are 
+https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/FOV%20QC/barcodes_by_panel.RDS){target="_blank"}.
 
 We advise this approach be applied separately to each slide or tissue in a study. 
 
