@@ -31,7 +31,13 @@ draft: false
 
 Accurate cell segmentation that assigns transcripts to cell locations is critical to data quality of spatial transcriptomics assays, but very challenging for tissue sections where cells are tightly packaged with shared, 3D boundaries and uneven morphology staining. 
 
-The [FastReseg R package](https://github.com/Nanostring-Biostats/FastReseg/tree/main) offers a rapid way to evaluate the performance of existing cell segmentation and to perform refinement given the spatial transcriptional profiles. The evaluation process starts with a cluster-specific reference expression profiles that are either derived from cell typing of query spatial dataset given its current image-based cell segmentation or from external non-spaital data sets, like scRNA-seq. Given the provided reference profiles, FastReseg algorithm scores individual transcripts for the goodness-of-fit within their respective cells based on the probability of each gene belonging to each cell type. FastReseg then scores each cell for its spatial dependency of transcript score profiles under its most likely cell type given the overall transcriptional profiles. As confirmed by the membrane-stained images, cells with boundary errors at the junction of different cell types, exhibit strong spatial dependency in their transcript score profile and thus can be easily identified. FastReseg further identifies the spatially connected groups of transcripts with low goodness-of-fit within incorrectly segmented cells. A set of heuristic rules on neighborhood cell typing and transcript number are then applied to the identified transcript groups to decide on the re-segmentation actions, like merging, splitting and trimming. The re-segmented results show no significant spatial dependency on transcript score of individual cells, suggesting the successful correction of poorly segmented cells.
+The [FastReseg R package](https://github.com/Nanostring-Biostats/FastReseg/tree/main) offers a rapid way to evaluate the performance of existing cell segmentation and to perform refinement given the spatial transcriptional profiles. 
+
+1. The evaluation process starts with a cluster-specific reference expression profiles that are either derived from cell typing of query spatial data set given its current image-based cell segmentation or from external non-spatial data sets, like scRNA-seq. 
+2. Given the provided reference profiles, FastReseg algorithm scores individual transcripts for the goodness-of-fit within their respective cells based on the probability of each gene belonging to each cell type. 
+3. FastReseg then scores each cell for its spatial dependency of transcript score profiles under its most likely cell type given the overall transcriptional profiles. As confirmed by the membrane-stained images, cells with boundary errors at the junction of different cell types, exhibit strong spatial dependency in their transcript score profile and thus can be easily identified. 
+4. FastReseg further identifies the spatially connected groups of transcripts with low goodness-of-fit within incorrectly segmented cells. 
+5. A set of heuristic rules on neighborhood cell typing and transcript number are then applied to the identified transcript groups to decide on the re-segmentation actions, like merging, splitting and trimming. The re-segmented results show no significant spatial dependency on transcript score of individual cells, suggesting the successful correction of poorly segmented cells.
 
 
 ![](figures/Fig1-FastReseg-workflow.png)
@@ -55,8 +61,8 @@ The required inputs for [FastReseg](https://github.com/Nanostring-Biostats/FastR
 This post will show you how to prepare your inputs if you have data assembled in the structure used by the Technology Access Program [TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/); similar outputs are available from the AtoMx^TM^ Spatial Informatics Portal (SIP). You can download an example public dataset from [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/){target="_blank"}. The [ReadMe](./assets/Pancreas-CosMx-ReadMe.html) associated with this example data set on pancreas shows the data structures of each file used in this post.
 
 - @sec-loading-flatFiles Prepare inputs from basic data files
-- @sec-FastReseg-flagging Run FastReseg segmentation evaluation 
-- @sec-FastReseg-full Run FastReseg full pipeline to correct putative segmentation error identified 
+- @sec-FastReseg-flagging Run segmentation evaluation 
+- @sec-FastReseg-full Run full pipeline to correct putative segmentation error identified 
 
 
 Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
@@ -146,11 +152,11 @@ By default, `FastReseg` would use 75% of available cores on your PC to do parall
 Too many large FOVs being processed in same batch could hit the memory limit and abort the current processing. Below is an example error message when memory limit was reached.
 
 <span style="color: red;">
-Error in FUN(X[[i]], ...) : subscript out of bounds
-In addition: Warning messages:
-<strong>1: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE,  :
-  scheduled cores 1, 3, 4, 7, 8, 10, 11 did not deliver results, all values of the jobs will be affected
-2: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE,  :
+Error in FUN(X[[i]], ...) : subscript out of bounds<br/>
+In addition: Warning messages:<br/>
+<strong>1: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE,  :<br/>
+  scheduled cores 1, 3, 4, 7, 8, 10, 11 did not deliver results, all values of the jobs will be affected<br/>
+2: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE,  :<br/>
   scheduled core 12 encountered error in user code, all values of the job will be affected</strong>
 </span>
 :::
@@ -161,7 +167,7 @@ percentCores <- 0.25
 ```
 
 
-# Run FastReseg segmentation evaluation {#sec-FastReseg-flagging}
+# Run segmentation evaluation {#sec-FastReseg-flagging}
 
 Now we have all the inputs needed to run `FastReseg` pipelines. For segmentation evaluation, one can use `FastReseg::fastReseg_flag_all_errors()` function to run through all the FOVs. 
 
@@ -229,7 +235,7 @@ flagCell_lrtest_cutoff  = 5
 modStats_ToFlagCells[['flagged']] <- (modStats_ToFlagCells[['lrtest_nlog10P']] > flagCell_lrtest_cutoff )
 flagged_cells <- modStats_ToFlagCells[['UMI_cellID']][modStats_ToFlagCells[['flagged']]]
 
-message(sprintf("%d cells, %.4f of all evaluated cells, are flagged for resegmentation with lrtest_nlog10P > %.1f.", 
+message(sprintf("%d cells, %.4f of all evaluated cells, \nare flagged for resegmentation with lrtest_nlog10P > %.1f.", 
                  length(flagged_cells), length(flagged_cells)/nrow(modStats_ToFlagCells), flagCell_lrtest_cutoff))
 ```
 
@@ -260,7 +266,84 @@ FastReseg::plotSpatialScoreMultiCells(chosen_cells = names(cells_to_plot),
 ![](figures/fig_plotFlagCells-1.png)
 
 
-# Run FastReseg full pipeline to correct putative segmentation error identified {#sec-FastReseg-full}
+You can see that cells with large `lrtest_nlog10P` value exhibited strong spatial dependency in their transcript score profiles under their best fitted cell type (i.e. `score_tLLR_maxCellType`). Below we would zoom in to one of the flagged cells (`c_1_51_238` with `lrtest_nlog10P = 10.91`) and visualize its transcript score profiles in 3D. 
+```{ojs}
+//| echo: false
+data = FileAttachment("assets/chosenCell_flagged_transDF.csv").csv({ typed: true })
+```
+```{ojs}
+//| echo: false
+//| panel: input
+viewof colorColumn = Inputs.select(
+  ['score_tLLR_maxCellType'], 
+  { label: 'Colored by', 
+    value: 'score_tLLR_maxCellType'
+  }
+)
+
+viewof lowerLimit = Inputs.range(
+  [Math.min(...data.map(d => d[colorColumn])), Math.max(...data.map(d => d[colorColumn]))], 
+  { label: 'Lower Limit', 
+    value: Math.min(...data.map(d => d[colorColumn])), 
+    step: 0.1
+  }
+)
+viewof upperLimit = Inputs.range(
+  [Math.min(...data.map(d => d[colorColumn])), Math.max(0.0, Math.max(...data.map(d => d[colorColumn])))], 
+  { label: 'Upper Limit', 
+    value: Math.max(0.0, Math.max(...data.map(d => d[colorColumn]))), 
+    step: 0.1
+  }
+)
+```
+```{ojs}
+//| echo: false
+Plotly = await require("https://cdn.plot.ly/plotly-2.32.0.min.js")
+
+// document element for plot
+plotDiv = {
+  const div = html`<div id="plotlyDiv" style="width:100%;height:600px;"></div>`;
+  return div;
+}
+
+
+// Function to create the 3D scatter plot
+function createPlot(data, colorColumn, lowerLimit, upperLimit, div) {
+  div=div||DOM.element('div')
+  div.id="plotlyDiv"
+
+  var trace = {
+    x:data.map(d => d.x),
+    y:data.map(d => d.y),
+    z:data.map(d => d.z),
+    mode: 'markers',
+     marker: {
+        size: 3,
+        color: data.map(d => d[colorColumn]),
+        colorscale: 'Viridis',
+        showscale: true,
+        cmin: lowerLimit,
+        cmax: upperLimit, 
+        colorbar: { title: colorColumn }
+      },
+    type: 'scatter3d',
+    text: data.map(d => `target: ${d.target}<br>score_tLLR_maxCellType:<br>${d.score_tLLR_maxCellType}`),
+    hoverinfo: 'text'
+  }
+  
+  Plotly.newPlot(div,[trace],{})
+  return div
+  
+ 
+}
+
+
+createPlot(data, colorColumn, lowerLimit, upperLimit, plotDiv)
+
+```
+
+
+# Run full pipeline to correct putative segmentation error identified {#sec-FastReseg-full}
 
 If cell segmentation correction is desired, one can use `FastReseg::fastReseg_full_pipeline()` function to not only flag but also correct the identified putative cell segmentation errors. 
 
