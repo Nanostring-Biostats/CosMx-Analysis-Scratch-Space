@@ -87,9 +87,14 @@ table(flag)
 
 ### FOV-level QC
 
-We check FOVs for two indicators of artifacts: lost efficiency, and biased gene expression profiles. 
-Procedures for both these checks, along with a detailed discussion, can be found [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/).
+We check FOVs for two indicators of artifacts: diminished total counts, and biased gene expression profiles. 
+Procedures for both these checks, along with a detailed discussion, can be found in a new (as of April 2024) method
+described [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/).
 These procedures will appear in AtoMx in summer 2024. 
+
+To summarize briefly: for each "bit" in our barcodes (e.g. red in reporter cycle 8), we look for FOVs where 
+genes using the bit are underexpressed. We also look for FOVs where total expression is suppressed.
+
 Note that an additional approach to FOV QC, one looking at primary data accessible from AtoMx through S3, 
 is described [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/FOV-QC-from-primary/).
 
@@ -98,92 +103,68 @@ Below we'll run our FOV QC code and examine its results:
 ```{r runfovqc}
 ## preparing resources:
 # source the FOV QC tool:
-source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/FOV-QC/code/FOV%20QC/FOV%20QC%20utils.R")
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/fov_qc_quarto/_code/FOV%20QC/FOV%20QC%20utils.R")
 # load necessary information for the QC tool: the gene to barcode map:
-allbarcodes <- readRDS(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/FOV-QC/code/FOV%20QC/barcodes_by_panel.RDS"))
+allbarcodes <- readRDS(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/fov_qc_quarto/_code/FOV%20QC/barcodes_by_panel.RDS"))
 names(allbarcodes)
 # get the barcodes for the panel we want:
 barcodemap <- allbarcodes$Hs_UCC
 head(barcodemap)
 
 ## run the method:
-res <- runFOVQC(counts = counts, xy = xy, fov = metadata$fov, barcodemap = barcodemap, max_prop_loss = 0.3) 
-
+fovqcresult <- runFOVQC(counts = counts, xy = xy, fov = metadata$FOV, barcodemap = barcodemap, max_prop_loss = 0.3) 
+# map of flagged FOVs:
+mapFlaggedFOVs(fovqcresult)
 ```
 
+We didn't flag any FOVs for signal loss, but it's still worth examining:
 
-
-
-
-A spatial map of per-cell signal total counts usually makes poor FOVs quite obvious. 
-Even better, we can color cells by the average counts of their spatial neighbors 
-within their FOV:
-
-```{r smoothedtotalcounts, fig.dim = c(7, 7)}
-source("utils/spatial functions.R")
-# get cells' spatial neighbors (within their FOV):
-neighbors <- 1 * (nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 20, subset = metadata$FOV) != 0)
-# now get mean counts of neighbors:
-neighborcounts <- neighbor_mean(x = metadata$nCount_RNA, neighbors = neighbors)
-lowerlimit <- max(log2(50), min(log2(neighborcounts)))
-# now plot it:
-plot(xy, pch = 16, cex = 0.1, 
-     asp = 1, # important: keep the true aspect ratio
-     col = viridis::viridis_pal(option = "B")(101)[
-       pmax(pmin(1 + round(100 * (log2(neighborcounts) - lowerlimit) / (max(log2(neighborcounts)) - lowerlimit)), 101), 1)])
-legend("topright", pch = 16, col = c(NA, viridis::viridis_pal(option = "B")(101)[c(1,50,101)]),
-       legend = c("Mean neighborhood counts per cell:", round(c(2^lowerlimit, 2^mean(c(lowerlimit, max(log2(neighborcounts)))), max(neighborcounts)))))
-# label FOVs:
-#for (fov in unique(metadata$FOV)) {
-#  text(median(xy[metadata$FOV == fov, 1]), median(xy[metadata$FOV == fov, 2]), fov)
-#}
+```{r fovqcsignalloss}
+FOVSignalLossSpatialPlot(fovqcresult) 
 ```
 
-We do see regions of low signal, but they appear to vary smoothly over space, tracing tissue biology, not FOV borders.
-If we did see FOVs where signal dropped, we could flag the cells in them as follows.
-Note that first you'd want to confirm that their signal was truly poor and not just slightly attenuated vs. their neighbors. It's OK for signal to vary; only true outliers need to be removed.
+We see signal strength varying, but smoothly with tissue biology, and not sharply with FOV borders.
+No FOVs are uniformly suppressed.
+
+The function did flags one FOV, however, not for signal loss, but for biased gene expression. 
+Specifically, counts from one barcode position appear suppressed in this FOV. Let's look in more detail:
+
+```{r examinefovqcresults, fig.width=8, fig.height=8}
+# spatial plots of flagged reporter positions:
+par(mfrow = c(2,2))
+FOVEffectsSpatialPlots(res = fovqcresult, outdir = NULL, bits = "flagged_reportercycles") 
+```
+
+The above plots show the view from which the algorithm flags FOVs for failed reporter cycles. 
+It looks not at single genes, but at the collection of all genes using a given barcode bit
+(reporter cycle + color).
+Each FOV is cut into a 7X7 grid, and each grid square is colored by how strongly
+ the total counts from a barcode bit diverge from similar grid squares from other FOVs. 
+
+In the above plots, we see strong loss of expression across all grid squares of the flagged FOV (highlighted yellow)
+in all 4 colors from reporter cycle 11. 
+In other FOVs, we see increased (red) and decreased (blue) expression, but these changes
+are more modest, and they vary smoothly over space rather than with the sharp boundaries of FOVs,
+so we attribute these changes to biology and not technical artifacts.
+
+A final useful plot shows which barcode bits x FOVs showed evidence for lost signal:
+
+```{ fovqcheatmap}
+FOVEffectsHeatmap(fovqcresult) 
+```
+
+The FOV QC result also reports which genes are impacted in any flagged FOVs:
+
+```{r flaggedgenes}
+# genes from all barcode bits that were flagged in any FOV:
+print(unique(fovqcresult$flagged_fov_x_gene[,"gene"]))
+```
+Thus while we only flagged one reporter cycle, i.e. 4 barcode bits, over a quarter 
+of the gene panel relies on one of these bits. None of these genes can be analyzed 
+in this FOV. The simplest way forward is to flag and remove all cells in this FOV:
 
 ```{r lowcountfovs}
-low_count_fovs <- c("exampleFOV101", "exampleFOV342") 
-flag <- flag | is.element(metadata$FOV, low_count_fovs)
-table(flag)
-```
-
-
-### FOV-level QC: check for distorted gene expression profiles:
-
-Above we checked for FOVs with an overall loss in signal. 
-However, there are other, more subtle, FOV error modes that cause loss of counts in just subsets of genes. 
-Here we search for FOVs showing this behavior. 
-
-A new (as of April 2024) approach to FOV QC is available here: https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/code/FOV%20QC
-
-A description of the method is found here: https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/FOV-QC/blog/FOV%20QC.md
-
-To summarize briefly: for each "bit" in our barcodes (e.g. red in reporter cycle 8), we look for FOVs where 
-genes using the bit are underexpressed. 
-
-```{r fovqc}
-# get the FOV QC utils code:
-source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/FOV-QC/code/FOV%20QC/FOV%20QC%20utils.R")
-
-# get barcode details for this panel:
-allbarcodes <- readRDS(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/FOV-QC/code/FOV%20QC/barcodes_by_panel.RDS"))
-names(allbarcodes)
-# get the barcodes for the panel we want:
-barcodemap <- allbarcodes$Hs_UCC
-head(barcodemap)
-
-# run the method:
-fovqc <- runFOVQC(counts = counts, xy = xy, fov = metadata$FOV, barcodemap = barcodemap, max_prop_loss = 0.33)
-# report flagged FOVs:
-fovqc$flaggedfovs
-
-# see how expression of genes with impacted bits changes:
-FOVEffectsSpatialPlots(fovqc, outdir = NULL, bits = "flagged_reportercycles") 
-
-# remove cells in those FOVs:
-flag <- flag | is.element(metadata$FOV, fovqc$flaggedfovs)
+flag <- flag | is.element(metadata$FOV, fovqcresult$flaggedfovs)
 table(flag)
 ```
 
