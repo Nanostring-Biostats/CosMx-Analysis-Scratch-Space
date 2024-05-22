@@ -237,8 +237,8 @@ mapFlaggedFOVs <- function(res, shownames = TRUE, outdir = NULL, plotwidth = NUL
     plotheight <- diff(range(res$xy[, 2])) * 1.5
   }
   
-  plot(res$xy, cex = 0.2, asp = 1, pch = 16,
-       col = "black", 
+  plot(res$xy, cex = 0.1, asp = 1, pch = 16,
+       col = "grey50", 
        main = "Flagged FOVs")
   for (f in unique(res$fov)) {
     inds <- res$fov == f
