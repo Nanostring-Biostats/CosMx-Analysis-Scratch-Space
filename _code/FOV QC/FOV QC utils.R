@@ -61,7 +61,7 @@ runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.3, max_total
   
   ## Search for failed reporter cycles:
   # get expected:
-  yhat <- t(sapply(1:nrow(bitcounts), function(i) {
+  yhat <- Matrix::t(sapply(1:nrow(bitcounts), function(i) {
     colMeans(bitcounts[comparators[i, ], ], na.rm = TRUE)
   }))
   # get resids:
