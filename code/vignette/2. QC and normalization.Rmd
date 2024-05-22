@@ -41,9 +41,12 @@ For smaller studies it could still be reasonable to hold on to the pre-QC .RDS f
 The QCs implemented here mimic and expand on those of AtoMx. 
 We reimplement AtoMx QCs here to give you more granular control on how they're implemented. 
 
-We start by loading the data we'll need:
+We start by loading the data we'll need, which was output by the earlier scripts from the [workflow vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/vignette-melanoma/_code/vignette):
 
 ```{r loaddata}
+library(Matrix)
+library(viridis)
+
 # note these files are for convenience during analysis, and are not a NanoString-supported format
 mydir <- "../"
 metadata <- readRDS(paste0(mydir, "/processed_data/metadata_unfiltered.RDS")) 
@@ -63,8 +66,7 @@ We generally require 20 counts per cell in 1000plex data and 50 counts in 6000pl
 ```{r countqc}
 # require 20 counts per cell 
 count_threshold <- 20
-metadata$totalcounts <- Matrix::rowSums(counts)
-flag <- metadata$totalcounts < count_threshold
+flag <- metadata$nCount_RNA < count_threshold
 table(flag)
 ```
 
@@ -94,7 +96,7 @@ source("utils/spatial functions.R")
 # get cells' spatial neighbors (within their FOV):
 neighbors <- 1 * (nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 20, subset = metadata$FOV) != 0)
 # now get mean counts of neighbors:
-neighborcounts <- neighbor_mean(x = metadata$totalcounts, neighbors = neighbors)
+neighborcounts <- neighbor_mean(x = metadata$nCount_RNA, neighbors = neighbors)
 lowerlimit <- max(log2(50), min(log2(neighborcounts)))
 # now plot it:
 plot(xy, pch = 16, cex = 0.1, 
@@ -158,8 +160,6 @@ table(flag)
 ```
 
 
-
-
 ### Remove flagged cells and FOVs
 
 Now that we've flagged cells we don't want to analyze, we remove them from all of our data objects. 
@@ -183,6 +183,8 @@ saveRDS(metadata, paste0(mydir, "/processed_data/metadata.RDS"))
 saveRDS(xy, paste0(mydir, "/processed_data/xy.RDS"))
 ```
 
+These new saved data objects have omitted the flagged cells. The original data can be recovered from AtoMx or the exported flat files. 
+
 ## Normalization
 
 Normalization is straightforward: we simply divide every cell's expression profile by its total counts.
@@ -191,13 +193,13 @@ cell's total counts.
 This can be done efficiently using matrix multiplication, which avoids converting the sparse (memory-efficient) matrix into a dense matrix.
 
 ```{r normalize}
-scaling_factor <- mean(metadata$totalcounts)
-norm <- Matrix::Diagonal(x = scaling_factor/metadata$totalcounts,names=colnames(counts)) %*% counts
+scaling_factor <- mean(metadata$nCount_RNA)
+norm <- Matrix::Diagonal(x = scaling_factor/metadata$nCount_RNA,names=colnames(counts)) %*% counts
 saveRDS(norm, paste0(mydir, "/processed_data/norm.RDS"))
 ```
 
 Note: if you'll analyze many tissues using the same pipeline, then you should 
-replace the `mean(metadata$totalcounts)` term with some fixed value that is the 
+replace the `mean(metadata$nCount_RNA)` term with some fixed value that is the 
 same for all samples. Mathematically all positive values are the same, but entering
 a value approximately equal to the average cell's total counts will put the data
 on an easily-interpretable scale. 

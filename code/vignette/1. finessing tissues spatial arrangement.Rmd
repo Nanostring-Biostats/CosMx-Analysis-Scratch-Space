@@ -24,16 +24,18 @@ knitr::opts_chunk$set(
 
 Here we rearrange FOV's by hand to make for plots with less white space. 
 We'll also append the metadata with further columns specifying tissue ID (which for multi-tissue slides is more granular than mere slide ID).
-For an under-development toolkit to automate this process, see [here](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/blog/condensing%20FOVs%20and%20tissues%20in%20XY%20space.md).
+For an under-development toolkit to automate this process, see [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/).
 
 
 ### Preliminaries
 
-First, we load in only the data we need:
+First, we load in only the data we need, which was output by the earlier script from the [workflow vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/vignette-melanoma/_code/vignette):
+
 
 ```{r loadxy}
 mydir <- ".."
-metadata <- readRDS(paste0(mydir, "/processed_data/metadata_unfiltered.RDS")) # load cell metadata
+# load cell metadata, output by the first vignette script, 0.-loading-flat-files.Rmd
+metadata <- readRDS(paste0(mydir, "/processed_data/metadata_unfiltered.RDS")) 
 ```
 
 Then break out cells' xy positions in a distinct data object:
@@ -55,6 +57,8 @@ this process:
 
 ```{r condensetissues}
 source("utils/condenseTissues.R")
+#equivalently, source from github:
+#source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/vignette-melanoma/_code/vignette/utils/condenseTissues.R")
 set.seed(1)
 xy <- condenseTissues(xy = xy, 
                       tissue = metadata$Run_Tissue_name, 
@@ -148,7 +152,7 @@ for (tiss in unique(metadata$tissue)) {
 ```
 
 Much better. And if we aren't worried about preserving long-range distances, which is usually the case,
-we can consolidate sample 2 a little better:
+we can consolidate sample 3 a little better:
 
 ```{r consolidate}
 isfarout <- (metadata$tissue == "sample3") & (xy[, 2] > 11)
@@ -160,6 +164,8 @@ plot(xy[sub, ], pch = 16, cex = 0.2,
 ```
 
 Finally, we save our new coordinate system and move on to the next module.
+
+**Please note that these are intermediate results, and not official file formats supported by NanoString.**
 
 ```{r savexy}
 saveRDS(xy, file = paste0(mydir, "/processed_data/xy_unfiltered.RDS"))

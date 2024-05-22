@@ -61,21 +61,26 @@ Our example dataset is from melanoma samples. We don't have a reference profile 
 a different melanoma would work well), but we do have reference profiles for immune and stroma cells. 
 So we'll run in semi-supervised mode, looking for reference immune/stroma cells and using our de novo clusters to capture cancer cells.
 
-We'll download a reference profile matrix from a previous CosMx experiment:
+We start by loading the data we'll need, which was output by the earlier scripts from the [workflow vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/vignette-melanoma/_code/vignette):
 
-```{r getreference}
+```{r loading}
+library(pheatmap)
+library(InSituType)
+
 # load CosMx data:
-# note these files are for convenience during analysis, and are not a NanoString-supported format
+# note these Rmd files are for convenience during analysis, and are not a NanoString-supported format
 mydir <- "../"
 metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS")) 
 counts <- readRDS(paste0(mydir, "/processed_data/counts.RDS")) 
 negcounts <- readRDS(paste0(mydir, "/processed_data/negcounts.RDS")) 
 um <- readRDS(paste0(mydir, "/processed_data/um.RDS"))
 xy <- readRDS(paste0(mydir, "/processed_data/xy.RDS"))
+```
 
+Next we'll download a reference profile matrix from a previous CosMx experiment:
 
+```{r getreference}
 refprofiles <- read.csv("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Cell-Profiles/main/Human/IO/IO.profiles.csv", row.names = 1, header = TRUE)
-mydir <- "../"
 refprofiles <- refprofiles[is.element(rownames(refprofiles), colnames(counts)), ]
 pheatmap::pheatmap(sweep(refprofiles, 1, pmax(apply(refprofiles, 1, max), 0.2), "/"), 
                    col = colorRampPalette(c("white", "darkblue"))(100))
@@ -88,7 +93,6 @@ Next we'll use Insitutype to assign our cells to these previously-published cell
 while looking for 6 new clusters (it's usually advisable to overcluster at first):
 
 ```{r runinsitutype}
-library(InSituType)
 insitutypefileloc <- paste0(mydir, "/processed_data/insitutype_initial_results.RDS")
 if (!file.exists(insitutypefileloc)) {
   set.seed(0)
@@ -123,7 +127,7 @@ They show the tendency of different cell types to be confused with each other.
 
 ```{r qcplots, fig.dim=c(6,6)}
 # flightpath
-flightpath <- flightpath_layout(logliks = res$logliks, profiles = res$profiles)
+flightpath <- InSituType::flightpath_layout(logliks = res$logliks, profiles = res$profiles)
 par(mar = c(0,0,0,0))
 plot(flightpath$cellpos, pch = 16, cex = 0.2, col = cols[res$clust])
 text(flightpath$clustpos[, 1], flightpath$clustpos[, 2], rownames(flightpath$clustpos), cex = 0.7)
