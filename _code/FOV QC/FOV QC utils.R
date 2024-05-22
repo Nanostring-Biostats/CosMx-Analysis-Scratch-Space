@@ -195,7 +195,7 @@ FOVSignalLossSpatialPlot <- function(res, shownames = TRUE, outdir = NULL, plotw
   
   plot(res$xy, cex = 0.2, asp = 1, pch = 16,
        col = colorRampPalette(c("darkblue", "blue", "grey80", "red", "darkred"))(101)[
-         pmax(pmin(51 + res$totalcountsresids[match(res$gridinfo$gridid, names(res$totalcountsresids))] * 100, 101), 1)], 
+         pmax(pmin(51 + res$totalcountsresids[match(res$gridinfo$gridid, names(res$totalcountsresids))] * 25, 101), 1)], 
        main = "Log2 fold-change in total counts compared to similar regions")
   for (f in unique(res$fov)) {
     inds <- res$fov == f
@@ -210,7 +210,7 @@ FOVSignalLossSpatialPlot <- function(res, shownames = TRUE, outdir = NULL, plotw
   }
   legend("right", pch = 16,
          col = rev(c("darkblue", "blue", "grey80", "red", "darkred")),
-         legend = rev(c("< -1", -0.5, 0, 0.5, "> 1")))
+         legend = rev(c("< -2", -1, 0, 1, "> 2")))
   if (!is.null(outdir)) {
     dev.off()
   }
