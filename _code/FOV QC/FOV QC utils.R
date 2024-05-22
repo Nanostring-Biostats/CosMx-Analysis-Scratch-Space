@@ -238,11 +238,11 @@ mapFlaggedFOVs <- function(res, shownames = TRUE, outdir = NULL, plotwidth = NUL
   }
   
   plot(res$xy, cex = 0.1, asp = 1, pch = 16,
-       col = "grey50", 
+       col = "grey80", 
        main = "Flagged FOVs")
   for (f in unique(res$fov)) {
     inds <- res$fov == f
-    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), col = scales::alpha("dodgerblue2", 0.25))
+    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), col = scales::alpha("dodgerblue2", 0.5))
   }
   for (f in res$flaggedfovs) {
     inds <- res$fov == f
