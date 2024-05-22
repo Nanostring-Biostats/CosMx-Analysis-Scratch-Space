@@ -10,7 +10,1807 @@
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
 <generator>quarto-1.4.554</generator>
-<lastBuildDate>Fri, 10 May 2024 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Wed, 15 May 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Evaluating Cell Segmentation Error based on Transcripional Spatial Profiles using FastReseg</title>
+  <dc:creator>Lidan Wu</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Accurate cell segmentation that assigns transcripts to cell locations is critical to data quality of spatial transcriptomics assays and the proper interpretation of downstream <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/index.html" target="_blank">differential expression</a> analysis results. But it’s very challenging for tissue sections where cells are tightly packaged with shared, 3D boundaries and uneven morphology staining.</p>
+<p>The <a href="https://github.com/Nanostring-Biostats/FastReseg/">FastReseg R package</a> offers a rapid way to evaluate the performance of existing cell segmentation and to perform refinement given the spatial transcriptional profiles.</p>
+<ol type="1">
+<li>The evaluation process starts with a cluster-specific reference expression profiles that are either derived from cell typing of query spatial data set given its current image-based cell segmentation or from external non-spatial data sets, like scRNA-seq.</li>
+<li>Given the provided reference profiles, FastReseg algorithm scores individual transcripts for the goodness-of-fit within their respective cells based on the probability of each gene belonging to each cell type.</li>
+<li>FastReseg then scores each cell for its spatial dependency of transcript score profiles under its most likely cell type given the overall transcriptional profiles. As confirmed by the membrane-stained images, cells with boundary errors at the junction of different cell types, exhibit strong spatial dependency in their transcript score profile and thus can be easily identified.</li>
+<li>FastReseg further identifies the spatially connected groups of transcripts with low goodness-of-fit within incorrectly segmented cells.</li>
+<li>A set of heuristic rules on neighborhood cell typing and transcript number are then applied to the identified transcript groups to decide on the re-segmentation actions, like merging, splitting and trimming. The re-segmented results show no significant spatial dependency on transcript score of individual cells, suggesting the successful correction of poorly segmented cells.</li>
+</ol>
+<div id="fig-FastReseg-workflow" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-FastReseg-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/figures/Fig1-FastReseg-workflow.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-FastReseg-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Schematic of FastReseg workflow
+</figcaption>
+</figure>
+</div>
+<p>You can find the FastReseg package <a href="https://github.com/Nanostring-Biostats/FastReseg/" target="_blank">here</a>. See the corresponding <a href="https://github.com/Nanostring-Biostats/FastReseg/blob/master/vignettes/tutorial.html" target="_blank">tutorial</a> inside the package for more details.</p>
+<p>The required inputs for <a href="https://github.com/Nanostring-Biostats/FastReseg/" target="_blank">FastReseg</a> include:</p>
+<ul>
+<li><p><code>counts</code>: a cell-by-gene counts matrix for entire dataset.</p></li>
+<li><p><code>clust</code>: a vector of cluster assignments for each cell in <code>counts</code>; use <code>NULL</code> to automatically assign the cell cluster for each cell based on maximum transcript score of given the provided <code>refProfiles</code>.</p></li>
+<li><p><code>refProfiles</code>: a gene-by-cluster matrix of cluster-specific expression profiles; default = <code>NULL</code> to use external cluster assignments.</p></li>
+<li><p><code>transDF_fileInfo</code>: a data.frame with each row for each individual file of per-FOV transcript data.frame, columns include the file path of per FOV transcript data.frame file, annotation columns like <code>slide</code> and <code>fov</code> to be used as prefix when creating unique cell_ID across entire dataset.</p>
+<ul>
+<li>when <code>NULL</code>, use the transcript data.frame <code>transcript_df</code> directly.</li>
+</ul></li>
+</ul>
+<p>This post will show you how to prepare your inputs if you have data assembled in the structure used by the Technology Access Program (<a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/">TAP</a>); similar outputs are available from the AtoMx™ Spatial Informatics Portal (SIP). You can download an example public dataset from <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/" target="_blank">here</a>. The <a href="./assets/Pancreas-CosMx-ReadMe.html">ReadMe</a> associated with this example data set on pancreas shows the data structures of each file used in this post.</p>
+<ul>
+<li>Section&nbsp;2 Prepare inputs from basic data files</li>
+<li>Section&nbsp;3 Run segmentation evaluation</li>
+<li>Section&nbsp;4 Run full pipeline to correct putative segmentation error identified</li>
+</ul>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+</section>
+<section id="sec-loading-flatFiles" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Prepare inputs from basic data files</h1>
+<p>Here we start from the basic data files exported from AtoMx™ SIP.</p>
+<p>While one can use cluster-specific expression profiles from other studies as <code>refProfiles</code>, here we take advantages of the existing cell typing derived from current cell segmentation in this data set and use it as <code>clust</code>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># load existing cell typing results </span></span>
+<span id="cb1-2">cellTypeRes <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">readRDS</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CellType_Accessory_Data/Pancreas_celltype_InSituType.rds"</span>)</span>
+<span id="cb1-3"></span>
+<span id="cb1-4">validCells <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cellTypeRes[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cell_ID'</span>]]</span>
+<span id="cb1-5">clust <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">setNames</span>(cellTypeRes[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cell_types'</span>]], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">nm =</span> cellTypeRes[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cell_ID'</span>]])</span></code></pre></div>
+</div>
+<p>Inspecting the cell typing results and the <a href="./assets/Pancreas-CosMx-ReadMe.html">ReadMe</a> associated with this data set, we can know that this data set uses <code>c_[slide ID]_[fov ID]_[cell ID]</code> format to get cell ids unique across entire data set.</p>
+<p>We next to load raw expression matrix for all genes and cells with available cell typing results.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># load raw expression matrix and assign unique cell_ID to each one </span></span>
+<span id="cb2-2">counts <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> data.table<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">fread</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Pancreas_exprMat_file.csv"</span>)</span>
+<span id="cb2-3"></span>
+<span id="cb2-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># use same slide ID as the existing cell typing results</span></span>
+<span id="cb2-5">cell_ids <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">paste0</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'c_1_'</span>, counts[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'fov'</span>]], <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'_'</span>, counts[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cell_ID'</span>]])</span>
+<span id="cb2-6"></span>
+<span id="cb2-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># get valid gene names</span></span>
+<span id="cb2-8">all_rnas <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">grep</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"fov|cell_ID|Negative|SystemControl"</span>, </span>
+<span id="cb2-9">                 <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(counts), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">value =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">invert =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>)</span>
+<span id="cb2-10"></span>
+<span id="cb2-11">counts <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.matrix</span>(counts[, .SD, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">.SDcols =</span> all_rnas])</span>
+<span id="cb2-12"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(counts) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cell_ids</span>
+<span id="cb2-13"></span>
+<span id="cb2-14">counts <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as</span>(counts[validCells, , <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">drop =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">FALSE</span>], <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"sparseMatrix"</span>) </span></code></pre></div>
+</div>
+<p>We then load the transcript file which contains all molecules’ coordinates and cell segmentation information. For faster processing in downstream <code>FastReseg</code> pipeline that is paralleled by input transcript files for different spatial regions, we recommend to split the full transcript data into multiple files by FOV (Field of View) and export those per-FOV transcript information as individual csv files. We would pass their file paths to <code>FastReseg</code> functions through <code>transDF_fileInfo</code> data.frame.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1">fullTx <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> data.table<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">fread</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Pancreas_tx_file.csv"</span>)</span>
+<span id="cb3-2"></span>
+<span id="cb3-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># add unique id for each transcript</span></span>
+<span id="cb3-4">fullTx[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'transcript_id'</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">seq_len</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">nrow</span>(fullTx))</span>
+<span id="cb3-5"></span>
+<span id="cb3-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># remove extracellular transcripts which has cell_ID = 0 in tx file </span></span>
+<span id="cb3-7">fullTx <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> fullTx[cell_ID <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, ]</span>
+<span id="cb3-8"></span>
+<span id="cb3-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># keep only the necessary info</span></span>
+<span id="cb3-10">fullTx <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> fullTx[, .SD, .SDcols <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'transcript_id'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cell'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'x_global_px'</span>, </span>
+<span id="cb3-11">                                    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'y_global_px'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'z'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'target'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'fov'</span>)]</span>
+<span id="cb3-12"></span>
+<span id="cb3-13"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># split by FOV and export as per FOV csv file</span></span>
+<span id="cb3-14">txDir <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"perFOV_txFile"</span></span>
+<span id="cb3-15"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">if</span>(<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">dir.exists</span>(txDir)) <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">dir.create</span>(txDir)</span>
+<span id="cb3-16"></span>
+<span id="cb3-17">allFOVs <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">unique</span>(fullTx[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'fov'</span>]])</span>
+<span id="cb3-18"></span>
+<span id="cb3-19">transDF_fileInfo <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">lapply</span>(allFOVs, <span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">function</span>(fovId){</span>
+<span id="cb3-20">  perFOV_filePath <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> fs<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">path</span>(txDir, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">paste0</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'fov_'</span>, fovId, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'_tx_data.csv'</span>))</span>
+<span id="cb3-21">  data.table<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">fwrite</span>(fullTx[fov <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> fovId, ], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">file =</span> perFOV_filePath)</span>
+<span id="cb3-22">  </span>
+<span id="cb3-23">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># since global coordinates of each molecule are available</span></span>
+<span id="cb3-24">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># use 0 for stage coordinates to disable conversion of local to global coordinates</span></span>
+<span id="cb3-25">  df <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.frame</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">file_path =</span> perFOV_filePath, </span>
+<span id="cb3-26">                   <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">slide =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, </span>
+<span id="cb3-27">                   <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fov =</span> fovId, </span>
+<span id="cb3-28">                   <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">stage_X =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, </span>
+<span id="cb3-29">                   <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">stage_Y =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb3-30">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">return</span>(df)</span>
+<span id="cb3-31">})</span>
+<span id="cb3-32"></span>
+<span id="cb3-33">transDF_fileInfo <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">do.call</span>(rbind, transDF_fileInfo)</span></code></pre></div>
+</div>
+<p><code>FastReseg</code> evaluates segmentation in physical space and thus it’s preferred to convert all 3D coordinates into same unit. The relevant default parameters of <code>FastReseg</code> are set with respect to micrometer in coordinate unit. According to the <a href="./assets/Pancreas-CosMx-ReadMe.html">ReadMe</a>, the pixel size for this data set is 0.12028 µm per pixel and the z step size is 0.8 µm per z slice. We would pass this information to <code>FastReseg</code> functions to do the coordinate conversion. If your data is already in micrometer unit, you can use <code>1</code> for pixel size and z step to disable the conversion.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1">pixel_size <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.12028</span></span>
+<span id="cb4-2">zstep_size <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.8</span></span></code></pre></div>
+</div>
+<p>By default, <code>FastReseg</code> would use 75% of available cores on your PC to do parallel processing of per-FOV transcript files in batch. If you have big per-FOV transcript file size (200+ MB per file) or limited memory available, it’s recommended to reduce the amount of cores used. You can control the number of cores in use by passing <code>percentCores</code> argument to <code>FastReseg</code> wrapper functions or set the core number directly with <code>options(mc.cores = X)</code>, where X is the number of cores you would to use. The set option approach would overwrite the <code>percentCores</code> argument.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Too many large FOVs being processed in same batch could hit the memory limit and abort the current processing. Below is an example error message when memory limit was reached.</p>
+<p><span style="color: red;"> Error in FUN(X[[i]], …) : subscript out of bounds<br> In addition: Warning messages:<br> <strong>1: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE, :<br> scheduled cores 1, 3, 4, 7, 8, 10, 11 did not deliver results, all values of the jobs will be affected<br> 2: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE, :<br> scheduled core 12 encountered error in user code, all values of the job will be affected</strong> </span></p>
+</div>
+</div>
+<p>Since the example data set in use is a Whole-Transcription spatial data set with high number of unique genes and large per-FOV transcript file size, here we cautiously reduce the % of core number to 0.25.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1">percentCores <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.25</span></span></code></pre></div>
+</div>
+</section>
+<section id="sec-FastReseg-flagging" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Run segmentation evaluation</h1>
+<p>Now we have all the inputs needed to run <code>FastReseg</code> pipelines. For segmentation evaluation, one can use <code>FastReseg::fastReseg_flag_all_errors()</code> function to run through all the FOVs.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># path to output folder</span></span>
+<span id="cb6-2">outDir_flagErrors <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"res1f_flagErrors"</span></span>
+<span id="cb6-3"></span>
+<span id="cb6-4">flagAll_res <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> FastReseg<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">fastReseg_flag_all_errors</span>(</span>
+<span id="cb6-5">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">counts =</span> counts,</span>
+<span id="cb6-6">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">clust =</span> clust,</span>
+<span id="cb6-7">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">refProfiles =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,</span>
+<span id="cb6-8">  </span>
+<span id="cb6-9">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># one can use `clust = NULL` if providing `refProfiles`</span></span>
+<span id="cb6-10">  </span>
+<span id="cb6-11">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transcript_df =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,</span>
+<span id="cb6-12">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transDF_fileInfo =</span> transDF_fileInfo,</span>
+<span id="cb6-13">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">filepath_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'file_path'</span>,</span>
+<span id="cb6-14">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">prefix_colns =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># to use existing cell IDs that are unique across entire data set </span></span>
+<span id="cb6-15">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fovOffset_colns =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'stage_Y'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'stage_X'</span>), <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># match XY axes between stage and each FOV</span></span>
+<span id="cb6-16">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">pixel_size =</span> pixel_size, </span>
+<span id="cb6-17">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">zstep_size =</span> zstep_size,</span>
+<span id="cb6-18">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transID_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'transcript_id'</span>, </span>
+<span id="cb6-19">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transGene_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"target"</span>,</span>
+<span id="cb6-20">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cellID_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cell"</span>, </span>
+<span id="cb6-21">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">spatLocs_colns =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'x_global_px'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'y_global_px'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'z'</span>),</span>
+<span id="cb6-22">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">extracellular_cellID =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>, </span>
+<span id="cb6-23">  </span>
+<span id="cb6-24">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># control core number used for parallel processing</span></span>
+<span id="cb6-25">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">percentCores =</span> percentCores, </span>
+<span id="cb6-26">  </span>
+<span id="cb6-27">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># cutoff of transcript number to do spatial modeling</span></span>
+<span id="cb6-28">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">flagModel_TransNum_cutoff =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>, </span>
+<span id="cb6-29">  </span>
+<span id="cb6-30">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">flagCell_lrtest_cutoff =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># cutoff for flagging wrongly segmented cells</span></span>
+<span id="cb6-31">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">svmClass_score_cutoff =</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># cutoff for low vs. high transcript score</span></span>
+<span id="cb6-32">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">path_to_output =</span> outDir_flagErrors, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># path to output folder</span></span>
+<span id="cb6-33">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">return_trimmed_perCell =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># flag to return per cell expression matrix after trimming all flagged transcripts </span></span>
+<span id="cb6-34">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">ctrl_genes =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span> <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># optional to include name for control probes in transcript data.frame, e.g. negative control probes</span></span>
+<span id="cb6-35">  )</span>
+<span id="cb6-36"></span>
+<span id="cb6-37"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># extract spatial evaluation outcomes of valid cells</span></span>
+<span id="cb6-38">modStats_ToFlagCells <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> flagAll_res[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'combined_modStats_ToFlagCells'</span>]]</span></code></pre></div>
+</div>
+<p>The function above returns the statistics for evaluating each cell for spatial dependent model against null model. Based on the P value, <code>lrtest_Pr</code> or the negative log10 value <code>lrtest_nlog10P</code>, one can select for cells with strong spatial dependency in transcript score profile. Those cells are likely to contain contaminating transcripts for neighbor cells.</p>
+<table class="table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 10%">
+<col style="width: 11%">
+<col style="width: 9%">
+<col style="width: 10%">
+<col style="width: 13%">
+<col style="width: 15%">
+<col style="width: 7%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">transcript_num</th>
+<th style="text-align: right;">modAlt_rsq</th>
+<th style="text-align: right;">lrtest_ChiSq</th>
+<th style="text-align: right;">lrtest_Pr</th>
+<th style="text-align: left;">UMI_cellID</th>
+<th style="text-align: right;">lrtest_nlog10P</th>
+<th style="text-align: left;">tLLR_maxCellType</th>
+<th style="text-align: left;">flagged</th>
+<th style="text-align: right;">file_idx</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">315</td>
+<td style="text-align: right;">0.1076159</td>
+<td style="text-align: right;">35.86547</td>
+<td style="text-align: right;">0.0000419</td>
+<td style="text-align: left;">c_1_51_1</td>
+<td style="text-align: right;">4.377932</td>
+<td style="text-align: left;">Macrophage</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">309</td>
+<td style="text-align: right;">0.0744980</td>
+<td style="text-align: right;">23.92246</td>
+<td style="text-align: right;">0.0044256</td>
+<td style="text-align: left;">c_1_51_10</td>
+<td style="text-align: right;">2.354028</td>
+<td style="text-align: left;">Ductal</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1676</td>
+<td style="text-align: right;">0.0976644</td>
+<td style="text-align: right;">172.24037</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: left;">c_1_51_100</td>
+<td style="text-align: right;">31.676496</td>
+<td style="text-align: left;">Ductal</td>
+<td style="text-align: left;">TRUE</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">753</td>
+<td style="text-align: right;">0.0928050</td>
+<td style="text-align: right;">73.34062</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: left;">c_1_51_1000</td>
+<td style="text-align: right;">11.974934</td>
+<td style="text-align: left;">Ductal</td>
+<td style="text-align: left;">TRUE</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">892</td>
+<td style="text-align: right;">0.1512712</td>
+<td style="text-align: right;">146.30190</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: left;">c_1_51_1001</td>
+<td style="text-align: right;">26.936616</td>
+<td style="text-align: left;">Ductal</td>
+<td style="text-align: left;">TRUE</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1220</td>
+<td style="text-align: right;">0.0802211</td>
+<td style="text-align: right;">102.01879</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: left;">c_1_51_1002</td>
+<td style="text-align: right;">17.211741</td>
+<td style="text-align: left;">Acinar.2</td>
+<td style="text-align: left;">TRUE</td>
+<td style="text-align: right;">1</td>
+</tr>
+</tbody>
+</table>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># histogram for spatial dependency in all cells</span></span>
+<span id="cb7-2">tmp_flag <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">which</span>(<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">is.na</span>(modStats_ToFlagCells<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>lrtest_nlog10P)) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># exclude cells with too few transcript number</span></span>
+<span id="cb7-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">hist</span>(modStats_ToFlagCells<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>lrtest_nlog10P[tmp_flag], </span>
+<span id="cb7-4">     <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">breaks =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"FD"</span>, </span>
+<span id="cb7-5">     <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">xlab =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"-log10(lrtest p.value)"</span>,</span>
+<span id="cb7-6">     <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">main =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">paste0</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Histogram of spatial dependency, mean = "</span>, </span>
+<span id="cb7-7">                   <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">round</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(modStats_ToFlagCells<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>lrtest_nlog10P[tmp_flag]), <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)))</span>
+<span id="cb7-8"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">abline</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">v =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(modStats_ToFlagCells<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>lrtest_nlog10P[tmp_flag]), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">col=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"red"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">lwd=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">lty=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span></code></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/index_files/figure-html/plotModStats-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># cutoff to flag for cells with strong spatial dependency in transcript score profiles</span></span>
+<span id="cb8-2">flagCell_lrtest_cutoff  <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span></span>
+<span id="cb8-3"></span>
+<span id="cb8-4">modStats_ToFlagCells[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'flagged'</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> (modStats_ToFlagCells[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'lrtest_nlog10P'</span>]] <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> flagCell_lrtest_cutoff )</span>
+<span id="cb8-5">flagged_cells <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> modStats_ToFlagCells[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'UMI_cellID'</span>]][modStats_ToFlagCells[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'flagged'</span>]]]</span>
+<span id="cb8-6"></span>
+<span id="cb8-7"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">message</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sprintf</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"%d cells, %.4f of all evaluated cells, </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">are flagged for resegmentation with lrtest_nlog10P &gt; %.1f."</span>, </span>
+<span id="cb8-8">                 <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">length</span>(flagged_cells), <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">length</span>(flagged_cells)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">nrow</span>(modStats_ToFlagCells), flagCell_lrtest_cutoff))</span></code></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>33210 cells, 0.6791 of all evaluated cells, 
+are flagged for resegmentation with lrtest_nlog10P &gt; 5.0.</code></pre>
+</div>
+</div>
+<p>Let’s visualize some flagged cells with various degrees of spatial dependency in transcript profiles</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># focus on 1st per-FOV file</span></span>
+<span id="cb10-2">transcript_df <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">read.csv</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">paste0</span>(outDir_flagErrors, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/1_flagged_transDF.csv"</span>))</span>
+<span id="cb10-3"></span>
+<span id="cb10-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(modStats_ToFlagCells) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> modStats_ToFlagCells<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>UMI_cellID</span>
+<span id="cb10-5">cells_to_plot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> modStats_ToFlagCells[flagged_cells, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'lrtest_nlog10P'</span>]</span>
+<span id="cb10-6"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">names</span>(cells_to_plot) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> flagged_cells</span>
+<span id="cb10-7"></span>
+<span id="cb10-8">cells_to_plot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cells_to_plot[flagged_cells <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%in%</span> transcript_df[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"UMI_cellID"</span>]]]</span>
+<span id="cb10-9"></span>
+<span id="cb10-10">cells_to_plot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cells_to_plot[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">order</span>(cells_to_plot, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">decreasing =</span> T)]</span>
+<span id="cb10-11">cells_to_plot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cells_to_plot[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">seq</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">length</span>(cells_to_plot), </span>
+<span id="cb10-12">                                   <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">by =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ceiling</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">length</span>(cells_to_plot)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">25</span>))]</span>
+<span id="cb10-13"></span>
+<span id="cb10-14">FastReseg<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">plotSpatialScoreMultiCells</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">chosen_cells =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">names</span>(cells_to_plot), </span>
+<span id="cb10-15">                                      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cell_labels =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">round</span>(cells_to_plot, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>), </span>
+<span id="cb10-16">                                      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transcript_df =</span> transcript_df, </span>
+<span id="cb10-17">                                      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cellID_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"UMI_cellID"</span>, </span>
+<span id="cb10-18">                                      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transID_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"UMI_transID"</span>,</span>
+<span id="cb10-19">                                      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">score_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"score_tLLR_maxCellType"</span>, </span>
+<span id="cb10-20">                                      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">spatLocs_colns =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"x"</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"y"</span>),</span>
+<span id="cb10-21">                                      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">point_size =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>)</span></code></pre></div>
+</div>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/figures/fig_plotFlagCells-1.png" class="img-fluid"></p>
+<p>You can see that cells with large <code>lrtest_nlog10P</code> value exhibited strong spatial dependency in their transcript score profiles under their best fitted cell type (i.e.&nbsp;<code>score_tLLR_maxCellType</code>). Below we would zoom in to one of the flagged cells (<code>c_1_51_1211</code> with <code>lrtest_nlog10P = 49.82</code>) and visualize its transcript score profiles in 3D.</p>
+<div class="cell">
+<div class="sourceCode cell-code hidden" id="cb11" data-startfrom="269" data-source-offset="0" style="background: #f1f3f5;"><pre class="sourceCode js code-with-copy"><code class="sourceCode javascript" style="counter-reset: source-line 268;"><span id="cb11-269">data <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">FileAttachment</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"assets/chosenCell_flagged_transDF.csv"</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">csv</span>({ <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">typed</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">true</span> })</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div id="ojs-cell-1" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell panel-input card bg-light p-2">
+<div class="sourceCode cell-code hidden" id="cb12" data-startfrom="275" data-source-offset="-0" style="background: #f1f3f5;"><pre class="sourceCode js code-with-copy"><code class="sourceCode javascript" style="counter-reset: source-line 274;"><span id="cb12-275">viewof colorColumn <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Inputs<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">select</span>(</span>
+<span id="cb12-276">  [<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'score_tLLR_maxCellType'</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb12-277">  { <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">label</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Colored by'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb12-278">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">value</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'score_tLLR_maxCellType'</span></span>
+<span id="cb12-279">  }</span>
+<span id="cb12-280">)</span>
+<span id="cb12-281"></span>
+<span id="cb12-282">viewof lowerLimit <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Inputs<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">range</span>(</span>
+<span id="cb12-283">  [<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb12-284">  { <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">label</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Lower Limit'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb12-285">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">value</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb12-286">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">step</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span></span>
+<span id="cb12-287">  }</span>
+<span id="cb12-288">)</span>
+<span id="cb12-289"></span>
+<span id="cb12-290">viewof upperLimit <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Inputs<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">range</span>(</span>
+<span id="cb12-291">  [<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb12-292">  { <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">label</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Upper Limit'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb12-293">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">value</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb12-294">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">step</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span></span>
+<span id="cb12-295">  }</span>
+<span id="cb12-296">)</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-2-1" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-2-2" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-2-3" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code hidden" id="cb13" data-startfrom="300" data-source-offset="-0" style="background: #f1f3f5;"><pre class="sourceCode js code-with-copy"><code class="sourceCode javascript" style="counter-reset: source-line 299;"><span id="cb13-300">Plotly <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">await</span> <span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">require</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://cdn.plot.ly/plotly-2.32.0.min.js"</span>)</span>
+<span id="cb13-301"></span>
+<span id="cb13-302"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// document element for plot</span></span>
+<span id="cb13-303">plotDiv <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {</span>
+<span id="cb13-304">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">const</span> div <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">html</span><span class="vs" style="color: #20794D;
+background-color: null;
+font-style: inherit;">`&lt;div id="plotlyDiv" style="width:100%;height:600px;"&gt;&lt;/div&gt;`</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb13-305">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">return</span> div<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb13-306">}</span>
+<span id="cb13-307"></span>
+<span id="cb13-308"></span>
+<span id="cb13-309"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// Function to create the 3D scatter plot</span></span>
+<span id="cb13-310"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">function</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">createPlot</span>(data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> colorColumn<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> lowerLimit<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> upperLimit<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> div) {</span>
+<span id="cb13-311">  div<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>div<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">||</span>DOM<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'div'</span>)</span>
+<span id="cb13-312">  div<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">id</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"plotlyDiv"</span></span>
+<span id="cb13-313">  </span>
+<span id="cb13-314">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">var</span> trace <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {</span>
+<span id="cb13-315">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">x</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span>data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">map</span>(d <span class="kw" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=&gt;</span> d<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-316">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">y</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span>data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">map</span>(d <span class="kw" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=&gt;</span> d<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-317">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">z</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span>data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">map</span>(d <span class="kw" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=&gt;</span> d<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">z</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-318">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">mode</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'markers'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-319">     <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">marker</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> {</span>
+<span id="cb13-320">        <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">size</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-321">        <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">color</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">map</span>(d <span class="kw" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=&gt;</span> d[colorColumn])<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-322">        <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">colorscale</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> [</span>
+<span id="cb13-323">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.000</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(252, 253, 191)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb13-324">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.056</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(252, 236, 173)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-325">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.111</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(253, 218, 156)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-326">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.167</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(254, 201, 141)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-327">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.222</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(254, 183, 126)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-328">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.278</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(254, 167, 114)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-329">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.333</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(253, 149, 103)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-330">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.389</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(251, 131, 95)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-331">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.444</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(247, 113, 92)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-332">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.500</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(241, 96, 93)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-333">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.556</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(232, 83, 98)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-334">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.611</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(219, 71, 106)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-335">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.667</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(205, 64, 113)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-336">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.722</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(189, 57, 119)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-337">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.778</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(174, 52, 123)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-338">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.833</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(159, 47, 127)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-339">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.889</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(0, 149, 175)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-340">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.944</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(0, 93, 158)"</span>]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb13-341">          [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.000</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rgb(38, 24, 95)"</span>]</span>
+<span id="cb13-342">        ]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-343">        <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">showscale</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">true</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-344">        <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">cmin</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">Math</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">min</span>(lowerLimit<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> upperLimit)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb13-345">        <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">cmax</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">Math</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">max</span>(lowerLimit<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> upperLimit)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> </span>
+<span id="cb13-346">        <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">colorbar</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> { <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">title</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> colorColumn }</span>
+<span id="cb13-347">      }<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-348">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">type</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'scatter3d'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-349">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">text</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">map</span>(d <span class="kw" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=&gt;</span> <span class="vs" style="color: #20794D;
+background-color: null;
+font-style: inherit;">`target: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">${</span>d<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">target</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="vs" style="color: #20794D;
+background-color: null;
+font-style: inherit;">&lt;br&gt;score_tLLR_maxCellType:&lt;br&gt;</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">${</span>d<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">score_tLLR_maxCellType</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="vs" style="color: #20794D;
+background-color: null;
+font-style: inherit;">`</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb13-350">    <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">hoverinfo</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'text'</span></span>
+<span id="cb13-351">  }</span>
+<span id="cb13-352">  </span>
+<span id="cb13-353">  Plotly<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">newPlot</span>(div<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span>[trace]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span>{})</span>
+<span id="cb13-354">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">return</span> div</span>
+<span id="cb13-355">  </span>
+<span id="cb13-356"> </span>
+<span id="cb13-357">}</span>
+<span id="cb13-358"></span>
+<span id="cb13-359"></span>
+<span id="cb13-360">figDiv <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">createPlot</span>(data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> colorColumn<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> lowerLimit<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> upperLimit<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> plotDiv)</span></code></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-3-1" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-3-2" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-3-3" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-3-4" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-FastReseg-full" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Run full pipeline to correct putative segmentation error identified</h1>
+<p>If cell segmentation correction is desired, one can use <code>FastReseg::fastReseg_full_pipeline()</code> function to not only flag but also correct the identified putative cell segmentation errors.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># path to output folder</span></span>
+<span id="cb14-2">outDir_full <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"res2_fullPipeline"</span></span>
+<span id="cb14-3"></span>
+<span id="cb14-4">refineAll_res <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> FastReseg<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">fastReseg_full_pipeline</span>(</span>
+<span id="cb14-5">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">counts =</span> counts,</span>
+<span id="cb14-6">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">clust =</span> clust,</span>
+<span id="cb14-7">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">refProfiles =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,</span>
+<span id="cb14-8">  </span>
+<span id="cb14-9">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># one can use `clust = NULL` if providing `refProfiles`</span></span>
+<span id="cb14-10">  </span>
+<span id="cb14-11">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transcript_df =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,</span>
+<span id="cb14-12">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transDF_fileInfo =</span> transDF_fileInfo,</span>
+<span id="cb14-13">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">filepath_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'file_path'</span>,</span>
+<span id="cb14-14">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">prefix_colns =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># to use existing cell IDs that are unique across entire data set </span></span>
+<span id="cb14-15">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fovOffset_colns =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'stage_Y'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'stage_X'</span>),</span>
+<span id="cb14-16">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">pixel_size =</span> pixel_size,</span>
+<span id="cb14-17">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">zstep_size =</span> zstep_size,</span>
+<span id="cb14-18">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transID_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'transcript_id'</span>,</span>
+<span id="cb14-19">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transGene_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"target"</span>,</span>
+<span id="cb14-20">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cellID_coln =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cell"</span>,</span>
+<span id="cb14-21">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">spatLocs_colns =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'x_global_px'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'y_global_px'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'z'</span>),</span>
+<span id="cb14-22">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">extracellular_cellID =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,</span>
+<span id="cb14-23">  </span>
+<span id="cb14-24">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># control core number used for parallel processing</span></span>
+<span id="cb14-25">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">percentCores =</span> percentCores, </span>
+<span id="cb14-26">  </span>
+<span id="cb14-27">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># cutoff of transcript number to do spatial modeling</span></span>
+<span id="cb14-28">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">flagModel_TransNum_cutoff =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>, </span>
+<span id="cb14-29">  </span>
+<span id="cb14-30">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Optionally, one can set various cutoffs to NULL for automatic calculation from input data</span></span>
+<span id="cb14-31">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Refer to `FastReseg::runPreprocess()` for more details</span></span>
+<span id="cb14-32">  </span>
+<span id="cb14-33">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># distance cutoff for neighborhood searching at molecular and cellular levels, respectively</span></span>
+<span id="cb14-34">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">molecular_distance_cutoff =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2.7</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 2.7um is recommended for CosMx RNA dataset</span></span>
+<span id="cb14-35">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cellular_distance_cutoff =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>, </span>
+<span id="cb14-36">  </span>
+<span id="cb14-37">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># cutoffs for transcript scores and number for cells under each cell type</span></span>
+<span id="cb14-38">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">score_baseline =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,</span>
+<span id="cb14-39">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">lowerCutoff_transNum =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,</span>
+<span id="cb14-40">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">higherCutoff_transNum=</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,</span>
+<span id="cb14-41">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">imputeFlag_missingCTs =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>,</span>
+<span id="cb14-42">  </span>
+<span id="cb14-43">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Settings for error detection and correction, refer to `FastReseg::runSegRefinement()` for more details</span></span>
+<span id="cb14-44">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">flagCell_lrtest_cutoff =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># cutoff to flag for cells with strong spatial dependency in transcript score profiles</span></span>
+<span id="cb14-45">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">svmClass_score_cutoff =</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,   <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># cutoff of transcript score to separate between high and low score classes</span></span>
+<span id="cb14-46">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">groupTranscripts_method =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"dbscan"</span>,</span>
+<span id="cb14-47">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">spatialMergeCheck_method =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"leidenCut"</span>, </span>
+<span id="cb14-48">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cutoff_spatialMerge =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># spatial constraint cutoff for a valid merge event</span></span>
+<span id="cb14-49">  </span>
+<span id="cb14-50">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">path_to_output =</span> outDir_full,</span>
+<span id="cb14-51">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">save_intermediates =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># flag to return and write intermediate results to disk</span></span>
+<span id="cb14-52">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">return_perCellData =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># flag to return per cell level outputs from updated segmentation </span></span>
+<span id="cb14-53">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">combine_extra =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">FALSE</span> <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># flag to include trimmed and extracellular transcripts in the exported `updated_transDF.csv` files </span></span>
+<span id="cb14-54">)</span></code></pre></div>
+</div>
+</section>
+<section id="sec-conclusions" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Conclusions</h1>
+<p>This post serves as a quick-start guide to use <a href="https://github.com/Nanostring-Biostats/FastReseg/" target="_blank">FastReseg</a> package on spatial transcriptomic data set. The package has several parameters one can adjust to tune the identification of wrongly segmented transcript groups and the rules used for cell segmentation correction. These include</p>
+<ul>
+<li>cutoffs for spatial model evaluation and flagging for poor-fit cells &amp; transcripts: <code>flagModel_TransNum_cutoff</code>, <code>flagCell_lrtest_cutoff</code>, <code>svmClass_score_cutoff</code>;</li>
+<li>distance cutoffs used to define neighborhood: <code>molecular_distance_cutoff</code>,<code>cellular_distance_cutoff</code>;</li>
+<li>method and rules used for grouping and separating poor-fit transcripts in space:<code>svm_args</code>, <code>groupTranscripts_method</code>, <code>config_spatNW_transcript</code>;</li>
+<li>cutoffs and rules used for segmentation correction: <code>score_baseline</code>, <code>lowerCutoff_transNum</code>, <code>higherCutoff_transNum</code></li>
+<li>additional spatial constraint on merging event during error correction: <code>spatialMergeCheck_method</code>, <code>cutoff_spatialMerge</code></li>
+</ul>
+<p>Many of those parameters have reasonable defaults for most spatial data sets and could be derived from your data using <code>FastReseg::runPreprocess()</code> function. For new user or new sample type, it’s recommended to process one per-FOV transcript using <code>FastReseg::fastReseg_perFOV_full_process()</code> functions first and check out the impact of the parameters chosen. Please refer to <a href="https://github.com/Nanostring-Biostats/FastReseg/blob/master/vignettes/tutorial.html" target="_blank">FastReseg tutorial</a>, <code>Modular functions for individual tasks</code> section, for more details.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>segmentation</category>
+  <category>algorithms</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/</guid>
+  <pubDate>Wed, 15 May 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/figures/Fig1-FastReseg-workflow.png" medium="image" type="image/png" height="72" width="144"/>
+</item>
 <item>
   <title>Introduction to visualizing CosMx data in Seurat</title>
   <dc:creator>Claire Williams</dc:creator>
@@ -24,7 +1824,7 @@
 <section id="introduction" class="level1" data-number="1">
 <h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
 <p>One of the most exciting aspects of CosMx™ Spatial Molecular Imager (SMI) data is the ability to directly observe gene expression in its spatial context at the single cell level. This is a great technological leap from previous single cell transcriptomics methods that lost spatial context while retrieving cells. For analysts looking to perform spatial data analysis, the <a href="https://satijalab.org/seurat/" target="_blank">Seurat R package</a> has continually added features to support CosMx data. Readers are encouraged to take a look at previous vignettes by the Seurat group (<a href="https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2.html#human-lung-nanostring-cosmx-spatial-molecular-imager" target="_blank">Spatial Vignette</a> and <a href="https://satijalab.org/seurat/articles/pbmc3k_tutorial" target="_blank">Clustering Tutorial</a>) as well as blog posts we’ve provided previously (<a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">scratch space</a>). The blog post herein supplements these and provides you with some of the plotting configurations we find most helpful as you explore your CosMx data. This vignette does not cover analysis of data in Seurat but rather tries to address frequently asked questions we’ve received from customers on getting started with their data in Seurat.</p>
-<p>For this vignette, we use a Seurat object made from the mouse brain public data set and assembled in the structure used by the Technology Access Program <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/">TAP</a>; similar outputs are available from the AtoMx™ Spatial Informatics Portal (SIP). To download raw data for this dataset, go <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="_blank">here</a>.</p>
+<p>For this vignette, we use a Seurat object made from the mouse brain public data set and assembled in the structure used by the Technology Access Program (<a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/">TAP</a>); similar outputs are available from the AtoMx™ Spatial Informatics Portal (SIP). To download raw data for this dataset, go <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="_blank">here</a>.</p>
 <p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies. This post will show you how to:</p>
 <ul>
 <li>Section&nbsp;2 Load needed libraries and example dataset</li>

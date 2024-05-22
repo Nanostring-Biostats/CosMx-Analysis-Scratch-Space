@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.4.554">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Lidan Wu">
+<meta name="dcterms.date" content="2024-05-15">
+<meta name="description" content="FastReseg algorithm scores individual transcripts for the goodness-of-fit within their respective cells based on the probability of each gene belonging to each cell type and the spatial dependency of transcript score. FastReseg can flag cells with putative cell segmentation errors and perform corrections rapidly.">
+
+<title>Blog - Evaluating Cell Segmentation Error based on Transcripional Spatial Profiles using FastReseg</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../assets/cropped-NS_Favicon_512x512-32x32.png" rel="icon" type="image/png">
+<script src="../../site_libs/cookie-consent/cookie-consent.js"></script>
+<link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-29W4MW0Y2W"></script>
+
+<script type="text/plain" cookie-consent="tracking">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-29W4MW0Y2W', { 'anonymize_ip': true});
+</script>
+
+<script type="text/javascript" charset="UTF-8">
+document.addEventListener('DOMContentLoaded', function () {
+cookieconsent.run({
+  "notice_banner_type":"simple",
+  "consent_type":"implied",
+  "palette":"light",
+  "language":"en",
+  "page_load_consent_levels":["strictly-necessary","functionality","tracking","targeting"],
+  "notice_banner_reject_button_hide":false,
+  "preferences_center_close_button_hide":false,
+  "website_name":""
+  ,
+"language":"en"
+  });
+});
+</script> 
+  
+<script type="module" src="../../site_libs/quarto-ojs/quarto-ojs-runtime.js"></script>
+<link href="../../site_libs/quarto-ojs/quarto-ojs.css" rel="stylesheet">
+
+
+</head>
+
+<body class="floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../license.html"> 
+<span class="menu-text">License</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../link-to-code.html"> 
+<span class="menu-text">Code</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">Browse Posts by Topic</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/nanostringtech"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/company/nanostring-technologies"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+          <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Evaluating Cell Segmentation Error based on Transcripional Spatial Profiles using FastReseg</h1>
+                  <div>
+        <div class="description">
+          FastReseg algorithm scores individual transcripts for the goodness-of-fit within their respective cells based on the probability of each gene belonging to each cell type and the spatial dependency of transcript score. FastReseg can flag cells with putative cell segmentation errors and perform corrections rapidly.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">segmentation</div>
+                <div class="quarto-category">algorithms</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliations</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author">Lidan Wu </p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              NanoString, a Bruker Company
+            </p>
+          <p class="affiliation">
+              Github: <a href="https://github.com/lidanwu" target="_blank"><span class="citation" data-cites="lidanwu">@lidanwu</span></a>
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">May 15, 2024</p>
+      </div>
+    </div>
+    
+      <div>
+      <div class="quarto-title-meta-heading">Modified</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date-modified">May 22, 2024</p>
+      </div>
+    </div>
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="2">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
+  <li><a href="#sec-loading-flatFiles" id="toc-sec-loading-flatFiles" class="nav-link" data-scroll-target="#sec-loading-flatFiles"><span class="header-section-number">2</span> Prepare inputs from basic data files</a></li>
+  <li><a href="#sec-FastReseg-flagging" id="toc-sec-FastReseg-flagging" class="nav-link" data-scroll-target="#sec-FastReseg-flagging"><span class="header-section-number">3</span> Run segmentation evaluation</a></li>
+  <li><a href="#sec-FastReseg-full" id="toc-sec-FastReseg-full" class="nav-link" data-scroll-target="#sec-FastReseg-full"><span class="header-section-number">4</span> Run full pipeline to correct putative segmentation error identified</a></li>
+  <li><a href="#sec-conclusions" id="toc-sec-conclusions" class="nav-link" data-scroll-target="#sec-conclusions"><span class="header-section-number">5</span> Conclusions</a></li>
+  </ul>
+</nav>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Accurate cell segmentation that assigns transcripts to cell locations is critical to data quality of spatial transcriptomics assays and the proper interpretation of downstream <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/index.html" target="_blank">differential expression</a> analysis results. But it’s very challenging for tissue sections where cells are tightly packaged with shared, 3D boundaries and uneven morphology staining.</p>
+<p>The <a href="https://github.com/Nanostring-Biostats/FastReseg/">FastReseg R package</a> offers a rapid way to evaluate the performance of existing cell segmentation and to perform refinement given the spatial transcriptional profiles.</p>
+<ol type="1">
+<li>The evaluation process starts with a cluster-specific reference expression profiles that are either derived from cell typing of query spatial data set given its current image-based cell segmentation or from external non-spatial data sets, like scRNA-seq.</li>
+<li>Given the provided reference profiles, FastReseg algorithm scores individual transcripts for the goodness-of-fit within their respective cells based on the probability of each gene belonging to each cell type.</li>
+<li>FastReseg then scores each cell for its spatial dependency of transcript score profiles under its most likely cell type given the overall transcriptional profiles. As confirmed by the membrane-stained images, cells with boundary errors at the junction of different cell types, exhibit strong spatial dependency in their transcript score profile and thus can be easily identified.</li>
+<li>FastReseg further identifies the spatially connected groups of transcripts with low goodness-of-fit within incorrectly segmented cells.</li>
+<li>A set of heuristic rules on neighborhood cell typing and transcript number are then applied to the identified transcript groups to decide on the re-segmentation actions, like merging, splitting and trimming. The re-segmented results show no significant spatial dependency on transcript score of individual cells, suggesting the successful correction of poorly segmented cells.</li>
+</ol>
+<div id="fig-FastReseg-workflow" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-FastReseg-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="figures/Fig1-FastReseg-workflow.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-FastReseg-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Schematic of FastReseg workflow
+</figcaption>
+</figure>
+</div>
+<p>You can find the FastReseg package <a href="https://github.com/Nanostring-Biostats/FastReseg/" target="_blank">here</a>. See the corresponding <a href="https://github.com/Nanostring-Biostats/FastReseg/blob/master/vignettes/tutorial.html" target="_blank">tutorial</a> inside the package for more details.</p>
+<p>The required inputs for <a href="https://github.com/Nanostring-Biostats/FastReseg/" target="_blank">FastReseg</a> include:</p>
+<ul>
+<li><p><code>counts</code>: a cell-by-gene counts matrix for entire dataset.</p></li>
+<li><p><code>clust</code>: a vector of cluster assignments for each cell in <code>counts</code>; use <code>NULL</code> to automatically assign the cell cluster for each cell based on maximum transcript score of given the provided <code>refProfiles</code>.</p></li>
+<li><p><code>refProfiles</code>: a gene-by-cluster matrix of cluster-specific expression profiles; default = <code>NULL</code> to use external cluster assignments.</p></li>
+<li><p><code>transDF_fileInfo</code>: a data.frame with each row for each individual file of per-FOV transcript data.frame, columns include the file path of per FOV transcript data.frame file, annotation columns like <code>slide</code> and <code>fov</code> to be used as prefix when creating unique cell_ID across entire dataset.</p>
+<ul>
+<li>when <code>NULL</code>, use the transcript data.frame <code>transcript_df</code> directly.</li>
+</ul></li>
+</ul>
+<p>This post will show you how to prepare your inputs if you have data assembled in the structure used by the Technology Access Program (<a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/">TAP</a>); similar outputs are available from the AtoMx™ Spatial Informatics Portal (SIP). You can download an example public dataset from <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/" target="_blank">here</a>. The <a href="./assets/Pancreas-CosMx-ReadMe.html">ReadMe</a> associated with this example data set on pancreas shows the data structures of each file used in this post.</p>
+<ul>
+<li><a href="#sec-loading-flatFiles" class="quarto-xref">Section&nbsp;2</a> Prepare inputs from basic data files</li>
+<li><a href="#sec-FastReseg-flagging" class="quarto-xref">Section&nbsp;3</a> Run segmentation evaluation</li>
+<li><a href="#sec-FastReseg-full" class="quarto-xref">Section&nbsp;4</a> Run full pipeline to correct putative segmentation error identified</li>
+</ul>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+</section>
+<section id="sec-loading-flatFiles" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Prepare inputs from basic data files</h1>
+<p>Here we start from the basic data files exported from AtoMx™ SIP.</p>
+<p>While one can use cluster-specific expression profiles from other studies as <code>refProfiles</code>, here we take advantages of the existing cell typing derived from current cell segmentation in this data set and use it as <code>clust</code>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># load existing cell typing results </span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>cellTypeRes <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">"CellType_Accessory_Data/Pancreas_celltype_InSituType.rds"</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>validCells <span class="ot">&lt;-</span> cellTypeRes[[<span class="st">'cell_ID'</span>]]</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>clust <span class="ot">&lt;-</span> <span class="fu">setNames</span>(cellTypeRes[[<span class="st">'cell_types'</span>]], <span class="at">nm =</span> cellTypeRes[[<span class="st">'cell_ID'</span>]])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Inspecting the cell typing results and the <a href="./assets/Pancreas-CosMx-ReadMe.html">ReadMe</a> associated with this data set, we can know that this data set uses <code>c_[slide ID]_[fov ID]_[cell ID]</code> format to get cell ids unique across entire data set.</p>
+<p>We next to load raw expression matrix for all genes and cells with available cell typing results.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># load raw expression matrix and assign unique cell_ID to each one </span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> data.table<span class="sc">::</span><span class="fu">fread</span>(<span class="st">"Pancreas_exprMat_file.csv"</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># use same slide ID as the existing cell typing results</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>cell_ids <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">'c_1_'</span>, counts[[<span class="st">'fov'</span>]], <span class="st">'_'</span>, counts[[<span class="st">'cell_ID'</span>]])</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># get valid gene names</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>all_rnas <span class="ot">&lt;-</span> <span class="fu">grep</span>(<span class="st">"fov|cell_ID|Negative|SystemControl"</span>, </span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">colnames</span>(counts), <span class="at">value =</span> <span class="cn">TRUE</span>, <span class="at">invert =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(counts[, .SD, <span class="at">.SDcols =</span> all_rnas])</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(counts) <span class="ot">&lt;-</span> cell_ids</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> <span class="fu">as</span>(counts[validCells, , <span class="at">drop =</span> <span class="cn">FALSE</span>], <span class="st">"sparseMatrix"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>We then load the transcript file which contains all molecules’ coordinates and cell segmentation information. For faster processing in downstream <code>FastReseg</code> pipeline that is paralleled by input transcript files for different spatial regions, we recommend to split the full transcript data into multiple files by FOV (Field of View) and export those per-FOV transcript information as individual csv files. We would pass their file paths to <code>FastReseg</code> functions through <code>transDF_fileInfo</code> data.frame.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>fullTx <span class="ot">&lt;-</span> data.table<span class="sc">::</span><span class="fu">fread</span>(<span class="st">"Pancreas_tx_file.csv"</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># add unique id for each transcript</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>fullTx[[<span class="st">'transcript_id'</span>]] <span class="ot">&lt;-</span> <span class="fu">seq_len</span>(<span class="fu">nrow</span>(fullTx))</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># remove extracellular transcripts which has cell_ID = 0 in tx file </span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>fullTx <span class="ot">&lt;-</span> fullTx[cell_ID <span class="sc">!=</span><span class="dv">0</span>, ]</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co"># keep only the necessary info</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>fullTx <span class="ot">&lt;-</span> fullTx[, .SD, .SDcols <span class="ot">=</span> <span class="fu">c</span>(<span class="st">'transcript_id'</span>, <span class="st">'cell'</span>, <span class="st">'x_global_px'</span>, </span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">'y_global_px'</span>, <span class="st">'z'</span>, <span class="st">'target'</span>, <span class="st">'fov'</span>)]</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="co"># split by FOV and export as per FOV csv file</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>txDir <span class="ot">&lt;-</span> <span class="st">"perFOV_txFile"</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span>(<span class="sc">!</span><span class="fu">dir.exists</span>(txDir)) <span class="fu">dir.create</span>(txDir)</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>allFOVs <span class="ot">&lt;-</span> <span class="fu">unique</span>(fullTx[[<span class="st">'fov'</span>]])</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>transDF_fileInfo <span class="ot">&lt;-</span> <span class="fu">lapply</span>(allFOVs, <span class="cf">function</span>(fovId){</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>  perFOV_filePath <span class="ot">&lt;-</span> fs<span class="sc">::</span><span class="fu">path</span>(txDir, <span class="fu">paste0</span>(<span class="st">'fov_'</span>, fovId, <span class="st">'_tx_data.csv'</span>))</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>  data.table<span class="sc">::</span><span class="fu">fwrite</span>(fullTx[fov <span class="sc">==</span> fovId, ], <span class="at">file =</span> perFOV_filePath)</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># since global coordinates of each molecule are available</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># use 0 for stage coordinates to disable conversion of local to global coordinates</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>  df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">file_path =</span> perFOV_filePath, </span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>                   <span class="at">slide =</span> <span class="dv">1</span>, </span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>                   <span class="at">fov =</span> fovId, </span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>                   <span class="at">stage_X =</span> <span class="dv">0</span>, </span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>                   <span class="at">stage_Y =</span> <span class="dv">0</span>)</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(df)</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>transDF_fileInfo <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, transDF_fileInfo)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><code>FastReseg</code> evaluates segmentation in physical space and thus it’s preferred to convert all 3D coordinates into same unit. The relevant default parameters of <code>FastReseg</code> are set with respect to micrometer in coordinate unit. According to the <a href="./assets/Pancreas-CosMx-ReadMe.html">ReadMe</a>, the pixel size for this data set is 0.12028 µm per pixel and the z step size is 0.8 µm per z slice. We would pass this information to <code>FastReseg</code> functions to do the coordinate conversion. If your data is already in micrometer unit, you can use <code>1</code> for pixel size and z step to disable the conversion.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>pixel_size <span class="ot">&lt;-</span> <span class="fl">0.12028</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>zstep_size <span class="ot">&lt;-</span> <span class="fl">0.8</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>By default, <code>FastReseg</code> would use 75% of available cores on your PC to do parallel processing of per-FOV transcript files in batch. If you have big per-FOV transcript file size (200+ MB per file) or limited memory available, it’s recommended to reduce the amount of cores used. You can control the number of cores in use by passing <code>percentCores</code> argument to <code>FastReseg</code> wrapper functions or set the core number directly with <code>options(mc.cores = X)</code>, where X is the number of cores you would to use. The set option approach would overwrite the <code>percentCores</code> argument.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Too many large FOVs being processed in same batch could hit the memory limit and abort the current processing. Below is an example error message when memory limit was reached.</p>
+<p><span style="color: red;"> Error in FUN(X[[i]], …) : subscript out of bounds<br> In addition: Warning messages:<br> <strong>1: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE, :<br> scheduled cores 1, 3, 4, 7, 8, 10, 11 did not deliver results, all values of the jobs will be affected<br> 2: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE, :<br> scheduled core 12 encountered error in user code, all values of the job will be affected</strong> </span></p>
+</div>
+</div>
+<p>Since the example data set in use is a Whole-Transcription spatial data set with high number of unique genes and large per-FOV transcript file size, here we cautiously reduce the % of core number to 0.25.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>percentCores <span class="ot">&lt;-</span> <span class="fl">0.25</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="sec-FastReseg-flagging" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Run segmentation evaluation</h1>
+<p>Now we have all the inputs needed to run <code>FastReseg</code> pipelines. For segmentation evaluation, one can use <code>FastReseg::fastReseg_flag_all_errors()</code> function to run through all the FOVs.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># path to output folder</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>outDir_flagErrors <span class="ot">&lt;-</span> <span class="st">"res1f_flagErrors"</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>flagAll_res <span class="ot">&lt;-</span> FastReseg<span class="sc">::</span><span class="fu">fastReseg_flag_all_errors</span>(</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">counts =</span> counts,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">clust =</span> clust,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">refProfiles =</span> <span class="cn">NULL</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># one can use `clust = NULL` if providing `refProfiles`</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">transcript_df =</span> <span class="cn">NULL</span>,</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">transDF_fileInfo =</span> transDF_fileInfo,</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">filepath_coln =</span> <span class="st">'file_path'</span>,</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">prefix_colns =</span> <span class="cn">NULL</span>, <span class="co"># to use existing cell IDs that are unique across entire data set </span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">fovOffset_colns =</span> <span class="fu">c</span>(<span class="st">'stage_Y'</span>,<span class="st">'stage_X'</span>), <span class="co"># match XY axes between stage and each FOV</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">pixel_size =</span> pixel_size, </span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">zstep_size =</span> zstep_size,</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">transID_coln =</span> <span class="st">'transcript_id'</span>, </span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>  <span class="at">transGene_coln =</span> <span class="st">"target"</span>,</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">cellID_coln =</span> <span class="st">"cell"</span>, </span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  <span class="at">spatLocs_colns =</span> <span class="fu">c</span>(<span class="st">'x_global_px'</span>, <span class="st">'y_global_px'</span>, <span class="st">'z'</span>),</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>  <span class="at">extracellular_cellID =</span> <span class="cn">NULL</span>, </span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># control core number used for parallel processing</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>  <span class="at">percentCores =</span> percentCores, </span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># cutoff of transcript number to do spatial modeling</span></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>  <span class="at">flagModel_TransNum_cutoff =</span> <span class="dv">50</span>, </span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>  <span class="at">flagCell_lrtest_cutoff =</span> <span class="dv">5</span>, <span class="co"># cutoff for flagging wrongly segmented cells</span></span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>  <span class="at">svmClass_score_cutoff =</span> <span class="sc">-</span><span class="dv">2</span>, <span class="co"># cutoff for low vs. high transcript score</span></span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>  <span class="at">path_to_output =</span> outDir_flagErrors, <span class="co"># path to output folder</span></span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>  <span class="at">return_trimmed_perCell =</span> <span class="cn">TRUE</span>, <span class="co"># flag to return per cell expression matrix after trimming all flagged transcripts </span></span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>  <span class="at">ctrl_genes =</span> <span class="cn">NULL</span> <span class="co"># optional to include name for control probes in transcript data.frame, e.g. negative control probes</span></span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="co"># extract spatial evaluation outcomes of valid cells</span></span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>modStats_ToFlagCells <span class="ot">&lt;-</span> flagAll_res[[<span class="st">'combined_modStats_ToFlagCells'</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The function above returns the statistics for evaluating each cell for spatial dependent model against null model. Based on the P value, <code>lrtest_Pr</code> or the negative log10 value <code>lrtest_nlog10P</code>, one can select for cells with strong spatial dependency in transcript score profile. Those cells are likely to contain contaminating transcripts for neighbor cells.</p>
+<table class="table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 10%">
+<col style="width: 11%">
+<col style="width: 9%">
+<col style="width: 10%">
+<col style="width: 13%">
+<col style="width: 15%">
+<col style="width: 7%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">transcript_num</th>
+<th style="text-align: right;">modAlt_rsq</th>
+<th style="text-align: right;">lrtest_ChiSq</th>
+<th style="text-align: right;">lrtest_Pr</th>
+<th style="text-align: left;">UMI_cellID</th>
+<th style="text-align: right;">lrtest_nlog10P</th>
+<th style="text-align: left;">tLLR_maxCellType</th>
+<th style="text-align: left;">flagged</th>
+<th style="text-align: right;">file_idx</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">315</td>
+<td style="text-align: right;">0.1076159</td>
+<td style="text-align: right;">35.86547</td>
+<td style="text-align: right;">0.0000419</td>
+<td style="text-align: left;">c_1_51_1</td>
+<td style="text-align: right;">4.377932</td>
+<td style="text-align: left;">Macrophage</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">309</td>
+<td style="text-align: right;">0.0744980</td>
+<td style="text-align: right;">23.92246</td>
+<td style="text-align: right;">0.0044256</td>
+<td style="text-align: left;">c_1_51_10</td>
+<td style="text-align: right;">2.354028</td>
+<td style="text-align: left;">Ductal</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1676</td>
+<td style="text-align: right;">0.0976644</td>
+<td style="text-align: right;">172.24037</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: left;">c_1_51_100</td>
+<td style="text-align: right;">31.676496</td>
+<td style="text-align: left;">Ductal</td>
+<td style="text-align: left;">TRUE</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">753</td>
+<td style="text-align: right;">0.0928050</td>
+<td style="text-align: right;">73.34062</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: left;">c_1_51_1000</td>
+<td style="text-align: right;">11.974934</td>
+<td style="text-align: left;">Ductal</td>
+<td style="text-align: left;">TRUE</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">892</td>
+<td style="text-align: right;">0.1512712</td>
+<td style="text-align: right;">146.30190</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: left;">c_1_51_1001</td>
+<td style="text-align: right;">26.936616</td>
+<td style="text-align: left;">Ductal</td>
+<td style="text-align: left;">TRUE</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1220</td>
+<td style="text-align: right;">0.0802211</td>
+<td style="text-align: right;">102.01879</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: left;">c_1_51_1002</td>
+<td style="text-align: right;">17.211741</td>
+<td style="text-align: left;">Acinar.2</td>
+<td style="text-align: left;">TRUE</td>
+<td style="text-align: right;">1</td>
+</tr>
+</tbody>
+</table>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># histogram for spatial dependency in all cells</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>tmp_flag <span class="ot">&lt;-</span> <span class="fu">which</span>(<span class="sc">!</span><span class="fu">is.na</span>(modStats_ToFlagCells<span class="sc">$</span>lrtest_nlog10P)) <span class="co"># exclude cells with too few transcript number</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">hist</span>(modStats_ToFlagCells<span class="sc">$</span>lrtest_nlog10P[tmp_flag], </span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>     <span class="at">breaks =</span> <span class="st">"FD"</span>, </span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">"-log10(lrtest p.value)"</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>     <span class="at">main =</span> <span class="fu">paste0</span>(<span class="st">"Histogram of spatial dependency, mean = "</span>, </span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">round</span>(<span class="fu">mean</span>(modStats_ToFlagCells<span class="sc">$</span>lrtest_nlog10P[tmp_flag]), <span class="dv">2</span>)))</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="fu">abline</span>(<span class="at">v =</span> <span class="fu">mean</span>(modStats_ToFlagCells<span class="sc">$</span>lrtest_nlog10P[tmp_flag]), <span class="at">col=</span><span class="st">"red"</span>, <span class="at">lwd=</span><span class="dv">3</span>, <span class="at">lty=</span><span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/plotModStats-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># cutoff to flag for cells with strong spatial dependency in transcript score profiles</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>flagCell_lrtest_cutoff  <span class="ot">=</span> <span class="dv">5</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>modStats_ToFlagCells[[<span class="st">'flagged'</span>]] <span class="ot">&lt;-</span> (modStats_ToFlagCells[[<span class="st">'lrtest_nlog10P'</span>]] <span class="sc">&gt;</span> flagCell_lrtest_cutoff )</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>flagged_cells <span class="ot">&lt;-</span> modStats_ToFlagCells[[<span class="st">'UMI_cellID'</span>]][modStats_ToFlagCells[[<span class="st">'flagged'</span>]]]</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="fu">sprintf</span>(<span class="st">"%d cells, %.4f of all evaluated cells, </span><span class="sc">\n</span><span class="st">are flagged for resegmentation with lrtest_nlog10P &gt; %.1f."</span>, </span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">length</span>(flagged_cells), <span class="fu">length</span>(flagged_cells)<span class="sc">/</span><span class="fu">nrow</span>(modStats_ToFlagCells), flagCell_lrtest_cutoff))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>33210 cells, 0.6791 of all evaluated cells, 
+are flagged for resegmentation with lrtest_nlog10P &gt; 5.0.</code></pre>
+</div>
+</div>
+<p>Let’s visualize some flagged cells with various degrees of spatial dependency in transcript profiles</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># focus on 1st per-FOV file</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>transcript_df <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">paste0</span>(outDir_flagErrors, <span class="st">"/1_flagged_transDF.csv"</span>))</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(modStats_ToFlagCells) <span class="ot">&lt;-</span> modStats_ToFlagCells<span class="sc">$</span>UMI_cellID</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>cells_to_plot <span class="ot">&lt;-</span> modStats_ToFlagCells[flagged_cells, <span class="st">'lrtest_nlog10P'</span>]</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(cells_to_plot) <span class="ot">&lt;-</span> flagged_cells</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>cells_to_plot <span class="ot">&lt;-</span> cells_to_plot[flagged_cells <span class="sc">%in%</span> transcript_df[[<span class="st">"UMI_cellID"</span>]]]</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>cells_to_plot <span class="ot">&lt;-</span> cells_to_plot[<span class="fu">order</span>(cells_to_plot, <span class="at">decreasing =</span> T)]</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>cells_to_plot <span class="ot">&lt;-</span> cells_to_plot[<span class="fu">seq</span>(<span class="dv">1</span>, <span class="fu">length</span>(cells_to_plot), </span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>                                   <span class="at">by =</span> <span class="fu">ceiling</span>(<span class="fu">length</span>(cells_to_plot)<span class="sc">/</span><span class="dv">25</span>))]</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>FastReseg<span class="sc">::</span><span class="fu">plotSpatialScoreMultiCells</span>(<span class="at">chosen_cells =</span> <span class="fu">names</span>(cells_to_plot), </span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">cell_labels =</span> <span class="fu">round</span>(cells_to_plot, <span class="dv">2</span>), </span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">transcript_df =</span> transcript_df, </span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">cellID_coln =</span> <span class="st">"UMI_cellID"</span>, </span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">transID_coln =</span> <span class="st">"UMI_transID"</span>,</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">score_coln =</span> <span class="st">"score_tLLR_maxCellType"</span>, </span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">spatLocs_colns =</span> <span class="fu">c</span>(<span class="st">"x"</span>,<span class="st">"y"</span>),</span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">point_size =</span> <span class="fl">0.5</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><img src="figures/fig_plotFlagCells-1.png" class="img-fluid"></p>
+<p>You can see that cells with large <code>lrtest_nlog10P</code> value exhibited strong spatial dependency in their transcript score profiles under their best fitted cell type (i.e.&nbsp;<code>score_tLLR_maxCellType</code>). Below we would zoom in to one of the flagged cells (<code>c_1_51_1211</code> with <code>lrtest_nlog10P = 49.82</code>) and visualize its transcript score profiles in 3D.</p>
+<div class="cell">
+<div class="sourceCode cell-code hidden" id="cb11" data-startfrom="269" data-source-offset="0"><pre class="sourceCode js code-with-copy"><code class="sourceCode javascript" style="counter-reset: source-line 268;"><span id="cb11-269"><a href="#cb11-269" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> <span class="fu">FileAttachment</span>(<span class="st">"assets/chosenCell_flagged_transDF.csv"</span>)<span class="op">.</span><span class="fu">csv</span>({ <span class="dt">typed</span><span class="op">:</span> <span class="kw">true</span> })</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div id="ojs-cell-1" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell panel-input card bg-light p-2">
+<div class="sourceCode cell-code hidden" id="cb12" data-startfrom="275" data-source-offset="-0"><pre class="sourceCode js code-with-copy"><code class="sourceCode javascript" style="counter-reset: source-line 274;"><span id="cb12-275"><a href="#cb12-275" aria-hidden="true" tabindex="-1"></a>viewof colorColumn <span class="op">=</span> Inputs<span class="op">.</span><span class="fu">select</span>(</span>
+<span id="cb12-276"><a href="#cb12-276" aria-hidden="true" tabindex="-1"></a>  [<span class="st">'score_tLLR_maxCellType'</span>]<span class="op">,</span> </span>
+<span id="cb12-277"><a href="#cb12-277" aria-hidden="true" tabindex="-1"></a>  { <span class="dt">label</span><span class="op">:</span> <span class="st">'Colored by'</span><span class="op">,</span> </span>
+<span id="cb12-278"><a href="#cb12-278" aria-hidden="true" tabindex="-1"></a>    <span class="dt">value</span><span class="op">:</span> <span class="st">'score_tLLR_maxCellType'</span></span>
+<span id="cb12-279"><a href="#cb12-279" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb12-280"><a href="#cb12-280" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-281"><a href="#cb12-281" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-282"><a href="#cb12-282" aria-hidden="true" tabindex="-1"></a>viewof lowerLimit <span class="op">=</span> Inputs<span class="op">.</span><span class="fu">range</span>(</span>
+<span id="cb12-283"><a href="#cb12-283" aria-hidden="true" tabindex="-1"></a>  [<span class="op">-</span><span class="dv">10</span><span class="op">,</span> <span class="dv">0</span>]<span class="op">,</span> </span>
+<span id="cb12-284"><a href="#cb12-284" aria-hidden="true" tabindex="-1"></a>  { <span class="dt">label</span><span class="op">:</span> <span class="st">'Lower Limit'</span><span class="op">,</span> </span>
+<span id="cb12-285"><a href="#cb12-285" aria-hidden="true" tabindex="-1"></a>    <span class="dt">value</span><span class="op">:</span> <span class="op">-</span><span class="dv">10</span><span class="op">,</span> </span>
+<span id="cb12-286"><a href="#cb12-286" aria-hidden="true" tabindex="-1"></a>    <span class="dt">step</span><span class="op">:</span> <span class="fl">0.1</span></span>
+<span id="cb12-287"><a href="#cb12-287" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb12-288"><a href="#cb12-288" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-289"><a href="#cb12-289" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-290"><a href="#cb12-290" aria-hidden="true" tabindex="-1"></a>viewof upperLimit <span class="op">=</span> Inputs<span class="op">.</span><span class="fu">range</span>(</span>
+<span id="cb12-291"><a href="#cb12-291" aria-hidden="true" tabindex="-1"></a>  [<span class="op">-</span><span class="dv">10</span><span class="op">,</span> <span class="dv">0</span>]<span class="op">,</span> </span>
+<span id="cb12-292"><a href="#cb12-292" aria-hidden="true" tabindex="-1"></a>  { <span class="dt">label</span><span class="op">:</span> <span class="st">'Upper Limit'</span><span class="op">,</span> </span>
+<span id="cb12-293"><a href="#cb12-293" aria-hidden="true" tabindex="-1"></a>    <span class="dt">value</span><span class="op">:</span> <span class="dv">0</span><span class="op">,</span> </span>
+<span id="cb12-294"><a href="#cb12-294" aria-hidden="true" tabindex="-1"></a>    <span class="dt">step</span><span class="op">:</span> <span class="fl">0.1</span></span>
+<span id="cb12-295"><a href="#cb12-295" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb12-296"><a href="#cb12-296" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-2-1" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-2-2" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-2-3" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code hidden" id="cb13" data-startfrom="300" data-source-offset="-0"><pre class="sourceCode js code-with-copy"><code class="sourceCode javascript" style="counter-reset: source-line 299;"><span id="cb13-300"><a href="#cb13-300" aria-hidden="true" tabindex="-1"></a>Plotly <span class="op">=</span> <span class="cf">await</span> <span class="pp">require</span>(<span class="st">"https://cdn.plot.ly/plotly-2.32.0.min.js"</span>)</span>
+<span id="cb13-301"><a href="#cb13-301" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-302"><a href="#cb13-302" aria-hidden="true" tabindex="-1"></a><span class="co">// document element for plot</span></span>
+<span id="cb13-303"><a href="#cb13-303" aria-hidden="true" tabindex="-1"></a>plotDiv <span class="op">=</span> {</span>
+<span id="cb13-304"><a href="#cb13-304" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> div <span class="op">=</span> <span class="fu">html</span><span class="vs">`&lt;div id="plotlyDiv" style="width:100%;height:600px;"&gt;&lt;/div&gt;`</span><span class="op">;</span></span>
+<span id="cb13-305"><a href="#cb13-305" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> div<span class="op">;</span></span>
+<span id="cb13-306"><a href="#cb13-306" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb13-307"><a href="#cb13-307" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-308"><a href="#cb13-308" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-309"><a href="#cb13-309" aria-hidden="true" tabindex="-1"></a><span class="co">// Function to create the 3D scatter plot</span></span>
+<span id="cb13-310"><a href="#cb13-310" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">createPlot</span>(data<span class="op">,</span> colorColumn<span class="op">,</span> lowerLimit<span class="op">,</span> upperLimit<span class="op">,</span> div) {</span>
+<span id="cb13-311"><a href="#cb13-311" aria-hidden="true" tabindex="-1"></a>  div<span class="op">=</span>div<span class="op">||</span>DOM<span class="op">.</span><span class="fu">element</span>(<span class="st">'div'</span>)</span>
+<span id="cb13-312"><a href="#cb13-312" aria-hidden="true" tabindex="-1"></a>  div<span class="op">.</span><span class="at">id</span><span class="op">=</span><span class="st">"plotlyDiv"</span></span>
+<span id="cb13-313"><a href="#cb13-313" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb13-314"><a href="#cb13-314" aria-hidden="true" tabindex="-1"></a>  <span class="kw">var</span> trace <span class="op">=</span> {</span>
+<span id="cb13-315"><a href="#cb13-315" aria-hidden="true" tabindex="-1"></a>    <span class="dt">x</span><span class="op">:</span>data<span class="op">.</span><span class="fu">map</span>(d <span class="kw">=&gt;</span> d<span class="op">.</span><span class="at">x</span>)<span class="op">,</span></span>
+<span id="cb13-316"><a href="#cb13-316" aria-hidden="true" tabindex="-1"></a>    <span class="dt">y</span><span class="op">:</span>data<span class="op">.</span><span class="fu">map</span>(d <span class="kw">=&gt;</span> d<span class="op">.</span><span class="at">y</span>)<span class="op">,</span></span>
+<span id="cb13-317"><a href="#cb13-317" aria-hidden="true" tabindex="-1"></a>    <span class="dt">z</span><span class="op">:</span>data<span class="op">.</span><span class="fu">map</span>(d <span class="kw">=&gt;</span> d<span class="op">.</span><span class="at">z</span>)<span class="op">,</span></span>
+<span id="cb13-318"><a href="#cb13-318" aria-hidden="true" tabindex="-1"></a>    <span class="dt">mode</span><span class="op">:</span> <span class="st">'markers'</span><span class="op">,</span></span>
+<span id="cb13-319"><a href="#cb13-319" aria-hidden="true" tabindex="-1"></a>     <span class="dt">marker</span><span class="op">:</span> {</span>
+<span id="cb13-320"><a href="#cb13-320" aria-hidden="true" tabindex="-1"></a>        <span class="dt">size</span><span class="op">:</span> <span class="dv">3</span><span class="op">,</span></span>
+<span id="cb13-321"><a href="#cb13-321" aria-hidden="true" tabindex="-1"></a>        <span class="dt">color</span><span class="op">:</span> data<span class="op">.</span><span class="fu">map</span>(d <span class="kw">=&gt;</span> d[colorColumn])<span class="op">,</span></span>
+<span id="cb13-322"><a href="#cb13-322" aria-hidden="true" tabindex="-1"></a>        <span class="dt">colorscale</span><span class="op">:</span> [</span>
+<span id="cb13-323"><a href="#cb13-323" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.000</span><span class="op">,</span> <span class="st">"rgb(252, 253, 191)"</span>]<span class="op">,</span> </span>
+<span id="cb13-324"><a href="#cb13-324" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.056</span><span class="op">,</span> <span class="st">"rgb(252, 236, 173)"</span>]<span class="op">,</span></span>
+<span id="cb13-325"><a href="#cb13-325" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.111</span><span class="op">,</span> <span class="st">"rgb(253, 218, 156)"</span>]<span class="op">,</span></span>
+<span id="cb13-326"><a href="#cb13-326" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.167</span><span class="op">,</span> <span class="st">"rgb(254, 201, 141)"</span>]<span class="op">,</span></span>
+<span id="cb13-327"><a href="#cb13-327" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.222</span><span class="op">,</span><span class="st">"rgb(254, 183, 126)"</span>]<span class="op">,</span></span>
+<span id="cb13-328"><a href="#cb13-328" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.278</span><span class="op">,</span> <span class="st">"rgb(254, 167, 114)"</span>]<span class="op">,</span></span>
+<span id="cb13-329"><a href="#cb13-329" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.333</span><span class="op">,</span> <span class="st">"rgb(253, 149, 103)"</span>]<span class="op">,</span></span>
+<span id="cb13-330"><a href="#cb13-330" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.389</span><span class="op">,</span> <span class="st">"rgb(251, 131, 95)"</span>]<span class="op">,</span></span>
+<span id="cb13-331"><a href="#cb13-331" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.444</span><span class="op">,</span><span class="st">"rgb(247, 113, 92)"</span>]<span class="op">,</span></span>
+<span id="cb13-332"><a href="#cb13-332" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.500</span><span class="op">,</span> <span class="st">"rgb(241, 96, 93)"</span>]<span class="op">,</span></span>
+<span id="cb13-333"><a href="#cb13-333" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.556</span><span class="op">,</span> <span class="st">"rgb(232, 83, 98)"</span>]<span class="op">,</span></span>
+<span id="cb13-334"><a href="#cb13-334" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.611</span><span class="op">,</span> <span class="st">"rgb(219, 71, 106)"</span>]<span class="op">,</span></span>
+<span id="cb13-335"><a href="#cb13-335" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.667</span><span class="op">,</span> <span class="st">"rgb(205, 64, 113)"</span>]<span class="op">,</span></span>
+<span id="cb13-336"><a href="#cb13-336" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.722</span><span class="op">,</span> <span class="st">"rgb(189, 57, 119)"</span>]<span class="op">,</span></span>
+<span id="cb13-337"><a href="#cb13-337" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.778</span><span class="op">,</span> <span class="st">"rgb(174, 52, 123)"</span>]<span class="op">,</span></span>
+<span id="cb13-338"><a href="#cb13-338" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.833</span><span class="op">,</span> <span class="st">"rgb(159, 47, 127)"</span>]<span class="op">,</span></span>
+<span id="cb13-339"><a href="#cb13-339" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.889</span><span class="op">,</span> <span class="st">"rgb(0, 149, 175)"</span>]<span class="op">,</span></span>
+<span id="cb13-340"><a href="#cb13-340" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">0.944</span><span class="op">,</span> <span class="st">"rgb(0, 93, 158)"</span>]<span class="op">,</span> </span>
+<span id="cb13-341"><a href="#cb13-341" aria-hidden="true" tabindex="-1"></a>          [<span class="fl">1.000</span><span class="op">,</span> <span class="st">"rgb(38, 24, 95)"</span>]</span>
+<span id="cb13-342"><a href="#cb13-342" aria-hidden="true" tabindex="-1"></a>        ]<span class="op">,</span></span>
+<span id="cb13-343"><a href="#cb13-343" aria-hidden="true" tabindex="-1"></a>        <span class="dt">showscale</span><span class="op">:</span> <span class="kw">true</span><span class="op">,</span></span>
+<span id="cb13-344"><a href="#cb13-344" aria-hidden="true" tabindex="-1"></a>        <span class="dt">cmin</span><span class="op">:</span> <span class="bu">Math</span><span class="op">.</span><span class="fu">min</span>(lowerLimit<span class="op">,</span> upperLimit)<span class="op">,</span> </span>
+<span id="cb13-345"><a href="#cb13-345" aria-hidden="true" tabindex="-1"></a>        <span class="dt">cmax</span><span class="op">:</span> <span class="bu">Math</span><span class="op">.</span><span class="fu">max</span>(lowerLimit<span class="op">,</span> upperLimit)<span class="op">,</span> </span>
+<span id="cb13-346"><a href="#cb13-346" aria-hidden="true" tabindex="-1"></a>        <span class="dt">colorbar</span><span class="op">:</span> { <span class="dt">title</span><span class="op">:</span> colorColumn }</span>
+<span id="cb13-347"><a href="#cb13-347" aria-hidden="true" tabindex="-1"></a>      }<span class="op">,</span></span>
+<span id="cb13-348"><a href="#cb13-348" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type</span><span class="op">:</span> <span class="st">'scatter3d'</span><span class="op">,</span></span>
+<span id="cb13-349"><a href="#cb13-349" aria-hidden="true" tabindex="-1"></a>    <span class="dt">text</span><span class="op">:</span> data<span class="op">.</span><span class="fu">map</span>(d <span class="kw">=&gt;</span> <span class="vs">`target: </span><span class="sc">${</span>d<span class="op">.</span><span class="at">target</span><span class="sc">}</span><span class="vs">&lt;br&gt;score_tLLR_maxCellType:&lt;br&gt;</span><span class="sc">${</span>d<span class="op">.</span><span class="at">score_tLLR_maxCellType</span><span class="sc">}</span><span class="vs">`</span>)<span class="op">,</span></span>
+<span id="cb13-350"><a href="#cb13-350" aria-hidden="true" tabindex="-1"></a>    <span class="dt">hoverinfo</span><span class="op">:</span> <span class="st">'text'</span></span>
+<span id="cb13-351"><a href="#cb13-351" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb13-352"><a href="#cb13-352" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb13-353"><a href="#cb13-353" aria-hidden="true" tabindex="-1"></a>  Plotly<span class="op">.</span><span class="fu">newPlot</span>(div<span class="op">,</span>[trace]<span class="op">,</span>{})</span>
+<span id="cb13-354"><a href="#cb13-354" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> div</span>
+<span id="cb13-355"><a href="#cb13-355" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb13-356"><a href="#cb13-356" aria-hidden="true" tabindex="-1"></a> </span>
+<span id="cb13-357"><a href="#cb13-357" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb13-358"><a href="#cb13-358" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-359"><a href="#cb13-359" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-360"><a href="#cb13-360" aria-hidden="true" tabindex="-1"></a>figDiv <span class="op">=</span> <span class="fu">createPlot</span>(data<span class="op">,</span> colorColumn<span class="op">,</span> lowerLimit<span class="op">,</span> upperLimit<span class="op">,</span> plotDiv)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-3-1" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-3-2" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-3-3" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-3-4" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-FastReseg-full" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Run full pipeline to correct putative segmentation error identified</h1>
+<p>If cell segmentation correction is desired, one can use <code>FastReseg::fastReseg_full_pipeline()</code> function to not only flag but also correct the identified putative cell segmentation errors.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># path to output folder</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>outDir_full <span class="ot">&lt;-</span> <span class="st">"res2_fullPipeline"</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>refineAll_res <span class="ot">&lt;-</span> FastReseg<span class="sc">::</span><span class="fu">fastReseg_full_pipeline</span>(</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">counts =</span> counts,</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">clust =</span> clust,</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">refProfiles =</span> <span class="cn">NULL</span>,</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># one can use `clust = NULL` if providing `refProfiles`</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">transcript_df =</span> <span class="cn">NULL</span>,</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">transDF_fileInfo =</span> transDF_fileInfo,</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">filepath_coln =</span> <span class="st">'file_path'</span>,</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">prefix_colns =</span> <span class="cn">NULL</span>, <span class="co"># to use existing cell IDs that are unique across entire data set </span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">fovOffset_colns =</span> <span class="fu">c</span>(<span class="st">'stage_Y'</span>,<span class="st">'stage_X'</span>),</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">pixel_size =</span> pixel_size,</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">zstep_size =</span> zstep_size,</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">transID_coln =</span> <span class="st">'transcript_id'</span>,</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>  <span class="at">transGene_coln =</span> <span class="st">"target"</span>,</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">cellID_coln =</span> <span class="st">"cell"</span>,</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>  <span class="at">spatLocs_colns =</span> <span class="fu">c</span>(<span class="st">'x_global_px'</span>, <span class="st">'y_global_px'</span>, <span class="st">'z'</span>),</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>  <span class="at">extracellular_cellID =</span> <span class="cn">NULL</span>,</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># control core number used for parallel processing</span></span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>  <span class="at">percentCores =</span> percentCores, </span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># cutoff of transcript number to do spatial modeling</span></span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>  <span class="at">flagModel_TransNum_cutoff =</span> <span class="dv">50</span>, </span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Optionally, one can set various cutoffs to NULL for automatic calculation from input data</span></span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Refer to `FastReseg::runPreprocess()` for more details</span></span>
+<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># distance cutoff for neighborhood searching at molecular and cellular levels, respectively</span></span>
+<span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a>  <span class="at">molecular_distance_cutoff =</span> <span class="fl">2.7</span>, <span class="co"># 2.7um is recommended for CosMx RNA dataset</span></span>
+<span id="cb14-35"><a href="#cb14-35" aria-hidden="true" tabindex="-1"></a>  <span class="at">cellular_distance_cutoff =</span> <span class="cn">NULL</span>, </span>
+<span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a>  <span class="co"># cutoffs for transcript scores and number for cells under each cell type</span></span>
+<span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a>  <span class="at">score_baseline =</span> <span class="cn">NULL</span>,</span>
+<span id="cb14-39"><a href="#cb14-39" aria-hidden="true" tabindex="-1"></a>  <span class="at">lowerCutoff_transNum =</span> <span class="cn">NULL</span>,</span>
+<span id="cb14-40"><a href="#cb14-40" aria-hidden="true" tabindex="-1"></a>  <span class="at">higherCutoff_transNum=</span> <span class="cn">NULL</span>,</span>
+<span id="cb14-41"><a href="#cb14-41" aria-hidden="true" tabindex="-1"></a>  <span class="at">imputeFlag_missingCTs =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb14-42"><a href="#cb14-42" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb14-43"><a href="#cb14-43" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Settings for error detection and correction, refer to `FastReseg::runSegRefinement()` for more details</span></span>
+<span id="cb14-44"><a href="#cb14-44" aria-hidden="true" tabindex="-1"></a>  <span class="at">flagCell_lrtest_cutoff =</span> <span class="dv">5</span>, <span class="co"># cutoff to flag for cells with strong spatial dependency in transcript score profiles</span></span>
+<span id="cb14-45"><a href="#cb14-45" aria-hidden="true" tabindex="-1"></a>  <span class="at">svmClass_score_cutoff =</span> <span class="sc">-</span><span class="dv">2</span>,   <span class="co"># cutoff of transcript score to separate between high and low score classes</span></span>
+<span id="cb14-46"><a href="#cb14-46" aria-hidden="true" tabindex="-1"></a>  <span class="at">groupTranscripts_method =</span> <span class="st">"dbscan"</span>,</span>
+<span id="cb14-47"><a href="#cb14-47" aria-hidden="true" tabindex="-1"></a>  <span class="at">spatialMergeCheck_method =</span> <span class="st">"leidenCut"</span>, </span>
+<span id="cb14-48"><a href="#cb14-48" aria-hidden="true" tabindex="-1"></a>  <span class="at">cutoff_spatialMerge =</span> <span class="fl">0.5</span>, <span class="co"># spatial constraint cutoff for a valid merge event</span></span>
+<span id="cb14-49"><a href="#cb14-49" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb14-50"><a href="#cb14-50" aria-hidden="true" tabindex="-1"></a>  <span class="at">path_to_output =</span> outDir_full,</span>
+<span id="cb14-51"><a href="#cb14-51" aria-hidden="true" tabindex="-1"></a>  <span class="at">save_intermediates =</span> <span class="cn">TRUE</span>, <span class="co"># flag to return and write intermediate results to disk</span></span>
+<span id="cb14-52"><a href="#cb14-52" aria-hidden="true" tabindex="-1"></a>  <span class="at">return_perCellData =</span> <span class="cn">TRUE</span>, <span class="co"># flag to return per cell level outputs from updated segmentation </span></span>
+<span id="cb14-53"><a href="#cb14-53" aria-hidden="true" tabindex="-1"></a>  <span class="at">combine_extra =</span> <span class="cn">FALSE</span> <span class="co"># flag to include trimmed and extracellular transcripts in the exported `updated_transDF.csv` files </span></span>
+<span id="cb14-54"><a href="#cb14-54" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="sec-conclusions" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Conclusions</h1>
+<p>This post serves as a quick-start guide to use <a href="https://github.com/Nanostring-Biostats/FastReseg/" target="_blank">FastReseg</a> package on spatial transcriptomic data set. The package has several parameters one can adjust to tune the identification of wrongly segmented transcript groups and the rules used for cell segmentation correction. These include</p>
+<ul>
+<li>cutoffs for spatial model evaluation and flagging for poor-fit cells &amp; transcripts: <code>flagModel_TransNum_cutoff</code>, <code>flagCell_lrtest_cutoff</code>, <code>svmClass_score_cutoff</code>;</li>
+<li>distance cutoffs used to define neighborhood: <code>molecular_distance_cutoff</code>,<code>cellular_distance_cutoff</code>;</li>
+<li>method and rules used for grouping and separating poor-fit transcripts in space:<code>svm_args</code>, <code>groupTranscripts_method</code>, <code>config_spatNW_transcript</code>;</li>
+<li>cutoffs and rules used for segmentation correction: <code>score_baseline</code>, <code>lowerCutoff_transNum</code>, <code>higherCutoff_transNum</code></li>
+<li>additional spatial constraint on merging event during error correction: <code>spatialMergeCheck_method</code>, <code>cutoff_spatialMerge</code></li>
+</ul>
+<p>Many of those parameters have reasonable defaults for most spatial data sets and could be derived from your data using <code>FastReseg::runPreprocess()</code> function. For new user or new sample type, it’s recommended to process one per-FOV transcript using <code>FastReseg::fastReseg_perFOV_full_process()</code> functions first and check out the impact of the parameters chosen. Please refer to <a href="https://github.com/Nanostring-Biostats/FastReseg/blob/master/vignettes/tutorial.html" target="_blank">FastReseg tutorial</a>, <code>Modular functions for individual tasks</code> section, for more details.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script type="ojs-module-contents">
+eyJjb250ZW50cyI6W3sibWV0aG9kTmFtZSI6ImludGVycHJldCIsImNlbGxOYW1lIjoib2pzLWNlbGwtMSIsImlubGluZSI6ZmFsc2UsInNvdXJjZSI6ImRhdGEgPSBGaWxlQXR0YWNobWVudChcImFzc2V0cy9jaG9zZW5DZWxsX2ZsYWdnZWRfdHJhbnNERi5jc3ZcIikuY3N2KHsgdHlwZWQ6IHRydWUgfSlcbiJ9LHsibWV0aG9kTmFtZSI6ImludGVycHJldCIsImNlbGxOYW1lIjoib2pzLWNlbGwtMiIsImlubGluZSI6ZmFsc2UsInNvdXJjZSI6InZpZXdvZiBjb2xvckNvbHVtbiA9IElucHV0cy5zZWxlY3QoXG4gIFsnc2NvcmVfdExMUl9tYXhDZWxsVHlwZSddLCBcbiAgeyBsYWJlbDogJ0NvbG9yZWQgYnknLCBcbiAgICB2YWx1ZTogJ3Njb3JlX3RMTFJfbWF4Q2VsbFR5cGUnXG4gIH1cbilcblxudmlld29mIGxvd2VyTGltaXQgPSBJbnB1dHMucmFuZ2UoXG4gIFstMTAsIDBdLCBcbiAgeyBsYWJlbDogJ0xvd2VyIExpbWl0JywgXG4gICAgdmFsdWU6IC0xMCwgXG4gICAgc3RlcDogMC4xXG4gIH1cbilcblxudmlld29mIHVwcGVyTGltaXQgPSBJbnB1dHMucmFuZ2UoXG4gIFstMTAsIDBdLCBcbiAgeyBsYWJlbDogJ1VwcGVyIExpbWl0JywgXG4gICAgdmFsdWU6IDAsIFxuICAgIHN0ZXA6IDAuMVxuICB9XG4pXG4ifSx7Im1ldGhvZE5hbWUiOiJpbnRlcnByZXQiLCJjZWxsTmFtZSI6Im9qcy1jZWxsLTMiLCJpbmxpbmUiOmZhbHNlLCJzb3VyY2UiOiJQbG90bHkgPSBhd2FpdCByZXF1aXJlKFwiaHR0cHM6Ly9jZG4ucGxvdC5seS9wbG90bHktMi4zMi4wLm1pbi5qc1wiKVxuXG4vLyBkb2N1bWVudCBlbGVtZW50IGZvciBwbG90XG5wbG90RGl2ID0ge1xuICBjb25zdCBkaXYgPSBodG1sYDxkaXYgaWQ9XCJwbG90bHlEaXZcIiBzdHlsZT1cIndpZHRoOjEwMCU7aGVpZ2h0OjYwMHB4O1wiPjwvZGl2PmA7XG4gIHJldHVybiBkaXY7XG59XG5cblxuLy8gRnVuY3Rpb24gdG8gY3JlYXRlIHRoZSAzRCBzY2F0dGVyIHBsb3RcbmZ1bmN0aW9uIGNyZWF0ZVBsb3QoZGF0YSwgY29sb3JDb2x1bW4sIGxvd2VyTGltaXQsIHVwcGVyTGltaXQsIGRpdikge1xuICBkaXY9ZGl2fHxET00uZWxlbWVudCgnZGl2JylcbiAgZGl2LmlkPVwicGxvdGx5RGl2XCJcbiAgXG4gIHZhciB0cmFjZSA9IHtcbiAgICB4OmRhdGEubWFwKGQgPT4gZC54KSxcbiAgICB5OmRhdGEubWFwKGQgPT4gZC55KSxcbiAgICB6OmRhdGEubWFwKGQgPT4gZC56KSxcbiAgICBtb2RlOiAnbWFya2VycycsXG4gICAgIG1hcmtlcjoge1xuICAgICAgICBzaXplOiAzLFxuICAgICAgICBjb2xvcjogZGF0YS5tYXAoZCA9PiBkW2NvbG9yQ29sdW1uXSksXG4gICAgICAgIGNvbG9yc2NhbGU6IFtcbiAgICAgICAgICBbMC4wMDAsIFwicmdiKDI1MiwgMjUzLCAxOTEpXCJdLCBcbiAgICAgICAgICBbMC4wNTYsIFwicmdiKDI1MiwgMjM2LCAxNzMpXCJdLFxuICAgICAgICAgIFswLjExMSwgXCJyZ2IoMjUzLCAyMTgsIDE1NilcIl0sXG4gICAgICAgICAgWzAuMTY3LCBcInJnYigyNTQsIDIwMSwgMTQxKVwiXSxcbiAgICAgICAgICBbMC4yMjIsXCJyZ2IoMjU0LCAxODMsIDEyNilcIl0sXG4gICAgICAgICAgWzAuMjc4LCBcInJnYigyNTQsIDE2NywgMTE0KVwiXSxcbiAgICAgICAgICBbMC4zMzMsIFwicmdiKDI1MywgMTQ5LCAxMDMpXCJdLFxuICAgICAgICAgIFswLjM4OSwgXCJyZ2IoMjUxLCAxMzEsIDk1KVwiXSxcbiAgICAgICAgICBbMC40NDQsXCJyZ2IoMjQ3LCAxMTMsIDkyKVwiXSxcbiAgICAgICAgICBbMC41MDAsIFwicmdiKDI0MSwgOTYsIDkzKVwiXSxcbiAgICAgICAgICBbMC41NTYsIFwicmdiKDIzMiwgODMsIDk4KVwiXSxcbiAgICAgICAgICBbMC42MTEsIFwicmdiKDIxOSwgNzEsIDEwNilcIl0sXG4gICAgICAgICAgWzAuNjY3LCBcInJnYigyMDUsIDY0LCAxMTMpXCJdLFxuICAgICAgICAgIFswLjcyMiwgXCJyZ2IoMTg5LCA1NywgMTE5KVwiXSxcbiAgICAgICAgICBbMC43NzgsIFwicmdiKDE3NCwgNTIsIDEyMylcIl0sXG4gICAgICAgICAgWzAuODMzLCBcInJnYigxNTksIDQ3LCAxMjcpXCJdLFxuICAgICAgICAgIFswLjg4OSwgXCJyZ2IoMCwgMTQ5LCAxNzUpXCJdLFxuICAgICAgICAgIFswLjk0NCwgXCJyZ2IoMCwgOTMsIDE1OClcIl0sIFxuICAgICAgICAgIFsxLjAwMCwgXCJyZ2IoMzgsIDI0LCA5NSlcIl1cbiAgICAgICAgXSxcbiAgICAgICAgc2hvd3NjYWxlOiB0cnVlLFxuICAgICAgICBjbWluOiBNYXRoLm1pbihsb3dlckxpbWl0LCB1cHBlckxpbWl0KSwgXG4gICAgICAgIGNtYXg6IE1hdGgubWF4KGxvd2VyTGltaXQsIHVwcGVyTGltaXQpLCBcbiAgICAgICAgY29sb3JiYXI6IHsgdGl0bGU6IGNvbG9yQ29sdW1uIH1cbiAgICAgIH0sXG4gICAgdHlwZTogJ3NjYXR0ZXIzZCcsXG4gICAgdGV4dDogZGF0YS5tYXAoZCA9PiBgdGFyZ2V0OiAke2QudGFyZ2V0fTxicj5zY29yZV90TExSX21heENlbGxUeXBlOjxicj4ke2Quc2NvcmVfdExMUl9tYXhDZWxsVHlwZX1gKSxcbiAgICBob3ZlcmluZm86ICd0ZXh0J1xuICB9XG4gIFxuICBQbG90bHkubmV3UGxvdChkaXYsW3RyYWNlXSx7fSlcbiAgcmV0dXJuIGRpdlxuICBcbiBcbn1cblxuXG5maWdEaXYgPSBjcmVhdGVQbG90KGRhdGEsIGNvbG9yQ29sdW1uLCBsb3dlckxpbWl0LCB1cHBlckxpbWl0LCBwbG90RGl2KVxuXG4ifSx7Im1ldGhvZE5hbWUiOiJpbnRlcnByZXRRdWlldCIsInNvdXJjZSI6InNoaW55SW5wdXQoJ2NvbG9yQ29sdW1uJykifSx7Im1ldGhvZE5hbWUiOiJpbnRlcnByZXRRdWlldCIsInNvdXJjZSI6InNoaW55SW5wdXQoJ2xvd2VyTGltaXQnKSJ9LHsibWV0aG9kTmFtZSI6ImludGVycHJldFF1aWV0Iiwic291cmNlIjoic2hpbnlJbnB1dCgndXBwZXJMaW1pdCcpIn1dfQ==
+</script>
+<script type="module">
+if (window.location.protocol === "file:") { alert("The OJS runtime does not work with file:// URLs. Please use a web server to view this document."); }
+window._ojs.paths.runtimeToDoc = "../../posts/segmentation-error-evaluation";
+window._ojs.paths.runtimeToRoot = "../..";
+window._ojs.paths.docToRoot = "../..";
+window._ojs.selfContained = false;
+window._ojs.runtime.interpretFromScriptTags();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/nanostring-biostats\.github\.io\/CosMx-Analysis-Scratch-Space");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+    <a class="nav-link" href="../../license.html">
+<p>License</p>
+</a>
+  </li>  
+    <li class="nav-item">
+    <a class="nav-link" href="../../how-to-contribute.html">
+<p>How to contribute</p>
+</a>
+  </li>  
+</ul>
+    <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
