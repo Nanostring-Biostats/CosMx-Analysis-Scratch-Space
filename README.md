@@ -5,7 +5,7 @@ of CosMx&#8482; Spatial Molecular Imager (SMI) data. Contained here are and writ
 and vignettes addressing a variety of topics discussed when analyzing single-cell
 spatial data.
 
-> Note: Code in this repo is provided without warranty or promise of support. This is not official NanoString software and has not been subjected to the usual rigorous review and testing._
+> _Note: Code in this repo is provided without warranty or promise of support. This is not official NanoString software and has not been subjected to the usual rigorous review and testing._
 
 
 ## Looking for the how-to blog? 
