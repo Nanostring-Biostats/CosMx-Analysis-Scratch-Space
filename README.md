@@ -1,6 +1,5 @@
 # CosMx Analysis Scratch Space
 
-![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/stained-glass.png)
 ![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/24ab79ab-e9c5-486e-9595-68f48797d757)
 
 
