@@ -1,6 +1,8 @@
 # CosMx Analysis Scratch Space
 
-[](assets/stained-glass.png)
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/stained-glass.png)
+![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/24ab79ab-e9c5-486e-9595-68f48797d757)
+
 
 This repository is an exploratory resource to accelerate opensource analysis
 of CosMx&#8482; Spatial Molecular Imager (SMI) data. Contained here are and writeups
