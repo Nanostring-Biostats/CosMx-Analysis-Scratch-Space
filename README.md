@@ -1,5 +1,7 @@
 # CosMx Analysis Scratch Space
 
+[](assets/stained-glass.png)
+
 This repository is an exploratory resource to accelerate opensource analysis
 of CosMx&#8482; Spatial Molecular Imager (SMI) data. Contained here are and writeups
 and vignettes addressing a variety of topics discussed when analyzing single-cell
