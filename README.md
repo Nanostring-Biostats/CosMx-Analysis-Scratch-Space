@@ -1,13 +1,16 @@
 # CosMx Analysis Scratch Space
 
-This repo is here to accelerate analysis of CosMx datasets. It contains code and writeups addressing challenges we've faced in analyzing CosMx data. After dozens of analyses, we have developed a sense of what works and what doesn't, and we have developed (sometimes partial) solutions for many frequent problems.
+This repository is an exploratory resource to accelerate opensource analysis
+of CosMx&#8482; Spatial Molecular Imager (SMI) data. Contained here are and writeups
+and vignettes addressing a variety of topics discussed when analyzing single-cell
+spatial data.
 
-> Note: _Code in this repo is provided without warranty or promise of support. This is not official NanoSting software and has not been subjected to the usual rigorous review and testing._
+> Note: Code in this repo is provided without warranty or promise of support. This is not official NanoString software and has not been subjected to the usual rigorous review and testing._
 
 
 ## Looking for the how-to blog? 
 
-Check out our Quarto blog at [https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/).
+This repo contains scripts, package source code, and the package vignettes. Many of these elements are used to create the blog posts which can be found here: [https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/).
 
 ## Code
 
@@ -16,4 +19,6 @@ Code and mini-packages can be found in the `_code` directory. Individual blog po
 ## License
 
 Please see the `license` tab for more information.
+
+
 
