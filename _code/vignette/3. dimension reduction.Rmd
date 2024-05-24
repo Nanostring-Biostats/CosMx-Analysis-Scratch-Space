@@ -1,0 +1,67 @@
+---
+title: "Dimension reduction"
+output: 
+rmarkdown::html_vignette: 
+fig_width: 7 
+fig_height: 8 
+vignette: >
+  %\VignetteIndexEntry{Dimension reduction}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+<style>
+p.caption {
+  font-size: 1.5em;
+}
+</style>
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+Our goal here is to produce an informative UMAP. To get there, we'll also use PCA to get a reduced-dimension dataset,
+and we'll try UMAP under a few parameterizations to see what works best.
+
+We start by loading the data we'll need, which was output by the earlier scripts from the [workflow vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/vignette-melanoma/_code/vignette):
+
+```{r loading}
+library(uwot)
+library(irlba)  
+# note: the irlba package is having some version trouble as of early 2024. 
+# If you encounter this, run: these lines:
+#  install.packages("Matrix", type = "source")
+#  install.packages("irlba", type = "source")
+
+# load data:
+# note these files are for convenience during analysis, and are not a NanoString-supported format
+mydir <- "../"
+norm <- readRDS(paste0(mydir, "/processed_data/norm.RDS"))
+metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS"))
+```
+
+Now we run PCA and UMAP:
+
+```{r prepforumap}
+tempumapfileloc <-  paste0(mydir, "/processed_data/um.RDS")
+if (!file.exists(tempumapfileloc)) {
+  # run PCA:
+  pc <- irlba::prcomp_irlba(sqrt(norm), n = 25)$x
+
+  # run UMAP:
+  um <- uwot::umap(pc, n_neighbors = 40, spread = 1, min_dist = 0.1, metric = "cosine")
+  #um <- uwot::umap(sqrt(as.matrix(norm))) #, n_neighbors = 40, spread = 1, min_dist = 0.1, metric = "cosine")
+  rownames(um) <- rownames(norm)
+  
+  # save:
+  saveRDS(um, tempumapfileloc)
+} else {
+  um <- readRDS(tempumapfileloc)
+}
+
+# plot it:
+par(mar = c(0,0,0,0))
+plot(um, pch = 16, cex = 0.1, col = "dodgerblue4")
+```
