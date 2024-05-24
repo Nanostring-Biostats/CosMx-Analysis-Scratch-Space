@@ -1,0 +1,129 @@
+---
+title: "FOC QV vignette"
+output: 
+rmarkdown::html_vignette: 
+toc: true
+fig_width: 7 
+fig_height: 8 
+vignette: >
+  %\VignetteIndexEntry{FOV QC vignette}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+<style>
+p.caption {
+  font-size: 1.5em;
+}
+</style>
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+This vignette contains a quick walkthrough of the FOV QC tool's functions on a small demo dataset.
+
+First we'll load the necessary data and code:
+
+```{r init}
+
+## source the necessary functions:
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/FOV-QC/code/FOV%20QC/FOV%20QC%20utils.R")
+
+## load barcodes:
+allbarcodes <- readRDS(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/FOV-QC/code/FOV%20QC/barcodes_by_panel.RDS"))
+names(allbarcodes)
+# get the barcodes for the panel we want:
+barcodemap <- allbarcodes$Hs_6k
+head(barcodemap)
+
+## load example data: a subset of FOVs and genes from a 6k panel study of breast cancer:
+load(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/FOV-QC/code/FOV%20QC/FOV%20QC%20example%20data.RData"))
+
+# data structure:
+str(counts)
+counts[1:5, 1:5]
+head(xy)
+head(fov)
+# (Note : the above data objects can easily be extracted from a Giotto or Seurat or tileDB object. 
+# See the docs for whichever system you're using for how to extract count matrices and metadata columns.
+# Note that this code expects a count matrix with cells in rows & genes in columns, and 
+# some toolkits store a transposed version of this matrix. In this case, use Matrix::t() to transpose
+# your sparse counts matrix.)
+```
+
+Now we run the FOV QC function. A single line of code suffices:
+
+```{r runfn}
+# run the method:
+res <- runFOVQC(counts = counts, xy = xy, fov = fov, barcodemap = barcodemap)
+str(res)
+```
+
+Parts of the output provide a high-level view of the impacted FOVs and genes:
+
+```{r highlevel}
+# which FOVs were flagged:
+res$flaggedfovs
+# show them in space:
+mapFlaggedFOVs(res)
+# which genes are involved in the flagged bits in those FOVs:
+head(res$flagged_fov_x_gene)
+# show the flagged genes (genes losing just one reporter cycle impacts a lot of genes):
+head(res$flagged_fov_x_gene[, "gene"])
+# count how many genes were impacted in one or more flagged FOVs:
+length(unique(res$flagged_fov_x_gene[, "gene"]))
+```
+
+Now we'll go into detail, dissecting the causes of FOV flags.
+We'll start by looking at signal loss:
+
+```{r signalloss}
+# Look for loss in total signal strength:
+FOVSignalLossSpatialPlot(res, shownames = TRUE) 
+```
+
+Two FOVs with clear signal loss have been flagged; another with more marginal signal loss has passed. 
+
+Now we'll look for FOVs with biased expression profiles.
+Below we draw a heatmap of estimated bias suffered for each FOV * barcode bit (only flagged FOV * bits are colored);
+Use this view to peek under the hood at the intermediate results used to flag individual FOVs.
+
+```{r biasheatmap}
+FOVEffectsHeatmap(res) 
+```
+
+We see FOV 19 has many flagged bits, though most are from just one color from a reporter cycle.
+Biological variability can cause single bits to be flagged, so we only flag FOVs where >=2
+However, all 4 bits of reporter cycle 12 are flagged in FOV 19, so we fail that FOV.
+Similarly, we fail FOV 17 for having 3 failed bits in both reporter cycle 18 and 27,
+and FOV 18 for failing all 4 bits of reporter cycle 18.
+FOVs 17 and 14 have sporadic bits flagged, but not consistently within a reporter cycle, so we pass them. 
+
+
+Next we draw spatial plots of per-bit FOV effects:
+These plots show all bits from flagged reporter cycles (only reporter cycles 
+with >= 2 flagged bits in a single FOV get shown):
+Here we divide the tissue into sub-FOV grids, and we color each grid square by its change
+in a barcode bit's total gene expression from similar grid squares from other FOVs.
+FOVs flagged for the bit are highlighted yellow.
+Grid squares without enough information are omitted. 
+
+```{r spatialplots, fig.width = 8, fig.height=8}
+par(mfrow = c(2,2))
+FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "flagged_reportercycles") 
+```
+
+In the above plots, FOV failures tend to be unambiguous: it's very clear when all 4 bits from a reporter
+cycle are lost in an impacted FOV.
+
+As a contrast, we can plot a flagged bit that appears more driven by spatial biology than by FOV artifacts.
+Although one FOV was flagged for this bit, no other bits from this reporter cycle have been flagged in that FOV, 
+so this result did not cause any FOVs to fail.
+
+```{r spatialplotsnofail}
+par(mfrow = c(1,1))
+FOVEffectsSpatialPlots(res = res, outdir = NULL, bits = "reportercycle22R") 
+```
+
