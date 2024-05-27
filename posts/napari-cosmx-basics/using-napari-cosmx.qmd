@@ -2,10 +2,6 @@
 title: "`napari-cosmx` essentials"
 author:
   - name: Evelyn Metzger
-    orcid: 0000-0002-4074-9003
-    affiliations: 
-      - ref: nstg
-      - ref: eveilyeverafter
 toc: true
 toc-title: Contents
 toc-depth: 3
@@ -17,7 +13,7 @@ date: "2024-05-01"
 categories: [napari]
 draft: false
 # image: figures/prostate.gif
-code-fold: true
+code-fold: false
 ---
 
 # Introduction 
@@ -52,55 +48,73 @@ XX minutes and had a peak resource use of XX GBs.
 Once downloaded, uncompress the `HalfBrain.zip` file on your computer. Stitching
 can process with one of two approaches:
 
-<!-- ## Formatting the example data -->
-
-<!-- The data come in a variety of formats though napari -->
-<!-- is not one of them. We therefore must download the `Coronal Hemisphere Raw Data Export` and use the technique from [this blog post](../napari-programmatically-stitching/stitching-programmatically.qmd){target="_blank"} -->
-<!-- to create the napari-ready files. We will also make use of the cell typing data from -->
-<!-- the `Seurat Object`. -->
-
 ::: {.panel-tabset group="language"}
 
 ## GUI Approach
 
-In your Finder window, create a folder named `mouse_brain`.  Move the `HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults` to `mouse_brain/AnalysisResults`, 
-Move the `HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir` to `mouse_brain/CellStatsDir`, and `HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary` to `mouse_brain/RunSummary`.
+In your Finder window, create a folder named `mouse_brain`.  Move:
 
-```{bash}
-#| eval: false
-#| label: tree
-
-$ tree -f
-
-TO DO
-```
+- `HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults` to `mouse_brain/AnalysisResults`
+- `HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir` to `mouse_brain/CellStatsDir`
+- `HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary` to `mouse_brain/RunSummary`
 
 Once you have that formatted, use the [stitching widget method](../using-napari-for-cosmx-data/index.qmd#sec-stitch-images){target="_blank"}
-to create the mouse brain napari files.
+to create the mouse brain napari files. For this post, I named my output folder 
+`mouse_brain_napari_files`.
 
 ## Terminal/Unix Approach
 
-We can use `stitch-images` and `read-targets` within our virtual environment 
+We can use `stitch-images` and `read-targets` within your virtual environment 
 to directly stitch our napari files. For more info, see our
 [previous post](../napari-programmatically-stitching/stitching-programmatically.qmd){target="_blank"}.
 
 
-```{bash}
+```{r}
 #| label: stitching mouse brain programmatically
 #| eval: false
-#| label: tree
 
 conda activate napari_stitching
 cd /into/your/project/folder
 unzip /path/to/your/downloaded/HalfBrain.zip
 outdir = "mouse_brain_napari_files"
+
 stitch-images -i /path/to/HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults \ 
+  -f /path/to/HalfBrain/RunSummary -o $outdir
 
-
+read-targets /path/to/HalfBrain/AnalysisResults -o $outdir
 
 ```
+
+To do. Run through this method and capture timing and CPU/RAM usage.
+
+```
+import psutil
+
+p=psutil.Process(121000) # a pid you want to track. Father, son, brother, unrelated. It doesn't matter
+p.cpu_percent()
+# 1.4 my process use 1.4% of a cpu
+p.cpu_times()
+# pcputimes(user=42.4, system=0.01, children_user=0.0, children_system=0.0, iowait=0.01)
+# Or detail
+p.cpu_times().user, p.cpu_times().system
+# Time spend so far, in sec
+
+p.memory_percent()
+#0.14 (0,14% memory used)
+```
+
+We will also use the cell typing data from the Seurat file
 
 
 
 :::
+
+
+<!-- ## Formatting the example data -->
+
+The data come in a variety of formats though napari
+is not one of them. We therefore must download the `Coronal Hemisphere Raw Data Export` and use the technique from [this blog post](../napari-programmatically-stitching/stitching-programmatically.qmd){target="_blank"}
+to create the napari-ready files. We will also make use of the cell typing data from
+the `Seurat Object`.
+
 
