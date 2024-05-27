@@ -73,6 +73,34 @@ In your Finder window, create a folder named `mouse_brain`.  Move:
 - `HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir` to `mouse_brain/CellStatsDir`
 - `HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary` to `mouse_brain/RunSummary`
 
+The folder structure should looks like this:
+
+```
+tree -f
+
+├── ./HalfBrain
+│   ├── ./HalfBrain/AnalysisResults
+│   │   └── ./HalfBrain/AnalysisResults/cp7bjyp7pm
+│   ├── ./HalfBrain/CellStatsDir
+│   │   ├── ./HalfBrain/CellStatsDir/CellComposite
+│   │   ├── ./HalfBrain/CellStatsDir/CellOverlay
+│   │   ├── ./HalfBrain/CellStatsDir/FOV001
+│   │   ├── ...
+│   │   ├── ./HalfBrain/CellStatsDir/FOV130
+│   │   ├── ./HalfBrain/CellStatsDir/Morphology2D
+│   │   └── ./HalfBrain/CellStatsDir/RnD
+│   ├── ./HalfBrain/RunSummary
+│   │   ├── ./HalfBrain/RunSummary/Beta12_Affine_Transform_20221103.csv
+│   │   ├── ./HalfBrain/RunSummary/FovTracking
+│   │   ├── ./HalfBrain/RunSummary/Morphology_ChannelID_Dictionary.txt
+│   │   ├── ./HalfBrain/RunSummary/Run1000_20230406_205644_S1_Beta12_ExptConfig.txt
+│   │   ├── ./HalfBrain/RunSummary/Run1000_20230406_205644_S1_Beta12_SpatialBC_Metrics4D.csv
+│   │   ├── ./HalfBrain/RunSummary/Shading
+│   │   ├── ./HalfBrain/RunSummary/c902.fovs.csv
+│   │   └── ./HalfBrain/RunSummary/latest.fovs.csv
+
+```
+
 Once you have that formatted, use the [stitching widget method](../using-napari-for-cosmx-data/index.qmd#sec-stitch-images){target="_blank"}
 to create the mouse brain napari files. For this post, I named my output folder 
 `mouse_brain_napari_files`.
@@ -102,25 +130,34 @@ read-targets /path/to/HalfBrain/AnalysisResults -o $outdir
 
 To do. Run through this method and capture timing and CPU/RAM usage.
 
+We will also use the cell typing data from the Seurat file. 
+
+```{r}
+#| label: extracting-seurat-data
+#| echo: true
+#| eval: false
+#| message: true
+#| warning: false
+
+# This is R code
+library(Seurat)
+library(plyr)
+library(dplyr)
+# sem_path will be wherever you downloaded your Seurat object
+sem_path <- "/path/to/your/muBrainRelease_seurat.RDS"
+#sem_path <- "/Volumes/Extreme_Pro/data/HalfBrain/muBrainRelease_seurat.RDS"
+sem <- readRDS(sem_path)
+meta <- sem@meta.data
+meta <- meta %>% select(starts_with("RNA_nbclust")) %>% select(ends_with("clusters"))
+colnames(meta)[1] <- 'cell_types'
+meta$cell_ID <- row.names(meta) # adds cell_ID column
+rownames(meta) <- NULL
+meta <- meta %>% relocate(cell_ID) # moves cell_ID to first column position
+write.table(meta, file="/path/to/inside/napari-ready-folder/_metadata.csv", 
+            sep=",", col.names=TRUE, row.names=FALSE, quote=FALSE)
+write.table(meta, file="/Volumes/Extreme_Pro/data/HalfBrain/mouse_brain_napari_files/_metadata.csv", 
+            sep=",", col.names=TRUE, row.names=FALSE, quote=FALSE)
 ```
-import psutil
-
-p=psutil.Process(121000) # a pid you want to track. Father, son, brother, unrelated. It doesn't matter
-p.cpu_percent()
-# 1.4 my process use 1.4% of a cpu
-p.cpu_times()
-# pcputimes(user=42.4, system=0.01, children_user=0.0, children_system=0.0, iowait=0.01)
-# Or detail
-p.cpu_times().user, p.cpu_times().system
-# Time spend so far, in sec
-
-p.memory_percent()
-#0.14 (0,14% memory used)
-```
-
-We will also use the cell typing data from the Seurat file
-
-
 
 :::
 
