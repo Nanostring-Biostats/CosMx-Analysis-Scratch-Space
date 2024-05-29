@@ -21,77 +21,87 @@ code-fold: false
 description: Did you know that napari-cosmx can stitch images from AtoMx programmatically? In this post I show you how.
 freeze: false
 #page-layout: full
-
+editor: 
+  markdown: 
+    wrap: 72
 ---
 
-# Introduction 
+# Introduction
 
-In our [first napari-series post](../using-napari-for-cosmx-data/index.qmd){target="_blank"}, 
-we introduced our
-`napari-cosmx` plugin that lets you view and analyze CosMx&#8482; SMI data that
-has been exported from AtoMx&#8482; SIP. There, users can "stitch" raw data from AtoMx
-using a widget within the Graphical User Interface (GUI). 
+In our [first napari-series
+post](../using-napari-for-cosmx-data/index.qmd){target="_blank"}, we
+introduced our `napari-cosmx` plugin that lets you view and analyze
+CosMx™ SMI data that has been exported from AtoMx™ SIP. There, users can
+"stitch" raw data from AtoMx using a widget within the Graphical User
+Interface (GUI).
 
-In some settings, such as linux servers, it's not possible to use a GUI to stitch.
-In other cases, one might be interested in programmatically stitching many slides
-without the need to use the GUI. And finally, with the GUI-based approach, 
-we had to start [from an existing slide](../using-napari-for-cosmx-data/index.qmd#sec-loading-slides){target="_blank"}.
-This extra step was necessary because the widget used to stitch was only available
-within the plugin itself and a slide is needed to launch the plugin.
+In some settings, such as linux servers, it's not possible to use a GUI
+to stitch. In other cases, one might be interested in programmatically
+stitching many slides without the need to use the GUI. And finally, with
+the GUI-based approach, we had to start [from an existing
+slide](../using-napari-for-cosmx-data/index.qmd#sec-loading-slides){target="_blank"}.
+This extra step was necessary because the widget used to stitch was only
+available within the plugin itself and a slide is needed to launch the
+plugin.
 
-It's possible to stitch without the need of a GUI. This post is for people
-familiar with programming in python but I try to make it approachable for non-experts.
-The [GUI approach](../using-napari-for-cosmx-data/index.qmd){target="_blank"} is
-recommended for most users as it eliminates much of the installation that is needed
-to stitch slides programmatically and has been tested on more machines.
+It's possible to stitch without the need of a GUI. This post is for
+people familiar with programming in python but I try to make it
+approachable for non-experts. The [GUI
+approach](../using-napari-for-cosmx-data/index.qmd){target="_blank"} is
+recommended for most users as it eliminates much of the installation
+that is needed to stitch slides programmatically and has been tested on
+more machines.
 
-- @sec-installation Install napari and `napari-cosmx` using a virtual environment
-- @sec-single-slide How to stitch a single slide within python
-- @sec-multiple-slides How to stitch multiple slides serially with python 
+-   @sec-installation Install napari and `napari-cosmx` using a virtual
+    environment
+-   @sec-single-slide How to stitch a single slide within python
+-   @sec-multiple-slides How to stitch multiple slides serially with
+    python
 
-::: {.callout-note}
-Note: throughout this post I use the term "stitching" for brevity to refer 
-to _both_ the stitching (`stitch-images`)
-and the reading of targets (`read-targets`). These are two separate package scripts but are 
-typically executed back-to-back. 
+::: callout-note
+Note: throughout this post I use the term "stitching" for brevity to
+refer to *both* the stitching (`stitch-images`) and the reading of
+targets (`read-targets`). These are two separate package scripts but are
+typically executed back-to-back.
 :::
 
 # Installation {#sec-installation}
 
+Before we begin stitching, we need to install napari and the
+`napari-cosmx` plugin. I've found that the success of installation
+depends on the particular package versions and the version of python and
+we recommend using a virtual environment such as python's built in
+[venv](https://docs.python.org/3/library/venv.html){target="_blank"} or
+[miniconda](https://docs.anaconda.com/free/miniconda/){target="_blank"}.
+Of those two virtual environment options, conda allows us the
+flexibility to select a specific version on python so this post will use
+conda.
 
-Before we begin stitching, we need to install napari and the `napari-cosmx` plugin.
-I've found that the success of installation depends on the particular package
-versions and the version of python and we recommend using a virtual environment
-such as python's built in 
-[venv](https://docs.python.org/3/library/venv.html){target="_blank"} or [miniconda](https://docs.anaconda.com/free/miniconda/){target="_blank"}. 
-
-Users may have trouble installing napari 0.4.17 with python 3.10+. For this post we'll
-stick with 3.9 but other configurations may be possible.
-Of the two virtual environment options above, conda allows us
-the flexibility to select a specific version on python so this post will use conda.
-
-I've tested the instructions below on MacOS (v12.5.1) and Windows (11 Pro). For Mac, 
-we'll make use of the built-in `Terminal`. For Windows we'll used
-[VS Code](https://code.visualstudio.com/download){target="_blank"}
-for this post. 
+I've tested the instructions below on MacOS (v12.5.1) and Windows (11
+Pro). For Mac, we'll make use of the built-in `Terminal`. For Windows
+we'll used [VS
+Code](https://code.visualstudio.com/download){target="_blank"} for this
+post.
 
 ## Create Virtual Environment
 
 ::: {.panel-tabset group="language"}
 ### Mac/Unix
 
-In `Terminal` create a virtual environment named `napari_stitching` and activate it. 
+In the `assests > napari-cosmx releases` folder, there's a yaml file
+named `napari-cosmx-env.yml` that will use to set the environment named
+`napari-cosmx-env`.
 
 ```{bash}
 #| eval: false
 #| label: mac venv creation and activation
 
-conda create -y -n napari_stitching -c conda-forge python=3.9 napari==0.4.17
-conda activate napari_stitching
+conda env create --file /path/to/-napari-cosmx-env.yml
+conda activate napari-cosmx-env
 
 # # built-in venv alternative
-# python3.9 -m venv napari_stitching
-# source napari_stitching/bin/activate
+# python3.9 -m venv napari-cosmx-env
+# source napari-cosmx-env/bin/activate
 
 ```
 
@@ -99,44 +109,30 @@ conda activate napari_stitching
 
 VS Code has a useful
 [page](https://code.visualstudio.com/docs/python/environments){target="_blank"}
-on virtual environments and we'll use some of those elements to create and
-activate ours.
+on virtual environments and we'll use some of those elements to create
+and activate ours.
 
-Open VS Code and navigate to a project folder. 
-Open the Command Pallete and type `Python: Create Environment`. When it is finished
-creating the `.conda` folder within your project, open the `Command Prompt` terminal
-(`Terminal` > `New Terminal`). This will open a terminal within your project. To
-activate the virtual environment, type:
+Open VS Code and navigate to a project folder. Open the Command Pallete
+and type `Python: Create Environment`. Choose conda and select Python
+3.10. When it is finished creating the `.conda` folder within your
+project, open the `Command Prompt` terminal (`Terminal` \>
+`New Terminal`). This will open a terminal within your project. To
+activate the virtual environment and install napari 0.4.17, type:
 
 ```{bash}
 #| eval: false
 #| label: windows venv activation
 
 conda activate .\.conda
+conda install -c conda-forge napari=0.4.17
 ```
-
 :::
 
-## Installing napari and `napari-cosmx`
-
-Now that we have our virtual environment installed and activated, 
-we need to install a few dependencies before we can install our plugin. I
-recommend installing one-at-a-time and ensuring that no errors occur. If errors
-occur, be sure to address them before continuing.
-
-```{bash}
-#| label: install depends
-#| eval: false
-
-pip install "pydantic<2"
-pip install pyqt5
-#pip install napari==0.4.17
-```
-
-We can optionally confirm that napari was installed and working using `ipython`. 
-@fig-confirmation shows the results of the code below which launched the napari viewer
-and added one of the example image layers: astronaut. To access the `ipython` interpreter, 
-simply type `ipython` within your virtual environment (and `exit()` to exit).
+We can optionally confirm that napari was installed and working using
+`ipython`. @fig-confirmation shows the results of the code below which
+launched the napari viewer and added one of the example image layers:
+astronaut. To access the `ipython` interpreter, simply type `ipython`
+within your virtual environment (and `exit()` to exit).
 
 ```{python}
 #| label: confirm napari
@@ -157,9 +153,14 @@ viewer, image_layer = napari.imshow(data.astronaut())
 knitr::include_graphics("./figures/fig-confirmation.png")
 ```
 
-Now that napari is installed we can install `napari-cosmx` plugin within our
-virtual environment. The file (and license) can be found in [asests/napari-cosmx releases](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/napari-cosmx%20releases){target="_blank"} in the source code of our scratch space repository. 
-Download this `whl` file, return to bash/cmd, and install it like this:
+## Installing `napari-cosmx`
+
+Now that we have our virtual environment installed, activated, and
+napari installed, we need to install the plugin. The file (and license)
+can be found in [asests/napari-cosmx
+releases](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/napari-cosmx%20releases){target="_blank"}
+in the source code of our scratch space repository. Download this `whl`
+file, return to bash/cmd, and install it like this:
 
 ::: {.panel-tabset group="language"}
 ### Mac/Unix
@@ -180,20 +181,21 @@ pip install /path/to/your/napari_CosMx-0.4.17.0-py3-none-any.whl
 pip install "C:\path\to\your\napari_CosMx-0.4.17.0-py3-none-any.whl"
 
 ```
-
 :::
 
-There are a few package scripts that are installed within your virtual environment. 
-The two we'll use on today is `stitch-images` and `read-targets`. 
+There are a few package scripts that are installed within your virtual
+environment. The two we'll use on today is `stitch-images` and
+`read-targets`.
 
 # Stitching a single slide in python {#sec-single-slide}
 
-Before we stitch multiple slides, let's stitch a single slide within python. 
-In the code below, we point python to the location of our raw data slide folder.
-This folder will have subfolders `CellStatsDir`, `RunSummary`, and `AnalysisResults`.
+Before we stitch multiple slides, let's stitch a single slide within
+python. In the code below, we point python to the location of our raw
+data slide folder. This folder will have subfolders `CellStatsDir`,
+`RunSummary`, and `AnalysisResults`.
 
-In the user-defined options section of this script,
-be sure to configure the paths as needed.
+In the user-defined options section of this script, be sure to configure
+the paths as needed.
 
 ```{python}
 #| label: stitch one slide
@@ -235,12 +237,12 @@ cmd_read_targets = 'read-targets "' + AnalysisDir + '"' + ' -o ' + SlideOutputDi
 
 ```
 
-In the script above, we directed python to the input (`SlideDir`) and the 
-output (`SlideOutputDir`) folders and
-then we called the package scripts that we installed moments ago. The first package script
-builds the zarr structure and the second one creates the targets.hdf5 file.
+In the script above, we directed python to the input (`SlideDir`) and
+the output (`SlideOutputDir`) folders and then we called the package
+scripts that we installed moments ago. The first package script builds
+the zarr structure and the second one creates the targets.hdf5 file.
 
-We can also call these package scripts directly in our terminal. 
+We can also call these package scripts directly in our terminal.
 
 ```{bash}
 #| label: call package scripts
@@ -250,7 +252,8 @@ stitch-images -i <path to CellStats dir> -f <path to RunSummary dir> -o <path to
 read-targets <path to AnalysisResults/sub dir> - o <path to output dir>
 ```
 
-For more information, and advanced options, run `stitch-image --help` or `read-targets --help`
+For more information, and advanced options, run `stitch-image --help` or
+`read-targets --help`
 
 ```{bash}
 #| label: call package scripts help 1
@@ -259,7 +262,7 @@ For more information, and advanced options, run `stitch-image --help` or `read-t
 stitch-images --help
 ```
 
-```
+```         
 usage: stitch-images [-h] [-i INPUTDIR] [--imagesdir IMAGESDIR] [-o OUTPUTDIR] [-f OFFSETSDIR] [-l] [-u UMPERPX] [-z ZSLICE] [--dotzarr]
 
 Tile CellLabels and morphology TIFFs.
@@ -293,7 +296,7 @@ optional arguments:
 read-targets --help
 ```
 
-```
+```         
 usage: read-targets [-h] [-o OUTPUTDIR] [--filename FILENAME] folder
 
 Read decoded targets and write to hdf5
@@ -310,15 +313,18 @@ optional arguments:
 
 ## Viewing the results {#sec-launching-napari-cosmx-from-python}
 
-We can launch the plugin directly from `ipython`. In the code below, I instantiated
-a `Gemini` class object, turned off the segmentation and FOV labels layers, 
-added the PanCK and DNA channels and manually adjusted the contrast of PanCK. 
-Finally, I launched the widget for further exploration. These methods and more will
-be part of a future blog post but I include them here as a preview. You'll note in
-the widget section that the `Color Cells` widget is blank. That's because we didn't
-create metadata for this slide (_i.e._, it was not present in the raw data). For 
-an example of adding metadata, see the
-[Adding and viewing metadata](../using-napari-for-cosmx-data/index.qmd#sec-adding-metadata){target="_blank"} section from the first post.
+We can launch the plugin directly from `ipython`. In the code below, I
+instantiated a `Gemini` class object, turned off the segmentation and
+FOV labels layers, added the PanCK and DNA channels and manually
+adjusted the contrast of PanCK. Finally, I launched the widget for
+further exploration. These methods and more will be part of a future
+blog post but I include them here as a preview. You'll note in the
+widget section that the `Color Cells` widget is blank. That's because we
+didn't create metadata for this slide (*i.e.*, it was not present in the
+raw data). For an example of adding metadata, see the [Adding and
+viewing
+metadata](../using-napari-for-cosmx-data/index.qmd#sec-adding-metadata){target="_blank"}
+section from the first post.
 
 ```{python}
 #| label: view one slide
@@ -353,10 +359,10 @@ knitr::include_graphics("./figures/fig-stitch-single-slide.png")
 
 # Stitching multiple slides {#sec-multiple-slides}
 
-We can process several slides serially in python. Let's try it. Let's say we
-have a `Batch` directory that contains five slides. Within each slide there is a folder
-containing the slide name and another folder named Logs. Here's what the batch folder 
-structure might look like.
+We can process several slides serially in python. Let's try it. Let's
+say we have a `Batch` directory that contains five slides. Within each
+slide there is a folder containing the slide name and another folder
+named Logs. Here's what the batch folder structure might look like.
 
 ```{bash}
 #| label: tree 2
@@ -382,30 +388,46 @@ structure might look like.
 
 ```
 
-In the python script below, we point `BatchFolder` to the location that contains
-these slide folders. We also define `OutputFolder` to store the napari folders.
-The script then searches through those folders and stitches the slides.
+In the python script below, we point `BatchFolder` to the location that
+contains these slide folders. We also define `OutputFolder` to store the
+napari folders. The script then searches through those folders and
+stitches the slides.
 
 <!-- ```{bash} -->
+
 <!-- #| label: make symbolic links to replicate slides (demo) -->
+
 <!-- #| eval: false -->
+
 <!-- #| echo: false -->
 
 <!-- #!/bin/bash -->
-<!-- # Define the source folder path -->
-<!-- source_folder="./AUG29_13INTEGR_6K_BRST_PS_S2" -->
-<!-- # Create symbolic links using a sequence -->
-<!-- for i in {3..6}; do -->
-<!--   target_folder_name="AUG29_13INTEGR_6K_BRST_PS_S$i" -->
-<!--   target_folder_path="./$target_folder_name" -->
-<!--   if ln -s "$source_folder" "$target_folder_path"; then -->
-<!--     echo "Created symbolic link: $target_folder_path -> $source_folder" -->
-<!--   else -->
-<!--     echo "Error creating symbolic link: $?" -->
-<!--   fi -->
-<!-- done -->
-<!-- ``` -->
 
+<!-- # Define the source folder path -->
+
+<!-- source_folder="./AUG29_13INTEGR_6K_BRST_PS_S2" -->
+
+<!-- # Create symbolic links using a sequence -->
+
+<!-- for i in {3..6}; do -->
+
+<!--   target_folder_name="AUG29_13INTEGR_6K_BRST_PS_S$i" -->
+
+<!--   target_folder_path="./$target_folder_name" -->
+
+<!--   if ln -s "$source_folder" "$target_folder_path"; then -->
+
+<!--     echo "Created symbolic link: $target_folder_path -> $source_folder" -->
+
+<!--   else -->
+
+<!--     echo "Error creating symbolic link: $?" -->
+
+<!--   fi -->
+
+<!-- done -->
+
+<!-- ``` -->
 
 ```{python}
 #| label: stitch multiple slides
@@ -418,12 +440,12 @@ from os import listdir
 from glob import iglob
 
 # Directory containing multiple slides
-BatchFolder = '/Users/evelynmetzger/Documents/Projects/napari/breast_cancer/from_s3'
-BatchFolder = r"C:\Users\SMIT-1\Documents\Projects\Evelyn\napari_testing\from_s3"
+BatchFolder = '/directory/containing/multiple/slides'
+BatchFolder = r"C:\directory\containing\multiple\slides"
 
 # Output path
-OutputFolder = '/Users/evelynmetzger/Documents/Projects/napari/how-tos/multiple_slides'
-OutputFolder = r"C:\Users\SMIT-1\Documents\Projects\Evelyn\napari_testing\from_s3\multiple_slides"
+OutputFolder = '/path/to/output/directory'
+OutputFolder = r"C:\path\to\output\directory"
 
 ### Functions
 
@@ -498,21 +520,13 @@ for dir in listdir(BatchFolder):
 
 ## Conclusion
 
-In this post, I showed how to prepare napari-ready slide folders from raw data programmatically. 
-To do this, we used a virtual environment to install our plugin and created a script
-to install a single slide followed by a script to install multiple slides. 
+In this post, I showed how to prepare napari-ready slide folders from
+raw data programmatically. To do this, we used a virtual environment to
+install our plugin and created a script to install a single slide
+followed by a script to install multiple slides.
 
-I also provided a preview of some of the things you can do with the `napari-cosmx`
-plugin, such as add layers, set contrasts, turn off visibility of layers. Check back
-later to see how we can use some of these features (GUI or within python) to 
-interact with and analyze CosMx data.
-
-
-
-
-
-
-
-
-
-
+I also provided a preview of some of the things you can do with the
+`napari-cosmx` plugin, such as add layers, set contrasts, turn off
+visibility of layers. Check back later to see how we can use some of
+these features (GUI or within python) to interact with and analyze CosMx
+data.
