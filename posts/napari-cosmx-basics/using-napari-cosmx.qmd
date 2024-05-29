@@ -165,7 +165,7 @@ the plugin.
 # Working with layers {#sec-working-with-layers}
 
 When we open a slide with `napari-cosmx`, by default there will be a few napari
-layers visible (@fig-initial). These include `FOV labels` and `Segmentation`. Clicking the eye
+layers visible (@fig-initial; Initial View tab). These include `FOV labels` and `Segmentation`. Clicking the eye
 icon next to a layer will change its visibility. Let's turn off those layers 
 for a moment and visualize the cell types from the `RNA_nbclust_clusters` column 
 (@fig-cell-types). In the `Color Cells` widget, we can control which cell types
@@ -178,7 +178,8 @@ types, added GFAP in red and DNA in blue, and zoomed into the hippocampus. When
 I click on a layer, it becomes the activate layer and I can use the `layer controls` widget
 to adjust attributes to that layer such as contrast
 limits, gamma, layer blending, and more. Finally, we can view raw transcripts 
-(or proteins). Simply select the target and the color and click `Add layer`. 
+(or proteins). Simply select the target and the color and click `Add layer`. In 
+@fig-tx, I zoomed in on a section of the cortex and plotted _Calb1_.
 
 
 ::: {.panel-tabset}
@@ -217,10 +218,8 @@ knitr::include_graphics("./figures/fig-IF.png")
 
 ## Transcripts
 
-To do.
-
 ```{r}
-#| eval: false
+#| eval: true
 #| echo: false
 #| label: "fig-tx"
 #| fig-cap: "Expression of _Calb1_ in cortex layer I"
@@ -287,7 +286,6 @@ with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         writer.append_data(screenshot)
 
 # IF only
-
 gem.viewer.layers['RNA_nbclust_clusters'].visible = False
 gem.add_channel('GFAP', colormap = 'red')
 gfap = gem.viewer.layers['GFAP']
@@ -326,14 +324,16 @@ In practice, I use the GUI to adjust the settings (_e.g._, zoom, opacity) and th
 'jot down' the results. For example, when I zoom or pan to another location, 
 that location can be found at:
 
-```
+```{r}
+#| eval: false
 gem.viewer.camera.zoom
 gem.viewer.camera.center
 ```
 
 Similarly, the contrast limits and gamma values for IF channels can be saved as well. 
 
-```
+```{r}
+#| eval: false
 dna = gem.viewer.layers['DNA']
 dna.contrast_limits = [507.82222222222225, 1260.8000000000002]
 dna.gamma = 1.1682758620689655
@@ -343,7 +343,8 @@ Screenshots can be done programmatically with the napari's `screenshot` method
 and there are additional settings you can change (_e.g._, just the canvas, scale)
 that we won't cover here.
 
-```
+```{r}
+#| eval: false
 fig_path = output_path + "/fig-transcripts.png"
 with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         screenshot = gem.viewer.screenshot(canvas_only=False)
@@ -359,13 +360,15 @@ want to highlight a few.
 The GUI offers a handful of colors to plot transcripts. We can specify which color,
 by name or by hexcode, to plot. For example: 
 
-```
+```{r}
+#| eval: false
 gem.plot_transcripts(gene = "Calb1", color = 'pink', point_size=20)
 ```
 
 which is the same as
 
-```
+```{r}
+#| eval: false
 gem.plot_transcripts(gene = "Calb1", color = '#FFC0CB', point_size=20)
 ```
 
@@ -373,7 +376,8 @@ gem.plot_transcripts(gene = "Calb1", color = '#FFC0CB', point_size=20)
 
 We can plot similar genes or targets with the same color:
 
-```
+```{r}
+#| eval: false
 to do: gem targets that are negative then loop
 negatives = 
 [gem.plot_transcripts(gene = x, color = "white", point_size=10) for x in negatives];
@@ -382,7 +386,8 @@ negatives =
 
 And we can combine this with a list of tuples:
 
-```
+```{r}
+#| eval: false
 genes = [('to do', "orange"), ("", "cyan"), ("", "yellow")]
 [gem.plot_transcripts(gene = x[0], color = x[1], point_size=10) for x in genes];
 
@@ -395,7 +400,8 @@ discern any features. For example (to do). Adjusting the transparents of the lay
 in the GUI only changes the transparency of a single point so that's not feasible.
 But this is possible in interepeter. 
 
-```
+```{r}
+#| eval: false
 gem.viewer.layers['Npy'].opacity = 0.2
 
 ```
@@ -405,8 +411,26 @@ gem.viewer.layers['Npy'].opacity = 0.2
 This is not advised for resource-limited systems as it plots all transcripts
 for the slide. 
 
-```
+```{r}
+#| eval: false
 to do
+```
+
+## Specify individual cell types
+
+Directly specifying the cell type colors is possible. 
+
+```{r}
+#| eval: false
+to do
+```
+
+
+## Changing background color
+
+```{r}
+#| eval: false
+gem.viewer.window.qt_viewer.canvas.background_color_override = 'white'
 ```
 
 
