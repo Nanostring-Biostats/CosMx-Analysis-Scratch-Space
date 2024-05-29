@@ -267,6 +267,7 @@ that can help reproduce the figures above.
 output_path = 'path/to/store/figures'
 
 ## Initial
+gem.show_widget()
 gem.viewer.window.resize(1650,1100)
 gem.viewer.camera.center = (0.0, 0.6830708351616575, -57.16103351264418)
 gem.viewer.camera.zoom = 125.266673507691
@@ -303,15 +304,17 @@ with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         screenshot = gem.viewer.screenshot(canvas_only=False)
         writer.append_data(screenshot)
 
+
 # Transcripts
+
 cell_type_layer = gem.viewer.layers['RNA_nbclust_clusters']
-cell_type_layer.opacity = 0.5
+cell_type_layer.opacity = 0.9
 cell_type_layer.visible = True
-gem.viewer.camera.center = (0.0, -0.09967980655740494, -58.955433742224685)
-gem.viewer.camera.zoom = 578.8381123472684
+gem.viewer.camera.center = (0.0, -0.009723512204714457, -59.25760232977486)
+gem.viewer.camera.zoom = 1204.3755331686673
 gem.viewer.layers['Segmentation'].visible = True
-gem.viewer.layers['Segmentation'].opacity = 0.2
-gem.plot_transcripts(gene = "Calb1", color = 'magenta', point_size=20) # I
+gem.viewer.layers['Segmentation'].opacity = 0.6
+gem.plot_transcripts(gene = "Calb1", color = 'cyan', point_size=50) # I
 
 fig_path = output_path + "/fig-transcripts.png"
 with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
@@ -374,21 +377,27 @@ gem.plot_transcripts(gene = "Calb1", color = '#FFC0CB', point_size=20)
 
 ## Plotting genes with list comprehensions
 
-We can plot similar genes or targets with the same color:
+We can plot similar genes or targets with the same color. For example, here's
+the negatives in white.
 
 ```{r}
 #| eval: false
-to do: gem targets that are negative then loop
-negatives = 
+#| 
+df = gem.targets
+filtered_df = df[df.target.str.contains("NegPrb")]
+
+pandas_df = filtered_df.to_pandas_df()
+negatives = pandas_df.target.unique().tolist()
 [gem.plot_transcripts(gene = x, color = "white", point_size=10) for x in negatives];
+
 
 ```
 
-And we can combine this with a list of tuples:
+We can also combine targets with a list of tuples:
 
 ```{r}
 #| eval: false
-genes = [('to do', "orange"), ("", "cyan"), ("", "yellow")]
+genes = [('Npy', "orange"), ("Calb1", "cyan")]
 [gem.plot_transcripts(gene = x[0], color = x[1], point_size=10) for x in genes];
 
 ```
@@ -408,30 +417,92 @@ gem.viewer.layers['Npy'].opacity = 0.2
 
 ## Plot all transcripts
 
-This is not advised for resource-limited systems as it plots all transcripts
-for the slide. 
+This is not advised for resource-limited systems as it plots all transcripts. 
+The method `add_points` plots all the points for a given FOV. If no FOV is
+specified, it will plot all transcripts (this can be taxing on resource-limited
+computers).
 
 ```{r}
 #| eval: false
-to do
+
+gem.add_points(fov=1)
 ```
 
 ## Specify individual cell types
 
-Directly specifying the cell type colors is possible. 
+You can choose the color of the cell types and which cells to color by supplying
+a dictionary to the 
 
 ```{r}
 #| eval: false
-to do
+custom_colors = {
+"Resp. Ciliated":"#AA0DFE",
+"Infected Resp. Ciliated":"#3283FE",
+"NK cell":"#85660D",
+"FS4":"#782AB6",
+"Pericyte":"#565656",
+"T cell":"#1C8356"
+}
+
+gem.color_cells('<name of metadata column>', color=custom_colors)
+
+```
+
+## Color cells with outlines
+
+We can also plot the cell colors as boundaries instead of filled in polygons (@fig-contours).
+
+```{r}
+#| eval: false
+
+# gem.viewer.camera.center = (0.0, -0.5375926704126319, -54.7415680001114)
+# gem.viewer.camera.zoom = 1371.524539264374
+
+gem.color_cells('RNA_nbclust_clusters', contour=2)
+
+```
+
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-contours"
+#| fig-cap: "Cells types (or other metadata items) can be represented as cell boundaries."
+
+knitr::include_graphics("./figures/fig-contours.png")
 ```
 
 
 ## Changing background color
 
+For some publication styles (_e.g._, posters), turning the background a lighter
+color might be useful. However, when changing the background, some items might be
+more difficult to see (compare @fig-contour with @fig-white).
+
 ```{r}
 #| eval: false
 gem.viewer.window.qt_viewer.canvas.background_color_override = 'white'
 ```
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-white"
+#| fig-cap: "Same extent as @fig-contours but with a white background."
+
+knitr::include_graphics("./figures/fig-white.png")
+```
+
+## Scale Bar location
+
+To reposition the scale bar to the bottom left: 
+
+```{r}
+#| eval: false
+
+gem.viewer.scale_bar.position='bottom_left'
+```
+
 
 
 # Appendix
