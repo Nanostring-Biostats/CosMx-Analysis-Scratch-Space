@@ -19,7 +19,7 @@ description: napari-cosmx is flexible enough to quickly explore SMI data in a GU
   ways in which we can use napari-cosmx to view SMI data. I will make use of this
   GUI/scripting duality and share a combination of GUI and programmatic tips-n-tricks.
 code-fold: false
-page-layout: full
+#page-layout: full
 ---
 
 ```{r}
@@ -46,7 +46,7 @@ provided a preview of the programmatic ways one can interact with their SMI data
 One of the things that I love about the `napari-cosmx` plugin 
 is its duality. It's flexible enough to quickly explore SMI data in a Graphical
 User Interface yet robust enough to script reproducible results and tap into
-the underlying python objects.In this post, I'll walk through some of the basic 
+the underlying python objects. In this post, I'll walk through some of the basic 
 ways in which we can use `napari-cosmx`to view SMI data. I'll make use of this
 duality and share a combination of GUI and programmatic tips-n-tricks.
 
@@ -104,7 +104,7 @@ to directly stitch our napari files. For more info, see our
 #| label: stitching mouse brain programmatically
 #| eval: false
 
-conda activate napari_stitching
+conda activate napari-cosmx-env
 cd /into/your/project/folder
 unzip /path/to/your/downloaded/HalfBrain.zip
 outdir = "mouse_brain_napari_files"
@@ -119,10 +119,10 @@ read-targets /path/to/HalfBrain/AnalysisResults -o $outdir
 :::
 
 We will also use the cell typing data from the Seurat file. Let's include the
-following metadata columns so we can view them: 
+following metadata columns: 
 
 - RNA_nbclust_clusters
-- RNA_nbclust_clusters_long
+- RNA_nbclust_clusters_long (optional)
 - spatialClusteringAssignments
 
 Note that the Seurat file contains _both_ public datasets. We need to filter
@@ -154,8 +154,6 @@ rownames(meta) <- NULL
 meta <- meta %>% relocate(cell_ID) # moves cell_ID to first column position
 write.table(meta, file="/path/to/inside/napari-ready-folder/_metadata.csv", 
             sep=",", col.names=TRUE, row.names=FALSE, quote=FALSE)
-# write.table(meta, file="/Volumes/Extreme_Pro/data/HalfBrain/mouse_brain_napari_files/_metadata.csv",
-#             sep=",", col.names=TRUE, row.names=FALSE, quote=FALSE)
 ```
 
 
@@ -168,11 +166,11 @@ When we open a slide with `napari-cosmx`, by default there will be a few napari
 layers visible (@fig-initial; Initial View tab). These include `FOV labels` and `Segmentation`. Clicking the eye
 icon next to a layer will change its visibility. Let's turn off those layers 
 for a moment and visualize the cell types from the `RNA_nbclust_clusters` column 
-(@fig-cell-types). In the `Color Cells` widget, we can control which cell types
-we would like to view. We can also see the cell type (and other metadata) for 
-individual cells but making the making visible the `Metadata` layer, clicking 
-on the layer, and hovering over cells of interest. When hovering, the cell 
-metadata will be displayed on the bottom of napari. To view the IF channels, use
+(@fig-cell-types). We can also color cells by their niche ('spatialClusteringAssignments'; @fig-niches). 
+In the `Color Cells` widget, we can control which cell types or niches
+we would like to view. When we activate the `Metadata` layer, hovering over
+a given cell will display the metadata associated with it as a ribbon at the bottom
+of the application. To view the IF channels, use
 the `Morphology Images` widget, In @fig-IF I turned off the visibility of the cell
 types, added GFAP in red and DNA in blue, and zoomed into the hippocampus. When
 I click on a layer, it becomes the activate layer and I can use the `layer controls` widget
@@ -195,7 +193,7 @@ limits, gamma, layer blending, and more. Finally, we can view raw transcripts
 knitr::include_graphics("./figures/fig-initial.png")
 ```
 
-## Only Cell Types
+## Cell Types
 
 ```{r}
 #| eval: true
@@ -205,6 +203,18 @@ knitr::include_graphics("./figures/fig-initial.png")
 
 knitr::include_graphics("./figures/fig-cell-types-short.png")
 ```
+
+## Niches
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-niches"
+#| fig-cap: "Cells colored by niche"
+
+knitr::include_graphics("./figures/fig-niches.png")
+```
+
 ## IF Channels
 
 ```{r}
@@ -222,7 +232,7 @@ knitr::include_graphics("./figures/fig-IF.png")
 #| eval: true
 #| echo: false
 #| label: "fig-tx"
-#| fig-cap: "Expression of _Calb1_ in cortex layer I"
+#| fig-cap: "Expression of _Calb1_ in cortex layer I."
 
 knitr::include_graphics("./figures/fig-transcripts.png")
 ```
@@ -256,7 +266,7 @@ This section is for advanced users who want finer control of the aesthetics.
 
 Most of the items we've covered can also be accessed through various methods in the `gem` object
 that can found loaded in the `>_` ipython interpeter. In fact, here's a script
-that can help reproduce the figures above.
+that can help reproduce the figures above and the ones below.
 
 
 ```{r}
@@ -270,14 +280,14 @@ output_path = 'path/to/store/figures'
 gem.show_widget()
 gem.viewer.window.resize(1650,1100)
 gem.viewer.camera.center = (0.0, 0.6830708351616575, -57.16103351264418)
-gem.viewer.camera.zoom = 125.266673507691
+gem.viewer.camera.zoom = 128.0
 
 fig_path = output_path + "/fig-initial.png"
 with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         screenshot = gem.viewer.screenshot(canvas_only=False)
         writer.append_data(screenshot)
 
-# cell types only
+## Cell types only
 gem.viewer.layers['FOV labels'].visible = False
 gem.viewer.layers['Segmentation'].visible = False
 
@@ -286,7 +296,15 @@ with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         screenshot = gem.viewer.screenshot(canvas_only=False)
         writer.append_data(screenshot)
 
-# IF only
+## Niches
+gem.color_cells('spatialClusteringAssignments')
+fig_path = output_path + "/fig-niches.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=False)
+        writer.append_data(screenshot)
+
+## IF only
+gem.color_cells('RNA_nbclust_clusters')
 gem.viewer.layers['RNA_nbclust_clusters'].visible = False
 gem.add_channel('GFAP', colormap = 'red')
 gfap = gem.viewer.layers['GFAP']
@@ -304,9 +322,7 @@ with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         screenshot = gem.viewer.screenshot(canvas_only=False)
         writer.append_data(screenshot)
 
-
-# Transcripts
-
+## Transcripts
 cell_type_layer = gem.viewer.layers['RNA_nbclust_clusters']
 cell_type_layer.opacity = 0.9
 cell_type_layer.visible = True
@@ -321,10 +337,32 @@ with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         screenshot = gem.viewer.screenshot(canvas_only=False)
         writer.append_data(screenshot)
 
+## Contours
+gfap.visible = False
+dna.visible = False
+gem.viewer.layers['Calb1'].visible = False
+
+gem.viewer.camera.center = (0.0, -0.5375926704126319, -54.7415680001114)
+gem.viewer.camera.zoom = 1371.524539264374
+gem.color_cells('RNA_nbclust_clusters', contour=2)
+
+fig_path = output_path + "/fig-contours.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=False)
+        writer.append_data(screenshot)
+
+## White background
+gem.viewer.window.qt_viewer.canvas.background_color_override = 'white'
+
+fig_path = output_path + "/fig-white.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=False)
+        writer.append_data(screenshot)
+
 ```
 
 In practice, I use the GUI to adjust the settings (_e.g._, zoom, opacity) and then
-'jot down' the results. For example, when I zoom or pan to another location, 
+'jot down' the results in my text editor. For example, when I zoom or pan to another location, 
 that location can be found at:
 
 ```{r}
@@ -436,15 +474,13 @@ a dictionary to the
 ```{r}
 #| eval: false
 custom_colors = {
-"Resp. Ciliated":"#AA0DFE",
-"Infected Resp. Ciliated":"#3283FE",
-"NK cell":"#85660D",
-"FS4":"#782AB6",
-"Pericyte":"#565656",
-"T cell":"#1C8356"
+"EPEN":"#AA0DFE",
+"CPEC":"#3283FE",
+"GN":"#85660D",
+"VLMC":"#1C8356"
 }
 
-gem.color_cells('<name of metadata column>', color=custom_colors)
+gem.color_cells('RNA_nbclust_clusters', color=custom_colors)
 
 ```
 
@@ -477,7 +513,7 @@ knitr::include_graphics("./figures/fig-contours.png")
 
 For some publication styles (_e.g._, posters), turning the background a lighter
 color might be useful. However, when changing the background, some items might be
-more difficult to see (compare @fig-contour with @fig-white).
+more difficult to see (compare @fig-contours with @fig-white).
 
 ```{r}
 #| eval: false
@@ -503,36 +539,7 @@ To reposition the scale bar to the bottom left:
 gem.viewer.scale_bar.position='bottom_left'
 ```
 
+# Conclusion
 
 
-# Appendix
-
-
-The folder structure should looks like this:
-
-```
-tree -f
-
-├── ./HalfBrain
-│   ├── ./HalfBrain/AnalysisResults
-│   │   └── ./HalfBrain/AnalysisResults/cp7bjyp7pm
-│   ├── ./HalfBrain/CellStatsDir
-│   │   ├── ./HalfBrain/CellStatsDir/CellComposite
-│   │   ├── ./HalfBrain/CellStatsDir/CellOverlay
-│   │   ├── ./HalfBrain/CellStatsDir/FOV001
-│   │   ├── ...
-│   │   ├── ./HalfBrain/CellStatsDir/FOV130
-│   │   ├── ./HalfBrain/CellStatsDir/Morphology2D
-│   │   └── ./HalfBrain/CellStatsDir/RnD
-│   ├── ./HalfBrain/RunSummary
-│   │   ├── ./HalfBrain/RunSummary/Beta12_Affine_Transform_20221103.csv
-│   │   ├── ./HalfBrain/RunSummary/FovTracking
-│   │   ├── ./HalfBrain/RunSummary/Morphology_ChannelID_Dictionary.txt
-│   │   ├── ./HalfBrain/RunSummary/Run1000_20230406_205644_S1_Beta12_ExptConfig.txt
-│   │   ├── ./HalfBrain/RunSummary/Run1000_20230406_205644_S1_Beta12_SpatialBC_Metrics4D.csv
-│   │   ├── ./HalfBrain/RunSummary/Shading
-│   │   ├── ./HalfBrain/RunSummary/c902.fovs.csv
-│   │   └── ./HalfBrain/RunSummary/latest.fovs.csv
-
-```
 
