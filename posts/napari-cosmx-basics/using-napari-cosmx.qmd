@@ -69,13 +69,8 @@ CPU, and a peak memory usage of about 12 GBs (swap space was also used). The siz
 of the napari files combined was an additional 22 GBs of disk space. 
 :::
 
-Once downloaded, uncompress the `HalfBrain.zip` file on your computer. Stitching
-can process with one of two approaches:
-
-::: {.panel-tabset group="language"}
-
-## GUI Approach
-
+Once downloaded, uncompress the `HalfBrain.zip` file on your computer or external
+hard drive.
 In your Finder window, create a folder named `mouse_brain`.  Move:
 
 - `HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults` to `mouse_brain/AnalysisResults`
@@ -86,31 +81,6 @@ Once you have that formatted, use the [stitching widget method](../using-napari-
 to create the mouse brain napari files. For this post, I named my output folder 
 `mouse_brain_napari_files`.
 
-## Terminal/Unix Approach
-
-We can use `stitch-images` and `read-targets` within your virtual environment 
-to directly stitch our napari files. For more info, see our
-[previous post](../napari-programmatically-stitching/stitching-programmatically.qmd){target="_blank"}.
-
-
-```{r}
-#| label: stitching mouse brain programmatically
-#| eval: false
-
-conda activate napari-cosmx-env
-cd /into/your/project/folder
-unzip /path/to/your/downloaded/HalfBrain.zip
-outdir = "mouse_brain_napari_files"
-
-stitch-images -i /path/to/HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults \ 
-  -f /path/to/HalfBrain/RunSummary -o $outdir
-
-read-targets /path/to/HalfBrain/AnalysisResults -o $outdir
-
-```
-
-:::
-
 We will also use the cell typing data from the Seurat file. Let's include the
 following metadata columns: 
 
@@ -118,7 +88,7 @@ following metadata columns:
 - RNA_nbclust_clusters_long (optional)
 - spatialClusteringAssignments
 
-Note that the Seurat file contains _both_ public datasets. We need to filter
+Note that the Seurat file contains _both_ public datasets of mouse brain. We need to filter
 the metadata to include only those cells from `Run1000_S1_Half`.
 
 ```{r}
@@ -134,7 +104,6 @@ library(plyr)
 library(dplyr)
 # sem_path will be wherever you downloaded your Seurat object
 sem_path <- "/path/to/your/muBrainRelease_seurat.RDS"
-#sem_path <- "/Volumes/Extreme_Pro/data/HalfBrain/muBrainRelease_seurat.RDS"
 sem <- readRDS(sem_path)
 meta <- sem@meta.data %>% 
   filter(Run_Tissue_name=="Run1000_S1_Half") %>%
@@ -148,7 +117,6 @@ meta <- meta %>% relocate(cell_ID) # moves cell_ID to first column position
 write.table(meta, file="/path/to/inside/napari-ready-folder/_metadata.csv", 
             sep=",", col.names=TRUE, row.names=FALSE, quote=FALSE)
 ```
-
 
 Now that the data are ready, drag and drop the slide folder into napari to launch
 the plugin. 
