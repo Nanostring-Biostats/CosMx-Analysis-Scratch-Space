@@ -124,22 +124,24 @@ the plugin.
 # Working with layers {#sec-working-with-layers}
 
 When we open a slide with `napari-cosmx`, by default there will be a few napari
-layers visible (@fig-initial; Initial View tab). These include `FOV labels` and `Segmentation`. Clicking the eye
+layers visible (Initial View tab; @fig-initial). These include `FOV labels` and `Segmentation`. Clicking the eye
 icon next to a layer will change its visibility. Let's turn off those layers 
 for a moment and visualize the cell types from the `RNA_nbclust_clusters` column 
-(@fig-cell-types). We can also color cells by their niche ('spatialClusteringAssignments'; @fig-niches). 
+(Cell Types tab; @fig-cell-types). We can also color cells by their spatialClusteringAssignments values (Niches tab; @fig-niches). 
 In the `Color Cells` widget, we can control which cell types or niches
 we would like to view. When we activate the `Metadata` layer, hovering over
 a given cell will display the metadata associated with it as a ribbon at the bottom
 of the application. To view the IF channels, use
-the `Morphology Images` widget, In @fig-IF I turned off the visibility of the cell
+the `Morphology Images` widget, In @fig-IF (IF Channels tab) I turned off the visibility of the cell
 types, added GFAP in red and DNA in blue, and zoomed into the hippocampus. When
 I click on a layer, it becomes the activate layer and I can use the `layer controls` widget
 to adjust attributes to that layer such as contrast
 limits, gamma, layer blending, and more. Finally, we can view raw transcripts 
 (or proteins). Simply select the target and the color and click `Add layer`. In 
-@fig-tx, I zoomed in on a section of the cortex and plotted _Calb1_.
+@fig-tx (Transcripts tab), I zoomed in on a section of the cortex and plotted _Calb1_. 
 
+Like other programs that use layers, napari allows the layers to be moved up/down
+and to blend (not shown below).
 
 ::: {.panel-tabset}
 
@@ -200,15 +202,13 @@ knitr::include_graphics("./figures/fig-transcripts.png")
 
 :::
 
-Like other programs that use layers, napari allows the layers to be moved up/down
-and to blend.
-
 # Scripting tips-n-tricks {#sec-scripting}
 
 This section is for advanced users who want finer control of the aesthetics.
 
 Most of the items we've covered can also be accessed through various methods in the `gem` object
-that can found loaded in the `>_` `ipython` interpreter. Here's a script
+that can found loaded in the `>_` `ipython` interpreter. You may have
+noticed in the figures above that there was code being used to take the screenshots. Here's a script
 that can help reproduce the figures above and the ones below. I use reproducible
 scripts often. This is because I may want to make slight changes to a figure 
 down the road. For example, if a reviewer overall likes an image but asks for the cell
@@ -221,12 +221,13 @@ other layers programmatically.
 #| echo: true
 #| eval: false
 
+import imageio
+
 output_path = 'path/to/store/figures'
 
 ## Initial
 gem.show_widget()
 gem.viewer.window.resize(1650,1100)
-### Note: this may depend on your display's settings
 gem.viewer.camera.center = (0.0, 0.6830708351616575, -57.16103351264418)
 gem.viewer.camera.zoom = 128.0
 
@@ -251,7 +252,7 @@ with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         screenshot = gem.viewer.screenshot(canvas_only=False)
         writer.append_data(screenshot)
 
-## IF only
+# IF only
 gem.color_cells('RNA_nbclust_clusters')
 gem.viewer.layers['RNA_nbclust_clusters'].visible = False
 gem.add_channel('GFAP', colormap = 'red')
@@ -270,7 +271,8 @@ with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         screenshot = gem.viewer.screenshot(canvas_only=False)
         writer.append_data(screenshot)
 
-## Transcripts
+
+# Transcripts
 cell_type_layer = gem.viewer.layers['RNA_nbclust_clusters']
 cell_type_layer.opacity = 0.9
 cell_type_layer.visible = True
@@ -285,7 +287,7 @@ with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         screenshot = gem.viewer.screenshot(canvas_only=False)
         writer.append_data(screenshot)
 
-## Contours
+## Contour
 gfap.visible = False
 dna.visible = False
 gem.viewer.layers['Calb1'].visible = False
@@ -296,7 +298,7 @@ gem.color_cells('RNA_nbclust_clusters', contour=2)
 
 fig_path = output_path + "/fig-contours.png"
 with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
-        screenshot = gem.viewer.screenshot(canvas_only=False)
+        screenshot = gem.viewer.screenshot(canvas_only=True)
         writer.append_data(screenshot)
 
 ## White background
@@ -304,13 +306,14 @@ gem.viewer.window.qt_viewer.canvas.background_color_override = 'white'
 
 fig_path = output_path + "/fig-white.png"
 with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
-        screenshot = gem.viewer.screenshot(canvas_only=False)
+        screenshot = gem.viewer.screenshot(canvas_only=True)
         writer.append_data(screenshot)
+
 
 ```
 
 In practice, I use the GUI to adjust the settings (_e.g._, zoom, opacity) and then
-'jot down' the results in my text editor. For example, when I zoom or pan to another location, 
+"jot down" the results in my text editor. For example, when I zoom or pan to another location, 
 that location can be found at:
 
 ```{r}
