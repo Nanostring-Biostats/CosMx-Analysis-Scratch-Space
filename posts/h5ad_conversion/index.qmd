@@ -1,0 +1,361 @@
+---
+title: "Creating anndata object from AtoMx&#8482; exported results for interactive viewer and python-based analysis"
+author:
+  - name: Lidan Wu
+    orcid: 0000-0003-3150-6170
+    affiliations:
+      - ref: nstg
+      - ref: lidanwu
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+number-sections: true
+number-depth: 4
+date: "2024-06-05"
+date-modified: last-modified
+categories: [visualization, Seurat, how-tos]
+image: figures/Fig-mBrain-S1-cirroViewer-screenshot.png
+description: "This post describes how to create anndata object from AtoMx&#8482; exported results. The resulting oject in '.h5ad' format could be further analyzed using various python-based single-cell analysis tools, like scanpy and squidpy. Non-coders could also share the light-weighted data object, visualize and explore the processed data in several open-sourced interactive viewers, like Cirrocumulus and CELLxGENE viewers. "
+draft: false
+---
+
+# Introduction 
+
+Annotated Data, [AnnData](https://anndata.readthedocs.io/en/latest/){target="_blank"}, is a popular data structure. There are quite a few open-sourced single-cell analysis tools in `python`, e.g. [`scanpy`](https://scanpy.readthedocs.io/en/stable/){target="_blank"} and [`squidpy`](https://squidpy.readthedocs.io/en/stable/index.html){target="_blank"}, as well as interactive viewers, e.g. [Cirrocumulus](https://cirrocumulus.readthedocs.io/en/latest/){target="_blank"} and [CELLxGENE](https://github.com/chanzuckerberg/cellxgene){target="_blank"} viewers, using this data structure. Converting data into `AnnData` data structure allows non-coders to easily share the light-weighted data object, visualize and explore the processed data in an interactive way. 
+
+This post describes how to create `anndata` object (`.h5ad`) from either a post-analyzed `Seurat` object or basic data files. 
+
+- @sec-convert-seurat Creating `anndata` object in `.h5ad` format from post-analyzed `Seurat` object exported by AtoMx&#8482; SIP
+- @sec-interactive-viewer Visualize the post-analyzed `.h5ad` object in interactive viewer
+- @sec-create-from-flatFiles Creating per-sample `anndata` object from basic data files exported by AtoMx&#8482; SIP
+- @sec-load-in-python Load basic `.h5ad` object with python packages like `scanpy` and `squidpy` for single-cell analysis
+
+Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
+the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
+
+
+# Creating `anndata` object from post-analyzed `Seurat` object exported by AtoMx&#8482; SIP {#sec-convert-seurat}
+
+The `Seurat` object used in this section is made from the CosMx&#8482; mouse brain public data set and assembled in the structure used by the Technology Access Program ([TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/)); similar outputs are available from the AtoMx&#8482; Spatial Informatics Portal (SIP). To download raw data for this dataset, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="_blank"}. For more details on its data structure, please refer to earlier post on [Visualizing spatial data with Seurat](/posts/seurat-cosmx-basics/#sec-data-structure). 
+
+::: {.callout-note}
+Many of the below functions require that you are working with [Seurat v5](https://satijalab.org/seurat/){target="_blank"} and may not work in earlier versions. Additionally, if you are exporting a Seurat object from AtoMx (v1.3+), be sure to export the Seurat object with polygon coordinates and transcripts included to access all of the functionality below.
+:::
+
+## Prepare post-analyzed `Seurat` object
+
+### Explore `Seurat` object and add in custom cell meta data
+
+You can add in any new cell metadata if desired. For illustration, the code below adds a new column with unique ID for each FOV.
+```{r exploreSeuratObj, message=FALSE, eval = FALSE}
+# load existing seurat object
+seu.obj <- readRDS("seurat_object.Rds")
+
+# add a new column for unique ID of each FOV
+fovNames <- seu.obj@meta.data[, c('slide_ID_numeric', 'fov')]
+fovNames[['fov_names']] <- paste0('fov_', fovNames[['slide_ID_numeric']], 
+                            '_', fovNames[['fov']])
+fovNames <- setNames(fovNames[['fov_names']], 
+                     nm = rownames(fovNames))
+
+seu.obj <- Seurat::AddMetaData(seu.obj, 
+                               metadata = fovNames, 
+                               col.name = "fov_names")
+```
+
+The post-analyzed `Seurat` object should contain dimension reduction results and you can visualize which results are included by running `names(seu.obj)`. 
+
+## Prepare spatial coordinates and visualize 
+
+AtoMx&#8482; SIP stores the per-slide cell segmentation information as separate `SeuratObject::FOV` object in the `images` slot. You can get the slide names by running `names(seu.obj@images)` in `R`. The example dataset used in this section has 2 tissue slides in one study and each slide is in its own spatial coordinate space and thus may have xy overlapping between the slides.  
+
+### Case 1: 1 slide per `anndata` object
+
+When per-slide `anndata` object is preferred, one should split the `Seurat` object by the slide name first before cleaning it up for `h5Seurat` export. The code below is for generating one `anndata` object per tissue slide and the resulting data is used in later sections. 
+```{r splitBySlide, message=FALSE, eval = FALSE}
+# extract the segmentation to separate variable
+imgList <- seu.obj@images
+
+# remove segmentation in current seurat object before split
+for (slideName in names(imgList)){
+  seu.obj[[slideName]] <- NULL
+}
+
+# split Seurat object by slide name which is stored under "Run_Tissue_name" column of cell meta.data. 
+objList <- Seurat::SplitObject(seu.obj, split.by = "Run_Tissue_name")
+
+# You can add the segmentation back for each per-slide object 
+for (eachSlide in names(objList)){
+  # standard names used in `images` slot
+  slideName <- gsub("\\W|_", ".", eachSlide)
+  # add the `SeuratObject::FOV` object for current slide alone
+  objList[[eachSlide]][[slideName]] <- imgList[[slideName]]
+}
+```
+
+We would focus on the first slide for this section. 
+```{r firstSlide, message=FALSE, eval = FALSE}
+# keep data for only the 1st section for analysis in later section
+eachSlide <- names(objList)[1]
+slideName <- gsub("\\W|_", ".", eachSlide)
+seu.obj1 <- objList[[eachSlide]]
+
+# extract spatial coordinates of each cell for the chosen slide
+spatial_coords <- seu.obj1[[slideName]]$centroids@coords
+rownames(spatial_coords) <- seu.obj1[[slideName]]$centroids@cells
+```
+
+Let's visualize the current cell segmentation colored by cell types and the molecular positions of a few selected genes. For more visualization tricks using `Seurat`, please refer to [this post](/posts/seurat-cosmx-basics/index.qmd){target="_blank"} and [Seurat's vignette](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2){target="_blank"} on image-based spatial data analysis. 
+```{r showSegmentation, message=FALSE, eval = FALSE}
+# specify to show cell boundary 
+SeuratObject::DefaultBoundary(seu.obj1[[slideName]]) <- "segmentation"
+
+Seurat::ImageDimPlot(object = seu.obj1, 
+                     fov = slideName, 
+                     
+                     # column name of cell type in meta.data
+                     group.by = "nb_clus_final", 
+                     
+                     # specify which molecules to plot
+                     molecules = c("Slc17a7", "Gad1", "Plp1"), 
+                     mols.size = 1.5, 
+                     
+                     # fixed aspect ratio and flip xy in ploting
+                     coord.fixed = TRUE, flip_xy = TRUE)
+```
+![](figures/Fig-mBrain-S1-cellType-segmentation.png)
+
+You can zoom in to view a subset of cells by specifying which cells to plots.
+```{r showSubset, message=FALSE, eval = FALSE}
+# change idents to "fov" for cell selection
+SeuratObject::Idents(seu.obj1) <- "fov"
+
+Seurat::ImageDimPlot(object = seu.obj1, 
+                     fov = slideName, 
+                     
+                     # column name of cell type in meta.data
+                     group.by = "nb_clus_final", 
+                     
+                     # a vector of chosen cells, plot cells in chosen fovs
+                     cells = SeuratObject::WhichCells(
+                       seu.obj1, idents = c(72:74, 90:92, 97:99, 114:116)), 
+                     
+                     # crop the plots to area with cells only
+                     crop = TRUE, 
+                     
+                     # fixed aspect ratio and flip xy in ploting
+                     coord.fixed = TRUE, flip_xy = TRUE)
+```
+
+![](figures/Fig-mBrain-S1-cellType-fovZoomed.png)
+
+
+### Case 2: multi-slide per `anndata` object
+
+Since AtoMx&#8482; SIP keeps the spatial coordinates of each slide in their own spatial coordinate space, one would need to arrange the spatial coordinates of multiple sample sections to avoid overlap in XY space when exporting multiple slides in same study-level `anndata` object. The example code below would arrange all slides along Y axis with some spacing between the slides. 
+
+```{r arrangeSlides, message=FALSE, eval = FALSE}
+# extract the segmentation to separate variable
+imgList <- seu.obj@images
+
+# arrange slides along Y axis, add in spacer which is 0.2x of previous slide's coordinate span in Y direction
+spacerFactor <- 0.2
+global_y_offset <- 0 
+
+spatial_coords <- lapply(imgList, function(img){
+  # coordinates of query slide
+  eachCoord <- img$centroids@coords
+  rownames(eachCoord) <- img$centroids@cells
+  
+  # align to lower left corner
+  ori_offsets <- apply(eachCoord, 2, min)
+  eachCoord <- sweep(eachCoord, 2, ori_offsets, "-")
+  
+  # span in y direction
+  y_span <- diff(range(eachCoord[, 2]))
+
+  # add spacer in y direction 
+  eachCoord[, 2] <- eachCoord[, 2] + global_y_offset
+  
+  # update global offset for next slide
+  global_y_offset <<- global_y_offset + y_span*(1+spacerFactor)
+  
+  return(eachCoord)
+})
+spatial_coords <- do.call(rbind, spatial_coords)  
+
+# use the study-level Seurat object for downstream
+seu.obj1 <- seu.obj
+
+# prefix for file name
+slideName <- "StudyLevel" 
+
+```
+
+Let's visualize the coordinates of each cell after slide arrangement. 
+```{r vizSlides, message=FALSE, eval = FALSE}
+# add in cell type for color
+plotData <- cbind(seu.obj1[["nb_clus_final"]], 
+                  spatial_coords[colnames(seu.obj1), ])
+
+ggplot2::ggplot(plotData, 
+                # flip xy to be consistent with earlir plot
+                aes(x = y, y = x, color = as.factor(nb_clus_final))) +
+  ggplot2::geom_point(size = 0.1)+
+  ggplot2::coord_fixed()+
+  Seurat::NoLegend()+
+  Seurat::DarkTheme()
+```
+![](figures/Fig-mBrain-S1S2-cellType-slidesArranged.png)
+
+
+## Clean up to keep only necessary data
+
+Next, we would further clean up the `Seurat` object (single-slide object from [Case 1: 1 slide per `anndata` object] or full-study-level object form [Case 2: multi-slide per `anndata` object]) by trimming it down to contain only the data of interested. 
+Typically, one would keep the raw data counts from `RNA` assay (this example dataset uses `Nanostring` as assay name for `RNA`), cell embedding for `umap` (standard AtoMx exported object uses `approximateumap` as name for `umap`). We would also store the spatial coordinates of each cell as the cell embedding in a dimension reduction object called `spatial`.
+```{r dietSeurat, message=FALSE, eval = FALSE}
+# clean up seurat object to only necessary data 
+seu.obj2 <- Seurat::DietSeurat(
+  seu.obj1, 
+  
+  # subset of assays to keep, standard AtoMx object uses "RNA" assay
+  assays = "Nanostring",
+  
+  # keep raw counts stored in "counts" layer
+  layers = "counts", 
+  
+  # dimension redunction to keep, standard AtoMx object uses "approximateumap"
+  dimreducs = "umap")
+
+# clear the `images` slot
+allImgs <- names(seu.obj1@images)
+for (img in allImgs){
+  seu.obj2[[img]] <- NULL
+}
+
+# add in spatial coordinates for current slide or study as a new dimension reduction
+colnames(spatial_coords) <- paste0("SPATIAL_", seq_len(ncol(spatial_coords)))
+seu.obj2[["spatial"]] <- Seurat::CreateDimReducObject(
+  embeddings = spatial_coords, 
+  key = "SPATIAL_", 
+  # standard AtoMx object use "RNA" assay
+  assay = "Nanostring")
+
+```
+
+## Converting to `h5ad` format via `h5Seurat`
+
+Lastly, we would export the cleaned `Seurat` object into `h5Seurat` format and then further convert it into `h5ad` format using `SeuratDisk::Convert` function.
+```{r h5Seurat, message=FALSE, eval = FALSE}
+# export as "h5Seurat" object
+SeuratDisk::SaveH5Seurat(seu.obj2, 
+                         filename = paste0(slideName, "_subset.h5Seurat"))
+```
+<span style="color: red;">
+Creating h5Seurat file for version 3.1.5.9900<br/>
+Adding counts for Nanostring<br/>
+Adding data for Nanostring<br/>
+No variable features found for Nanostring<br/>
+No feature-level metadata found for Nanostring<br/>
+Adding cell embeddings for umap<br/>
+No loadings for umap<br/>
+No projected loadings for umap<br/>
+No standard deviations for umap<br/>
+No JackStraw data for umap<br/>
+Adding cell embeddings for spatial<br/>
+No loadings for spatial<br/>
+No projected loadings for spatial<br/>
+No standard deviations for spatial<br/>
+No JackStraw data for spatial<br/>
+</span>
+
+```{r h5adConversion, message=FALSE, eval = FALSE}
+# convert to h5ad format
+SeuratDisk::Convert(paste0(slideName, "_subset.h5Seurat"), 
+                    dest = "h5ad")
+```
+<span style="color: red;">
+Validating h5Seurat file<br/>
+Adding data from Nanostring as X<br/>
+Adding counts from Nanostring as raw<br/>
+Transfering meta.data to obs<br/>
+Adding dimensional reduction information for spatial<br/>
+Adding dimensional reduction information for umap<br/>
+</span>
+
+# Visualize the post-analyzed `.h5ad` object in interactive viewer {#sec-interactive-viewer}
+
+The resulting `anndata` object in `.h5ad` format could be visualized by various open-sourced interactive viewers. One such viewer would be [Cirrocumulus viewer](https://cirrocumulus.readthedocs.io/en/latest/){target="_blank"}. 
+
+For a quick start, one can install the viewer in terminal via `pip`. 
+```{bash, eval = FALSE}
+pip install cirrocumulus
+```
+
+To launch the viewer for the `.h5ad` object of interest, one can simply run
+```{bash, eval = FALSE}
+cirro launch <path_to_dataset>
+```
+
+The cirrocumulus viewer allows user to 
+
+* view multiple cell embeddings (`umap` and `spatial`) side-by-side for both cell metadata and gene expression (Dual Embedding View, @fig-full-embedding); 
+
+* use lasso tool to subset cells of interest in the embedding space (Lasso-in-Space, @fig-chosen);
+
+* explore how the gene expression changes between different selections (Marker Heatmap for all cells, @fig-marker-heatmap vs. Dot Plots for Subsets, @fig-dot-plots). 
+
+For more information, please refer to the [documentation](https://cirrocumulus.readthedocs.io/en/latest/documentation.html){target="_blank"} of `cirrocumulus` package
+
+::: {.panel-tabset}
+
+## Dual Embedding View
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-full-embedding"
+#| fig-cap: "The dual-embedding views of `umap` and `spatial` for chosen cell meta data and gene expression level."
+knitr::include_graphics("./figures/Fig-mBrain-S1-cirroViewer-screenshot.png")
+```
+
+## Lasso-in-Space
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-chosen"
+#| fig-cap: "Use lasso tool to select cells in `spatial` embedding. Chosen cells are shown in solid colors."
+knitr::include_graphics("./figures/Fig-mBrain-S1-lasso.png")
+```
+
+## Marker Heatmap
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-marker-heatmap"
+#| fig-cap: "Heatmap of selected gene expression across 'leiden_clus' of all cells."
+knitr::include_graphics("./figures/Fig-mBrain-S1-cirroViewer-markerHeatmap.png")
+```
+
+## Dot Plots for Subsets
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-dot-plots"
+#| fig-cap: "Dot plots of chosen gene expression for all cells (top) vs. cells within lasso selection (bottom) in @fig-chosen tab."
+knitr::include_graphics("./figures/Fig-mBrain-S1-cirroViewer-dotPlot-selection-vs-all.png")
+```
+
+:::
+
+
+# Creating per-sample `anndata` object from basic data files exported by AtoMx&#8482; SIP {#sec-create-from-flatFiles}
+
+In this section, we start from the basic data files exported from AtoMx&#8482; SIP for an example public dataset that you can download from [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/){target="_blank"}. The [ReadMe](posts/segmentation-error-evaluation/assets/Pancreas-CosMx-ReadMe.html) associated with this example data set on pancreas shows the data structures of each file used in this section. 
+
+# Load basic `.h5ad` object with python packages like `scanpy` and `squidpy` for single-cell analysis {#sec-load-in-python}
+
+You could also load it with `scanpy` or `anndata` python packages for further analysis.
+
+
