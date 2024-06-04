@@ -7,9 +7,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Patrick Danaher">
-<meta name="dcterms.date" content="2024-01-05">
+<meta name="dcterms.date" content="2024-05-24">
 
-<title>Blog - What is high-plex spatial transcriptomics for?</title>
+<title>Blog - Vignette: Basics of CosMx Analysis in R</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -169,9 +169,14 @@ cookieconsent.run({
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">What is high-plex spatial transcriptomics for?</h1>
+      <h1 class="title">Vignette: Basics of CosMx Analysis in R</h1>
                                 <div class="quarto-categories">
+                <div class="quarto-category">recommended</div>
                 <div class="quarto-category">overview</div>
+                <div class="quarto-category">quality control</div>
+                <div class="quarto-category">normalization</div>
+                <div class="quarto-category">cell typing</div>
+                <div class="quarto-category">pre-processing</div>
               </div>
                   </div>
   </div>
@@ -199,14 +204,14 @@ cookieconsent.run({
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">January 5, 2024</p>
+        <p class="date">May 24, 2024</p>
       </div>
     </div>
     
       <div>
       <div class="quarto-title-meta-heading">Modified</div>
       <div class="quarto-title-meta-contents">
-        <p class="date-modified">April 16, 2024</p>
+        <p class="date-modified">May 24, 2024</p>
       </div>
     </div>
       
@@ -224,32 +229,99 @@ cookieconsent.run({
 
 
 
-<section id="what-is-high-plex-spatial-transcriptomics-for" class="level1">
-<h1>What is high-plex spatial transcriptomics for?</h1>
-<p>High-plex single cell spatial transcriptomics data is a little awe-inspiring: even a perfunctory analysis of a single run produces a terabyte of data, gorgeous images, and spatial relationships from the scale of centimeters to micrometers that you could spend weeks exploring.</p>
-<p>But ultimately, you don’t need amazing images, you need answers to biological questions. Here I’ll lay out questions typically asked with spatial transcriptomics, and I’ll suggest a more expansive approach that reveals spatial single-cell data to be perhaps the most productive question-posing machine in molecular biology.</p>
-<p>Data analysis begins with two fundamental pieces: a matrix of all cells’ gene expression, and their spatial locations: <img src="figures/fig1.png" class="img-fluid"></p>
-<p>As with any single cell dataset, we begin by using the gene expression matrix to call cell types. Then, simply coloring our spatial map by cell type, we obtain an intricate picture of tissue structure.</p>
-<p><img src="figures/fig2.png" class="img-fluid"></p>
-<p>Even this simplistic analysis is valuable: most experts examining these plots come away with new insights and new questions.</p>
-<p>Questions answered with cell type + location:</p>
+<section id="basic-cosmx-analysis-workflow" class="level1">
+<h1>Basic CosMx analysis workflow</h1>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>A complete demo analysis of a CosMx dataset can be found <a href="&quot;https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/vignette&quot;">here</a>. It’s intended to be used as a template for other analyses to follow.</p>
+<p>We’ll be analyzing a 1000-plex dataset from melanoma samples. We begin with the files written by the AtoMx flat file export module. The full dataset we’ve used is too big to be saved on Github. To follow along, we recommend using your own data, also as output by the AtoMx flat file export module.</p>
+</section>
+<section id="file-structure" class="level2">
+<h2 class="anchored" data-anchor-id="file-structure">File structure</h2>
+<p>We’ll organize the data for this analysis as follows:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/19fbb937-4d5a-414a-9c08-1577860c0225.png" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
 <ul>
-<li>How is each immune cell type spread through this tumor? Where are the inflammatory vs.&nbsp;the suppressive macrophages trafficking?</li>
-<li>Do we see more memory T-cell invasion in post-treatment samples?</li>
-<li>What immune cell types tend to physically interact with each other?</li>
+<li>The “data” folder holds the exports from AtoMx</li>
+<li>“processed_data” holds data objects generated during analysis, meant to be used by later analyses.</li>
+<li>“results” holds results intended for human consumption.</li>
 </ul>
-<p>Most early analyses of spatial transcriptomic data stop here. They wrap questions like the above in formal statistics (“spatial clustering” / “niche analysis”, “cell proximity analysis”), and publish what is usually already a compelling story. But if we take this analysis just a little farther, we can begin to ask a staggering number of questions. The power of this data isn’t its ability to get single cell expression profiles, nor its ability to describe spatial variation: it’s the ability to do both of these at the same time. By simultaneously measuring single cells’ phenotypes (gene expression) and environments (the phenotypes of surrounding cells), we can interrogate how phenotype responds to environment. What can we say about a cell’s environment? Consider the below closeup of a PDAC tumor. “T-cell 1” is in a lymphoid structure, surrounded by B-cells and endothelial cells. These cells are expressing certain levels of ligands that bind receptors on T-cells. In contrast, “T-cell 2” has invaded into the tumor bed and is mainly surrounded by tumor cells, plus a few macrophages, and these cells are signaling the T-cell with a different set of genes.</p>
-<p><img src="figures/fig3.png" class="img-fluid"></p>
-<p>In short, we can trivially derive over 1000 variables describing each cell’s environment. And now, for every cell type, we can measure how every gene responds to every environmental variable. This amounts to roughly 20 * 1000 * 1000 = 20 million questions. Or, in a study across multiple tissues, we might ask these 20 million questions separately for each tissue. (Note that in a lower-plex technology, where a panel of ~300 genes might be devoted almost entirely to cell typing, the number of interesting questions to be asked drops precipitously.)</p>
-<p>In short, a standard analysis can lead to millions of hypothesis tests. Single-cell data without spatial information, and spatial data at larger-than-single-cell resolution, can’t come close to this.</p>
-<p>Questions on how phenotype responds to environment:</p>
+<p>Inside the “data” folder, we’ll place a folder names “flat_files”, containing the AtoMx exports:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/a29d3832-5d47-4179-a966-f7c6ef666b94.png" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
+<p>And we’ll organize code as follows:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/effb200a-31db-4c0e-b0b0-d92d42eef459.png" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
 <ul>
-<li>How do tumor cells modulate gene expression in the face of T-cell attack?</li>
-<li>How do macrophages in the stroma differ from macrophages in the tumor interior?</li>
-<li>What genes do T-cells express when exposed to inflammatory cytokines?</li>
+<li>Analysis scripts are numbered by the order in which they should be run. Each creates data used by the downstream scripts.</li>
+<li>Scripts are meant to be run in the directory where they lie.</li>
+<li>“utils” holds R scripts containing functions used by analyses.</li>
+</ul>
+</section>
+<section id="data-structure" class="level2">
+<h2 class="anchored" data-anchor-id="data-structure">Data structure</h2>
+<p>Our flat file exports contain the following data types:</p>
+<ul>
+<li>Raw counts</li>
+<li>Cell metadata: other attributes of cells, e.g.&nbsp;size, immunofluorescence values, tissue and FOV IDs,…</li>
+<li>Spatial locations: xy locations given in mm. <strong>Warning</strong>: studies containing multiple slides may initially have overlapping xy locations.</li>
+<li>Transcript data: for all RNA transcripts detected, location, gene ID, and cell ID. Most analyses use cell-level data, not this transcript-level data, but it can make compelling plots.</li>
+<li>Tissue images. Not used by most analyses, but useful for Figures.</li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="img/data_before.png" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
+<p>Our analyses will append lots of new information to this starting point, ending here:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="img/data_after.png" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
+<p>New data types include: - UMAP coordinates - Data acting as new metadata columns, e.g.&nbsp;cell type assignment and spatial cluster - Special results objects from analyses: cell typing, differential expression, InSituCor, …</p>
+</section>
+<section id="workflow" class="level2">
+<h2 class="anchored" data-anchor-id="workflow">Workflow:</h2>
+<p>Our workflow performs the below steps:</p>
+<p>First, the fundamentals:</p>
+<ul>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/0.-loading-flat-files.Rmd">Parse and format data export by AtoMx</a></li>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/1.%20finessing%20tissues%20spatial%20arrangement.Rmd">Custom arranging of tissues and FOVs in space</a></li>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/2.%20QC%20and%20normalization.Rmd">QC and normalization</a></li>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/3.%20dimension%20reduction.Rmd">Dimension reduction (PCA and UMAP)</a></li>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/4.%20cell%20typing.Rmd">Cell typing</a></li>
+</ul>
+<p>Then, we go after biology:</p>
+<ul>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/5.%20define%20spatial%20context.Rmd">Defining cells’ spatial context</a></li>
+<li>Hypothesis-driven analyses, i.e.&nbsp;differential expression: how do cells change behavior based on their spatial context? (coming summer 2024)</li>
+<li>Hypothesis-generating analyses: identifying spatially correlated genes with InSituCor (coming summer 2024)</li>
+</ul>
+</section>
+<section id="general-analysis-advice" class="level2">
+<h2 class="anchored" data-anchor-id="general-analysis-advice">General analysis advice</h2>
+<ul>
+<li>For large experiments, <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/big-data/">more advanced workflows</a> may be needed to avoid overwhelming your compute and/or memory.</li>
+<li>For studies across multiple flow cells, batch correction should be considered.</li>
 </ul>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

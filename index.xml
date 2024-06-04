@@ -9,8 +9,123 @@
 <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/</link>
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
-<generator>quarto-1.4.554</generator>
-<lastBuildDate>Mon, 20 May 2024 00:00:00 GMT</lastBuildDate>
+<generator>quarto-1.4.555</generator>
+<lastBuildDate>Fri, 24 May 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Vignette: Basics of CosMx Analysis in R</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="basic-cosmx-analysis-workflow" class="level1">
+<h1>Basic CosMx analysis workflow</h1>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>A complete demo analysis of a CosMx dataset can be found <a href="&quot;https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/vignette&quot;">here</a>. It’s intended to be used as a template for other analyses to follow.</p>
+<p>We’ll be analyzing a 1000-plex dataset from melanoma samples. We begin with the files written by the AtoMx flat file export module. The full dataset we’ve used is too big to be saved on Github. To follow along, we recommend using your own data, also as output by the AtoMx flat file export module.</p>
+</section>
+<section id="file-structure" class="level2">
+<h2 class="anchored" data-anchor-id="file-structure">File structure</h2>
+<p>We’ll organize the data for this analysis as follows:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/19fbb937-4d5a-414a-9c08-1577860c0225.png" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
+<ul>
+<li>The “data” folder holds the exports from AtoMx</li>
+<li>“processed_data” holds data objects generated during analysis, meant to be used by later analyses.</li>
+<li>“results” holds results intended for human consumption.</li>
+</ul>
+<p>Inside the “data” folder, we’ll place a folder names “flat_files”, containing the AtoMx exports:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/a29d3832-5d47-4179-a966-f7c6ef666b94.png" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
+<p>And we’ll organize code as follows:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/effb200a-31db-4c0e-b0b0-d92d42eef459.png" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
+<ul>
+<li>Analysis scripts are numbered by the order in which they should be run. Each creates data used by the downstream scripts.</li>
+<li>Scripts are meant to be run in the directory where they lie.</li>
+<li>“utils” holds R scripts containing functions used by analyses.</li>
+</ul>
+</section>
+<section id="data-structure" class="level2">
+<h2 class="anchored" data-anchor-id="data-structure">Data structure</h2>
+<p>Our flat file exports contain the following data types:</p>
+<ul>
+<li>Raw counts</li>
+<li>Cell metadata: other attributes of cells, e.g.&nbsp;size, immunofluorescence values, tissue and FOV IDs,…</li>
+<li>Spatial locations: xy locations given in mm. <strong>Warning</strong>: studies containing multiple slides may initially have overlapping xy locations.</li>
+<li>Transcript data: for all RNA transcripts detected, location, gene ID, and cell ID. Most analyses use cell-level data, not this transcript-level data, but it can make compelling plots.</li>
+<li>Tissue images. Not used by most analyses, but useful for Figures.</li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/img/data_before.png" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
+<p>Our analyses will append lots of new information to this starting point, ending here:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/img/data_after.png" class="img-fluid figure-img"></p>
+<figcaption>image</figcaption>
+</figure>
+</div>
+<p>New data types include: - UMAP coordinates - Data acting as new metadata columns, e.g.&nbsp;cell type assignment and spatial cluster - Special results objects from analyses: cell typing, differential expression, InSituCor, …</p>
+</section>
+<section id="workflow" class="level2">
+<h2 class="anchored" data-anchor-id="workflow">Workflow:</h2>
+<p>Our workflow performs the below steps:</p>
+<p>First, the fundamentals:</p>
+<ul>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/0.-loading-flat-files.Rmd">Parse and format data export by AtoMx</a></li>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/1.%20finessing%20tissues%20spatial%20arrangement.Rmd">Custom arranging of tissues and FOVs in space</a></li>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/2.%20QC%20and%20normalization.Rmd">QC and normalization</a></li>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/3.%20dimension%20reduction.Rmd">Dimension reduction (PCA and UMAP)</a></li>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/4.%20cell%20typing.Rmd">Cell typing</a></li>
+</ul>
+<p>Then, we go after biology:</p>
+<ul>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/vignette/5.%20define%20spatial%20context.Rmd">Defining cells’ spatial context</a></li>
+<li>Hypothesis-driven analyses, i.e.&nbsp;differential expression: how do cells change behavior based on their spatial context? (coming summer 2024)</li>
+<li>Hypothesis-generating analyses: identifying spatially correlated genes with InSituCor (coming summer 2024)</li>
+</ul>
+</section>
+<section id="general-analysis-advice" class="level2">
+<h2 class="anchored" data-anchor-id="general-analysis-advice">General analysis advice</h2>
+<ul>
+<li>For large experiments, <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/big-data/">more advanced workflows</a> may be needed to avoid overwhelming your compute and/or memory.</li>
+<li>For studies across multiple flow cells, batch correction should be considered.</li>
+</ul>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>recommended</category>
+  <category>overview</category>
+  <category>quality control</category>
+  <category>normalization</category>
+  <category>cell typing</category>
+  <category>pre-processing</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/</guid>
+  <pubDate>Fri, 24 May 2024 00:00:00 GMT</pubDate>
+</item>
 <item>
   <title>FOV QC from single-cell gene expression</title>
   <dc:creator>Patrick Danaher</dc:creator>
@@ -646,7 +761,7 @@ background-color: null;
 font-style: inherit;">'combined_modStats_ToFlagCells'</span>]]</span></code></pre></div>
 </div>
 <p>The function above returns the statistics for evaluating each cell for spatial dependent model against null model. Based on the P value, <code>lrtest_Pr</code> or the negative log10 value <code>lrtest_nlog10P</code>, one can select for cells with strong spatial dependency in transcript score profile. Those cells are likely to contain contaminating transcripts for neighbor cells.</p>
-<table class="table">
+<table class="caption-top table">
 <colgroup>
 <col style="width: 13%">
 <col style="width: 10%">
