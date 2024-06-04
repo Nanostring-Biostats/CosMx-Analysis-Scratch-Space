@@ -58,10 +58,10 @@ strong platform effects found between CosMx and scRNA-seq.
 For now, the library of scRNA-seq profiles covers more tissue types.
 
 Our example dataset is from melanoma samples. We don't have a reference profile for melanoma (and given the diversity of cancers, it's unclear that a reference from
-a different melanoma would work well), but we do have reference profiles for immune and stroma cells. 
-So we'll run in semi-supervised mode, looking for reference immune/stroma cells and using our de novo clusters to capture cancer cells.
+a different melanoma would work well), but we do have reference profiles for immune and stroma cells, which have much less between-sample variability than cancer cells. 
+So we'll run in semi-supervised mode, looking for reference immune/stroma cells and using our de novo clusters to capture cancer cells. 
 
-We start by loading the data we'll need, which was output by the earlier scripts from the [workflow vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/vignette-melanoma/_code/vignette):
+We start by loading the data we'll need, which was output by the earlier scripts from the [workflow vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/vignette):
 
 ```{r loading}
 library(pheatmap)
@@ -100,8 +100,7 @@ if (!file.exists(insitutypefileloc)) {
                                neg = Matrix::rowMeans(negcounts), 
                                reference_profiles = refprofiles,
                                update_reference_profiles = FALSE,
-                               n_clust = 6,  
-                               assay_type = "rna")
+                               n_clust = 6)
   saveRDS(res, file = insitutypefileloc)
 } else {
   res <- readRDS(insitutypefileloc)
@@ -151,7 +150,7 @@ if (FALSE) {
 }
 ```
 
-Higher rates of confusion are seen between closely-related cell types, e.g. T-cells or the (presumably tumor) clusters b, d, e and f. 
+Higher rates of confusion are seen between closely-related cell types, e.g. among T-cell subtypes or the (presumably tumor) clusters a, b, c, and e. 
 But for the most part this is a good result, with no indication that any clusters are irredeemably confused. 
 
 Next we draw a heatmap of the cluster profiles. These are helpful for confirming that clusters have the expected marker genes,

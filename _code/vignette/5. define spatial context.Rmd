@@ -46,6 +46,7 @@ library(mclust)
 library(irlba)
 library(spatstat)
 library(spatstat.geom)
+library(spatstat.explore)
 # load data:
 # note these files are for convenience during analysis, and are not a NanoString-supported format
 mydir <- "../"
@@ -68,7 +69,7 @@ Quite a few algorithms now exist for spatial clustering, many quite complex.
 Be warned that some of these become computationally intractable with the very 
 large datasets now routinely produced by spatial platforms. 
 We find that a simple, computationally quick approach works well: we record the mean 
-expression in each cell's neighborhood, and and we cluster cells based on these values. 
+expression in each cell's neighborhood, and we cluster cells based on these values. 
 
 
 ```{r spatialclust_by_expression}
@@ -109,7 +110,7 @@ pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = ran
 marks(pp) <- celltype
 spatstat.geom::marks(pp) <- as.factor(spatstat.geom::marks(pp))
 # count neighbors of each db cluster:
-neighbormarks <- spatstat.core::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+neighbormarks <- spatstat.explore::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
 neighbormarks <- as.matrix(neighbormarks)
 rownames(neighbormarks) <- rownames(xy)
 head(neighbormarks)
@@ -162,7 +163,7 @@ marks(pp) <- celltype
 spatstat.geom::marks(pp) <- celltype
 spatstat.geom::marks(pp) <- as.factor(spatstat.geom::marks(pp))
 # count neighbors of each db cluster:
-neighbormarks <- spatstat.core::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+neighbormarks <- spatstat.explore::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
 neighbormarks <- as.matrix(neighbormarks)
 rownames(neighbormarks) <- rownames(xy)
 head(neighbormarks)[, 1:10]

@@ -22,18 +22,17 @@ knitr::opts_chunk$set(
 ```
 
 
-Our goal here is to produce an informative UMAP. To get there, we'll also use PCA to get a reduced-dimension dataset,
-and we'll try UMAP under a few parameterizations to see what works best.
+Our goal here is to produce an informative UMAP. To get there, we'll first use PCA to get a reduced-dimension dataset,
+and then run UMAP on the leading PCs. 
+If desired, nicer-looking UMAPs can usually be obtained by re-running the UMAP projection 
+under a variety of parameterizations. 
 
 We start by loading the data we'll need, which was output by the earlier scripts from the [workflow vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/vignette-melanoma/_code/vignette):
 
 ```{r loading}
 library(uwot)
 library(irlba)  
-# note: the irlba package is having some version trouble as of early 2024. 
-# If you encounter this, run: these lines:
-#  install.packages("Matrix", type = "source")
-#  install.packages("irlba", type = "source")
+library(viridis)
 
 # load data:
 # note these files are for convenience during analysis, and are not a NanoString-supported format
@@ -42,7 +41,8 @@ norm <- readRDS(paste0(mydir, "/processed_data/norm.RDS"))
 metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS"))
 ```
 
-Now we run PCA and UMAP:
+Now we run PCA and UMAP. For smaller plex studies, UMAP can be run directly on the normalized count data.
+Good results can be obtained by applying a log transformation, a square root transformation as we've done, or no transformation.
 
 ```{r prepforumap}
 tempumapfileloc <-  paste0(mydir, "/processed_data/um.RDS")
@@ -52,8 +52,12 @@ if (!file.exists(tempumapfileloc)) {
 
   # run UMAP:
   um <- uwot::umap(pc, n_neighbors = 40, spread = 1, min_dist = 0.1, metric = "cosine")
-  #um <- uwot::umap(sqrt(as.matrix(norm))) #, n_neighbors = 40, spread = 1, min_dist = 0.1, metric = "cosine")
   rownames(um) <- rownames(norm)
+  # note: the irlba package is having some version trouble as of early 2024. 
+  # If you encounter the error message, "function 'as_cholmod_sparse' not provided by package 'Matrix'",
+  # then run these lines:
+  #  install.packages("Matrix", type = "source")
+  #  install.packages("irlba", type = "source")
   
   # save:
   saveRDS(um, tempumapfileloc)
@@ -65,3 +69,39 @@ if (!file.exists(tempumapfileloc)) {
 par(mar = c(0,0,0,0))
 plot(um, pch = 16, cex = 0.1, col = "dodgerblue4")
 ```
+
+The UMAP projection is useful for data exploration and QC. 
+To begin, it's worth seeing how important study variables like tissue and slide ID project:
+
+```{r plots}
+# random point order so no tissue or slide is on top by default:
+o <- sample(1:nrow(um))
+
+par(mar = c(0,0,2,0))
+
+# color by tissue
+plot(um[o, ], pch = 16, cex = 0.1, col = as.numeric(as.factor(metadata$tissue[o])), main = "by tissue")
+legend("topright", pch = 16, col = 1:length(unique(metadata$tissue)), legend = levels(as.factor(metadata$tissue)))
+# color by slide ID
+plot(um[o, ], pch = 16, cex = 0.1, col = as.numeric(as.factor(metadata$slide_ID[o])), main = "by slide")
+legend("topright", pch = 16, col = 1:length(unique(metadata$slide_ID)), legend = levels(as.factor(metadata$slide_ID)))
+# color by total counts
+tempx <- log2(metadata$nCount_RNA)[o]
+plot(um[o, ], pch = 16, cex = 0.1, col = viridis_pal(option = "B")(101)[
+  pmin(round(1 + 100 * (tempx - min(tempx)) / (quantile(tempx, 0.99) - min(tempx))), 101)], 
+  main = "by total counts")
+legend("topright", pch = 16, col = viridis_pal(option = "B")(101)[c(11,51,101)],
+       legend = round(2^c(0.9*min(tempx) + 0.1*quantile(tempx, 0.99), median(c(min(tempx), quantile(tempx, 0.99))), quantile(tempx, 0.99))))
+# color by PanCK stain
+tempx <- log2(1 + metadata$Mean.PanCK)[o]
+plot(um[o, ], pch = 16, cex = 0.1, col = viridis_pal(option = "B")(101)[
+  pmin(round(1 + 100 * (tempx - min(tempx)) / (quantile(tempx, 0.99) - min(tempx))), 101)], 
+  main = "by PanCK")
+legend("topright", pch = 16, col = viridis_pal(option = "B")(101)[c(11,51,101)],
+       legend = round(2^c(0.9*min(tempx) + 0.1*quantile(tempx, 0.99), median(c(min(tempx), quantile(tempx, 0.99))), quantile(tempx, 0.99))))
+```
+
+The above plots show how technical factors influence the data. 
+We see that the two slides overlap nicely, which is reassuring for the absense of batch effects.
+The PanCK intensity tells us that the island on the left where tissues are separated is probably cancer cells; 
+we will not generally expect cancer cells from different patients to resemble each other. 
