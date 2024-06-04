@@ -1,0 +1,194 @@
+---
+title: "Define spatial context"
+output: 
+rmarkdown::html_vignette: 
+fig_width: 7 
+fig_height: 8 
+vignette: >
+  %\VignetteIndexEntry{Define spatial context}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+<style>
+p.caption {
+  font-size: 1.5em;
+}
+</style>
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+## Introduction
+
+Perhaps the most useful analysis we can perform with this data is to study how cells
+change in response to their *spatial context*. 
+Here some expertise/taste is required: how we define spatial context should depend on
+our understanding our how our tissues are spatially organized and on the biological 
+questions we want to answer. 
+
+There are two general approaches we can employ:
+
+1. Unsupervised: use clustering algorithms to partition our tissues into distinct "niches"/ "spatial clusters". 
+2. Hypothesis-driven: use custom code to define variables you care about. Examples: distance to nearest 
+tumor cell, number of tumor cells in neighborhood, neighborhood expression level of a given cytokine, 
+in/out of a substructure (e.g. TLS in a tumor, glomeruli in kidneys...).
+
+
+We start by loading the data we'll need, which was output by the earlier scripts from the [workflow vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/vignette-melanoma/_code/vignette):
+
+```{r loading}
+# packages:
+library(mclust)
+library(irlba)
+library(spatstat)
+library(spatstat.geom)
+library(spatstat.explore)
+# load data:
+# note these files are for convenience during analysis, and are not a NanoString-supported format
+mydir <- "../"
+norm <- readRDS(paste0(mydir, "processed_data/norm.RDS"))
+metadata <- readRDS(paste0(mydir, "/processed_data/metadata.RDS")) 
+celltype <- readRDS(paste0(mydir, "processed_data/celltype.RDS"))
+xy <- readRDS(paste0(mydir, "/processed_data/xy.RDS"))
+```
+
+The functions we need for spatial annotations are all here:
+```{r source}
+source("utils/spatial functions.R")
+#equivalently, source from github:
+#source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/vignette-melanoma/code/vignette/utils/spatial%20functions.R")
+```
+
+## Spatial clustering
+
+Quite a few algorithms now exist for spatial clustering, many quite complex. 
+Be warned that some of these become computationally intractable with the very 
+large datasets now routinely produced by spatial platforms. 
+We find that a simple, computationally quick approach works well: we record the mean 
+expression in each cell's neighborhood, and we cluster cells based on these values. 
+
+
+```{r spatialclust_by_expression}
+# define neighbors:
+neighbors_sparsematrix <- nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50, subset = metadata$tissue)
+
+# get matrix of mean expression in each cell's neighbors:
+neighborhoodexpression <- neighbor_colMeans(x = norm, neighbors = neighbors_sparsematrix)
+
+# reduce the matrix to its top PCs:
+pc <- irlba::prcomp_irlba(neighborhoodexpression, n = 25)$x
+
+# cluster the top PCs:
+temp <- mclust::Mclust(pc, 
+                       G = 6, # 6 clusters
+                       modelNames = c("EEI"))
+spatialclust <- temp$classification
+
+# plot the results:
+cols <- c("#616161","#4285f4","#db4437","#f4b400","#0f9d58","#ab47bc","#00acc1",
+          "#ff7043","#9e9d24","#5c6bc0","#f06292","#00796b","#c2185b","#7e57c2",
+          "#03a9f4","#8bc34a","#fdd835","#fb8c00","#8d6e63","#9e9e9e","#607d8b")
+# plot:
+sub = TRUE
+plot(xy[sub, ], pch = 16, cex = 0.1, 
+     asp = 1, xlab = "", ylab = "",
+     col = cols[as.numeric(as.factor(spatialclust[sub]))])
+# add to metadata:
+metadata$spatialclust <- spatialclust
+```
+
+Alternatively, we can cluster cells based on the cell type composition of their neighborhoods:
+
+```{r spatialclust_by_celltype}
+## get neighborhood cell type abundance:
+# create a point process object:
+pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = range(xy[, 2]))
+marks(pp) <- celltype
+spatstat.geom::marks(pp) <- as.factor(spatstat.geom::marks(pp))
+# count neighbors of each db cluster:
+neighbormarks <- spatstat.explore::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+neighbormarks <- as.matrix(neighbormarks)
+rownames(neighbormarks) <- rownames(xy)
+head(neighbormarks)
+## cluster it: 
+spatialclust <- mclust::Mclust(neighbormarks, #sweep(neighbormarks, 1, rowSums(neighbormarks), "/"),
+                               G = 8, # 8 clusters
+                               modelNames = c("EEI"))$classification
+## plot the results:
+# subset for faster plotting:
+sub <- sample(1:nrow(xy), round(nrow(xy) / 20), replace = FALSE)
+# color palette:
+cols <- c("#616161","#4285f4","#db4437","#f4b400","#0f9d58","#ab47bc","#00acc1",
+          "#ff7043","#9e9d24","#5c6bc0","#f06292","#00796b","#c2185b","#7e57c2",
+          "#03a9f4","#8bc34a","#fdd835","#fb8c00","#8d6e63","#9e9e9e","#607d8b")
+# plot:
+plot(xy[sub, ], pch = 16, cex = 0.2, 
+     asp = 1, 
+     col = cols[as.numeric(as.factor(spatialclust[sub])) %% length(cols) + 1])
+```
+
+## Hand-defining spatial context
+
+Here we present three ways to annotate cells based on their spatial context:
+
+#### Distance to a given cell type:
+
+Example: you might categorize cells by how far they are from the nearest tumor cell:
+
+```{r mindistance}
+# record IDs and distances to nearest 50 neighbors:
+tumorcelltypes <- c("b", "e", "f", "d_1", "d_2")
+neighbors_dists <- FNN::get.knnx(data = xy[is.element(celltype, tumorcelltypes), ], 
+                           query = xy, 
+                           k = 5)
+str(neighbors_dists)
+# record distance to a cell type:
+metadata$disttonearesttumor <- neighbors_dists$nn.dist[, 1]
+# record 3rd-closest distance to the cell type:
+metadata$distto3rdnearesttumor <- neighbors_dists$nn.dist[, 3]
+```
+
+#### Number of neighbors of a cell type:
+
+Example: you might categorize cells by how many of a given cell type are in their neighborhood:
+
+```{r countneighbors}
+# create a point process object:
+pp <- spatstat.geom::ppp(xy[, 1], xy[, 2], xrange = range(xy[, 1]), yrange = range(xy[, 2]))
+marks(pp) <- celltype
+spatstat.geom::marks(pp) <- celltype
+spatstat.geom::marks(pp) <- as.factor(spatstat.geom::marks(pp))
+# count neighbors of each db cluster:
+neighbormarks <- spatstat.explore::marktable(X = pp, R = NULL, N = 50, exclude=TRUE, collapse=FALSE)
+neighbormarks <- as.matrix(neighbormarks)
+rownames(neighbormarks) <- rownames(xy)
+head(neighbormarks)[, 1:10]
+# save results for your desired cell types:
+metadata$n_tumor_neighbors <- rowSums(neighbormarks[, tumorcelltypes])
+metadata$n_fibroblast_neighbors <- neighbormarks[, "Fibroblast"]
+# save the sum of several related cell types:
+metadata$n_lymphoid_neighbors <- rowSums(neighbormarks[, c("T-cell", "T.cell.regulatory", "B.cell", "NK.cell", "Plasma", "Plasmablast")])
+```
+
+#### Neighborhood expression of a gene
+
+Example: immune cells respond to cytokine signaling, so you might want to see 
+how much of a given cytokine each cell is exposed to. 
+
+```{r neighborhoodexpression}
+# get cells' nearest 50 spatial neighbors:
+neighbors_sparsematrix <- nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50, subset = metadata$tissue)  
+# get neighborhood expression of a chosen gene:
+gene <- "C1QA"
+metadata$neighborhood_C1QA_expression <- neighbor_mean(x = norm[, gene], neighbors = neighbors_sparsematrix)
+```
+
+Save all these results for later:
+
+```{r saving}
+saveRDS(metadata, file = paste0(mydir, "/processed_data/metadata_with_spatialcontext.RDS"))
+```
