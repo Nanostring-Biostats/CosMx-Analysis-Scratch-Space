@@ -367,6 +367,14 @@ figDiv = createPlot(data, colorColumn, lowerLimit, upperLimit, plotDiv)
 
 If cell segmentation correction is desired, one can use `FastReseg::fastReseg_full_pipeline()` function to not only flag but also correct the identified putative cell segmentation errors. 
 
+::: {.callout-note}
+The current defaults for separating out poor-fit transcripts are on the conservative ends. To make the separation more aggressive with less constraint in spatial neighborhood, please refer to the [manual of `e1071::svm()` function](https://www.rdocumentation.org/packages/e1071/versions/1.7-14/topics/svm){target="_blank"} on what arguments one can adjust and pass to the `FastReseg` functions via `svm_args` list variable. Example arguments include `kernel` type, `scale`, `gamma` and `type` of `svm` classification machine.
+:::
+
+::: {.callout-tip title="Include control probes"}
+If you would like to keep the control probes, e.g. negative probes, in the post-resegmentation data, you can pass the names of those control probes as a vector to the function via `ctrl_genes` argument. Those `ctrl_genes` would be assigned with same transcript scores under all cell types and thus the only way they changed their cell ID assignment would be due to the presence of poor-fit transcriptional zone in proximity. Of note, to avoid significant interference from those `ctrl_genes`, it's recommended to have total counts of those genes below 1% of total counts of all genes in each cell.
+:::
+
 ```{r fastReseg_refine, message=FALSE, eval = FALSE}
 # path to output folder
 outDir_full <- "res2_fullPipeline"
@@ -424,6 +432,7 @@ refineAll_res <- FastReseg::fastReseg_full_pipeline(
 )
 ```
 
+The re-segmentation pipeline would generate new transcript `data.frame` and cell expression matrix after the segmentation refinement. The updated results should be treated as a new data set and go through the standard single-cell analysis pipeline, including QC, normalization, and cell typing, etc. While the `updated_cellID` matches with their original source cell ID in most cases, cells involved in the evaluation of a potential merging event may have their `updated_cellID` unrelated to their original source cell ID. You can track the change of cell assignment for each transcript group via either the `reseg_actions` returned by the pipeline function or the spatial coordinates of each transcript.  
 
 # Conclusions {#sec-conclusions}
 
