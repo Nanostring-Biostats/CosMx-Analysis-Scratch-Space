@@ -1,5 +1,5 @@
 ---
-title: "Creating anndata object from AtoMx&#8482; exported results for interactive viewer and python-based analysis"
+title: "Creating an anndata object from AtoMx&#8482; exported results for interactive viewer and python-based analysis"
 author:
   - name: Lidan Wu
     orcid: 0000-0003-3150-6170
@@ -23,36 +23,52 @@ draft: false
 
 # Introduction 
 
-Annotated Data, [AnnData](https://anndata.readthedocs.io/en/latest/){target="_blank"}, is a popular data structure. There are quite a few open-sourced single-cell analysis tools in `python`, e.g. [`scanpy`](https://scanpy.readthedocs.io/en/stable/){target="_blank"} and [`squidpy`](https://squidpy.readthedocs.io/en/stable/index.html){target="_blank"}, as well as interactive viewers, e.g. [Cirrocumulus](https://cirrocumulus.readthedocs.io/en/latest/){target="_blank"} and [CELLxGENE](https://github.com/chanzuckerberg/cellxgene){target="_blank"} viewers, using this data structure. Converting data into `anndata` data structure allows non-coders to easily share the light-weighted data object, visualize and explore the processed data in an interactive way. 
+Annotated Data, [AnnData](https://anndata.readthedocs.io/en/latest/){target="_blank"}, is a popular data structure for exploring and analyzing high-plex single-cell data, including spatial transcription data. There are quite a few open-sourced single-cell analysis tools in `python`, e.g. [`scanpy`](https://scanpy.readthedocs.io/en/stable/){target="_blank"} and [`squidpy`](https://squidpy.readthedocs.io/en/stable/index.html){target="_blank"}, as well as interactive viewers, e.g. [Cirrocumulus](https://cirrocumulus.readthedocs.io/en/latest/){target="_blank"} and [CELLxGENE](https://github.com/chanzuckerberg/cellxgene){target="_blank"} viewers, using this data structure. Converting CosMx&#8482; spatial data sets into `anndata` data structure allows non-coders to easily share the light-weighted data object, visualize and explore the processed data in an interactive way. 
 
-This post describes how to create `anndata` object (`.h5ad`) from either a post-analyzed `Seurat` object or basic data files. 
+This post describes how to create `anndata` object (`.h5ad`) from either a post-analysis `Seurat` object or basic data files exported from AtoMx&#8482; Spatial Informatics Portal (SIP). We hope this post would facilitate seamless integration of CosMx&#8482; spatial data sets into Python-based single-cell analysis workflows.
 
-- @sec-convert-seurat Creating `anndata` object in `.h5ad` format from post-analyzed `Seurat` object exported by AtoMx&#8482; SIP
-- @sec-interactive-viewer Visualize the post-analyzed `.h5ad` object in interactive viewer
+- @sec-convert-seurat Creating an `anndata` object in `.h5ad` format from post-analysis `Seurat` object exported by AtoMx&#8482; SIP
+- @sec-interactive-viewer Visualize the post-analysis `.h5ad` object in an interactive viewer
 - @sec-create-from-flatFiles Creating per-sample `anndata` object from basic data files in `Python` for python-based single-cell analysis
 
 Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
 the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
 
 
-# Creating `anndata` object from post-analyzed `Seurat` object exported by AtoMx&#8482; SIP {#sec-convert-seurat}
+# Creating an `anndata` object from post-analysis `Seurat` object exported by AtoMx&#8482; SIP {#sec-convert-seurat}
 
-The `Seurat` object used in this section is made from the CosMx&#8482; mouse brain public data set and assembled in the structure used by the Technology Access Program ([TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/)); similar outputs are available from the AtoMx&#8482; Spatial Informatics Portal (SIP). To download raw data for this dataset, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="_blank"}. For more details on its data structure, please refer to earlier post on [Visualizing spatial data with Seurat](/posts/seurat-cosmx-basics/#sec-data-structure). 
+AtoMx&#8482; SIP can export a CosMx&#8482; Spatial Molecular Imager (SMI) study into `Seurat` data objects for direct usage in `R`. Here we first work in `R` to open, visualize, and make minor adjustments to the object. We then export it into a `.h5ad` file for usage in `Python` tools.
+
+The `Seurat` object used in this section is made from the CosMx&#8482; mouse brain public data set and assembled in the structure used by the Technology Access Program ([TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/)); similar outputs are available from the AtoMx&#8482; SIP. To download raw data for this dataset, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="_blank"}. For more details on its data structure, please refer to earlier post on [Visualizing spatial data with Seurat](/posts/seurat-cosmx-basics/#sec-data-structure){target="_blank"}. 
 
 ::: {.callout-important}
 All the code in this [section -@sec-convert-seurat] is in `R`.
 :::
 ::: {.callout-note}
-Many of the below functions require that you are working with [Seurat v5](https://satijalab.org/seurat/){target="_blank"} and may not work in earlier versions. Additionally, if you are exporting a Seurat object from AtoMx (v1.3+), be sure to export the Seurat object with polygon coordinates and transcripts included to access all of the functionality below.
+Many of the below functions require that you are working with [Seurat v5](https://satijalab.org/seurat/){target="_blank"} and may not work in earlier versions. Additionally, if you are exporting a `Seurat` object from AtoMx (v1.3+), be sure to export the `Seurat` object with polygon coordinates and transcripts included to access all of the functionality below. 
 :::
 
-## Explore post-analyzed `Seurat` object and add in custom cell meta data
+## Explore post-analysis `Seurat` object and add in custom cell meta data
+```{r filename="Setup R", message=FALSE, eval = FALSE}
+library(Seurat)
+library(SeuratObject)
+library(SeuratDisk)
+library(ggplot2)
 
-You can add in any new cell metadata if desired. For illustration, the code below adds a new column with unique ID for each FOV.
-```{r exploreSeuratObj, message=FALSE, eval = FALSE}
 # load existing seurat object
 seu.obj <- readRDS("seurat_object.Rds")
+```
 
+The post-analysis `Seurat` object exported from AtoMx&#8482; SIP should contain 
+
+* expression matrices for various feature types, like `RNA`, `RNA_normalized`, `negprobes` and `falsecodes`; 
+* dimension reduction results, like `pca` and `umap`; 
+* results for graphs, like `snn` and `nn`. 
+
+You can visualize which results are included by running `names(seu.obj)`. The exact names of the results stored in your post-analysis `Seurat` object might be slightly different from what are included in the particular example here. Please adjust the code accordingly. 
+
+You can also add in any new cell metadata if desired. For illustration, the code below adds a new column with unique ID for each FOV.
+```{r exploreSeuratObj, message=FALSE, eval = FALSE}
 # add a new column for unique ID of each FOV
 fovNames <- seu.obj@meta.data[, c('slide_ID_numeric', 'fov')]
 fovNames[['fov_names']] <- paste0('fov_', fovNames[['slide_ID_numeric']], 
@@ -65,23 +81,16 @@ seu.obj <- Seurat::AddMetaData(seu.obj,
                                col.name = "fov_names")
 ```
 
-The post-analyzed `Seurat` object exported from AtoMx&#8482; SIP should contain 
-
-* expression matrices for various feature types, like `RNA`, `RNA_normalized`, `negprobes` and `falsecodes`; 
-* dimension reduction results, like `pca` and `umap`; 
-* results for graphs, like `snn` and `nn`. 
-
-You can visualize which results are included by running `names(seu.obj)`. The exact names of the results stored in your post-analyzed `Seurat` object might be slightly different from what are included in the particular example here. Please adjust the code accordingly. 
 
 ## Prepare spatial coordinates and visualize 
 
-AtoMx&#8482; SIP stores the per-slide cell segmentation information as separate `SeuratObject::FOV` object in the `images` slot. You can get the slide names by running `names(seu.obj@images)` in `R`. 
+AtoMx&#8482; SIP stores the per-slide cell segmentation information as separate `SeuratObject::FOV` objects in the `images` slot. You can get the slide names by running `names(seu.obj@images)` in `R`. 
 
 The example dataset used in this section has **two** tissue slides in one study and each slide is in its own spatial coordinate space and thus may have xy overlapping between the slides.  
 
 ### Case 1: 1 slide per `anndata` object {#sec-perSlide}
 
-When per-slide `anndata` object is preferred, one should split the `Seurat` object by the slide name first before cleaning it up in [section -@sec-cleanUp]. The code below is for generating one `anndata` object per tissue slide and the resulting data is used in later sections. 
+When a per-slide `anndata` object is preferred, one should split the `Seurat` object by the slide name first before cleaning it up in [section -@sec-cleanUp]. The code below is for generating one `anndata` object per tissue slide and the resulting data is used in later sections. 
 ```{r splitBySlide, message=FALSE, eval = FALSE}
 # extract the segmentation to separate variable
 imgList <- seu.obj@images
@@ -130,7 +139,7 @@ Seurat::ImageDimPlot(object = seu.obj1,
                      molecules = c("Slc17a7", "Gad1", "Plp1"), 
                      mols.size = 1.5, 
                      
-                     # fixed aspect ratio and flip xy in ploting
+                     # fixed aspect ratio and flip xy in plotting
                      coord.fixed = TRUE, flip_xy = TRUE)
 ```
 ![](figures/Fig-mBrain-S1-cellType-segmentation.png)
@@ -153,7 +162,7 @@ Seurat::ImageDimPlot(object = seu.obj1,
                      # crop the plots to area with cells only
                      crop = TRUE, 
                      
-                     # fixed aspect ratio and flip xy in ploting
+                     # fixed aspect ratio and flip xy in plotting
                      coord.fixed = TRUE, flip_xy = TRUE)
 ```
 
@@ -260,7 +269,7 @@ seu.obj2[["spatial"]] <- Seurat::CreateDimReducObject(
 
 Lastly, we would export the cleaned `Seurat` object into `h5Seurat` format and then further convert it into `h5ad` format using `SeuratDisk::Convert` function.
 ```{r h5Seurat, message=FALSE, eval = FALSE}
-# export as "h5Seurat" object
+# export as "h5Seurat" object in your current working directory
 SeuratDisk::SaveH5Seurat(seu.obj2, 
                          filename = paste0(slideName, "_subset.h5Seurat"))
 ```
@@ -294,7 +303,7 @@ Transfering meta.data to obs<br/>
 Adding dimensional reduction information for spatial<br/>
 Adding dimensional reduction information for umap</span></code>
 
-# Visualize the post-analyzed `.h5ad` object in interactive viewer {#sec-interactive-viewer}
+# Visualize the post-analysis `.h5ad` object in an interactive viewer {#sec-interactive-viewer}
 
 The resulting `anndata` object in `.h5ad` format could be visualized by various open-sourced interactive viewers. One such viewer would be [Cirrocumulus viewer](https://cirrocumulus.readthedocs.io/en/latest/){target="_blank"}. 
 
@@ -310,7 +319,7 @@ It's recommended to create separate virtual environment for viewer. The current 
 - pandas >= 1.3.4 and pandas <= 2.1.0
 - anndata >= 0.9.1 and <= 0.10.2
 
-One can create a new environment with specific version of packages for this viewer using `conda` function in terminal. 
+One can create a new environment with specific version of packages for this viewer using [conda](https://docs.anaconda.com/free/miniconda/miniconda-install/){target="_blank"} package manager in terminal. 
 ```{default filename="Terminal"}
 conda create --name myenv python==3.9.18 pandas==2.1.0 anndata==0.10.2
 ```
@@ -383,7 +392,7 @@ For python lovers, it may be desired to create `anndata` object from scratch and
 
 In this section, we start from the basic data files (in `.csv` format) exported from AtoMx&#8482; SIP for an example public dataset that you can download from [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/){target="_blank"}. 
 
-AtoMx&#8482; SIP splits and organizes the basic data files by tissue slides during export. Thus, unlike the `Seurat` object of the mouse brain dataset used in earlier [section -@sec-convert-seurat], the basic data files used for this [section -@sec-create-from-flatFiles] contain information for one **single** slide of pancreas sample. The [ReadMe](/posts/segmentation-error-evaluation/assets/Pancreas-CosMx-ReadMe.html){target="_blank"} associated with this example data set on pancreas shows the data structures of each file used in this section. 
+AtoMx&#8482; SIP splits and organizes the basic data files by tissue slides during export. Thus, unlike the `Seurat` object of the mouse brain dataset used in earlier [section -@sec-convert-seurat], the basic data files used for this [section -@sec-create-from-flatFiles] contain information for one **single** slide of pancreas sample. The [ReadMe](/assets/Pancreas-CosMx-ReadMe.html){target="_blank"} associated with this example data set on pancreas shows the data structures of each file used in this section. 
 
 ::: {.callout-important}
 All the code in this [section -@sec-create-from-flatFiles] is in `Python`.
@@ -433,7 +442,7 @@ raw = csr_matrix(df[chosen_probes].astype(pd.SparseDtype("float64",0)).sparse.to
 del df
 ```
 
-Next, we would read in the cell meta data and extract the spatial coordinates of each cell. Based on the [ReadMe](/posts/segmentation-error-evaluation/assets/Pancreas-CosMx-ReadMe.html) of these data files, we can know this data set has pixel size of 0.12028 µm per pixel. For illustration, we also convert the pixel coordinates to µm here. 
+Next, we would read in the cell meta data and extract the spatial coordinates of each cell. Based on the [ReadMe](/assets/Pancreas-CosMx-ReadMe.html){target="_blank"} of these data files, we can know this data set has pixel size of 0.12028 µm per pixel. For illustration, we also convert the pixel coordinates to µm here. 
 ```{python}
 #| eval: false
 
@@ -608,5 +617,5 @@ For more details on how to analyze spatial data sets using python tools, please 
 
 # Conclusions {#sec-conclusions}
 
-In summary, `anndata` serves as a versatile data structure in Python-based single-cell analysis. This post outlines how to create `anndata` object in `.h5ad` file format from AtoMx&#8482; SIP exported results, which are either a post-analyzed `Seurat` object or basic data files in `.csv` format. The conversion of AtoMx&#8482; SIP exported results into `.h5ad` file would facilitate seamless integration into Python-based single-cell analysis workflows. Leveraging Python libraries like [`scanpy`](https://scanpy.readthedocs.io/en/stable/){target="_blank"} and [`squidpy`](https://squidpy.readthedocs.io/en/stable/index.html){target="_blank"}, as well as interactive viewers such as [Cirrocumulus](https://cirrocumulus.readthedocs.io/en/latest/){target="_blank"} and [CELLxGENE](https://github.com/chanzuckerberg/cellxgene){target="_blank"} viewers, researchers can share the lightweight data objects, visualize processed data, and explore them in more avenues.
+In summary, `anndata` serves as a versatile data structure in Python-based single-cell analysis. This post outlines how to create `anndata` object in `.h5ad` file format from AtoMx&#8482; SIP exported results, which are either a post-analysis `Seurat` object or basic data files in `.csv` format. The conversion of AtoMx&#8482; SIP exported results into `.h5ad` file would facilitate seamless integration into Python-based single-cell analysis workflows. Leveraging Python libraries like [`scanpy`](https://scanpy.readthedocs.io/en/stable/){target="_blank"} and [`squidpy`](https://squidpy.readthedocs.io/en/stable/index.html){target="_blank"}, as well as interactive viewers such as [Cirrocumulus](https://cirrocumulus.readthedocs.io/en/latest/){target="_blank"} and [CELLxGENE](https://github.com/chanzuckerberg/cellxgene){target="_blank"} viewers, researchers can share the lightweight data objects, visualize processed data, and explore them in more avenues.
 

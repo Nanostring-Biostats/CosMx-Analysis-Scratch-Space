@@ -52,7 +52,7 @@ The required inputs for [FastReseg](https://github.com/Nanostring-Biostats/FastR
    + when `NULL`, use the transcript data.frame `transcript_df` directly.
 
 
-This post will show you how to prepare your inputs if you have data assembled in the structure used by the Technology Access Program ([TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/)); similar outputs are available from the AtoMx&#8482; Spatial Informatics Portal (SIP). You can download an example public dataset from [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/){target="_blank"}. The [ReadMe](./assets/Pancreas-CosMx-ReadMe.html) associated with this example data set on pancreas shows the data structures of each file used in this post.
+This post will show you how to prepare your inputs if you have data assembled in the structure used by the Technology Access Program ([TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/)); similar outputs are available from the AtoMx&#8482; Spatial Informatics Portal (SIP). You can download an example public dataset from [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/){target="_blank"}. The [ReadMe](/assets/Pancreas-CosMx-ReadMe.html){target="_blank"} associated with this example data set on pancreas shows the data structures of each file used in this post.
 
 - @sec-loading-flatFiles Prepare inputs from basic data files
 - @sec-FastReseg-flagging Run segmentation evaluation 
@@ -77,7 +77,7 @@ validCells <- cellTypeRes[['cell_ID']]
 clust <- setNames(cellTypeRes[['cell_types']], nm = cellTypeRes[['cell_ID']])
 
 ```
-Inspecting the cell typing results and the [ReadMe](./assets/Pancreas-CosMx-ReadMe.html) associated with this data set, we can know that this data set uses `c_[slide ID]_[fov ID]_[cell ID]` format to get cell ids unique across entire data set. 
+Inspecting the cell typing results and the [ReadMe](/assets/Pancreas-CosMx-ReadMe.html){target="_blank"} associated with this data set, we can know that this data set uses `c_[slide ID]_[fov ID]_[cell ID]` format to get cell ids unique across entire data set. 
  
 We next to load raw expression matrix for all genes and cells with available cell typing results. 
 ```{r readRawCounts, message=FALSE, eval = FALSE}
@@ -136,7 +136,7 @@ transDF_fileInfo <- lapply(allFOVs, function(fovId){
 transDF_fileInfo <- do.call(rbind, transDF_fileInfo)
 ```
 
-`FastReseg` evaluates segmentation in physical space and thus it's preferred to convert all 3D coordinates into same unit. The relevant default parameters of `FastReseg` are set with respect to micrometer in coordinate unit. According to the  [ReadMe](./assets/Pancreas-CosMx-ReadMe.html), the pixel size for this data set is 0.12028 µm per pixel and the z step size is 0.8 µm per z slice. We would pass this information to `FastReseg` functions to do the coordinate conversion. If your data is already in micrometer unit, you can use `1` for pixel size and z step to disable the conversion. 
+`FastReseg` evaluates segmentation in physical space and thus it's preferred to convert all 3D coordinates into same unit. The relevant default parameters of `FastReseg` are set with respect to micrometer in coordinate unit. According to the [ReadMe](/assets/Pancreas-CosMx-ReadMe.html){target="_blank"}, the pixel size for this data set is 0.12028 µm per pixel and the z step size is 0.8 µm per z slice. We would pass this information to `FastReseg` functions to do the coordinate conversion. If your data is already in micrometer unit, you can use `1` for pixel size and z step to disable the conversion. 
 
 ```{r pxUnit, message=FALSE, eval = TRUE}
 pixel_size <- 0.12028
@@ -158,7 +158,7 @@ In addition: Warning messages:<br/>
 </span></code>
 :::
 
-Since the example data set in use is a Whole-Transcription spatial data set with high number of unique genes and large per-FOV transcript file size, here we cautiously reduce the % of core number to 0.25.
+Since the example data set in use is a Whole Transcriptome (WTx) spatial data set with high number of unique genes and large per-FOV transcript file size, here we cautiously reduce the % of core number to 0.25.
 ```{r coreNum, message=FALSE, eval = TRUE}
 percentCores <- 0.25
 ```
@@ -209,7 +209,7 @@ flagAll_res <- FastReseg::fastReseg_flag_all_errors(
 modStats_ToFlagCells <- flagAll_res[['combined_modStats_ToFlagCells']]
 ```
 
-The function above returns the statistics for evaluating each cell for spatial dependent model against null model. Based on the P value, `lrtest_Pr` or the negative log10 value `lrtest_nlog10P`, one can select for cells with strong spatial dependency in transcript score profile. Those cells are likely to contain contaminating transcripts for neighbor cells.
+The function above returns the statistics for evaluating each cell for spatial dependent model against null model. Based on the P value `lrtest_Pr` or the negative log10 value `lrtest_nlog10P`, one can select for cells with strong spatial dependency in transcript score profile. Those cells are likely to contain contaminating transcripts for neighbor cells.
 ```{r loadModStats, message=FALSE, eval = TRUE, echo=FALSE, results ='asis'}
 modStats_ToFlagCells <- read.csv("assets/Pancreas_flagAll_modStats.csv")
 outDir_flagErrors <- "assets"
@@ -444,4 +444,4 @@ This post serves as a quick-start guide to use [FastReseg](https://github.com/Na
 - cutoffs and rules used for segmentation correction: `score_baseline`, `lowerCutoff_transNum`, `higherCutoff_transNum`
 - additional spatial constraint on merging event during error correction: `spatialMergeCheck_method`, `cutoff_spatialMerge`
 
-Many of those parameters have reasonable defaults for most spatial data sets and could be derived from your data using `FastReseg::runPreprocess()` function. For new user or new sample type, it's recommended to process one per-FOV transcript using `FastReseg::fastReseg_perFOV_full_process()` functions first and check out the impact of the parameters chosen. Please refer to [FastReseg tutorial](https://nanostring-biostats.github.io/FastReseg/articles/tutorial.html){target="_blank"}, `Modular functions for individual tasks` section, for more details. 
+Many of those parameters have reasonable defaults for most spatial data sets and could be derived from your data using `FastReseg::runPreprocess()` function. For new user or new sample type, it's recommended to process just one per-FOV transcript data using `FastReseg::fastReseg_perFOV_full_process()` functions first and check out the impact of the parameters chosen. Please refer to [FastReseg tutorial](https://nanostring-biostats.github.io/FastReseg/articles/tutorial.html#modular-functions-for-individual-tasks){target="_blank"}, `Modular functions for individual tasks` section, for more details. 
