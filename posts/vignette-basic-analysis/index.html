@@ -103,7 +103,7 @@ cookieconsent.run({
 
 </head>
 
-<body class="nav-fixed fullcontent">
+<body class="floating nav-fixed">
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top quarto-banner">
@@ -166,7 +166,7 @@ cookieconsent.run({
     </nav>
 </header>
 <!-- content -->
-<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+<header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
       <h1 class="title">Vignette: Basics of CosMx Analysis in R</h1>
@@ -220,8 +220,26 @@ cookieconsent.run({
   
   </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="2">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#basic-cosmx-analysis-workflow" id="toc-basic-cosmx-analysis-workflow" class="nav-link active" data-scroll-target="#basic-cosmx-analysis-workflow">Basic CosMx analysis workflow</a>
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#file-structure" id="toc-file-structure" class="nav-link" data-scroll-target="#file-structure">File structure</a></li>
+  <li><a href="#data-structure" id="toc-data-structure" class="nav-link" data-scroll-target="#data-structure">Data structure</a></li>
+  <li><a href="#sec-workflow" id="toc-sec-workflow" class="nav-link" data-scroll-target="#sec-workflow">Workflow</a></li>
+  <li><a href="#general-analysis-advice" id="toc-general-analysis-advice" class="nav-link" data-scroll-target="#general-analysis-advice">General analysis advice</a></li>
+  </ul></li>
+  </ul>
+</nav>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
-    
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+    </div>
 <!-- main -->
 <main class="content quarto-banner-title-block" id="quarto-document-content">
 
@@ -233,37 +251,22 @@ cookieconsent.run({
 <h1>Basic CosMx analysis workflow</h1>
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>A complete demo analysis of a CosMx dataset can be found <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/vignette">here</a>. It’s intended to be used as a template for other analyses to follow.</p>
+<p>A complete demo analysis of a CosMx dataset can be found at <a href="#sec-workflow" target="_blank">workflow</a> section in this post and the correspond scripts are stored under <code>_code/vignette</code> <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/vignette" target="_blank">folder</a> in this repository. It’s intended to be used as a template for other analyses to follow.</p>
 <p>We’ll be analyzing a 1000-plex dataset from melanoma samples. We begin with the files written by the AtoMx flat file export module. The full dataset we’ve used is too big to be saved on Github. To follow along, we recommend using your own data, also as output by the AtoMx flat file export module.</p>
 </section>
 <section id="file-structure" class="level2">
 <h2 class="anchored" data-anchor-id="file-structure">File structure</h2>
 <p>We’ll organize the data for this analysis as follows:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="figures/folders.png" class="img-fluid figure-img"></p>
-<figcaption>image</figcaption>
-</figure>
-</div>
+<p><img src="figures/folders.png" class="img-fluid"></p>
 <ul>
 <li>The “data” folder holds the exports from AtoMx</li>
 <li>“processed_data” holds data objects generated during analysis, meant to be used by later analyses.</li>
 <li>“results” holds results intended for human consumption.</li>
 </ul>
 <p>Inside the “data” folder, we’ll place a folder names “flat_files”, containing the AtoMx exports:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="figures/folders2.png" class="img-fluid figure-img"></p>
-<figcaption>image</figcaption>
-</figure>
-</div>
+<p><img src="figures/folders2.png" class="img-fluid"></p>
 <p>And we’ll organize code as follows:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="figures/folders3.png" class="img-fluid figure-img"></p>
-<figcaption>image</figcaption>
-</figure>
-</div>
+<p><img src="figures/folders3.png" class="img-fluid"></p>
 <ul>
 <li>Analysis scripts are numbered by the order in which they should be run. Each creates data used by the downstream scripts.</li>
 <li>Scripts are meant to be run in the directory where they lie.</li>
@@ -280,19 +283,9 @@ cookieconsent.run({
 <li>Transcript data: for all RNA transcripts detected, location, gene ID, and cell ID. Most analyses use cell-level data, not this transcript-level data, but it can make compelling plots.</li>
 <li>Tissue images. Not used by most analyses, but useful for Figures.</li>
 </ul>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="figures/data_before.png" class="img-fluid figure-img"></p>
-<figcaption>image</figcaption>
-</figure>
-</div>
+<p><img src="figures/data_before.png" class="img-fluid"></p>
 <p>Our analyses will append lots of new information to this starting point, ending here:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="figures/data_after.png" class="img-fluid figure-img"></p>
-<figcaption>image</figcaption>
-</figure>
-</div>
+<p><img src="figures/data_after.png" class="img-fluid"></p>
 <p>New data types include:</p>
 <ul>
 <li>UMAP coordinates</li>
@@ -300,20 +293,20 @@ cookieconsent.run({
 <li>Special results objects from analyses: cell typing, differential expression, InSituCor, …</li>
 </ul>
 </section>
-<section id="workflow" class="level2">
-<h2 class="anchored" data-anchor-id="workflow">Workflow:</h2>
+<section id="sec-workflow" class="level2">
+<h2 class="anchored" data-anchor-id="sec-workflow">Workflow</h2>
 <p>Our workflow performs the below steps:</p>
 <p>First, the fundamentals:</p>
 <ul>
-<li><a href="posts/vignette-basic-analysis/assets/0.-loading-flat-files.html">Parse and format data export by AtoMx</a></li>
-<li><a href="posts/vignette-basic-analysis/assets/1.-finessing-tissues-spatial-arrangement.html">Custom arranging of tissues and FOVs in space</a></li>
-<li><a href="posts/vignette-basic-analysis/assets/2.-QC-and-normalization.html">QC and normalization</a></li>
-<li><a href="posts/vignette-basic-analysis/assets/3.-dimension-reduction.html">Dimension reduction (PCA and UMAP)</a></li>
-<li><a href="posts/vignette-basic-analysis/assets/4.-cell-typing.html">Cell typing</a></li>
+<li><a href="./assets/0.-loading-flat-files.html" target="_blank">Parse and format data export by AtoMx</a></li>
+<li><a href="./assets/1.-finessing-tissues-spatial-arrangement.html" target="_blank">Custom arranging of tissues and FOVs in space</a></li>
+<li><a href="./assets/2.-QC-and-normalization.html" target="_blank">QC and normalization</a></li>
+<li><a href="./assets/3.-dimension-reduction.html" target="_blank">Dimension reduction (PCA and UMAP)</a></li>
+<li><a href="./assets/4.-cell-typing.html" target="_blank">Cell typing</a></li>
 </ul>
 <p>Then, we go after biology:</p>
 <ul>
-<li><a href="posts/vignette-basic-analysis/assets/5.-define-spatial-context.html">Defining cells’ spatial context</a></li>
+<li><a href="./assets/5.-define-spatial-context.html" target="_blank">Defining cells’ spatial context</a></li>
 <li>Hypothesis-driven analyses, i.e.&nbsp;differential expression: how do cells change behavior based on their spatial context? (coming summer 2024)</li>
 <li>Hypothesis-generating analyses: identifying spatially correlated genes with InSituCor (coming summer 2024)</li>
 </ul>
@@ -321,7 +314,7 @@ cookieconsent.run({
 <section id="general-analysis-advice" class="level2">
 <h2 class="anchored" data-anchor-id="general-analysis-advice">General analysis advice</h2>
 <ul>
-<li>For large experiments, <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/big-data/">more advanced workflows</a> may be needed to avoid overwhelming your compute and/or memory.</li>
+<li>For large experiments, <a href="../../posts/big-data/index.html" target="_blank">more advanced workflows</a> may be needed to avoid overwhelming your compute and/or memory.</li>
 <li>For studies across multiple flow cells, batch correction should be considered.</li>
 </ul>
 
