@@ -147,6 +147,7 @@ Seurat::ImageDimPlot(object = seu.obj1,
 You can zoom in to view a subset of cells by specifying which cells to plots.
 ```{r showSubset, message=FALSE, eval = FALSE}
 # change idents to "fov" for cell selection
+# note: "fov" here is a column in cell meta.data instead of the `SeuratObject::FOV` object. 
 SeuratObject::Idents(seu.obj1) <- "fov"
 
 Seurat::ImageDimPlot(object = seu.obj1, 
@@ -219,7 +220,7 @@ plotData <- cbind(seu.obj1[["nb_clus_final"]],
 
 ggplot2::ggplot(plotData, 
                 # flip xy to be consistent with earlier plots
-                aes(x = y, y = x, color = as.factor(nb_clus_final))) +
+                ggplot2::aes(x = y, y = x, color = as.factor(nb_clus_final))) +
   ggplot2::geom_point(size = 0.1)+
   ggplot2::coord_fixed()+
   Seurat::NoLegend()+
@@ -313,7 +314,7 @@ pip install cirrocumulus
 ```
 
 ::: {.callout-tip title="Create virtual environment for viewer"}
-It's recommended to create separate virtual environment for viewer. The current released version of `cirrowcumulus` viewer is in version `1.1.57` and has package dependencies as listed below.
+It's recommended to create separate virtual environment for viewer. The current released version of `cirrocumulus` viewer is in version `1.1.57` and has package dependencies as listed below.
 
 - Python >= 3.9.7 and Python <= 3.9.18
 - pandas >= 1.3.4 and pandas <= 2.1.0
@@ -390,7 +391,7 @@ knitr::include_graphics("./figures/Fig-mBrain-S1-cirroViewer-dotPlot-selection-v
 
 For python lovers, it may be desired to create `anndata` object from scratch and then feed it into python-based single-cell analysis tools, like [`scanpy`](https://scanpy.readthedocs.io/en/stable/){target="_blank"} and [`squidpy`](https://squidpy.readthedocs.io/en/stable/index.html){target="_blank"}.
 
-In this section, we start from the basic data files (in `.csv` format) exported from AtoMx&#8482; SIP for an example public dataset that you can download from [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/){target="_blank"}. 
+In this section, we start from the basic data files (in `.csv` format) exported from AtoMx&#8482; SIP. For an example public dataset that you can download, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/){target="_blank"}. 
 
 AtoMx&#8482; SIP splits and organizes the basic data files by tissue slides during export. Thus, unlike the `Seurat` object of the mouse brain dataset used in earlier [section -@sec-convert-seurat], the basic data files used for this [section -@sec-create-from-flatFiles] contain information for one **single** slide of pancreas sample. The [ReadMe](/assets/Pancreas-CosMx-ReadMe.html){target="_blank"} associated with this example data set on pancreas shows the data structures of each file used in this section. 
 
@@ -484,7 +485,7 @@ adata = ad.AnnData(
 # add spatial coordinates 
 adata.obsm['spatial'] = coords.to_numpy()
 
-# you can add name of slide or orignal file as one of unstructured annotation
+# you can add name of slide or original file as one of unstructured annotation
 adata.uns['name'] = "Pancreas"
 
 # convert string columns to categorical data in `obs`
