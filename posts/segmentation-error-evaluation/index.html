@@ -285,7 +285,7 @@ cookieconsent.run({
 <section id="introduction" class="level1" data-number="1">
 <h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
 <p>Accurate cell segmentation that assigns transcripts to cell locations is critical to data quality of spatial transcriptomics assays and the proper interpretation of downstream <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/index.html" target="_blank">differential expression</a> analysis results. But it’s very challenging for tissue sections where cells are tightly packaged with shared, 3D boundaries and uneven morphology staining.</p>
-<p>The <a href="https://github.com/Nanostring-Biostats/FastReseg/">FastReseg R package</a> offers a rapid way to evaluate the performance of existing cell segmentation and to perform refinement given the spatial transcriptional profiles.</p>
+<p>The <a href="https://github.com/Nanostring-Biostats/FastReseg/" target="_blank">FastReseg R package</a> offers a rapid way to evaluate the performance of existing cell segmentation and to perform refinement given the spatial transcriptional profiles.</p>
 <ol type="1">
 <li>The evaluation process starts with a cluster-specific reference expression profiles that are either derived from cell typing of query spatial data set given its current image-based cell segmentation or from external non-spatial data sets, like scRNA-seq.</li>
 <li>Given the provided reference profiles, FastReseg algorithm scores individual transcripts for the goodness-of-fit within their respective cells based on the probability of each gene belonging to each cell type.</li>
@@ -314,7 +314,7 @@ Figure&nbsp;1: Schematic of FastReseg workflow
 <li>when <code>NULL</code>, use the transcript data.frame <code>transcript_df</code> directly.</li>
 </ul></li>
 </ul>
-<p>This post will show you how to prepare your inputs if you have data assembled in the structure used by the Technology Access Program (<a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/">TAP</a>); similar outputs are available from the AtoMx™ Spatial Informatics Portal (SIP). You can download an example public dataset from <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/" target="_blank">here</a>. The <a href="./assets/Pancreas-CosMx-ReadMe.html">ReadMe</a> associated with this example data set on pancreas shows the data structures of each file used in this post.</p>
+<p>This post will show you how to prepare your inputs if you have data assembled in the structure used by the Technology Access Program (<a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/" target="_blank">TAP</a>); similar outputs are available from the AtoMx™ Spatial Informatics Portal (SIP). You can download an example public dataset from <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/" target="_blank">here</a>. The <a href="../../assets/Pancreas-CosMx-ReadMe.html" target="_blank">ReadMe</a> associated with this example data set on pancreas shows the data structures of each file used in this post.</p>
 <ul>
 <li><a href="#sec-loading-flatFiles" class="quarto-xref">Section&nbsp;2</a> Prepare inputs from basic data files</li>
 <li><a href="#sec-FastReseg-flagging" class="quarto-xref">Section&nbsp;3</a> Run segmentation evaluation</li>
@@ -333,7 +333,7 @@ Figure&nbsp;1: Schematic of FastReseg workflow
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>validCells <span class="ot">&lt;-</span> cellTypeRes[[<span class="st">'cell_ID'</span>]]</span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>clust <span class="ot">&lt;-</span> <span class="fu">setNames</span>(cellTypeRes[[<span class="st">'cell_types'</span>]], <span class="at">nm =</span> cellTypeRes[[<span class="st">'cell_ID'</span>]])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>Inspecting the cell typing results and the <a href="./assets/Pancreas-CosMx-ReadMe.html">ReadMe</a> associated with this data set, we can know that this data set uses <code>c_[slide ID]_[fov ID]_[cell ID]</code> format to get cell ids unique across entire data set.</p>
+<p>Inspecting the cell typing results and the <a href="../../assets/Pancreas-CosMx-ReadMe.html" target="_blank">ReadMe</a> associated with this data set, we can know that this data set uses <code>c_[slide ID]_[fov ID]_[cell ID]</code> format to get cell ids unique across entire data set.</p>
 <p>We next to load raw expression matrix for all genes and cells with available cell typing results.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># load raw expression matrix and assign unique cell_ID to each one </span></span>
@@ -387,7 +387,7 @@ Figure&nbsp;1: Schematic of FastReseg workflow
 <span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>transDF_fileInfo <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, transDF_fileInfo)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p><code>FastReseg</code> evaluates segmentation in physical space and thus it’s preferred to convert all 3D coordinates into same unit. The relevant default parameters of <code>FastReseg</code> are set with respect to micrometer in coordinate unit. According to the <a href="./assets/Pancreas-CosMx-ReadMe.html">ReadMe</a>, the pixel size for this data set is 0.12028 µm per pixel and the z step size is 0.8 µm per z slice. We would pass this information to <code>FastReseg</code> functions to do the coordinate conversion. If your data is already in micrometer unit, you can use <code>1</code> for pixel size and z step to disable the conversion.</p>
+<p><code>FastReseg</code> evaluates segmentation in physical space and thus it’s preferred to convert all 3D coordinates into same unit. The relevant default parameters of <code>FastReseg</code> are set with respect to micrometer in coordinate unit. According to the <a href="../../assets/Pancreas-CosMx-ReadMe.html" target="_blank">ReadMe</a>, the pixel size for this data set is 0.12028 µm per pixel and the z step size is 0.8 µm per z slice. We would pass this information to <code>FastReseg</code> functions to do the coordinate conversion. If your data is already in micrometer unit, you can use <code>1</code> for pixel size and z step to disable the conversion.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>pixel_size <span class="ot">&lt;-</span> <span class="fl">0.12028</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>zstep_size <span class="ot">&lt;-</span> <span class="fl">0.8</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -404,10 +404,10 @@ Note
 </div>
 <div class="callout-body-container callout-body">
 <p>Too many large FOVs being processed in same batch could hit the memory limit and abort the current processing. Below is an example error message when memory limit was reached.</p>
-<p><span style="color: red;"> Error in FUN(X[[i]], …) : subscript out of bounds<br> In addition: Warning messages:<br> <strong>1: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE, :<br> scheduled cores 1, 3, 4, 7, 8, 10, 11 did not deliver results, all values of the jobs will be affected<br> 2: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE, :<br> scheduled core 12 encountered error in user code, all values of the job will be affected</strong> </span></p>
+<p><code><span style="color: red;"> Error in FUN(X[[i]], …) : subscript out of bounds<br> In addition: Warning messages:<br> 1: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE, :<br> scheduled cores 1, 3, 4, 7, 8, 10, 11 did not deliver results, all values of the jobs will be affected<br> 2: In parallel::mclapply(X = seq_len(nrow(transDF_fileInfo)), mc.allow.recursive = TRUE, :<br> scheduled core 12 encountered error in user code, all values of the job will be affected </span></code></p>
 </div>
 </div>
-<p>Since the example data set in use is a Whole-Transcription spatial data set with high number of unique genes and large per-FOV transcript file size, here we cautiously reduce the % of core number to 0.25.</p>
+<p>Since the example data set in use is a Whole Transcriptome (WTx) spatial data set with high number of unique genes and large per-FOV transcript file size, here we cautiously reduce the % of core number to 0.25.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>percentCores <span class="ot">&lt;-</span> <span class="fl">0.25</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
@@ -455,7 +455,7 @@ Note
 <span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="co"># extract spatial evaluation outcomes of valid cells</span></span>
 <span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>modStats_ToFlagCells <span class="ot">&lt;-</span> flagAll_res[[<span class="st">'combined_modStats_ToFlagCells'</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The function above returns the statistics for evaluating each cell for spatial dependent model against null model. Based on the P value, <code>lrtest_Pr</code> or the negative log10 value <code>lrtest_nlog10P</code>, one can select for cells with strong spatial dependency in transcript score profile. Those cells are likely to contain contaminating transcripts for neighbor cells.</p>
+<p>The function above returns the statistics for evaluating each cell for spatial dependent model against null model. Based on the P value <code>lrtest_Pr</code> or the negative log10 value <code>lrtest_nlog10P</code>, one can select for cells with strong spatial dependency in transcript score profile. Those cells are likely to contain contaminating transcripts for neighbor cells.</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 13%">
@@ -755,6 +755,32 @@ are flagged for resegmentation with lrtest_nlog10P &gt; 5.0.</code></pre>
 <section id="sec-FastReseg-full" class="level1" data-number="4">
 <h1 data-number="4"><span class="header-section-number">4</span> Run full pipeline to correct putative segmentation error identified</h1>
 <p>If cell segmentation correction is desired, one can use <code>FastReseg::fastReseg_full_pipeline()</code> function to not only flag but also correct the identified putative cell segmentation errors.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The current defaults for separating out poor-fit transcripts are on the conservative ends. To make the separation more aggressive with less constraint in spatial neighborhood, please refer to the <a href="https://www.rdocumentation.org/packages/e1071/versions/1.7-14/topics/svm" target="_blank">manual of <code>e1071::svm()</code> function</a> on what arguments one can adjust and pass to the <code>FastReseg</code> functions via <code>svm_args</code> list variable. Example arguments include <code>kernel</code> type, <code>scale</code>, <code>gamma</code> and <code>type</code> of <code>svm</code> classification machine.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Include control probes">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Include control probes
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you would like to keep the control probes, e.g.&nbsp;negative probes, in the post-resegmentation data, you can pass the names of those control probes as a vector to the function via <code>ctrl_genes</code> argument. Those <code>ctrl_genes</code> would be assigned with same transcript scores under all cell types and thus the only way they changed their cell ID assignment would be due to the presence of poor-fit transcriptional zone in proximity. Of note, to avoid significant interference from those <code>ctrl_genes</code>, it’s recommended to have total counts of those genes below 1% of total counts of all genes in each cell.</p>
+</div>
+</div>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># path to output folder</span></span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>outDir_full <span class="ot">&lt;-</span> <span class="st">"res2_fullPipeline"</span></span>
@@ -811,6 +837,7 @@ are flagged for resegmentation with lrtest_nlog10P &gt; 5.0.</code></pre>
 <span id="cb14-53"><a href="#cb14-53" aria-hidden="true" tabindex="-1"></a>  <span class="at">combine_extra =</span> <span class="cn">FALSE</span> <span class="co"># flag to include trimmed and extracellular transcripts in the exported `updated_transDF.csv` files </span></span>
 <span id="cb14-54"><a href="#cb14-54" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+<p>The re-segmentation pipeline would generate new transcript <code>data.frame</code> and cell expression matrix after the segmentation refinement. The updated results should be treated as a new data set and go through the standard single-cell analysis pipeline, including QC, normalization, and cell typing, etc. While the <code>updated_cellID</code> matches with their original source cell ID in most cases, cells involved in the evaluation of a potential merging event may have their <code>updated_cellID</code> unrelated to their original source cell ID. You can track the change of cell assignment for each transcript group via either the <code>reseg_actions</code> returned by the pipeline function or the spatial coordinates of each transcript.</p>
 </section>
 <section id="sec-conclusions" class="level1" data-number="5">
 <h1 data-number="5"><span class="header-section-number">5</span> Conclusions</h1>
@@ -822,7 +849,7 @@ are flagged for resegmentation with lrtest_nlog10P &gt; 5.0.</code></pre>
 <li>cutoffs and rules used for segmentation correction: <code>score_baseline</code>, <code>lowerCutoff_transNum</code>, <code>higherCutoff_transNum</code></li>
 <li>additional spatial constraint on merging event during error correction: <code>spatialMergeCheck_method</code>, <code>cutoff_spatialMerge</code></li>
 </ul>
-<p>Many of those parameters have reasonable defaults for most spatial data sets and could be derived from your data using <code>FastReseg::runPreprocess()</code> function. For new user or new sample type, it’s recommended to process one per-FOV transcript using <code>FastReseg::fastReseg_perFOV_full_process()</code> functions first and check out the impact of the parameters chosen. Please refer to <a href="https://nanostring-biostats.github.io/FastReseg/articles/tutorial.html" target="_blank">FastReseg tutorial</a>, <code>Modular functions for individual tasks</code> section, for more details.</p>
+<p>Many of those parameters have reasonable defaults for most spatial data sets and could be derived from your data using <code>FastReseg::runPreprocess()</code> function. For new user or new sample type, it’s recommended to process just one per-FOV transcript data using <code>FastReseg::fastReseg_perFOV_full_process()</code> functions first and check out the impact of the parameters chosen. Please refer to <a href="https://nanostring-biostats.github.io/FastReseg/articles/tutorial.html#modular-functions-for-individual-tasks" target="_blank">FastReseg tutorial</a>, <code>Modular functions for individual tasks</code> section, for more details.</p>
 
 
 </section>

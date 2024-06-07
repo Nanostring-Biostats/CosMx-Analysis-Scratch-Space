@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.4.555">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Lidan Wu">
+<meta name="dcterms.date" content="2024-06-05">
+<meta name="description" content="This post describes how to create anndata object from AtoMx™ exported results. The resulting oject in ‘.h5ad’ format could be further analyzed using various python-based single-cell analysis tools, like scanpy and squidpy. Non-coders could also share the light-weighted data object, visualize and explore the processed data in several open-sourced interactive viewers, like Cirrocumulus and CELLxGENE viewers.">
+
+<title>Blog - Creating an anndata object from AtoMx™ exported results for interactive viewer and python-based analysis</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../assets/cropped-NS_Favicon_512x512-32x32.png" rel="icon" type="image/png">
+<script src="../../site_libs/cookie-consent/cookie-consent.js"></script>
+<link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-29W4MW0Y2W"></script>
+
+<script type="text/plain" cookie-consent="tracking">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-29W4MW0Y2W', { 'anonymize_ip': true});
+</script>
+
+<script type="text/javascript" charset="UTF-8">
+document.addEventListener('DOMContentLoaded', function () {
+cookieconsent.run({
+  "notice_banner_type":"simple",
+  "consent_type":"implied",
+  "palette":"light",
+  "language":"en",
+  "page_load_consent_levels":["strictly-necessary","functionality","tracking","targeting"],
+  "notice_banner_reject_button_hide":false,
+  "preferences_center_close_button_hide":false,
+  "website_name":""
+  ,
+"language":"en"
+  });
+});
+</script> 
+  
+
+
+</head>
+
+<body class="floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../.././assets/NS_Logo@3x_Bruker_gray 1.png" alt="" class="navbar-logo">
+    </a>
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../license.html"> 
+<span class="menu-text">License</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../link-to-code.html"> 
+<span class="menu-text">Code</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">Browse Posts by Topic</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/nanostringtech"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/company/nanostring-technologies"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+          <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Creating an anndata object from AtoMx™ exported results for interactive viewer and python-based analysis</h1>
+                  <div>
+        <div class="description">
+          This post describes how to create anndata object from AtoMx™ exported results. The resulting oject in ‘.h5ad’ format could be further analyzed using various python-based single-cell analysis tools, like scanpy and squidpy. Non-coders could also share the light-weighted data object, visualize and explore the processed data in several open-sourced interactive viewers, like Cirrocumulus and CELLxGENE viewers.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">how-tos</div>
+                <div class="quarto-category">visualization</div>
+                <div class="quarto-category">Seurat</div>
+                <div class="quarto-category">AnnData</div>
+                <div class="quarto-category">Python</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliations</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author">Lidan Wu <a href="https://orcid.org/0000-0003-3150-6170" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              NanoString, a Bruker Company
+            </p>
+          <p class="affiliation">
+              Github: <a href="https://github.com/lidanwu" target="_blank"><span class="citation" data-cites="lidanwu">@lidanwu</span></a>
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">June 5, 2024</p>
+      </div>
+    </div>
+    
+      <div>
+      <div class="quarto-title-meta-heading">Modified</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date-modified">June 7, 2024</p>
+      </div>
+    </div>
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="2">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
+  <li><a href="#sec-convert-seurat" id="toc-sec-convert-seurat" class="nav-link" data-scroll-target="#sec-convert-seurat"><span class="header-section-number">2</span> Creating an <code>anndata</code> object from post-analysis <code>Seurat</code> object exported by AtoMx™ SIP</a>
+  <ul class="collapse">
+  <li><a href="#explore-post-analysis-seurat-object-and-add-in-custom-cell-meta-data" id="toc-explore-post-analysis-seurat-object-and-add-in-custom-cell-meta-data" class="nav-link" data-scroll-target="#explore-post-analysis-seurat-object-and-add-in-custom-cell-meta-data"><span class="header-section-number">2.1</span> Explore post-analysis <code>Seurat</code> object and add in custom cell meta data</a></li>
+  <li><a href="#prepare-spatial-coordinates-and-visualize" id="toc-prepare-spatial-coordinates-and-visualize" class="nav-link" data-scroll-target="#prepare-spatial-coordinates-and-visualize"><span class="header-section-number">2.2</span> Prepare spatial coordinates and visualize</a>
+  <ul class="collapse">
+  <li><a href="#sec-perSlide" id="toc-sec-perSlide" class="nav-link" data-scroll-target="#sec-perSlide"><span class="header-section-number">2.2.1</span> Case 1: 1 slide per <code>anndata</code> object</a></li>
+  <li><a href="#sec-perStudy" id="toc-sec-perStudy" class="nav-link" data-scroll-target="#sec-perStudy"><span class="header-section-number">2.2.2</span> Case 2: multi-slide per <code>anndata</code> object</a></li>
+  </ul></li>
+  <li><a href="#sec-cleanUp" id="toc-sec-cleanUp" class="nav-link" data-scroll-target="#sec-cleanUp"><span class="header-section-number">2.3</span> Clean up to keep only necessary data</a></li>
+  <li><a href="#converting-to-h5ad-format-via-h5seurat" id="toc-converting-to-h5ad-format-via-h5seurat" class="nav-link" data-scroll-target="#converting-to-h5ad-format-via-h5seurat"><span class="header-section-number">2.4</span> Converting to <code>h5ad</code> format via <code>h5Seurat</code></a></li>
+  </ul></li>
+  <li><a href="#sec-interactive-viewer" id="toc-sec-interactive-viewer" class="nav-link" data-scroll-target="#sec-interactive-viewer"><span class="header-section-number">3</span> Visualize the post-analysis <code>.h5ad</code> object in an interactive viewer</a></li>
+  <li><a href="#sec-create-from-flatFiles" id="toc-sec-create-from-flatFiles" class="nav-link" data-scroll-target="#sec-create-from-flatFiles"><span class="header-section-number">4</span> Creating per-sample <code>anndata</code> object from basic data files in <code>Python</code> for python-based single-cell analysis</a></li>
+  <li><a href="#sec-conclusions" id="toc-sec-conclusions" class="nav-link" data-scroll-target="#sec-conclusions"><span class="header-section-number">5</span> Conclusions</a></li>
+  </ul>
+</nav>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Annotated Data, <a href="https://anndata.readthedocs.io/en/latest/" target="_blank">AnnData</a>, is a popular data structure for exploring and analyzing high-plex single-cell data, including spatial transcription data. There are quite a few open-sourced single-cell analysis tools in <code>python</code>, e.g.&nbsp;<a href="https://scanpy.readthedocs.io/en/stable/" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank"><code>squidpy</code></a>, as well as interactive viewers, e.g.&nbsp;<a href="https://cirrocumulus.readthedocs.io/en/latest/" target="_blank">Cirrocumulus</a> and <a href="https://github.com/chanzuckerberg/cellxgene" target="_blank">CELLxGENE</a> viewers, using this data structure. Converting CosMx™ spatial data sets into <code>anndata</code> data structure allows non-coders to easily share the light-weighted data object, visualize and explore the processed data in an interactive way.</p>
+<p>This post describes how to create <code>anndata</code> object (<code>.h5ad</code>) from either a post-analysis <code>Seurat</code> object or basic data files exported from AtoMx™ Spatial Informatics Portal (SIP). We hope this post would facilitate seamless integration of CosMx™ spatial data sets into Python-based single-cell analysis workflows.</p>
+<ul>
+<li><a href="#sec-convert-seurat" class="quarto-xref">Section&nbsp;2</a> Creating an <code>anndata</code> object in <code>.h5ad</code> format from post-analysis <code>Seurat</code> object exported by AtoMx™ SIP</li>
+<li><a href="#sec-interactive-viewer" class="quarto-xref">Section&nbsp;3</a> Visualize the post-analysis <code>.h5ad</code> object in an interactive viewer</li>
+<li><a href="#sec-create-from-flatFiles" class="quarto-xref">Section&nbsp;4</a> Creating per-sample <code>anndata</code> object from basic data files in <code>Python</code> for python-based single-cell analysis</li>
+</ul>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+</section>
+<section id="sec-convert-seurat" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Creating an <code>anndata</code> object from post-analysis <code>Seurat</code> object exported by AtoMx™ SIP</h1>
+<p>AtoMx™ SIP can export a CosMx™ Spatial Molecular Imager (SMI) study into <code>Seurat</code> data objects for direct usage in <code>R</code>. Here we first work in <code>R</code> to open, visualize, and make minor adjustments to the object. We then export it into a <code>.h5ad</code> file for usage in <code>Python</code> tools.</p>
+<p>The <code>Seurat</code> object used in this section is made from the CosMx™ mouse brain public data set and assembled in the structure used by the Technology Access Program (<a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/" target="_blank">TAP</a>); similar outputs are available from the AtoMx™ SIP. To download raw data for this dataset, go <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="_blank">here</a>. For more details on its data structure, please refer to earlier post on <a href="../../posts/seurat-cosmx-basics/#sec-data-structure" target="_blank">Visualizing spatial data with Seurat</a>.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>All the code in this <a href="#sec-convert-seurat" class="quarto-xref">section&nbsp;2</a> is in <code>R</code>.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Many of the below functions require that you are working with <a href="https://satijalab.org/seurat/" target="_blank">Seurat v5</a> and may not work in earlier versions. Additionally, if you are exporting a <code>Seurat</code> object from AtoMx (v1.3+), be sure to export the <code>Seurat</code> object with polygon coordinates and transcripts included to access all of the functionality below.</p>
+</div>
+</div>
+<section id="explore-post-analysis-seurat-object-and-add-in-custom-cell-meta-data" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="explore-post-analysis-seurat-object-and-add-in-custom-cell-meta-data"><span class="header-section-number">2.1</span> Explore post-analysis <code>Seurat</code> object and add in custom cell meta data</h2>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Setup R</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(SeuratObject)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(SeuratDisk)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># load existing seurat object</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>seu.obj <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">"seurat_object.Rds"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>The post-analysis <code>Seurat</code> object exported from AtoMx™ SIP should contain</p>
+<ul>
+<li>expression matrices for various feature types, like <code>RNA</code>, <code>RNA_normalized</code>, <code>negprobes</code> and <code>falsecodes</code>;</li>
+<li>dimension reduction results, like <code>pca</code> and <code>umap</code>;</li>
+<li>results for graphs, like <code>snn</code> and <code>nn</code>.</li>
+</ul>
+<p>You can visualize which results are included by running <code>names(seu.obj)</code>. The exact names of the results stored in your post-analysis <code>Seurat</code> object might be slightly different from what are included in the particular example here. Please adjust the code accordingly.</p>
+<p>You can also add in any new cell metadata if desired. For illustration, the code below adds a new column with unique ID for each FOV.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># add a new column for unique ID of each FOV</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>fovNames <span class="ot">&lt;-</span> seu.obj<span class="sc">@</span>meta.data[, <span class="fu">c</span>(<span class="st">'slide_ID_numeric'</span>, <span class="st">'fov'</span>)]</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>fovNames[[<span class="st">'fov_names'</span>]] <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">'fov_'</span>, fovNames[[<span class="st">'slide_ID_numeric'</span>]], </span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>                            <span class="st">'_'</span>, fovNames[[<span class="st">'fov'</span>]])</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>fovNames <span class="ot">&lt;-</span> <span class="fu">setNames</span>(fovNames[[<span class="st">'fov_names'</span>]], </span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>                     <span class="at">nm =</span> <span class="fu">rownames</span>(fovNames))</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>seu.obj <span class="ot">&lt;-</span> Seurat<span class="sc">::</span><span class="fu">AddMetaData</span>(seu.obj, </span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>                               <span class="at">metadata =</span> fovNames, </span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>                               <span class="at">col.name =</span> <span class="st">"fov_names"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="prepare-spatial-coordinates-and-visualize" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="prepare-spatial-coordinates-and-visualize"><span class="header-section-number">2.2</span> Prepare spatial coordinates and visualize</h2>
+<p>AtoMx™ SIP stores the per-slide cell segmentation information as separate <code>SeuratObject::FOV</code> objects in the <code>images</code> slot. You can get the slide names by running <code>names(seu.obj@images)</code> in <code>R</code>.</p>
+<p>The example dataset used in this section has <strong>two</strong> tissue slides in one study and each slide is in its own spatial coordinate space and thus may have xy overlapping between the slides.</p>
+<section id="sec-perSlide" class="level3" data-number="2.2.1">
+<h3 data-number="2.2.1" class="anchored" data-anchor-id="sec-perSlide"><span class="header-section-number">2.2.1</span> Case 1: 1 slide per <code>anndata</code> object</h3>
+<p>When a per-slide <code>anndata</code> object is preferred, one should split the <code>Seurat</code> object by the slide name first before cleaning it up in <a href="#sec-cleanUp" class="quarto-xref">section&nbsp;2.3</a>. The code below is for generating one <code>anndata</code> object per tissue slide and the resulting data is used in later sections.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># extract the segmentation to separate variable</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>imgList <span class="ot">&lt;-</span> seu.obj<span class="sc">@</span>images</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># remove segmentation in current seurat object before split</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (slideName <span class="cf">in</span> <span class="fu">names</span>(imgList)){</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  seu.obj[[slideName]] <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co"># split Seurat object by slide name which is stored under "Run_Tissue_name" column of cell meta.data. </span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>objList <span class="ot">&lt;-</span> Seurat<span class="sc">::</span><span class="fu">SplitObject</span>(seu.obj, <span class="at">split.by =</span> <span class="st">"Run_Tissue_name"</span>)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co"># You can add the segmentation back for each per-slide object </span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (eachSlide <span class="cf">in</span> <span class="fu">names</span>(objList)){</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># standard names used in `images` slot</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  slideName <span class="ot">&lt;-</span> <span class="fu">gsub</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">W|_"</span>, <span class="st">"."</span>, eachSlide)</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># add the `SeuratObject::FOV` object for current slide alone</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  objList[[eachSlide]][[slideName]] <span class="ot">&lt;-</span> imgList[[slideName]]</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>We would focus on the first slide for this section.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># keep data for only the 1st section for analysis in later section</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>eachSlide <span class="ot">&lt;-</span> <span class="fu">names</span>(objList)[<span class="dv">1</span>]</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>slideName <span class="ot">&lt;-</span> <span class="fu">gsub</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">W|_"</span>, <span class="st">"."</span>, eachSlide)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>seu.obj1 <span class="ot">&lt;-</span> objList[[eachSlide]]</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co"># extract spatial coordinates of each cell for the chosen slide</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>spatial_coords <span class="ot">&lt;-</span> seu.obj1[[slideName]]<span class="sc">$</span>centroids<span class="sc">@</span>coords</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(spatial_coords) <span class="ot">&lt;-</span> seu.obj1[[slideName]]<span class="sc">$</span>centroids<span class="sc">@</span>cells</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Let’s visualize the current cell segmentation colored by cell types and the molecular positions of a few selected genes. For more visualization tricks using <code>Seurat</code>, please refer to <a href="../../posts/seurat-cosmx-basics/index.html" target="_blank">earlier post</a> and <a href="https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2" target="_blank">Seurat’s vignette</a> on image-based spatial data analysis.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># specify to show cell boundary </span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>SeuratObject<span class="sc">::</span><span class="fu">DefaultBoundary</span>(seu.obj1[[slideName]]) <span class="ot">&lt;-</span> <span class="st">"segmentation"</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>Seurat<span class="sc">::</span><span class="fu">ImageDimPlot</span>(<span class="at">object =</span> seu.obj1, </span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>                     <span class="at">fov =</span> slideName, </span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>                     </span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>                     <span class="co"># column name of cell type in meta.data</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>                     <span class="at">group.by =</span> <span class="st">"nb_clus_final"</span>, </span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>                     </span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>                     <span class="co"># specify which molecules to plot</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>                     <span class="at">molecules =</span> <span class="fu">c</span>(<span class="st">"Slc17a7"</span>, <span class="st">"Gad1"</span>, <span class="st">"Plp1"</span>), </span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>                     <span class="at">mols.size =</span> <span class="fl">1.5</span>, </span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>                     </span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>                     <span class="co"># fixed aspect ratio and flip xy in plotting</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>                     <span class="at">coord.fixed =</span> <span class="cn">TRUE</span>, <span class="at">flip_xy =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><img src="figures/Fig-mBrain-S1-cellType-segmentation.png" class="img-fluid"></p>
+<p>You can zoom in to view a subset of cells by specifying which cells to plots.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># change idents to "fov" for cell selection</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># note: "fov" here is a column in cell meta.data instead of the `SeuratObject::FOV` object. </span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>SeuratObject<span class="sc">::</span><span class="fu">Idents</span>(seu.obj1) <span class="ot">&lt;-</span> <span class="st">"fov"</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>Seurat<span class="sc">::</span><span class="fu">ImageDimPlot</span>(<span class="at">object =</span> seu.obj1, </span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>                     <span class="at">fov =</span> slideName, </span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>                     </span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>                     <span class="co"># column name of cell type in meta.data</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>                     <span class="at">group.by =</span> <span class="st">"nb_clus_final"</span>, </span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                     </span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>                     <span class="co"># a vector of chosen cells, plot cells in chosen fovs</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>                     <span class="at">cells =</span> SeuratObject<span class="sc">::</span><span class="fu">WhichCells</span>(</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>                       seu.obj1, <span class="at">idents =</span> <span class="fu">c</span>(<span class="dv">72</span><span class="sc">:</span><span class="dv">74</span>, <span class="dv">90</span><span class="sc">:</span><span class="dv">92</span>, <span class="dv">97</span><span class="sc">:</span><span class="dv">99</span>, <span class="dv">114</span><span class="sc">:</span><span class="dv">116</span>)), </span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>                     </span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>                     <span class="co"># crop the plots to area with cells only</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>                     <span class="at">crop =</span> <span class="cn">TRUE</span>, </span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>                     </span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>                     <span class="co"># fixed aspect ratio and flip xy in plotting</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>                     <span class="at">coord.fixed =</span> <span class="cn">TRUE</span>, <span class="at">flip_xy =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><img src="figures/Fig-mBrain-S1-cellType-fovZoomed.png" class="img-fluid"></p>
+</section>
+<section id="sec-perStudy" class="level3" data-number="2.2.2">
+<h3 data-number="2.2.2" class="anchored" data-anchor-id="sec-perStudy"><span class="header-section-number">2.2.2</span> Case 2: multi-slide per <code>anndata</code> object</h3>
+<p>Since AtoMx™ SIP keeps the spatial coordinates of each slide in their own spatial coordinate space, one would need to arrange the spatial coordinates of multiple sample sections to avoid overlap in XY space when exporting multiple slides in same study-level <code>anndata</code> object. The example code below would arrange all slides along Y axis with some spacing between the slides.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># extract the segmentation to separate variable</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>imgList <span class="ot">&lt;-</span> seu.obj<span class="sc">@</span>images</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># arrange slides along Y axis, add in spacer which is 0.2x of previous slide's coordinate span in Y direction</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>spacerFactor <span class="ot">&lt;-</span> <span class="fl">0.2</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>global_y_offset <span class="ot">&lt;-</span> <span class="dv">0</span> </span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>spatial_coords <span class="ot">&lt;-</span> <span class="fu">lapply</span>(imgList, <span class="cf">function</span>(img){</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># coordinates of query slide</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  eachCoord <span class="ot">&lt;-</span> img<span class="sc">$</span>centroids<span class="sc">@</span>coords</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rownames</span>(eachCoord) <span class="ot">&lt;-</span> img<span class="sc">$</span>centroids<span class="sc">@</span>cells</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># align to lower left corner</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>  ori_offsets <span class="ot">&lt;-</span> <span class="fu">apply</span>(eachCoord, <span class="dv">2</span>, min)</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>  eachCoord <span class="ot">&lt;-</span> <span class="fu">sweep</span>(eachCoord, <span class="dv">2</span>, ori_offsets, <span class="st">"-"</span>)</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>  <span class="co"># span in y direction</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>  y_span <span class="ot">&lt;-</span> <span class="fu">diff</span>(<span class="fu">range</span>(eachCoord[, <span class="dv">2</span>]))</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># add spacer in y direction </span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>  eachCoord[, <span class="dv">2</span>] <span class="ot">&lt;-</span> eachCoord[, <span class="dv">2</span>] <span class="sc">+</span> global_y_offset</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># update global offset for next slide</span></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>  global_y_offset <span class="ot">&lt;&lt;-</span> global_y_offset <span class="sc">+</span> y_span<span class="sc">*</span>(<span class="dv">1</span><span class="sc">+</span>spacerFactor)</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(eachCoord)</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>spatial_coords <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, spatial_coords)  </span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a><span class="co"># use the study-level Seurat object for downstream</span></span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>seu.obj1 <span class="ot">&lt;-</span> seu.obj</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a><span class="co"># prefix for file name</span></span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>slideName <span class="ot">&lt;-</span> <span class="st">"StudyLevel"</span> </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Let’s visualize the coordinates of all cells after slide arrangement.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># add in cell type for color</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>plotData <span class="ot">&lt;-</span> <span class="fu">cbind</span>(seu.obj1[[<span class="st">"nb_clus_final"</span>]], </span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>                  spatial_coords[<span class="fu">colnames</span>(seu.obj1), ])</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>ggplot2<span class="sc">::</span><span class="fu">ggplot</span>(plotData, </span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>                <span class="co"># flip xy to be consistent with earlier plots</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>                ggplot2<span class="sc">::</span><span class="fu">aes</span>(<span class="at">x =</span> y, <span class="at">y =</span> x, <span class="at">color =</span> <span class="fu">as.factor</span>(nb_clus_final))) <span class="sc">+</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">geom_point</span>(<span class="at">size =</span> <span class="fl">0.1</span>)<span class="sc">+</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">coord_fixed</span>()<span class="sc">+</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  Seurat<span class="sc">::</span><span class="fu">NoLegend</span>()<span class="sc">+</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  Seurat<span class="sc">::</span><span class="fu">DarkTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><img src="figures/Fig-mBrain-S1S2-cellType-slidesArranged.png" class="img-fluid"></p>
+</section>
+</section>
+<section id="sec-cleanUp" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="sec-cleanUp"><span class="header-section-number">2.3</span> Clean up to keep only necessary data</h2>
+<p>Next, we would further clean up the <code>Seurat</code> object (single-slide object from <a href="#sec-perSlide" class="quarto-xref">Case 1 in section&nbsp;2.2.1</a> or full-study-level object from <a href="#sec-perStudy" class="quarto-xref">Case 2 in section&nbsp;2.2.2</a>) by trimming it down to contain only the data of interested.</p>
+<p>Typically, one would keep the raw data counts from <code>RNA</code> assay (this example dataset uses <code>Nanostring</code> as assay name for <code>RNA</code>), cell embedding for <code>umap</code> (standard AtoMx exported object uses <code>approximateumap</code> as name for <code>umap</code>). We would also store the spatial coordinates of each cell as the cell embedding in a dimension reduction object called <code>spatial</code>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># clean up seurat object to only necessary data </span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>seu.obj2 <span class="ot">&lt;-</span> Seurat<span class="sc">::</span><span class="fu">DietSeurat</span>(</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  seu.obj1, </span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># subset of assays to keep, standard AtoMx object uses "RNA" assay</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># of note, AtoMx stores normalized RNA counts in separate "RNA_normalized" assay</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">assays =</span> <span class="st">"Nanostring"</span>,</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># keep raw counts stored in "counts" layer</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># use "data" or "scale.data" if prefer to keep normalized counts before or after scaling</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">layers =</span> <span class="st">"counts"</span>, </span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># dimension reduction to keep, standard AtoMx object uses "approximateumap"</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">dimreducs =</span> <span class="st">"umap"</span>)</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="co"># clear the `images` slot</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>allImgs <span class="ot">&lt;-</span> <span class="fu">names</span>(seu.obj1<span class="sc">@</span>images)</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (img <span class="cf">in</span> allImgs){</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>  seu.obj2[[img]] <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a><span class="co"># add in spatial coordinates for current slide or study as a new dimension reduction</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(spatial_coords) <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"SPATIAL_"</span>, <span class="fu">seq_len</span>(<span class="fu">ncol</span>(spatial_coords)))</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>seu.obj2[[<span class="st">"spatial"</span>]] <span class="ot">&lt;-</span> Seurat<span class="sc">::</span><span class="fu">CreateDimReducObject</span>(</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>  <span class="at">embeddings =</span> spatial_coords, </span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>  <span class="at">key =</span> <span class="st">"SPATIAL_"</span>, </span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># standard AtoMx object use "RNA" assay</span></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>  <span class="at">assay =</span> <span class="st">"Nanostring"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="converting-to-h5ad-format-via-h5seurat" class="level2" data-number="2.4">
+<h2 data-number="2.4" class="anchored" data-anchor-id="converting-to-h5ad-format-via-h5seurat"><span class="header-section-number">2.4</span> Converting to <code>h5ad</code> format via <code>h5Seurat</code></h2>
+<p>Lastly, we would export the cleaned <code>Seurat</code> object into <code>h5Seurat</code> format and then further convert it into <code>h5ad</code> format using <code>SeuratDisk::Convert</code> function.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># export as "h5Seurat" object in your current working directory</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>SeuratDisk<span class="sc">::</span><span class="fu">SaveH5Seurat</span>(seu.obj2, </span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>                         <span class="at">filename =</span> <span class="fu">paste0</span>(slideName, <span class="st">"_subset.h5Seurat"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><code><span style="color: red;"> Creating h5Seurat file for version 3.1.5.9900<br> Adding counts for Nanostring<br> Adding data for Nanostring<br> No variable features found for Nanostring<br> No feature-level metadata found for Nanostring<br> Adding cell embeddings for umap<br> No loadings for umap<br> No projected loadings for umap<br> No standard deviations for umap<br> No JackStraw data for umap<br> Adding cell embeddings for spatial<br> No loadings for spatial<br> No projected loadings for spatial<br> No standard deviations for spatial<br> No JackStraw data for spatial</span></code></p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># convert to h5ad format</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>SeuratDisk<span class="sc">::</span><span class="fu">Convert</span>(<span class="fu">paste0</span>(slideName, <span class="st">"_subset.h5Seurat"</span>), </span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>                    <span class="at">dest =</span> <span class="st">"h5ad"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><code><span style="color: red;"> Validating h5Seurat file<br> Adding data from Nanostring as X<br> Adding counts from Nanostring as raw<br> Transfering meta.data to obs<br> Adding dimensional reduction information for spatial<br> Adding dimensional reduction information for umap</span></code></p>
+</section>
+</section>
+<section id="sec-interactive-viewer" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Visualize the post-analysis <code>.h5ad</code> object in an interactive viewer</h1>
+<p>The resulting <code>anndata</code> object in <code>.h5ad</code> format could be visualized by various open-sourced interactive viewers. One such viewer would be <a href="https://cirrocumulus.readthedocs.io/en/latest/" target="_blank">Cirrocumulus viewer</a>.</p>
+<p>For a quick start, one can install the viewer in terminal via <code>pip</code>.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>pip install cirrocumulus</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Create virtual environment for viewer">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Create virtual environment for viewer
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>It’s recommended to create separate virtual environment for viewer. The current released version of <code>cirrocumulus</code> viewer is in version <code>1.1.57</code> and has package dependencies as listed below.</p>
+<ul>
+<li>Python &gt;= 3.9.7 and Python &lt;= 3.9.18</li>
+<li>pandas &gt;= 1.3.4 and pandas &lt;= 2.1.0</li>
+<li>anndata &gt;= 0.9.1 and &lt;= 0.10.2</li>
+</ul>
+<p>One can create a new environment with specific version of packages for this viewer using various package managers in terminal. One of such managers that people often use is <a href="https://docs.anaconda.com/free/miniconda/miniconda-install/" target="_blank">conda</a> and below is an example code.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>conda create --name myenv python==3.9.18 pandas==2.1.0 anndata==0.10.2</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>To activate an existing environment, one should pass the name of environment to <code>conda activate</code> function.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>conda activate myenv</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+</div>
+<p>To launch the viewer for the <code>.h5ad</code> object of interest, one can simply run</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>cirro launch &lt;path_to_dataset_file.h5ad&gt;</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>The cirrocumulus viewer allows user to</p>
+<ul>
+<li><p>view multiple cell embeddings (<code>umap</code> and <code>spatial</code>) side-by-side for both cell metadata and gene expression (<a href="#fig-full-embedding" class="quarto-xref">Figure&nbsp;1</a>, Dual Embedding View);</p></li>
+<li><p>use lasso tool to subset cells of interest in the embedding space (<a href="#fig-chosen" class="quarto-xref">Figure&nbsp;2</a>, Lasso-in-Space);</p></li>
+<li><p>explore how the gene expression changes between different selections (<a href="#fig-marker-heatmap" class="quarto-xref">Figure&nbsp;3</a>, Marker Heatmap for all cells vs. <a href="#fig-dot-plots" class="quarto-xref">Figure&nbsp;4</a>, Dot Plots for Subsets).</p></li>
+</ul>
+<p>For more information, please refer to the <a href="https://cirrocumulus.readthedocs.io/en/latest/documentation.html" target="_blank">documentation</a> of <code>cirrocumulus</code> package</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true">Dual Embedding View</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false">Lasso-in-Space</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" role="tab" aria-controls="tabset-1-3" aria-selected="false">Marker Heatmap</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-4" role="tab" aria-controls="tabset-1-4" aria-selected="false">Dot Plots for Subsets</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-full-embedding" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-full-embedding-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/Fig-mBrain-S1-cirroViewer-screenshot.png" class="img-fluid figure-img" width="776">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-full-embedding-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: The dual-embedding views of <code>umap</code> and <code>spatial</code> for chosen cell meta data and gene expression level.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-chosen" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-chosen-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/Fig-mBrain-S1-lasso.png" class="img-fluid figure-img" width="760">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-chosen-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Use lasso tool to select cells in <code>spatial</code> embedding. Chosen cells are shown in solid colors.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-3-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-marker-heatmap" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-marker-heatmap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/Fig-mBrain-S1-cirroViewer-markerHeatmap.png" class="img-fluid figure-img" width="760">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-marker-heatmap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Heatmap of selected gene expression across ‘leiden_clus’ of all cells.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-4-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-dot-plots" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-dot-plots-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/Fig-mBrain-S1-cirroViewer-dotPlot-selection-vs-all.png" class="img-fluid figure-img" width="760">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-dot-plots-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Dot plots of chosen gene expression for all cells (top) vs.&nbsp;cells within lasso selection (bottom) in <a href="#fig-chosen" class="quarto-xref">Figure&nbsp;2</a> tab.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-create-from-flatFiles" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Creating per-sample <code>anndata</code> object from basic data files in <code>Python</code> for python-based single-cell analysis</h1>
+<p>For python lovers, it may be desired to create <code>anndata</code> object from scratch and then feed it into python-based single-cell analysis tools, like <a href="https://scanpy.readthedocs.io/en/stable/" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank"><code>squidpy</code></a>.</p>
+<p>In this section, we start from the basic data files (in <code>.csv</code> format) exported from AtoMx™ SIP. For an example public dataset that you can download, go <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/" target="_blank">here</a>.</p>
+<p>AtoMx™ SIP splits and organizes the basic data files by tissue slides during export. Thus, unlike the <code>Seurat</code> object of the mouse brain dataset used in earlier <a href="#sec-convert-seurat" class="quarto-xref">section&nbsp;2</a>, the basic data files used for this <a href="#sec-create-from-flatFiles" class="quarto-xref">section&nbsp;4</a> contain information for one <strong>single</strong> slide of pancreas sample. The <a href="../../assets/Pancreas-CosMx-ReadMe.html" target="_blank">ReadMe</a> associated with this example data set on pancreas shows the data structures of each file used in this section.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>All the code in this <a href="#sec-create-from-flatFiles" class="quarto-xref">section&nbsp;4</a> is in <code>Python</code>.</p>
+</div>
+</div>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Setup Python</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> re</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> anndata <span class="im">as</span> ad</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.sparse <span class="im">import</span> csr_matrix</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="co"># path to folder of downloaded basic data files</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>dataDir <span class="op">=</span> <span class="st">"Pancreas-CosMx-WTx-FlatFiles"</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>Firstly, we would load the raw expression matrix and assign row names for <code>cell</code> in same naming pattern as the ones in cell meta data file. For demonstration purpose, we would focus on just the <code>RNA</code> probes and remove all the control probes.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># read in cell expression file</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.read_csv(os.path.join(dataDir, <span class="st">'Pancreas_exprMat_file.csv'</span>))</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="co"># create row names for "cell" in same format as what's used in cell metadata file</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="co"># the new cell_ID has pattern as 'c_[slideID]_[cell_ID]', where slideID = 1 in this example dataset</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>df[<span class="st">"new_cell_ID"</span>] <span class="op">=</span>  df.<span class="bu">apply</span>(<span class="kw">lambda</span> row: <span class="ss">f"c_1_</span><span class="sc">{</span>row<span class="sc">.</span>fov<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>row<span class="sc">.</span>cell_ID<span class="sc">}</span><span class="ss">"</span>, axis <span class="op">=</span> <span class="dv">1</span>)</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>df.set_index(<span class="st">"new_cell_ID"</span>, inplace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a><span class="co"># drop annotation columns</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>df.drop(columns<span class="op">=</span>[<span class="st">"fov"</span>, <span class="st">"cell_ID"</span>], inplace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a><span class="co"># focus on RNA probes while drop control probes</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>dummy<span class="op">=</span>re.<span class="bu">compile</span>(<span class="vs">r'Negative|SystemControl'</span>, flags<span class="op">=</span>re.IGNORECASE)</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>chosen_probes <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> <span class="bu">list</span>(df.columns) <span class="cf">if</span> <span class="kw">not</span> dummy.search(col)]</span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a><span class="co"># "cell" names for ordering downstream</span></span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>chosen_cells <span class="op">=</span> df.index</span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a><span class="co"># convert to a sparse matrix</span></span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>raw <span class="op">=</span> csr_matrix(df[chosen_probes].astype(pd.SparseDtype(<span class="st">"float64"</span>,<span class="dv">0</span>)).sparse.to_coo())</span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a><span class="co"># delete unused variable to free up memory</span></span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a><span class="kw">del</span> df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Next, we would read in the cell meta data and extract the spatial coordinates of each cell. Based on the <a href="../../assets/Pancreas-CosMx-ReadMe.html" target="_blank">ReadMe</a> of these data files, we can know this data set has pixel size of 0.12028 µm per pixel. For illustration, we also convert the pixel coordinates to µm here.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># read in cell meta data file</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>cell_meta <span class="op">=</span> pd.read_csv(os.path.join(dataDir, <span class="st">'Pancreas_metadata_file.csv'</span>))</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="co"># use "cell" column as row names to match with raw expression matrix</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="co"># for convenience, the "cell" column is kept with the meta data</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>cell_meta.set_index(<span class="st">"cell"</span>, inplace<span class="op">=</span><span class="va">True</span>, drop <span class="op">=</span> <span class="va">False</span>)</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a><span class="co"># extract spatial coordinates of cells, use the global coordinates</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>coords <span class="op">=</span> cell_meta[[<span class="st">"CenterX_global_px"</span>,<span class="st">"CenterY_global_px"</span>]]</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a><span class="co"># use "x" and "y" as column names</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>coords <span class="op">=</span> coords.rename(columns<span class="op">=</span>{<span class="st">"CenterX_global_px"</span>:<span class="st">"x"</span>, </span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>                                <span class="st">"CenterY_global_px"</span>: <span class="st">"y"</span>})</span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a><span class="co"># reorder cells to be in same row order as raw expression matrix</span></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>coords <span class="op">=</span> coords.reindex(index <span class="op">=</span> chosen_cells)</span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a><span class="co"># convert px coordinates to micrometer </span></span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>pixel_size <span class="op">=</span> <span class="fl">0.12028</span></span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a>coords <span class="op">=</span> coords.mul(pixel_size)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now, we are ready to create the <code>anndata</code> object using <code>anndata.AnnData()</code> python function. We would add the spatial coordinates as an annotation array stored in <code>obsm</code> slot.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> ad.AnnData(</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    X <span class="op">=</span> raw, </span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    obs <span class="op">=</span> cell_meta, </span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    <span class="co"># row names should be the same as gene names</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>    var <span class="op">=</span> pd.DataFrame(</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>        <span class="bu">list</span>(chosen_probes), </span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>        columns <span class="op">=</span> [<span class="st">"gene"</span>],</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>        index <span class="op">=</span> chosen_probes))</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>                   </span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a><span class="co"># add spatial coordinates </span></span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>adata.obsm[<span class="st">'spatial'</span>] <span class="op">=</span> coords.to_numpy()</span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a><span class="co"># you can add name of slide or original file as one of unstructured annotation</span></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>adata.uns[<span class="st">'name'</span>] <span class="op">=</span> <span class="st">"Pancreas"</span></span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a><span class="co"># convert string columns to categorical data in `obs`</span></span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>adata.strings_to_categoricals()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Add additional embedding">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Add additional embedding
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>You can add additional embedding if exists. The code below assumes you have a new embedding for <code>umap</code> stored in <code>umap.csv</code> file as a data frame with rows in same order as the cell expression file.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>adata.obsm[<span class="st">'umap'</span>] <span class="op">=</span> pd.read_csv(os.path.join(dataDir, <span class="st">'umap.csv'</span>)).to_numpy()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+<p>In some case, one may want to convert a meta data column with numeric values (like numeric ID for cell clusters) to categorical data, you can do this as shown below.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># for illustration, we would convert the "fov" column here</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>columnName <span class="op">=</span> <span class="st">"fov"</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>adata.obs[columnName] <span class="op">=</span> pd.Categorical(adata.obs[columnName].astype(<span class="bu">str</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>You can also specific color for each categorical value via a dictionary. Most viewers based on <code>anndata</code> data structure would be able to recognize the color information stored under <code>[cell_meta_name]_colors</code> when displaying the corresponding categorical cell meta data.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># use random colors for illustration here</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>colors_dict <span class="op">=</span> {}</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> catVal <span class="kw">in</span> adata.obs[columnName].cat.categories:</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    <span class="co"># random RGB value</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    [r, g, b] <span class="op">=</span> [random.randint(<span class="dv">0</span>, <span class="dv">255</span>) <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">3</span>)]</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># convert to hex format</span></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>    colors_dict[catVal] <span class="op">=</span> <span class="st">"#</span><span class="sc">{:02x}{:02x}{:02x}</span><span class="st">"</span>.<span class="bu">format</span>(r, g, b)</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a><span class="co"># add to `uns` slot</span></span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>colorName <span class="op">=</span> <span class="st">"_"</span>.join((columnName, <span class="st">"colors"</span>))</span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>adata.uns[colorName] <span class="op">=</span> [colors_dict[k] <span class="cf">for</span> k <span class="kw">in</span> adata.obs[columnName].cat.categories]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>At this point, we have a <code>anndata</code> object that could be exported to <code>.h5ad</code> file format and pass to other python-based single-cell analysis tools, like <a href="https://scanpy.readthedocs.io/en/stable/" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank"><code>squidpy</code></a>.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Export as .h5ad file</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>adata.write(os.path.join(dataDir, <span class="st">"Pancreas_basic.h5ad"</span>), compression<span class="op">=</span><span class="st">"gzip"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Load existing .h5ad file</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> scanpy <span class="im">as</span> sc</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> sc.read(os.path.join(dataDir, <span class="st">"Pancreas_basic.h5ad"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>Let’s visualize the distribution of some cell meta data saved in this <code>anndata</code> object.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> seaborn <span class="im">as</span> sns</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="co"># plot transcripts distribution</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>fig, axs <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">15</span>, <span class="dv">4</span>))</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>axs[<span class="dv">0</span>].set_title(<span class="st">"Total RNA transcripts per cell"</span>)</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>sns.histplot(</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    adata.obs[<span class="st">"nCount_RNA"</span>],</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>    kde<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>axs[<span class="dv">0</span>],</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>axs[<span class="dv">1</span>].set_title(<span class="st">"Unique RNA transcripts per cell"</span>)</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>sns.histplot(</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>    adata.obs[<span class="st">"nFeature_RNA"</span>],</span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>    kde<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>axs[<span class="dv">1</span>],</span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>axs[<span class="dv">2</span>].set_title(<span class="st">"Transcripts per FOV"</span>)</span>
+<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a>sns.histplot(</span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a>    adata.obs.groupby(<span class="st">"fov"</span>).<span class="bu">sum</span>()[<span class="st">"nCount_RNA"</span>],</span>
+<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a>    kde<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>axs[<span class="dv">2</span>],</span>
+<span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><img src="figures/Fig-Pancreas-RNA-distribution.png" class="img-fluid"></p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co"># plot immune intensity distribution</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>fig, axs <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">4</span>, figsize<span class="op">=</span>(<span class="dv">15</span>, <span class="dv">4</span>))</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>axs[<span class="dv">0</span>].set_title(<span class="st">"PanCK"</span>)</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>sns.histplot(</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>    adata.obs[<span class="st">"Mean.PanCK"</span>],</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>    kde<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>axs[<span class="dv">0</span>],</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>axs[<span class="dv">1</span>].set_title(<span class="st">"CD68 &amp; CK8/18"</span>)</span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>sns.histplot(</span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>    adata.obs[<span class="st">"Mean.CD68_CK8_18"</span>],</span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>    kde<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>axs[<span class="dv">1</span>],</span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>axs[<span class="dv">2</span>].set_title(<span class="st">"CD298 &amp; B2M"</span>)</span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>sns.histplot(</span>
+<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a>    adata.obs[<span class="st">"Mean.CD298_B2M"</span>],</span>
+<span id="cb26-21"><a href="#cb26-21" aria-hidden="true" tabindex="-1"></a>    kde<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb26-22"><a href="#cb26-22" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>axs[<span class="dv">2</span>],</span>
+<span id="cb26-23"><a href="#cb26-23" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb26-24"><a href="#cb26-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-25"><a href="#cb26-25" aria-hidden="true" tabindex="-1"></a>axs[<span class="dv">3</span>].set_title(<span class="st">"CD45"</span>)</span>
+<span id="cb26-26"><a href="#cb26-26" aria-hidden="true" tabindex="-1"></a>sns.histplot(</span>
+<span id="cb26-27"><a href="#cb26-27" aria-hidden="true" tabindex="-1"></a>    adata.obs[<span class="st">"Mean.CD45"</span>],</span>
+<span id="cb26-28"><a href="#cb26-28" aria-hidden="true" tabindex="-1"></a>    kde<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb26-29"><a href="#cb26-29" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>axs[<span class="dv">3</span>],</span>
+<span id="cb26-30"><a href="#cb26-30" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><img src="figures/Fig-Pancreas-Membrane-Intensity-distribution.png" class="img-fluid"> For more details on how to analyze spatial data sets using python tools, please refer to the tutorials provided by <a href="https://scanpy.readthedocs.io/en/stable/tutorials/index.html" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/index.html" target="_blank"><code>squidpy</code></a> packages.</p>
+</section>
+<section id="sec-conclusions" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Conclusions</h1>
+<p>In summary, <code>anndata</code> serves as a versatile data structure in Python-based single-cell analysis. This post outlines how to create <code>anndata</code> object in <code>.h5ad</code> file format from AtoMx™ SIP exported results, which are either a post-analysis <code>Seurat</code> object or basic data files in <code>.csv</code> format. The conversion of AtoMx™ SIP exported results into <code>.h5ad</code> file would facilitate seamless integration into Python-based single-cell analysis workflows. Leveraging Python libraries like <a href="https://scanpy.readthedocs.io/en/stable/" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank"><code>squidpy</code></a>, as well as interactive viewers such as <a href="https://cirrocumulus.readthedocs.io/en/latest/" target="_blank">Cirrocumulus</a> and <a href="https://github.com/chanzuckerberg/cellxgene" target="_blank">CELLxGENE</a> viewers, researchers can share the lightweight data objects, visualize processed data, and explore them in more avenues.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/nanostring-biostats\.github\.io\/CosMx-Analysis-Scratch-Space");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+    <a class="nav-link" href="../../license.html">
+<p>License</p>
+</a>
+  </li>  
+    <li class="nav-item">
+    <a class="nav-link" href="../../how-to-contribute.html">
+<p>How to contribute</p>
+</a>
+  </li>  
+</ul>
+    <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
