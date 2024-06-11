@@ -14,14 +14,11 @@ toc-location: left
 number-sections: true
 number-depth: 4
 date: "2024-06-11"
-categories: [napari, how-tos, visualization]
+categories: [image analysis]
 draft: false
-image: figures/fig-duality.png
-description: In this post, I describe make_composite.py script, a developmental python
-  script that creates composite images from layered morphology 2D images. Layered
-  images are extracted from the 2D morphology tif files and written in a file format
-  selected by the user. The extracted images are converted to 8bit, and composite
-  images are written from these 8bit images.
+image: figures/fig1.png
+description: In this post, I describe a developmental python
+  script that creates composite images from layered morphology 2D images. 
 code-fold: false
 # page-layout: full
 format: 
@@ -41,10 +38,15 @@ format-links: [pdf, docx]
 ```{r}
 #| eval: true
 #| echo: false
-#| label: "fig-duality"
-#| fig-cap: "Drawing that represents the duality of `napari-cosmx`. On the left side, cell types within a mouse coronal hemisphere are shown in an interactive Graphical User Interface. In addition to creating images interactively, the right side highlights that images can be generated programmatically. Both sides of `napari-cosmx` are discussed in this post."
+#| label: "fig-composite"
+#| fig-width: 4
+#| fig-height: 4
+#| fig-cap: "A composite image created using the make_composity.py script. 
+#|  This image represents all channels of a single field of view in the 
+#|  [publicaly available](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target='blank'} 
+#|  mouse coronal hemisphere FFPE."
 
-# knitr::include_graphics("./figures/fig-duality.png")
+knitr::include_graphics("./figures/fig1.png")
 ```
 
 <!-- napari-cosmx is flexible enough to quickly explore SMI data in a GUI -->
@@ -54,11 +56,16 @@ format-links: [pdf, docx]
 
 # Description 
 
-In this post, I describe make_composite.py script, a developmental python
-  script that creates composite images from layered morphology 2D images. Layered
-  images are extracted from the 2D morphology tif files and written in a file format
-  selected by the user. The extracted images are converted to 8bit, and composite
-  images are written from these 8bit images.
+Composite images of CosMx&#8482; Spatial Molecular Imager (SMI) fields of view (FOVs) can 
+useful for interfacing with open-sourced software such as 
+[squidpy](https://squidpy.readthedocs.io/en/stable/index.html){target="_blank"}.
+In this post, I describe the make_composite.py script, a developmental python
+script that creates such composite images from layered morphology 2D images that 
+can be exported from the AtoMx&#8482; Spatial Informatics
+Portal (SIP). Layered
+images are extracted from the 2D morphology TIF files and written in a file format
+selected by the user. The extracted images are converted to 8bit, and composite
+images are written from these 8bit images.
 
 ::: {.callout-note}
 make_composite.py is a development version. Use at your own risk.
@@ -153,17 +160,84 @@ The file format will follow fov_num>_composite_autocontrast.<user_format>.
 
 # Usage
 
-Copy the python file to the folder containing 2D morphology files. 
+```
+navigate to your Morphology2D folder
+python /path/to/your/make_composite.py # and follow the on-screen prompts
+```
+
 Regex pattern matching on 2D morphology file name format is implemented, 
 however, only NanoString 2D morphology files should be present in the 
-folder containing the make_composite script. At the command line navigate to 
-the 2D morphology folder and type:
-
-```
-python make_composite.py # and follow the on-screen prompts
-```
+folder containing the make_composite script. 
 
 # Example
+
+The example dataset that I am using is the mouse coronal hemisphere
+FFPE that is available to download from NanoString's website [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="blank"}. 
+
+The Morphology2D folder is found within the CellStatsDir folder and has TIF files
+for each of the 130 FOVs.
+
+```{default filename="Terminal"}
+#| eval: false
+cd /path/to/slide/CellStatsDir/Morphology2D
+```
+
+```{default filename="Terminal"}
+#| eval: false
+tree -L 1
+```
+
+```
+├── 20230406_205644_S1_C902_P99_N99_F001.TIF
+├── 20230406_205644_S1_C902_P99_N99_F002.TIF
+...
+├── 20230406_205644_S1_C902_P99_N99_F129.TIF
+└── 20230406_205644_S1_C902_P99_N99_F130.TIF
+
+```
+
+Once in the Morphology2D folder, simply run the script and follow the on-screen
+prompts (@fig-run).
+
+```{default filename="Terminal"}
+#| eval: false
+python /path/to/CosMx-Analysis-Scratch-Space/assets/make-composite/make_composite.py
+```
+
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-run"
+#| fig-cap: "Screenshot of standard output from terminal following script execution. In this example, I set the clipping percentage to 3 and the output to `png`. On my Macbook Pro M1, this took about 25 minutes to process 130 FOVs."
+
+knitr::include_graphics("./figures/fig-out.png")
+```
+
+
+
+When complete, the structure of the Morphology2D folder should resemble this:
+
+```{default filename="Terminal"}
+#| eval: false
+tree -L 1
+```
+
+```
+├── 20230406_205644_S1_C902_P99_N99_F001.TIF
+├── 20230406_205644_S1_C902_P99_N99_F002.TIF
+...
+├── 20230406_205644_S1_C902_P99_N99_F129.TIF
+├── 20230406_205644_S1_C902_P99_N99_F130.TIF
+├── 8bit
+├── 8bit_autocontrast
+├── composite
+├── composite_autocontrast
+└── raw
+```
+
+
+
 
 
 

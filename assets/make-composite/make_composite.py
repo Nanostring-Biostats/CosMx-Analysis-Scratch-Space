@@ -5,7 +5,7 @@
 """
 Application: make_composite.py
 Author: Vikram Kohli, PSS
-Version: 1.2
+Version: 1.2.1
 
 Description:
 The script creates composite images from the layered morphology 2D images.
@@ -182,7 +182,7 @@ def write_composite(image_files, colors):
 if __name__ == '__main__':
     
        
-    os.system('cls')
+    os.system('cls') # Windows only
     current_dir = os.getcwd()
     
     print('********************************')
@@ -199,13 +199,13 @@ if __name__ == '__main__':
     
     print(f'\nPlease wait: Processing the files in {current_dir}')
     
-    #Loop through all images that match the regex mattern and extract images fromt the layered 2D morphology files
+    #Loop through all images that match the regex mattern and extract images from the layered 2D morphology files
     print(f'\n...Extracting {user_format} files (raw) from layered 2D morphology image files')   
-    for image_file in glob.glob('*.tif'):
+    for image_file in glob.glob('*.tif') + glob.glob('*.TIF'):
         if regex.match(image_file):
             fov_num = image_file.split('_')[-1].replace('.TIF','')
             image = Image.open(image_file)
-            layer_extraction(image, fov_num, current_dir, raw_folder, user_format) #Calls the function to extract the layered images fromt the 2D morphology tif files.
+            layer_extraction(image, fov_num, current_dir, raw_folder, user_format) #Calls the function to extract the layered images from the 2D morphology tif files.
          
     #Convert images to 8bit. If the user_format is jpg, conversion is skipped and the files are copied to the 8bit folder        
     print(f'\n...Converting raw files to 8bit of type {user_format} and creating 8bit autocontrast files')  
