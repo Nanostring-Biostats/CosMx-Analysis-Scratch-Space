@@ -1,0 +1,170 @@
+---
+title: "Making composite images from layered morphology 2D images"
+author:
+  - name: Evelyn Metzger
+    orcid: 0000-0002-4074-9003
+    affiliations: 
+      - ref: nstg
+      - ref: eveilyeverafter
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+number-sections: true
+number-depth: 4
+date: "2024-06-11"
+categories: [napari, how-tos, visualization]
+draft: false
+image: figures/fig-duality.png
+description: In this post, I describe make_composite.py script, a developmental python
+  script that creates composite images from layered morphology 2D images. Layered
+  images are extracted from the 2D morphology tif files and written in a file format
+  selected by the user. The extracted images are converted to 8bit, and composite
+  images are written from these 8bit images.
+code-fold: false
+# page-layout: full
+format: 
+  html:
+    theme: 
+      light: custom.scss
+      dark: darkly
+  pdf:
+    number-sections: true
+  docx:
+    toc: true
+    number-sections: true
+    highlight-style: github
+format-links: [pdf, docx]
+---
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-duality"
+#| fig-cap: "Drawing that represents the duality of `napari-cosmx`. On the left side, cell types within a mouse coronal hemisphere are shown in an interactive Graphical User Interface. In addition to creating images interactively, the right side highlights that images can be generated programmatically. Both sides of `napari-cosmx` are discussed in this post."
+
+# knitr::include_graphics("./figures/fig-duality.png")
+```
+
+<!-- napari-cosmx is flexible enough to quickly explore SMI data in a GUI -->
+<!--   yet robust enough to script reproducible results and tap into -->
+<!--   the underlying python objects.  -->
+
+
+# Description 
+
+In this post, I describe make_composite.py script, a developmental python
+  script that creates composite images from layered morphology 2D images. Layered
+  images are extracted from the 2D morphology tif files and written in a file format
+  selected by the user. The extracted images are converted to 8bit, and composite
+  images are written from these 8bit images.
+
+::: {.callout-note}
+make_composite.py is a development version. Use at your own risk.
+:::
+
+# Requird libraries
+
+The script requires the following libraries to be installed: 
+
+- Pillow (_e.g._, `pip install pillow`)
+- Numpy (_e.g._, `pip install numpy`)
+
+# User inputs (required)
+
+`clipping` (int or float) - Histogram clipping percentage. This value is the 
+percentage of the histogram to clip on the left and right side. The effect 
+changes the contrast of the image. Higher % produces more contrast. 
+The user needs to determine the appropriate percentage by testing on a subset 
+of images. The same clipping value is applied to all images. Generally, setting 
+the value between 1 and 3 is a good starting point. Specifying a clipping value 
+of 0 will not alter the histogram. A value is required, there is no default. 
+`clipping` is a required input.
+
+`user_format` (str) - File format to be written. Options are jpg, png, and tif. 
+All output files will be written in the format specified by the user. 
+`user_format` is a required input.
+
+# Additional inputs (changed within the script)
+
+- Variable: `colors` = ['cyan', 'red', 'yellow', 'blue', 'magenta']. 
+The variable is the composite color scheme (not a user input; 
+changeable within the script). The colors are listed in order of channel 
+number (channel 0 to channel 4).
+Example: Channel 0 is colored ‘cyan’,
+
+- Variable: `compress_value` (set to 3). Lossless file compression value. Higher values produce smaller files at 
+the expensive of increased script execution time. The set value is a 
+compromise between file size and execution time.
+
+# Output
+
+- `raw` – The extracted tif files from the morphology 2D 
+images will be saved in this folder. 
+The file format will follow <fov_num>_ch<#>_raw.<user_format>. <fov_num> is the fov number,
+- `ch<#>` is the channel number (from 0 to 4), and <user_format> is the 
+specified file type format (see User inputs). Note: If the specified 
+user_format is jpg, the raw files will be 8bit jpg files.
+
+  Example
+  ```
+  F001_ch0_raw.jpg (for user_format = jpg)
+  ```
+  
+- `8bit` - The images in the raw_folder 
+are converted to 8bit and saved in this folder. Note: If the specified 
+user_format is jpg, the 8bit files are identical to the raw files. 
+The file format will follow <fov_num>_ch<#>_8bit.<user_format> except 
+when user_format = jpg
+
+  Example
+  ```
+  F001_ch0_8bit.tif (for user_format = tif)
+  F001_ch0_raw.jpg (for user_format = jpg)
+  ```
+
+- `8bit_autocontrast` – Images in the 8bit folder are autocontrasted 
+based on the user supplied clipping value. The file format will follow 
+fov_num>_ch<#>_8bit_autocontrast.<user_format>.
+
+  Example
+  ```
+  F001_ch0_8bit_autocontrast.png (for user_format = png)
+  ```
+
+- `composite` - Composite images created from the images in the 
+`8bit` folder. The composite type is a screen composite. 
+The file format will follow fov_num>_composite.<user_format>.
+
+  Example
+  ```
+  F001_composite.jpg (for user_format = jpg)
+  ```
+
+- `composite_autocontrast` -  Images in the composite_folder are 
+autocontrasted based on the user specified clipping value. 
+The file format will follow fov_num>_composite_autocontrast.<user_format>.
+
+  Example
+  ```
+  F001_composite_autocontrast.png (for user_format = png)
+  ```
+
+# Usage
+
+Copy the python file to the folder containing 2D morphology files. 
+Regex pattern matching on 2D morphology file name format is implemented, 
+however, only NanoString 2D morphology files should be present in the 
+folder containing the make_composite script. At the command line navigate to 
+the 2D morphology folder and type:
+
+```
+python make_composite.py # and follow the on-screen prompts
+```
+
+# Example
+
+
+
+
