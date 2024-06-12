@@ -5,7 +5,7 @@
 """
 Application: make_composite.py
 Author: Vikram Kohli, PSS
-Version: 1.2.1
+Version: 1.2.2
 
 Description:
 The script creates composite images from the layered morphology 2D images.
@@ -35,6 +35,7 @@ import os
 import sys
 import re
 import shutil
+from os import name
 from time import perf_counter
 
 #Allowed image formats
@@ -158,7 +159,11 @@ def force_8bit(image_file):
        Numpy is used for fast vectorization. '''
        
     array = np.array(image_file)
-    reduced_bit = (array / array.max())*255
+    if array.max() == 0:
+        reduced_bit = (array / 1.0)*255
+    else:
+        reduced_bit = (array / array.max())*255
+        
     img = Image.fromarray(reduced_bit.astype('int8'))
     return img
 
@@ -181,8 +186,11 @@ def write_composite(image_files, colors):
 
 if __name__ == '__main__':
     
-       
-    os.system('cls') # Windows only
+    if name == 'nt':
+        os.system('cls') #Windows only
+    else:
+        os.system('clear') #Posix only
+        
     current_dir = os.getcwd()
     
     print('********************************')
