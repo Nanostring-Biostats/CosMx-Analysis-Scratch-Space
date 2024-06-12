@@ -1,0 +1,102 @@
+---
+title: "Vignette: Basics of CosMx Analysis in R"
+author:
+  - name: Patrick Danaher
+    orcid: 0000-0002-2844-5883
+    affiliations:
+      - ref: nstg
+      - ref: patrickjdanaher
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+date: "2024-05-24"
+date-modified: "2024-05-24"
+categories: [recommended, overview, quality control, normalization, cell typing, pre-processing]
+draft: false
+---
+
+# Basic CosMx analysis workflow
+
+## Introduction
+
+A complete demo analysis of a CosMx dataset can be found at [workflow](#sec-workflow){target="_blank"} section in this post and the correspond scripts are stored under `_code/vignette`  [folder](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/vignette){target="_blank"} in this repository. 
+It's intended to be used as a template for other analyses to follow. 
+
+We'll be analyzing a 1000-plex dataset from melanoma samples.
+We begin with the files written by the AtoMx flat file export module. 
+The full dataset we've used is too big to be saved on Github. 
+To follow along, we recommend using your own data, also as output by the AtoMx flat file export module.
+
+## File structure 
+
+We'll organize the data for this analysis as follows:
+
+![](figures/folders.png) 
+
+- The "data" folder holds the exports from AtoMx
+- "processed_data" holds data objects generated during analysis, meant to be used by later analyses. 
+- "results" holds results intended for human consumption.
+
+Inside the "data" folder, we'll place a folder names "flat_files", containing the AtoMx exports:
+
+![](figures/folders2.png) 
+
+And we'll organize code as follows:
+
+![](figures/folders3.png) 
+
+- Analysis scripts are numbered by the order in which they should be run. Each creates data used by the downstream scripts. 
+- Scripts are meant to be run in the directory where they lie.
+- "utils" holds R scripts containing functions used by analyses.
+  
+## Data structure 
+
+Our flat file exports contain the following data types:
+
+- Raw counts
+- Cell metadata: other attributes of cells, e.g. size, immunofluorescence values, tissue and FOV IDs,...
+- Spatial locations: xy locations given in mm. **Warning**: studies containing multiple slides may initially have overlapping xy locations.
+- Transcript data: for all RNA transcripts detected, location, gene ID, and cell ID. Most analyses use cell-level data, not this transcript-level data, but it can make compelling plots.
+- Tissue images. Not used by most analyses, but useful for Figures. 
+
+![](figures/data_before.png)
+
+Our analyses will append lots of new information to this starting point, ending here:
+
+![](figures/data_after.png)
+
+New data types include:
+
+- UMAP coordinates
+- Data acting as new metadata columns, e.g. cell type assignment and spatial cluster
+- Special results objects from analyses: cell typing, differential expression, InSituCor, ...
+
+## Workflow {#sec-workflow}
+
+Our workflow performs the below steps:
+
+First, the fundamentals:
+
+- [Parse and format data export by AtoMx](./assets/0.-loading-flat-files.html){target="_blank"}
+- [Custom arranging of tissues and FOVs in space](./assets/1.-finessing-tissues-spatial-arrangement.html){target="_blank"}
+- [QC and normalization](./assets/2.-QC-and-normalization.html){target="_blank"}
+- [Dimension reduction (PCA and UMAP)](./assets/3.-dimension-reduction.html){target="_blank"}
+- [Cell typing](./assets/4.-cell-typing.html){target="_blank"}
+
+Then, we go after biology:
+
+- [Defining cells' spatial context](./assets/5.-define-spatial-context.html){target="_blank"}
+- Hypothesis-driven analyses, i.e. differential expression: how do cells change behavior based on their spatial context? (coming summer 2024)
+- Hypothesis-generating analyses: identifying spatially correlated genes with InSituCor (coming summer 2024)
+
+
+## General analysis advice 
+
+- For large experiments, [more advanced workflows](/posts/big-data/index.qmd){target="_blank"} 
+may be needed to avoid overwhelming your compute and/or memory. 
+- For studies across multiple flow cells, batch correction should be considered.
+  
+
+

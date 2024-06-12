@@ -1,0 +1,228 @@
+---
+title: "QC normalization and batch-correction"
+output: 
+rmarkdown::html_vignette: 
+fig_width: 7 
+fig_height: 8 
+vignette: >
+  %\VignetteIndexEntry{QC normalization and batch-correction}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+<style>
+p.caption {
+  font-size: 1.5em;
+}
+</style>
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+## QC
+
+QC of CosMx data is mostly straightforward. Technical effects can be complex,
+ but they manifest in limited ways:
+ 
+- Many individual cells can have low signal
+- Segmentation errors can create "cells" with bad data
+- Sporadic FOVs can have low signal
+- Sporadic FOVs can have distorted / outlier expression profiles
+
+
+First we'll flag cells with poor signal, then we'll flag FOVs. 
+When we're done, we'll delete everything we've flagged. 
+(The full original data will remain on AtoMx, so this step is not as drastic as it seems. 
+For smaller studies it could still be reasonable to hold on to the pre-QC .RDS files.)
+
+The QCs implemented here mimic and expand on those of AtoMx. 
+We reimplement AtoMx QCs here to give you more granular control on how they're implemented. 
+
+We start by loading the data we'll need, which was output by the earlier scripts from the [workflow vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/vignette):
+
+```{r loaddata}
+library(Matrix)
+library(viridis)
+
+# note these files are for convenience during analysis, and are not a NanoString-supported format
+mydir <- "../"
+metadata <- readRDS(paste0(mydir, "/processed_data/metadata_unfiltered.RDS")) 
+counts <- readRDS(paste0(mydir, "/processed_data/counts_unfiltered.RDS")) 
+negcounts <- readRDS(paste0(mydir, "/processed_data/negcounts_unfiltered.RDS")) 
+falsecounts <- readRDS(paste0(mydir, "/processed_data/falsecounts_unfiltered.RDS")) 
+xy <- readRDS(paste0(mydir, "/processed_data/xy_unfiltered.RDS"))
+```
+
+### Cell-level QC
+
+We'll check for two kinds of bad cells: those with too few transcripts to use, 
+and those that look to result from bad segmentation errors.
+
+We generally require 20 counts per cell in 1000plex data and 50 counts in 6000plex data:
+
+```{r countqc}
+# require 20 counts per cell 
+count_threshold <- 20
+flag <- metadata$nCount_RNA < count_threshold
+table(flag)
+```
+
+Then we'll look for very large cells. You can run a formal test for outliers on 
+the vector of cell areas, or you can determine a reasonable threshold yourself:
+
+```{r areaqc}
+# what's the distribution of areas?
+hist(metadata$Area, breaks = 100, xlab = "Cell Area", main = "")
+# based on the above, set a threshold:
+area_threshold <- 30000
+abline(v = area_threshold, col = "red")
+# flag cells based on area:
+flag <- flag | (metadata$Area > area_threshold)
+table(flag)
+```
+
+
+### FOV-level QC
+
+We check FOVs for two indicators of artifacts: diminished total counts, and biased gene expression profiles. 
+Procedures for both these checks, along with a detailed discussion, can be found in a new (as of April 2024) method
+described [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/).
+These procedures will appear in AtoMx in summer 2024. 
+
+To summarize briefly: for each "bit" in our barcodes (e.g. red in reporter cycle 8), we look for FOVs where 
+genes using the bit are underexpressed. We also look for FOVs where total expression is suppressed.
+
+Note that an additional approach to FOV QC, one looking at primary data accessible from AtoMx through S3, will be described in future post in  [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/).
+
+Below we'll run our FOV QC code and examine its results:
+
+```{r runfovqc}
+## preparing resources:
+# source the FOV QC tool:
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/FOV%20QC/FOV%20QC%20utils.R")
+# load necessary information for the QC tool: the gene to barcode map:
+allbarcodes <- readRDS(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/Main/_code/FOV%20QC/barcodes_by_panel.RDS"))
+names(allbarcodes)
+# get the barcodes for the panel we want:
+barcodemap <- allbarcodes$Hs_UCC
+head(barcodemap)
+
+## run the method:
+fovqcresult <- runFOVQC(counts = counts, xy = xy, fov = metadata$FOV, barcodemap = barcodemap, max_prop_loss = 0.3) 
+```
+
+We can see which FOVs were flagged with the below plots and summaries:
+
+```{r showflagged}
+# map of flagged FOVs:
+mapFlaggedFOVs(fovqcresult)
+
+# list FOVs flagged for any reason, for loss of signal, for bias:
+fovqcresult$flaggedfovs
+fovqcresult$flaggedfovs_fortotalcounts
+fovqcresult$flaggedfovs_forbias
+```
+
+We only flagged FOVs for bias, not for signal loss, but the map of signal strength is still worth examining:
+
+```{r fovqcsignalloss}
+FOVSignalLossSpatialPlot(fovqcresult) 
+```
+
+We see signal strength varying, but smoothly with tissue biology, and not sharply with FOV borders.
+No FOVs are uniformly suppressed.
+
+The function did flags one FOV, however, not for signal loss, but for biased gene expression. 
+Specifically, counts from one barcode position appear suppressed in this FOV. Let's look in more detail:
+
+```{r examinefovqcresults, fig.width=8, fig.height=8}
+# spatial plots of flagged reporter positions:
+par(mfrow = c(2,2))
+FOVEffectsSpatialPlots(res = fovqcresult, outdir = NULL, bits = "flagged_reportercycles") 
+```
+
+The above plots show the view from which the algorithm flags FOVs for failed reporter cycles. 
+It looks not at single genes, but at the collection of all genes using a given barcode bit
+(reporter cycle + color).
+Each FOV is cut into a 7X7 grid, and each grid square is colored by how strongly
+ the total counts from a barcode bit diverge from similar grid squares from other FOVs. 
+
+In the above plots, we see strong loss of expression across all grid squares of the flagged FOV (highlighted yellow)
+in all 4 colors from reporter cycle 11. 
+In other FOVs, we see increased (red) and decreased (blue) expression, but these changes
+are more modest, and they vary smoothly over space rather than with the sharp boundaries of FOVs,
+so we attribute these changes to biology and not technical artifacts.
+
+A final useful plot shows which barcode bits x FOVs showed evidence for lost signal:
+
+```{r fovqcheatmap}
+FOVEffectsHeatmap(fovqcresult) 
+```
+
+The FOV QC result also reports which genes are impacted in any flagged FOVs:
+
+```{r flaggedgenes}
+# genes from all barcode bits that were flagged in any FOV:
+print(unique(fovqcresult$flagged_fov_x_gene[,"gene"]))
+```
+
+Thus while we only flagged one reporter cycle, i.e. 4 barcode bits, over a quarter 
+of the gene panel relies on one of these bits. None of these genes can be analyzed 
+in this FOV. The simplest way forward is to flag and remove all cells in this FOV:
+
+```{r lowcountfovs}
+flag <- flag | is.element(metadata$FOV, fovqcresult$flaggedfovs)
+table(flag)
+```
+
+Advanced users may wish to retain FOVs with detectable but modest bias. 
+Under this workflow, take great care that your analyses are robust to this kind of artifact. 
+
+### Remove flagged cells and FOVs
+
+Now that we've flagged cells we don't want to analyze, we remove them from all of our data objects. 
+To avoid risk of data misalignment, we'll use cell IDs to coordinate this operation. 
+
+```{r remove}
+# how many cells are we flagging?
+table(flag)
+# subset all data objects to only the cells to be kept:
+counts <- counts[!flag, ]
+negcounts <- negcounts[!flag, ]
+falsecounts <- falsecounts[!flag, ]
+metadata <- metadata[!flag, ]
+xy <- xy[!flag, ]
+# overwrite saved data with filtered data:
+# note these files are for convenience during analysis, and are not a NanoString-supported format
+saveRDS(counts, paste0(mydir, "/processed_data/counts.RDS"))
+saveRDS(negcounts, paste0(mydir, "/processed_data/negcounts.RDS"))
+saveRDS(falsecounts, paste0(mydir, "/processed_data/falsecounts.RDS"))
+saveRDS(metadata, paste0(mydir, "/processed_data/metadata.RDS"))
+saveRDS(xy, paste0(mydir, "/processed_data/xy.RDS"))
+```
+
+These new saved data objects have omitted the flagged cells. The original data can be recovered from AtoMx or the exported flat files. 
+
+## Normalization
+
+Normalization is straightforward: we simply divide every cell's expression profile by its total counts.
+To put our counts back on a more natural scale, we then multiply all cells by the mean
+cell's total counts. 
+This can be done efficiently using matrix multiplication, which avoids converting the sparse (memory-efficient) matrix into a dense matrix.
+
+```{r normalize}
+scaling_factor <- mean(metadata$nCount_RNA)
+norm <- Matrix::Diagonal(x = scaling_factor/metadata$nCount_RNA,names=colnames(counts)) %*% counts
+saveRDS(norm, paste0(mydir, "/processed_data/norm.RDS"))
+```
+
+Note: if you'll run the same pipeline over many studies, then you should 
+replace the `mean(metadata$nCount_RNA)` term with some fixed value that is the 
+same for all studies. All positive values will produce equivalent data, but entering
+a value approximately equal to the average cell's total counts will put the data
+on an easily-interpretable scale. Neglecting this step will result in different studies 
+being normalized to different levels, complicating efforts to compare data generated by 
+different pipeline runs. 
