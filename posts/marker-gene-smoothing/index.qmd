@@ -32,9 +32,9 @@ In spatial transcriptomic (ST) data, lower sensitivity, autoflourescent backgrou
 
 A common feedback for new ST analysts when dealing with ST data may be along the lines of "Why don't I see gene 'X' in a majority of cells for cell type 'Y'?".  
 
-This post demonstrates a method for calculating the smoothed expected expression of any gene, conditioning on it's most similar neighbor cells.  Neighbor cells here are defined based on local proximity in UMAP space. 
+This post demonstrates a method for calculating the smoothed expected expression of any gene, conditioning on its most similar neighbor cells.  Neighbor cells here are defined based on local proximity in UMAP space. 
 
-# A motivating example: Noisy T cell typing in non-small cell lung cancer tissue
+# A motivating example: Noisy T-cell typing in non-small cell lung cancer tissue
 
 For example, here is a data set below consisting of non-small cell lung cancer tissues.
 Let's load it in, run some quick unrefined-cell typing using InSituType (https://www.biorxiv.org/content/10.1101/2022.10.19.512902v1.full.pdf), and take a look at the initial results.
@@ -147,7 +147,7 @@ knitr::include_graphics("./figures/umap_clust_all.png")
 Let's zoom in on some of the supervised clusters we hoped to identify below.
 We can see that some of the major cell types are somewhat clearly delineated on the UMAP.
 
-- Lymphocytes; T cell types (T CD8, T CD4, and Treg) are clustered together, and near the 'B cell' cluster.
+- Lymphocytes; T-cell types (T CD8, T CD4, and Treg) are clustered together, and near the 'B cell' cluster.
 - Myeloid cell types; (macrophage, pDC, mDC) are clustered in a similar area.
 
 But there does appear to potentially be some noise in delineating cell types within those major categories.
@@ -167,12 +167,12 @@ We can focus on T cells in this dataset as a driving example for using smoothing
 
 Canonical marker genes for T cells include
 
-- CD3 (expected to be expressed in all T cell types), 
+- CD3 (expected to be expressed in all T-cell types), 
 - FOXP3 (commonly used together with CD3 to identify Treg cells. Treg cells are a special subset of T CD4 cells)
 - CD8 (used together with CD3 to identify T CD8 cells)
 
-First, let's take a look at the relative frequency of our T cell clusters 'Treg', 'T CD8', and 'T CD4'.
-Tregs are supposed to be a particular sub type of T CD4 cells. Yet we have more than 3x as many Tregs called than we do T CD4.  
+First, let's take a look at the relative frequency of our T-cell clusters 'Treg', 'T CD8', and 'T CD4'.
+Tregs are supposed to be a rare sub type of T CD4 cells. Yet we have more than 3x as many Tregs called than we do T CD4.  
 
 
 ```{r eval=FALSE, message=FALSE}
@@ -243,9 +243,9 @@ clusterwise_fold_change_stats <- function(cnts=NULL, normed = NULL, metainfo, cl
 }
 ```
 
-We can see that FOXP3 is expressed in a much larger frequency in Treg cells relative to other T cell subtypes-- this is good.  
+We can see that FOXP3 is expressed in a much larger frequency in Treg cells relative to other T-cell subtypes-- this is good.  
 
-However, only 12.7% of our Treg cells are FOXP3 positive, which may be a concern given that we have so many more Treg cells than other T cell subtypes.
+However, only 12.7% of our Treg cells are FOXP3 positive, which may be a concern given that we have so many more Treg cells than other T-cell subtypes.
 
 
 ```{r, eval=FALSE, message=FALSE}
@@ -368,18 +368,28 @@ By averaging the expression of a marker gene of interest across cells with simil
 
 
 This function below identifies the nearest neighbors in *UMAP* space, and makes a smoothing matrix, which can be used to get the average expression of any gene among a given cell's nearest neighbors.
-
+Here is a simple implementation of the function, to take a 'Seurat' object as input, but could easily be modified for other data formats.
 ```{r,eval=FALSE,message=FALSE}
 
 ## create a column-standardized nearest neighbor matrix 
-## based on umap reduction
+## based on nearest neighbors in umap coordinates
+#' 
+#' @param sem a seureat object, which contains the UMAP reduction.
+#' @param umapreduc name of the umap reduction, i.e. "umap"
+#' @param n_neighbor number of nearest neighbors to be identified.
+#' 
+#' @return smoother "smoothing" matrix. expression (genes x cells ) x  smoother(cells x cells) , 
+#' will create an averaged expression across nearest neighbors.
+#' 
 umap_nn <- function(sem, umapreduc, n_neighbors=100){
-  
+ 
+  ## umap coordinates 
   umapd <-  
     data.table(sem@reductions[[umapreduc]]@cell.embeddings
                ,keep.rownames = TRUE)
   setnames(umapd, c(names(umapd)[1:3]), c("cell_ID", "UMAP_1", "UMAP_2"))
   
+  ## identify nearest n_neighbors (+1 includes the cell itself)
   nn_umap <- RANN::nn2(umapd[,.(UMAP_1, UMAP_2)],k = n_neighbors + 1)$nn.idx
   nn_umap <- data.table::melt(cbind(umapd[,.(cell_ID)], data.table(nn_umap))
                               , id.vars=c("cell_ID", "V1"))
@@ -388,11 +398,14 @@ umap_nn <- function(sem, umapreduc, n_neighbors=100){
                    , nn_umap[,.(cell_ID2=cell_ID1, cell_ID2_idx=cell_ID1_idx)][
                      ,unique(.SD)],by="cell_ID2_idx")
   
+  ## Cell x cell neighbor indicator matrix
   wumap <- Matrix::sparseMatrix(i = c(unique(nn_umap$cell_ID1_idx), nn_umap$cell_ID2_idx)
                                 ,j=c(unique(nn_umap$cell_ID1_idx), nn_umap$cell_ID1_idx)
                                 ,x=1)
   
   rownames(wumap) <- colnames(wumap) <- nn_umap[order(nn_umap$cell_ID1_idx),unique(cell_ID1)]
+  
+  ## Column standardize, so that columns (cells) sum to 1, and each neighbor given equal weight.
   mumap <- Matrix::sparseMatrix(i=1:ncol(wumap)
                                 ,j=1:ncol(wumap)
                                 ,x=1/Matrix::colSums(wumap)
@@ -405,7 +418,7 @@ umap_nn <- function(sem, umapreduc, n_neighbors=100){
 
 ```
 
-Here, we can apply our 'smoothing matrix' to some T cell marker genes and compare the difference on the UMAP.
+Here, we can apply our 'smoothing matrix' to some T-cell marker genes and compare the difference on the UMAP.
 Whereas raw marker expression is noisy and sparse, smoothed expression clearly highlights the focal points for each marker on the UMAP.
 
 ```{r}
@@ -440,7 +453,7 @@ cowplot::plot_grid(plotlist=plist, nrow=3) +
 knitr::include_graphics("./figures/smooth_vs_raw.png")
 ```
 
-From here, we could take a number of different approaches to 'clean up' our T cell calls.
+From here, we could take a number of different approaches to 'clean up' our T-cell calls.
 For example, because Tregs are a subset of T CD4 cells, we might consider reassigning them to T CD4 if they have low 'smoothed FOXP3' expression.
 
 Below, we could rank the Treg cells by their smoothed FOXP3 expression, as a way of measuring our confidence in the cell type call.
