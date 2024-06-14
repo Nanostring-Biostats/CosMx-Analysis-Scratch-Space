@@ -13,7 +13,7 @@ toc-expand: 2
 toc-location: left
 number-sections: true
 number-depth: 4
-date: "2024-06-11"
+date: "2024-06-14"
 categories: [napari, how-tos, visualization]
 draft: false
 image: figures/fig-duality.png
@@ -62,26 +62,29 @@ is its duality. It's flexible enough to quickly explore SMI data in a Graphical
 User Interface (GUI) yet robust enough to script reproducible results and tap into
 the underlying python objects. In this post, I'll walk through some of the basic 
 ways in which we can use `napari-cosmx`to view SMI data. I'll make use of this
-duality and share a combination of GUI and programmatic tips-n-tricks.
-
-- @sec-example-data describes the example data that is publicaly available
-- @sec-working-with-layers shows you how to interact with viewer
-- @sec-scripting shows how we script to things to fine-tune image appearances and more
+duality by sharing a combination of GUI and programmatic tips.
 
 ::: {.callout-note}
 This is not intended to be official documentation for the `napari-cosmx` plugin. 
-The tips and tricks contained within are not an exhaustive list of features and methods.
+The tips herein are not an exhaustive list of features and methods.
 :::
+
+- @sec-example-data shows how to preprocess the example dataset. If you are using your AtoMx-exported SMI data, this section is optional.
+- @sec-working-with-layers shows basic GUI tips for interacting with SMI data
+- @sec-scripting provides several examples of recapitulating the aesthetics 
+seen with the GUI as well as advanced ways we can fine-tune images and more
 
 
 # The Example Dataset {#sec-example-data}
 
 The example dataset that I am using is the mouse coronal hemisphere
 FFPE that is available to download from NanoString's website [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="blank"}. 
+If you are following along with your AtoMx exported data, you can skip most of
+these pre-processing steps as they are not required.
 
 ::: {.callout-note}
 Large memory (RAM) might be required to work with raw images. Stitching the example data on a laptop might not work for everyone. 
-The raw data size for this example is 183 GBs. Not all raw data are needed to stitch
+The raw data size for this example is 183 GBs. Not all raw data are needed to stitch, however,
 and users can exclude the `CellStatsDir/Morphology3D` folder if downloading locally.
 If excluding this folder, the raw data is closer to 35 GBs. 
 
@@ -91,27 +94,112 @@ CPU, and a peak memory usage of about 12 GBs (swap space was also used). The siz
 of the napari files combined was an additional 22 GBs of disk space. 
 :::
 
+
+## Pre-processing example data {#sec-preprocessing}
+
 Once downloaded, unzip the `HalfBrain.zip` file on your computer or external
-hard drive. Adjust the file structure to match the standard AtoMx 1.3.2 format. 
-Specifically, in your Finder window, create a folder named `mouse_brain`, move:
+hard drive. The format for this dataset differs from the expected AtoMx SIP export so a
+preprocessing step is necessary. 
 
-- `HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults` to `mouse_brain/AnalysisResults`
-- `HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir` to `mouse_brain/CellStatsDir`
-- `HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary` to `mouse_brain/RunSummary`
+When uncompressed, the raw data in the HalfBrain folder are actually nested like this:
 
-Once you have that formatted, use the [stitching widget method](../using-napari-for-cosmx-data/index.qmd#sec-stitch-images){target="_blank"}
+```
+tree -L 4
+
+├── AnalysisResult
+│   └── HalfBrain_20230406_205644_S1
+│       └── AnalysisResults <-- **Raw Data Folder**
+|           └── cp7bjyp7pm
+├── CellStatsDir
+│   └── HalfBrain_20230406_205644_S1
+│       └── CellStatsDir <-- **Raw Data Folder**
+│           ├── CellComposite
+│           ├── CellOverlay
+│           ├── FOV001
+│           ├── FOV002
+|           ...
+│           ├── Morphology2D
+│           └── RnD
+└── RunSummary
+    └── HalfBrain_20230406_205644_S1
+        └── RunSummary <-- **Raw Data Folder**
+            ├── Beta12_Affine_Transform_20221103.csv
+            ├── FovTracking
+            ├── Morphology_ChannelID_Dictionary.txt
+            ├── Run1000_20230406_205644_S1_Beta12_ExptConfig.txt
+            ├── Run1000_20230406_205644_S1_Beta12_SpatialBC_Metrics4D.csv
+            ├── Shading
+            ├── c902.fovs.csv
+            └── latest.fovs.csv
+```
+
+Rearrange the folders so that the nested raw data are at the top level.
+After rearrangement, the proper file structure should look like this:
+
+```
+tree -L 2
+
+.
+├── AnalysisResults
+│   └── cp7bjyp7pm
+├── CellStatsDir
+│   ├── CellComposite
+│   ├── CellOverlay
+│   ├── FOV001
+│   ├── FOV002
+...
+│   ├── Morphology2D
+│   └── RnD
+└── RunSummary
+    ├── Beta12_Affine_Transform_20221103.csv
+    ├── FovTracking
+    ├── Morphology_ChannelID_Dictionary.txt
+    ├── Run1000_20230406_205644_S1_Beta12_ExptConfig.txt
+    ├── Run1000_20230406_205644_S1_Beta12_SpatialBC_Metrics4D.csv
+    ├── Shading
+    ├── c902.fovs.csv
+    └── latest.fovs.csv
+```
+
+There are a few ways to rearrange. First, we could manually move folders.
+Specifically, in your Finder window, create a folder named `RawData`. Then, move:
+
+- `HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults` to `RawData/AnalysisResults`
+- `HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir` to `RawData/CellStatsDir`
+- `HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary` to `RawData/RunSummary`
+
+Second, we can create a new folder in terminal and then use symbolic links to 
+map the example data in the correct format. Here's an example of doing that in linux/mac.
+
+```
+# Terminal in Mac/Linux
+
+# cd to folder containing HalfBrain. Then, 
+
+mkdir -p RawFiles && cd $_
+ln -s ../HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults .
+ln -s ../HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir .
+ln -s ../HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary .
+
+```
+
+Once the file structure is properly formatted, use the [stitching widget method](../using-napari-for-cosmx-data/index.qmd#sec-stitch-images){target="_blank"}
 to create the mouse brain napari files. For this post, I named my output folder 
 `mouse_brain_napari_files`.
+
+### Adding metadata {#sec-adding-metadata}
 
 We will also use the cell typing data from the Seurat file. Let's include the
 following metadata columns: 
 
-- RNA_nbclust_clusters
-- RNA_nbclust_clusters_long (optional)
-- spatialClusteringAssignments
+- `RNA_nbclust_clusters`: the cell typing results (with abbreviated names)
+- `RNA_nbclust_clusters_long`: (optional) human-readable cell type names
+- `spatialClusteringAssignments`: spatial niche assignments
 
-Note that the Seurat file contains _both_ public datasets of mouse brain. We need to filter
-the metadata to include only those cells from `Run1000_S1_Half`.
+Note that the Seurat file contains _both_ tissues of mouse brain dataaset. We need to filter
+the metadata to include only those cells from `Run1000_S1_Half`. Note that when
+preparing the metadata for napari, the cell ID must be the first column (_i.e._, 
+see the `relocate` verb in the code below).
 
 ```{r}
 #| label: extracting-seurat-data
@@ -142,6 +230,8 @@ write.table(meta, file="/path/to/inside/napari-ready-folder/_metadata.csv",
 
 Now that the data are ready, drag and drop the slide folder into napari to launch
 the plugin. 
+
+to do: a picture of what the "final" product looks like would be helpful.
 
 # Working with layers {#sec-working-with-layers}
 
