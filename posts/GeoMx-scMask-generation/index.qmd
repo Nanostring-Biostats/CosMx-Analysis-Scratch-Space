@@ -15,7 +15,7 @@ number-sections: true
 number-depth: 4
 date: "2024-06-12"
 date-modified: last-modified
-categories: [GeoMx, how-tos, segmentation, image processing]
+categories: [GeoMx, how-tos, image processing, Python]
 image: figures/workflow_GeoMx_scMask_given_query.png
 description: "This post introduces a pipeline for automatic generating GeoMx&#8482;-ready binary masks in batch for marker-based single-cell application. Given the query marker protein of interest, the pipeline would take morphology images and generate binary masks for negative-stained cells and cells connecting to positive-stained regions, respectively. The pipeline runs as a command line and this post would serve as a guide to how it works and how to use it."
 draft: false
@@ -70,13 +70,13 @@ The pipeline script in use, `Generate_scMask_given_query.py`, assumes you have m
     + By default, `nuc_chan` is set to `0` such that it would not be included in cell segmentation downstream. But if you would like to use stains for both cytoplasm and nucleus for cell segmentation, you can pass the corresponding channel index of nucleus stain to the script. 
 * `cell_diameter`: median cell diameter in pixel unit within your images, default to `30`. For best cell segmentation results, it's recommended to set this parameter based on your sample. 
 
-To use the pipeline, run `python GeoMx_tangle_mask_pipeline.py` and specify parameters as desired. 
+To use the pipeline, run `python Generate_scMask_given_query.py` and specify parameters as desired. 
 
 For instance to run on a folder with images where the 4th and 3rd channels of each image are cytoplasm and query marker stain, respectively while defining positive-stained objects (in query marker channel) to have at least 500 squared pixel area (using default values for all other parameters):
 
 ```{default filename="Command Line Interface (CLI) example to run in Terminal"}
 #| eval: false
-python GeoMx_tangle_mask_pipeline.py --in_dir imageFolder --cyto_chan 4 --query_chan 3 --out_dir outputFolder --min_positive_area 500
+python Generate_scMask_given_query.py --in_dir imageFolder --cyto_chan 4 --query_chan 3 --out_dir outputFolder --min_positive_area 500
 ```
 
 The resulting output folder structure looks like this:
@@ -106,12 +106,12 @@ There are other additional arguments providing fine control of different steps o
 
 ```{default filename="Command Line Parameters"}
 #| eval: false
-usage: GeoMx_tangle_mask_pipeline.py [-h] [--in_dir IN_DIR] [--out_dir OUT_DIR] [--cyto_chan CYTO_CHAN]
-                                     [--query_chan QUERY_CHAN] [--nuc_chan NUC_CHAN]
-                                     [--cell_seg_model CELL_SEG_MODEL] [--cell_diameter CELL_DIAMETER]
-                                     [--min_cell_area MIN_CELL_AREA] [--thresh_method THRESH_METHOD]
-                                     [--fill_holes] [--min_positive_area MIN_POSITIVE_AREA]
-                                     [--min_intersect_area MIN_INTERSECT_AREA] [--clean_export]
+usage: Generate_scMask_given_query.py [-h] [--in_dir IN_DIR] [--out_dir OUT_DIR] [--cyto_chan CYTO_CHAN]
+                                      [--query_chan QUERY_CHAN] [--nuc_chan NUC_CHAN]
+                                      [--cell_seg_model CELL_SEG_MODEL] [--cell_diameter CELL_DIAMETER]
+                                      [--min_cell_area MIN_CELL_AREA] [--thresh_method THRESH_METHOD]
+                                      [--fill_holes] [--min_positive_area MIN_POSITIVE_AREA]
+                                      [--min_intersect_area MIN_INTERSECT_AREA] [--clean_export]
 ```
 
 ## Input Image Arguments:
