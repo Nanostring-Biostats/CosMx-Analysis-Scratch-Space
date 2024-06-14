@@ -69,10 +69,12 @@ This is not intended to be official documentation for the `napari-cosmx` plugin.
 The tips herein are not an exhaustive list of features and methods.
 :::
 
-- @sec-example-data shows how to preprocess the example dataset. If you are using your AtoMx-exported SMI data, this section is optional.
-- @sec-working-with-layers shows basic GUI tips for interacting with SMI data
+- @sec-example-data shows how to preprocess the example dataset. If you are using your AtoMx-exported SMI data, this section is optional
+- @sec-interacting-with-the-gui shows basic GUI tips for interacting with SMI data
 - @sec-scripting provides several examples of recapitulating the aesthetics 
 seen with the GUI as well as advanced ways we can fine-tune images and more
+
+
 
 
 # The Example Dataset {#sec-example-data}
@@ -80,7 +82,8 @@ seen with the GUI as well as advanced ways we can fine-tune images and more
 The example dataset that I am using is the mouse coronal hemisphere
 FFPE that is available to download from NanoString's website [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="blank"}. 
 If you are following along with your AtoMx exported data, you can skip most of
-these pre-processing steps as they are not required.
+these pre-processing steps as they are not required (but see @sec-adding-metadata
+if you would like to view metadata).
 
 ::: {.callout-note}
 Large memory (RAM) might be required to work with raw images. Stitching the example data on a laptop might not work for everyone. 
@@ -103,7 +106,9 @@ preprocessing step is necessary.
 
 When uncompressed, the raw data in the HalfBrain folder are actually nested like this:
 
-```
+```{default filename="Terminal"}
+#| eval: false
+
 tree -L 4
 
 ├── AnalysisResult
@@ -133,10 +138,12 @@ tree -L 4
             └── latest.fovs.csv
 ```
 
-Rearrange the folders so that the nested raw data are at the top level.
+In order for `napari-cosmx` to stitch this dataset, we'll need to rearrange the folders so that the nested raw data are at the top level.
 After rearrangement, the proper file structure should look like this:
 
-```
+```{default filename="Terminal"}
+#| eval: false
+
 tree -L 2
 
 .
@@ -161,17 +168,12 @@ tree -L 2
     └── latest.fovs.csv
 ```
 
-There are a few ways to rearrange. First, we could manually move folders.
-Specifically, in your Finder window, create a folder named `RawData`. Then, move:
+There are a few ways to rearrange. The first method retains the original folder
+structure and simply makes symbolic links to the data in the expected format. Here's how
+to do it in unix/mac (Windows not shown).
 
-- `HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults` to `RawData/AnalysisResults`
-- `HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir` to `RawData/CellStatsDir`
-- `HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary` to `RawData/RunSummary`
-
-Second, we can create a new folder in terminal and then use symbolic links to 
-map the example data in the correct format. Here's an example of doing that in linux/mac.
-
-```
+```{default filename="Terminal"}
+#| eval: false
 # Terminal in Mac/Linux
 
 # cd to folder containing HalfBrain. Then, 
@@ -183,9 +185,17 @@ ln -s ../HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary .
 
 ```
 
+Alternatively, we could manually move folders.
+Specifically, in your Finder window, create a folder named `RawData`. Then, move:
+
+- `HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults` to `RawData/AnalysisResults`
+- `HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir` to `RawData/CellStatsDir`
+- `HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary` to `RawData/RunSummary`
+
 Once the file structure is properly formatted, use the [stitching widget method](../using-napari-for-cosmx-data/index.qmd#sec-stitch-images){target="_blank"}
-to create the mouse brain napari files. For this post, I named my output folder 
-`mouse_brain_napari_files`.
+for an earlier blog post to create the mouse brain napari files. 
+
+<!-- For this post, I named my output folder `mouse_brain_napari_files`. -->
 
 ### Adding metadata {#sec-adding-metadata}
 
@@ -231,9 +241,7 @@ write.table(meta, file="/path/to/inside/napari-ready-folder/_metadata.csv",
 Now that the data are ready, drag and drop the slide folder into napari to launch
 the plugin. 
 
-to do: a picture of what the "final" product looks like would be helpful.
-
-# Working with layers {#sec-working-with-layers}
+# Interacting with the GUI {#sec-interacting-with-the-gui}
 
 When we open a slide with `napari-cosmx`, by default there will be a few napari
 layers visible (Initial View tab; @fig-initial). These include `FOV labels` and `Segmentation`. Clicking the eye
@@ -314,7 +322,7 @@ knitr::include_graphics("./figures/fig-transcripts.png")
 
 :::
 
-# Scripting tips-n-tricks {#sec-scripting}
+# Scripting with `napari-cosmx` {#sec-scripting}
 
 This section is for advanced users who want finer control of the aesthetics.
 
