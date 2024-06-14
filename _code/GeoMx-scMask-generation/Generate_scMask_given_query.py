@@ -203,6 +203,12 @@ def group_cells_by_intersection(L1: np.ndarray, L2: np.ndarray, area_cutoff: int
         else:
             # Mark the region in L1 as non-touching
             non_touching_mask[coords_L1[:, 0], coords_L1[:, 1]] = True
+    
+    # make sure no overlapping pixel between 2 masks
+    # if overlapping, remove from both masks 
+    flagBad = combined_touching_mask & non_touching_mask
+    combined_touching_mask = np.where(flagBad, False, combined_touching_mask)
+    non_touching_mask = np.where(flagBad, False, non_touching_mask)
 
     return combined_touching_mask, non_touching_mask
 
@@ -352,14 +358,14 @@ def main():
             Mask2 = (Mask2 * 255).astype(np.uint8)
             
             if not args.clean_export:
-                io.imsave(os.path.join(posDir, os.path.splitext(os.path.basename(newImg_names[n]))[0]+'_pos_masks.tif'), Mask1)
-                io.imsave(os.path.join(negDir, os.path.splitext(os.path.basename(newImg_names[n]))[0]+'_neg_masks.tif'), Mask2)
+                io.imsave(os.path.join(posDir, os.path.splitext(os.path.basename(newImg_names[n]))[0]+'_pos_1.tif'), Mask1)
+                io.imsave(os.path.join(negDir, os.path.splitext(os.path.basename(newImg_names[n]))[0]+'_neg_2.tif'), Mask2)
             else:
                 # only export when mask contain positive pixel 
                 if Mask1.max() >0:
-                    io.imsave(os.path.join(posDir, os.path.splitext(os.path.basename(newImg_names[n]))[0]+'_pos_masks.tif'), Mask1)
+                    io.imsave(os.path.join(posDir, os.path.splitext(os.path.basename(newImg_names[n]))[0]+'_pos_1.tif'), Mask1)
                 if Mask2.max() >0:
-                    io.imsave(os.path.join(negDir, os.path.splitext(os.path.basename(newImg_names[n]))[0]+'_neg_masks.tif'), Mask2)
+                    io.imsave(os.path.join(negDir, os.path.splitext(os.path.basename(newImg_names[n]))[0]+'_neg_2.tif'), Mask2)
     
     logger.info("\n")
     logger.info(f"Process completed, output at: {outDir}\n")
