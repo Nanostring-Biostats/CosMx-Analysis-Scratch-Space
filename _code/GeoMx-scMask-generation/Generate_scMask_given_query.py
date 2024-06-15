@@ -1,5 +1,6 @@
 """
-Copyright © 2024 NanoString Technologies (a Bruker company), Authored by Lidan Wu.
+Copyright ©2024 Bruker Spatial Biology, Inc. All rights reserved. Subject to additional license terms and conditions provided separately by Bruker Spatial Biology, Inc.
+Author: Lidan Wu
 Date: 2024-06-11
 Version: v1.0.0
 """
