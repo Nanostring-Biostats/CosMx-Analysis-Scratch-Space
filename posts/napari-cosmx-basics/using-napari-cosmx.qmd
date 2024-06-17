@@ -51,7 +51,7 @@ knitr::include_graphics("./figures/fig-duality.png")
 
 # Introduction 
 
-This post is part of our napari series. In the [first blog post](../using-napari-for-cosmx-data/index.qmd){target="_blank"} I introduced the
+This post is the second installment of the napari series. In the [first blog post](../using-napari-for-cosmx-data/index.qmd){target="_blank"} I introduced the
 `napari-cosmx` plugin, how CosMx&#8482; Spatial Molecular Imager (SMI) data
 can be viewed as layers within napari, and a method for processing, 
 or "stitching", raw data that are exported from AtoMx&#8482; Spatial Informatics
@@ -261,7 +261,7 @@ we would like to view. When we activate the `Metadata` layer, hovering over
 a given cell will display the metadata associated with it as a ribbon at the bottom
 of the application. To view the IF channels, use
 the `Morphology Images` widget, In @fig-IF (IF Channels tab) I turned off the visibility of the cell
-types, added GFAP in red and DNA in blue, and zoomed into the hippocampus. When
+types, added GFAP in red and DNA in cyan, and zoomed into the hippocampus. When
 I click on a layer, it becomes the activate layer and I can use the `layer controls` widget
 to adjust attributes to that layer such as contrast
 limits, gamma, layer blending, and more. Finally, we can view raw transcripts 
@@ -279,7 +279,7 @@ and to blend (not shown below).
 #| eval: true
 #| echo: false
 #| label: "fig-initial"
-#| fig-cap: "The initial view of the tissue shows the location of FOVs and cell boundary layers."
+#| fig-cap: "The initial view of the tissue shows the location of FOVs and cell boundary layers. Yellow arrow shows location of ipython terminal. "
 
 knitr::include_graphics("./figures/fig-initial.png")
 ```
@@ -312,7 +312,7 @@ knitr::include_graphics("./figures/fig-niches.png")
 #| eval: true
 #| echo: false
 #| label: "fig-IF"
-#| fig-cap: "Hippocampal region of tissue with GFAP (red) and DNA (blue)."
+#| fig-cap: "Hippocampal region of tissue with GFAP (red) and DNA (cyan)."
 
 knitr::include_graphics("./figures/fig-IF.png")
 ```
@@ -323,21 +323,24 @@ knitr::include_graphics("./figures/fig-IF.png")
 #| eval: true
 #| echo: false
 #| label: "fig-tx"
-#| fig-cap: "Expression of _Calb1_ in cortex layer I."
+#| fig-cap: "Expression of _Calb1_ (white dots) in cortex layer I."
 
 knitr::include_graphics("./figures/fig-transcripts.png")
 ```
 
 :::
 
+To capture screenshots, simply click `File > Save Screenshot...`. The images
+above are captured "with viewer" but that is optional. 
+
 # Scripting with `napari-cosmx` {#sec-scripting}
 
 This section is for advanced users who want finer control of the aesthetics.
 
 Most of the items we've covered can also be accessed through various methods in the `gem` object
-that can found loaded in the `>_` `ipython` interpreter. You may have
-noticed in the figures above that there was code being used to take the screenshots. Here's a script
-that can help reproduce the figures above and the ones below. I use reproducible
+that can found loaded in the `>_` `ipython` interpreter (_i.e._, yellow arrow in @fig-initial). You may have
+noticed in the figures above that there was code being used to take the screenshots. Here's the full script
+that can help reproduce the figures above. I use reproducible
 scripts often. This is because I may want to make slight changes to a figure 
 down the road. For example, if a reviewer overall likes an image but asks for the cell
 colors to be different, I just need to change the colors in the code and the script
@@ -386,13 +389,15 @@ gem.viewer.layers['RNA_nbclust_clusters'].visible = False
 gem.add_channel('GFAP', colormap = 'red')
 gfap = gem.viewer.layers['GFAP']
 
-gem.add_channel('DNA', colormap = 'blue')
+gem.add_channel('DNA', colormap = 'cyan')
 dna = gem.viewer.layers['DNA']
-dna.contrast_limits = [507.82222222222225, 1260.8000000000002]
+dna.contrast_limits = [208.39669421487605, 1328.5289256198346]
 dna.gamma = 1.1682758620689655
 
-gem.viewer.camera.center = (0.0, -0.8953219176820948, -55.709824851949776)
-gem.viewer.camera.zoom = 340.6570306050387
+gem.viewer.camera.center = (0.0, -0.7181216373638928, -55.314605674992876)
+gem.viewer.camera.zoom = 1095.856465340922
+gem.viewer.layers['Segmentation'].visible = True
+gem.viewer.layers['Segmentation'].opacity = 0.371900826446281
 
 fig_path = output_path + "/fig-IF.png"
 with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
@@ -408,35 +413,12 @@ gem.viewer.camera.center = (0.0, -0.009723512204714457, -59.25760232977486)
 gem.viewer.camera.zoom = 1204.3755331686673
 gem.viewer.layers['Segmentation'].visible = True
 gem.viewer.layers['Segmentation'].opacity = 0.6
-gem.plot_transcripts(gene = "Calb1", color = 'cyan', point_size=50) # I
+gem.plot_transcripts(gene = "Calb1", color = 'white', point_size=50) # I
 
 fig_path = output_path + "/fig-transcripts.png"
 with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
         screenshot = gem.viewer.screenshot(canvas_only=False)
         writer.append_data(screenshot)
-
-## Contour
-gfap.visible = False
-dna.visible = False
-gem.viewer.layers['Calb1'].visible = False
-
-gem.viewer.camera.center = (0.0, -0.5375926704126319, -54.7415680001114)
-gem.viewer.camera.zoom = 1371.524539264374
-gem.color_cells('RNA_nbclust_clusters', contour=2)
-
-fig_path = output_path + "/fig-contours.png"
-with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
-        screenshot = gem.viewer.screenshot(canvas_only=True)
-        writer.append_data(screenshot)
-
-## White background
-gem.viewer.window.qt_viewer.canvas.background_color_override = 'white'
-
-fig_path = output_path + "/fig-white.png"
-with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
-        screenshot = gem.viewer.screenshot(canvas_only=True)
-        writer.append_data(screenshot)
-
 
 ```
 
@@ -455,7 +437,7 @@ Similarly, the contrast limits and gamma values for IF channels can be saved as 
 ```{r}
 #| eval: false
 dna = gem.viewer.layers['DNA']
-dna.contrast_limits = [507.82222222222225, 1260.8000000000002]
+dna.contrast_limits = [208.39669421487605, 1328.5289256198346]
 dna.gamma = 1.1682758620689655
 ```
 
@@ -474,6 +456,44 @@ with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
 There are also methods available in `napari-cosmx` that do not have the GUI
 equivalent. We won't be able to touch on all of these methods in this post but I 
 want to highlight a few. 
+
+## Color cells with outlines
+
+We can plot the cell colors as boundaries instead of filled in polygons (@fig-contours).
+
+```{r}
+#| eval: false
+
+# gem.viewer.camera.center = (0.0, -0.5375926704126319, -54.7415680001114)
+# gem.viewer.camera.zoom = 1371.524539264374
+
+gfap.visible = False
+dna.visible = False
+gem.viewer.layers['Calb1'].visible = False
+gem.viewer.layers['Npy'].visible = False
+gem.viewer.layers['Targets'].visible = False
+
+gem.viewer.camera.center = (0.0, -0.6346878790298397, -54.95271110236874)
+gem.viewer.camera.zoom = 2113.6387223301786
+gem.color_cells('RNA_nbclust_clusters', contour=2)
+
+fig_path = output_path + "/fig-contours.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=True)
+        writer.append_data(screenshot)
+
+```
+
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-contours"
+#| fig-cap: "Cells types (or other metadata items) can be represented as cell boundaries."
+
+knitr::include_graphics("./figures/fig-contours.png")
+```
+
 
 ## Plot transcripts with an expanded color pallette
 
@@ -494,48 +514,138 @@ gem.plot_transcripts(gene = "Calb1", color = '#FFC0CB', point_size=20)
 
 ## Plotting genes with list comprehensions
 
-We can plot similar genes or targets with the same color. For example, here's
-the negatives in white.
+We can plot similar genes or targets with the same color. For example, the
+code that generated @fig-negatives is here.
+
 
 ```{r}
 #| eval: false
-#| 
+
+gem.viewer.camera.center = (0.0, -0.6346878790298397, -54.95271110236874)
+gem.viewer.camera.zoom = 2113.6387223301786
+
 df = gem.targets
 filtered_df = df[df.target.str.contains("NegPrb")]
 
 pandas_df = filtered_df.to_pandas_df()
 negatives = pandas_df.target.unique().tolist()
-[gem.plot_transcripts(gene = x, color = "white", point_size=10) for x in negatives];
+[gem.plot_transcripts(gene = x, color = "white", point_size=20) for x in negatives];
 
-
+fig_path = output_path + "/fig-negatives.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=False)
+        writer.append_data(screenshot)
 ```
 
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-negatives"
+#| fig-cap: "Same extent as @fig-contours but with negatives shown in white."
+
+knitr::include_graphics("./figures/fig-negatives.png")
+```
+
+
 We can also supply of list of tuples where each tuple is a target
-and a color:
+and a color.
+
 
 ```{r}
 #| eval: false
-genes = [('Npy', "orange"), ("Calb1", "cyan")]
-[gem.plot_transcripts(gene = x[0], color = x[1], point_size=10) for x in genes];
 
+genes = [('Npy', "magenta"), ("Calb1", "white")]
+[gem.plot_transcripts(gene = x[0], color = x[1], point_size=20) for x in genes];
+
+for x in negatives:
+  gem.viewer.layers[x].visible = False
+
+gem.color_cells('RNA_nbclust_clusters') # reset to filled contours
+cell_type_layer = gem.viewer.layers['RNA_nbclust_clusters']
+cell_type_layer.opacity = 0.9
+cell_type_layer.visible = True
+gem.viewer.camera.center = (0.0, -0.026937869510583412, -59.20560304046731)
+gem.viewer.camera.zoom = 3820.667999302201
+gem.viewer.layers['Segmentation'].visible = True
+gem.viewer.layers['Segmentation'].opacity = 0.6
+
+fig_path = output_path + "/fig-crowded-tx.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=False)
+        writer.append_data(screenshot)
+        
 ```
+
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-crowded-tx"
+#| fig-cap: "Cortical layer with _Npy_ (magenta) and _Calb1_ (white)."
+
+knitr::include_graphics("./figures/fig-crowded-tx.png")
+```
+
 
 ## Changing transcript transparency
 
-Sometimes transcripts can be stacked on top of each other to the point you cannot
-discern any features. For example (to do). Adjusting the transparents of the layer
-in the GUI only changes the transparency of a single point so that's not feasible.
-But this is possible in interepeter. 
+Sometimes transcripts can be stacked on top of each other to the ponit that
+it's difficult to qualitatively determine the number of transcripts. 
+Adjusting the transcript opacity of the layer
+in the GUI only changes the transparency of a single point. 
+But it's possible to change all points using the `ipython` interpreter. 
 
 ```{r}
 #| eval: false
-gem.viewer.layers['Npy'].opacity = 0.2
+gem.viewer.layers['Npy'].opacity = 0.5
+fig_path = output_path + "/fig-tx-opacity.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=False)
+        writer.append_data(screenshot)
+  
+```
 
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-tx-opacity"
+#| fig-cap: "Same extent as @fig-crowded-tx but opacity of _Npy_ reduced from 1 to 0.5."
+
+knitr::include_graphics("./figures/fig-tx-opacity.png")
+```
+
+## Center to a particular FOV
+
+While zooming (`gem.viewer.camera.zoom`) and panning (`gem.viewer.camera.center`)
+can control the exact location of the camera, you can programmatically go to a
+particular fov with the `center_fov` method. 
+
+```{r}
+#| eval: false
+#| echo: true
+
+# center to fov 123 and zoom in a little (i.e., buffer > 1).
+gem.center_fov(fov=123, buffer=1.2)
+
+fig_path = output_path + "/fig-center-to-fov.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=False)
+        writer.append_data(screenshot)
+  
+```
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-center-to-fov"
+#| fig-cap: "Centering to a particular FOV (123) using the `center_fov` method."
+
+knitr::include_graphics("./figures/fig-center-to-fov.png")
 ```
 
 ## Plot all transcripts
 
-This is not advised for resource-limited systems as it plots all transcripts. 
+This is not advised for resource-limited systems as it plots _all_ transcripts. 
 The method `add_points` plots all the points for a given FOV. If no FOV is
 specified, it will plot all transcripts (this can be taxing on resource-limited
 computers).
@@ -543,51 +653,23 @@ computers).
 ```{r}
 #| eval: false
 
-gem.add_points(fov=1)
+gem.add_points(fov=123)
+gem.viewer.layers['Targets'].opacity = 0.4
+fig_path = output_path + "/fig-tx-all.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=False)
+        writer.append_data(screenshot)
+  
 ```
-
-## Specify individual cell types
-
-You can choose the color of the cell types and which cells to color by supplying
-a dictionary to the 
-
-```{r}
-#| eval: false
-custom_colors = {
-"EPEN":"#AA0DFE",
-"CPEC":"#3283FE",
-"GN":"#85660D",
-"VLMC":"#1C8356"
-}
-
-gem.color_cells('RNA_nbclust_clusters', color=custom_colors)
-
-```
-
-## Color cells with outlines
-
-We can also plot the cell colors as boundaries instead of filled in polygons (@fig-contours).
-
-```{r}
-#| eval: false
-
-# gem.viewer.camera.center = (0.0, -0.5375926704126319, -54.7415680001114)
-# gem.viewer.camera.zoom = 1371.524539264374
-
-gem.color_cells('RNA_nbclust_clusters', contour=2)
-
-```
-
 
 ```{r}
 #| eval: true
 #| echo: false
-#| label: "fig-contours"
-#| fig-cap: "Cells types (or other metadata items) can be represented as cell boundaries."
+#| label: "fig-tx-all"
+#| fig-cap: "All targets for FOV 123."
 
-knitr::include_graphics("./figures/fig-contours.png")
+knitr::include_graphics("./figures/fig-tx-all.png")
 ```
-
 
 ## Changing background color
 
@@ -598,6 +680,11 @@ more difficult to see (compare @fig-contours with @fig-white).
 ```{r}
 #| eval: false
 gem.viewer.window.qt_viewer.canvas.background_color_override = 'white'
+fig_path = output_path + "/fig-white.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=True)
+        writer.append_data(screenshot)
+
 ```
 
 ```{r}
@@ -616,8 +703,54 @@ To reposition the scale bar to the bottom left:
 ```{r}
 #| eval: false
 
+gem.viewer.window.qt_viewer.canvas.background_color_override = 'black'
 gem.viewer.scale_bar.position='bottom_left'
+fig_path = output_path + "/fig-scale_bl.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=True)
+        writer.append_data(screenshot)
+
 ```
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-scale_bl"
+#| fig-cap: "Same extent as @fig-contours but with a scale bar moved to the bottom left."
+
+knitr::include_graphics("./figures/fig-scale_bl.png")
+```
+
+## Specify individual cell types
+
+Here's my last tip for this post. Using the `color_cells` method, one can choose the color of the cell types and which cells to color by supplying
+a dictionary.
+
+```{r}
+#| eval: false
+custom_colors = {
+"MOL":"#AA0DFE",
+"GN":"#85660D",
+"CHO_HB":"orange" # need not be hexcode
+}
+
+gem.color_cells('RNA_nbclust_clusters', color=custom_colors)
+fig_path = output_path + "/fig-color_three.png"
+with imageio.get_writer(fig_path, dpi=(800, 800)) as writer:
+        screenshot = gem.viewer.screenshot(canvas_only=True)
+        writer.append_data(screenshot)
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-color_three"
+#| fig-cap: "Same extent as @fig-contours highlighting three cell types only. MOL = mature oligodenrocytes = purple; GN = granule neurons = brown; CHO_HB = Cholinergic neurons Habenula = orange; cyan = all other cells."
+
+knitr::include_graphics("./figures/fig-color_three.png")
+```
+
 
 # Conclusion
 
@@ -626,5 +759,5 @@ use when analyzing SMI data. In my workflow, I take advantage of the plugin's
 interactivity as well as its underlying functions and methods. This comes in the form
 of "jotting down" settings for reproducibility or fine-tuning an image's aesthetics
 ahead of publication. I couldn't cover all the things this plugin can do but look
-for other tips-n-tricks posts in the future.
+for other tips in future posts.
 
