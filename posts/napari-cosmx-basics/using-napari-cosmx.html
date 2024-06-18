@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.4.555">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Evelyn Metzger">
+<meta name="dcterms.date" content="2024-06-17">
+<meta name="description" content="In this post, I walk through some of the basic ways I use napari-cosmx to view and analyze SMI data. I will make use of this GUI/scripting duality and share a combination of GUI and programmatic tips and tricks.">
+
+<title>Blog - napari-cosmx essentials</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../assets/cropped-NS_Favicon_512x512-32x32.png" rel="icon" type="image/png">
+<script src="../../site_libs/cookie-consent/cookie-consent.js"></script>
+<link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-29W4MW0Y2W"></script>
+
+<script type="text/plain" cookie-consent="tracking">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-29W4MW0Y2W', { 'anonymize_ip': true});
+</script>
+
+<script type="text/javascript" charset="UTF-8">
+document.addEventListener('DOMContentLoaded', function () {
+cookieconsent.run({
+  "notice_banner_type":"simple",
+  "consent_type":"implied",
+  "palette":"light",
+  "language":"en",
+  "page_load_consent_levels":["strictly-necessary","functionality","tracking","targeting"],
+  "notice_banner_reject_button_hide":false,
+  "preferences_center_close_button_hide":false,
+  "website_name":""
+  ,
+"language":"en"
+  });
+});
+</script> 
+  
+
+
+</head>
+
+<body class="floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../.././assets/NS_Logo@3x_Bruker_gray 1.png" alt="" class="navbar-logo">
+    </a>
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../license.html"> 
+<span class="menu-text">License</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../link-to-code.html"> 
+<span class="menu-text">Code</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">Browse Posts by Topic</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/nanostringtech"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/company/nanostring-technologies"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+          <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-page-right">
+      <h1 class="title"><code>napari-cosmx</code> essentials</h1>
+                  <div>
+        <div class="description">
+          In this post, I walk through some of the basic ways I use napari-cosmx to view and analyze SMI data. I will make use of this GUI/scripting duality and share a combination of GUI and programmatic tips and tricks.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">napari</div>
+                <div class="quarto-category">how-tos</div>
+                <div class="quarto-category">visualization</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author column-page-right">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliations</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author">Evelyn Metzger <a href="https://orcid.org/0000-0002-4074-9003" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              NanoString, a Bruker Company
+            </p>
+          <p class="affiliation">
+              Github: <a href="https://github.com/eveilyeverafter" target="_blank"><span class="citation" data-cites="eveilyeverafter">@eveilyeverafter</span></a>
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta column-page-right">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">June 17, 2024</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-full page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="2">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
+  <li><a href="#sec-example-data" id="toc-sec-example-data" class="nav-link" data-scroll-target="#sec-example-data"><span class="header-section-number">2</span> The Example Dataset</a>
+  <ul class="collapse">
+  <li><a href="#sec-preprocessing" id="toc-sec-preprocessing" class="nav-link" data-scroll-target="#sec-preprocessing"><span class="header-section-number">2.1</span> Pre-processing example data</a>
+  <ul class="collapse">
+  <li><a href="#sec-expected-raw-format" id="toc-sec-expected-raw-format" class="nav-link" data-scroll-target="#sec-expected-raw-format"><span class="header-section-number">2.1.1</span> Expected Raw Data Format</a></li>
+  <li><a href="#sec-adding-metadata" id="toc-sec-adding-metadata" class="nav-link" data-scroll-target="#sec-adding-metadata"><span class="header-section-number">2.1.2</span> Adding metadata</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#sec-interacting-with-the-gui" id="toc-sec-interacting-with-the-gui" class="nav-link" data-scroll-target="#sec-interacting-with-the-gui"><span class="header-section-number">3</span> Interacting with the GUI</a></li>
+  <li><a href="#sec-scripting" id="toc-sec-scripting" class="nav-link" data-scroll-target="#sec-scripting"><span class="header-section-number">4</span> Scripting with <code>napari-cosmx</code></a>
+  <ul class="collapse">
+  <li><a href="#color-cells-with-outlines" id="toc-color-cells-with-outlines" class="nav-link" data-scroll-target="#color-cells-with-outlines"><span class="header-section-number">4.1</span> Color cells with outlines</a></li>
+  <li><a href="#plot-transcripts-with-an-expanded-color-pallette" id="toc-plot-transcripts-with-an-expanded-color-pallette" class="nav-link" data-scroll-target="#plot-transcripts-with-an-expanded-color-pallette"><span class="header-section-number">4.2</span> Plot transcripts with an expanded color pallette</a></li>
+  <li><a href="#plotting-genes-with-list-comprehensions" id="toc-plotting-genes-with-list-comprehensions" class="nav-link" data-scroll-target="#plotting-genes-with-list-comprehensions"><span class="header-section-number">4.3</span> Plotting genes with list comprehensions</a></li>
+  <li><a href="#changing-transcript-transparency" id="toc-changing-transcript-transparency" class="nav-link" data-scroll-target="#changing-transcript-transparency"><span class="header-section-number">4.4</span> Changing transcript transparency</a></li>
+  <li><a href="#center-to-a-particular-fov" id="toc-center-to-a-particular-fov" class="nav-link" data-scroll-target="#center-to-a-particular-fov"><span class="header-section-number">4.5</span> Center to a particular FOV</a></li>
+  <li><a href="#plot-all-transcripts" id="toc-plot-all-transcripts" class="nav-link" data-scroll-target="#plot-all-transcripts"><span class="header-section-number">4.6</span> Plot all transcripts</a></li>
+  <li><a href="#changing-background-color" id="toc-changing-background-color" class="nav-link" data-scroll-target="#changing-background-color"><span class="header-section-number">4.7</span> Changing background color</a></li>
+  <li><a href="#scale-bar-location" id="toc-scale-bar-location" class="nav-link" data-scroll-target="#scale-bar-location"><span class="header-section-number">4.8</span> Scale Bar location</a></li>
+  <li><a href="#specify-individual-cell-types" id="toc-specify-individual-cell-types" class="nav-link" data-scroll-target="#specify-individual-cell-types"><span class="header-section-number">4.9</span> Specify individual cell types</a></li>
+  </ul></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion"><span class="header-section-number">5</span> Conclusion</a></li>
+  </ul>
+<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="using-napari-cosmx.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li><li><a href="using-napari-cosmx.docx"><i class="bi bi-file-word"></i>MS Word</a></li></ul></div></nav>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block column-page-right" id="quarto-document-content">
+
+
+
+
+
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-duality" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-duality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-duality.png" class="img-fluid figure-img" width="400">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-duality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Drawing that represents the duality of <code>napari-cosmx</code>. On the left side, cell types within a mouse coronal hemisphere are shown in an interactive Graphical User Interface. In addition to creating images interactively, the right side highlights that images can be generated programmatically. Both sides of <code>napari-cosmx</code> are discussed in this post.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<!-- napari-cosmx is flexible enough to quickly explore SMI data in a GUI -->
+<!--   yet robust enough to script reproducible results and tap into -->
+<!--   the underlying python objects.  -->
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>This post is the second installment of the napari series. In the <a href="../../posts/using-napari-for-cosmx-data/index.html" target="_blank">first blog post</a> I introduced the <code>napari-cosmx</code> plugin, how CosMx™ Spatial Molecular Imager (SMI) data can be viewed as layers within napari, and a method for processing, or “stitching”, raw data that are exported from AtoMx™ Spatial Informatics Portal (SIP).</p>
+<p>One of the things that I love about the <code>napari-cosmx</code> plugin is its duality. It’s flexible enough to quickly explore SMI data in a Graphical User Interface (GUI) yet robust enough to script reproducible results and tap into the underlying python objects. In this post, I’ll walk through some of the basic ways in which we can use <code>napari-cosmx</code>to view SMI data. I’ll make use of this duality by sharing a combination of GUI and programmatic tips.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This is not intended to be official documentation for the <code>napari-cosmx</code> plugin. The tips herein are not an exhaustive list of features and methods.</p>
+</div>
+</div>
+<ul>
+<li><a href="#sec-example-data" class="quarto-xref">Section&nbsp;2</a> shows how to preprocess the example dataset. If you are using your AtoMx-exported SMI data, this section is optional</li>
+<li><a href="#sec-interacting-with-the-gui" class="quarto-xref">Section&nbsp;3</a> shows basic GUI tips for interacting with SMI data</li>
+<li><a href="#sec-scripting" class="quarto-xref">Section&nbsp;4</a> provides several examples of recapitulating the aesthetics seen with the GUI as well as advanced ways we can fine-tune images and more</li>
+</ul>
+</section>
+<section id="sec-example-data" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> The Example Dataset</h1>
+<p>The example dataset that I am using is the mouse coronal hemisphere FFPE that is available to download from NanoString’s website <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">here</a>. If you are following along with your AtoMx exported data, you can skip most of these pre-processing steps as they are not required (but see <a href="#sec-adding-metadata" class="quarto-xref">Section&nbsp;2.1.2</a> if you would like to view metadata).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Large memory (RAM) might be required to work with raw images. Stitching the example data on a laptop might not work for everyone. The raw data size for this example is 183 GBs. Not all raw data are needed to stitch, however, and users can exclude the <code>CellStatsDir/Morphology3D</code> folder if downloading locally. If excluding this folder, the raw data is closer to 35 GBs.</p>
+<p>The computer I used to stitch was an M1 Macbook Pro. Processing this 130 FOV, mouse 1K data set took about 10 minutes, ~700% CPU, and a peak memory usage of about 12 GBs (swap space was also used). The size of the napari files combined was an additional 22 GBs of disk space.</p>
+</div>
+</div>
+<section id="sec-preprocessing" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="sec-preprocessing"><span class="header-section-number">2.1</span> Pre-processing example data</h2>
+<p>Once downloaded, unzip the <code>HalfBrain.zip</code> file on your computer or external hard drive. The format for this dataset differs from the expected AtoMx SIP export so a preprocessing step is necessary.</p>
+<p>When uncompressed, the raw data in the HalfBrain folder are actually nested like this:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>tree -L 4</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>├── AnalysisResult</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; └── HalfBrain_20230406_205644_S1</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;     └── AnalysisResults &lt;-- **Raw Data Folder**</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>|           └── cp7bjyp7pm</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>├── CellStatsDir</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; └── HalfBrain_20230406_205644_S1</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;     └── CellStatsDir &lt;-- **Raw Data Folder**</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>│           ├── CellComposite</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>│           ├── CellOverlay</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>│           ├── FOV001</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>│           ├── FOV002</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>|           ...</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>│           ├── Morphology2D</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>│           └── RnD</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>└── RunSummary</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    └── HalfBrain_20230406_205644_S1</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>        └── RunSummary &lt;-- **Raw Data Folder**</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>            ├── Beta12_Affine_Transform_20221103.csv</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>            ├── FovTracking</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>            ├── Morphology_ChannelID_Dictionary.txt</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>            ├── Run1000_20230406_205644_S1_Beta12_ExptConfig.txt</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>            ├── Run1000_20230406_205644_S1_Beta12_SpatialBC_Metrics4D.csv</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>            ├── Shading</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>            ├── c902.fovs.csv</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>            └── latest.fovs.csv</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<section id="sec-expected-raw-format" class="level3" data-number="2.1.1">
+<h3 data-number="2.1.1" class="anchored" data-anchor-id="sec-expected-raw-format"><span class="header-section-number">2.1.1</span> Expected Raw Data Format</h3>
+<p>In order for <code>napari-cosmx</code> to stitch this non-AtoMx example dataset, we’ll need to rearrange the folders so that the nested raw data are at the top level. After rearrangement, the proper file structure should look like this:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tree -L 2</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>.</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>├── AnalysisResults</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; └── cp7bjyp7pm</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>├── CellStatsDir</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── CellComposite</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── CellOverlay</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── FOV001</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── FOV002</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>...</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── Morphology2D</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; └── RnD</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>└── RunSummary</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    ├── Beta12_Affine_Transform_20221103.csv</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    ├── FovTracking</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    ├── Morphology_ChannelID_Dictionary.txt</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    ├── Run1000_20230406_205644_S1_Beta12_ExptConfig.txt</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    ├── Run1000_20230406_205644_S1_Beta12_SpatialBC_Metrics4D.csv</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    ├── Shading</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    ├── c902.fovs.csv</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    └── latest.fovs.csv</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>There are a few ways to rearrange. The first method retains the original folder structure and simply makes symbolic links to the data in the expected format. Here’s how to do it in unix/mac (Windows not shown).</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a># Terminal in Mac/Linux</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a># cd to folder containing HalfBrain. Then, </span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>mkdir -p RawFiles &amp;&amp; cd $_</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>ln -s ../HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults .</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>ln -s ../HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir .</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>ln -s ../HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary .</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>Alternatively, we could manually move folders. Specifically, in your Finder window, create a folder named <code>RawData</code>. Then, move:</p>
+<ul>
+<li><code>HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults</code> to <code>RawData/AnalysisResults</code></li>
+<li><code>HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir</code> to <code>RawData/CellStatsDir</code></li>
+<li><code>HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary</code> to <code>RawData/RunSummary</code></li>
+</ul>
+<p>Once the file structure is properly formatted, use the <a href="../../posts/using-napari-for-cosmx-data/index.html#sec-stitch-images" target="_blank">stitching widget method</a> for an earlier blog post to create the mouse brain napari files.</p>
+<!-- For this post, I named my output folder `mouse_brain_napari_files`. -->
+</section>
+<section id="sec-adding-metadata" class="level3" data-number="2.1.2">
+<h3 data-number="2.1.2" class="anchored" data-anchor-id="sec-adding-metadata"><span class="header-section-number">2.1.2</span> Adding metadata</h3>
+<p>We will also use the cell typing data from the Seurat file. Let’s include the following metadata columns:</p>
+<ul>
+<li><code>RNA_nbclust_clusters</code>: the cell typing results (with abbreviated names)</li>
+<li><code>RNA_nbclust_clusters_long</code>: (optional) human-readable cell type names</li>
+<li><code>spatialClusteringAssignments</code>: spatial niche assignments</li>
+</ul>
+<p>Note that the Seurat file contains two sections of mouse brain samples. We need to filter the metadata to include only those cells from <code>Run1000_S1_Half</code>. Note that when preparing the metadata for napari, the cell ID must be the first column (<em>i.e.</em>, see the <code>relocate</code> verb in the code below).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># This is R code</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(plyr)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co"># sem_path will be wherever you downloaded your Seurat object</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>sem_path <span class="ot">&lt;-</span> <span class="st">"/path/to/your/muBrainRelease_seurat.RDS"</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>sem <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(sem_path)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>meta <span class="ot">&lt;-</span> sem<span class="sc">@</span>meta.data <span class="sc">%&gt;%</span> </span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Run_Tissue_name<span class="sc">==</span><span class="st">"Run1000_S1_Half"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(RNA_nbclust_clusters, </span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  RNA_nbclust_clusters_long, </span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  spatialClusteringAssignments)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>meta<span class="sc">$</span>cell_ID <span class="ot">&lt;-</span> <span class="fu">row.names</span>(meta) <span class="co"># adds cell_ID column</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(meta) <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>meta <span class="ot">&lt;-</span> meta <span class="sc">%&gt;%</span> <span class="fu">relocate</span>(cell_ID) <span class="co"># moves cell_ID to first column position</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="fu">write.table</span>(meta, <span class="at">file=</span><span class="st">"/path/to/inside/napari-ready-folder/_metadata.csv"</span>, </span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>            <span class="at">sep=</span><span class="st">","</span>, <span class="at">col.names=</span><span class="cn">TRUE</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>, <span class="at">quote=</span><span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now that the data are ready, drag and drop the slide folder into napari to launch the plugin.</p>
+</section>
+</section>
+</section>
+<section id="sec-interacting-with-the-gui" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Interacting with the GUI</h1>
+<p>This section focuses on features relevant to the <code>napari-cosmx</code> plugin. Users new to napari may find napari’s general <a href="https://napari.org/stable/tutorials/fundamentals/viewer.html" target="_blank">viewer tutorial</a> helpful as well.</p>
+<p>When we open a slide with <code>napari-cosmx</code>, by default there will be a few napari layers visible (Initial View tab; <a href="#fig-initial" class="quarto-xref">Figure&nbsp;2</a>). These include <code>FOV labels</code> and <code>Segmentation</code>. Clicking the eye icon next to a layer will change its visibility. Let’s turn off those layers for a moment and visualize the cell types from the <code>RNA_nbclust_clusters</code> column (Cell Types tab; <a href="#fig-cell-types" class="quarto-xref">Figure&nbsp;3</a>). We can also color cells by their spatialClusteringAssignments values (Niches tab; <a href="#fig-niches" class="quarto-xref">Figure&nbsp;4</a>). In the <code>Color Cells</code> widget, we can control which cell types or niches we would like to view. When we activate the <code>Metadata</code> layer, hovering over a given cell will display the metadata associated with it as a ribbon at the bottom of the application. To view the IF channels, use the <code>Morphology Images</code> widget, In <a href="#fig-IF" class="quarto-xref">Figure&nbsp;5</a> (IF Channels tab) I turned off the visibility of the cell types, added GFAP in red and DNA in cyan, and zoomed into the hippocampus. When I click on a layer, it becomes the activate layer and I can use the <code>layer controls</code> widget to adjust attributes to that layer such as contrast limits, gamma, layer blending, and more. Finally, we can view raw transcripts (or proteins). Simply select the target and the color and click <code>Add layer</code>. In <a href="#fig-tx" class="quarto-xref">Figure&nbsp;6</a> (Transcripts tab), I zoomed in on a section of the cortex and plotted <em>Calb1</em>.</p>
+<p>Like other programs that use layers, napari allows the layers to be moved up/down and to blend (not shown below).</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true">Initial View</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false">Cell Types</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" role="tab" aria-controls="tabset-1-3" aria-selected="false">Niches</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-4" role="tab" aria-controls="tabset-1-4" aria-selected="false">IF Channels</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-5-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-5" role="tab" aria-controls="tabset-1-5" aria-selected="false">Transcripts</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-initial" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-initial-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-initial.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-initial-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: The initial view of the tissue shows the location of FOVs and cell boundary layers. Yellow arrow shows location of ipython terminal.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-cell-types" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-cell-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-cell-types-short.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-cell-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Same extent as <a href="#fig-initial" class="quarto-xref">Figure&nbsp;2</a> and displaying the cell type from the ‘RNA_nbclust_clusters’.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-3-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-niches" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-niches-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-niches.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-niches-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Cells colored by niche
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-4-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-IF" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-IF-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-IF.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-IF-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Hippocampal region of tissue with GFAP (red) and DNA (cyan).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-5" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-5-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-tx" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-transcripts.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Expression of <em>Calb1</em> (white dots) in cortex layer I.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>To capture screenshots, simply click <code>File &gt; Save Screenshot...</code>. The images above are captured “with viewer” but that is optional.</p>
+</section>
+<section id="sec-scripting" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Scripting with <code>napari-cosmx</code></h1>
+<p>This section is for advanced users who want finer control of the aesthetics.</p>
+<p>Most of the items we’ve covered can also be accessed through various methods in the <code>gem</code> object that can found loaded in the <code>&gt;_</code> <code>ipython</code> interpreter (<em>i.e.</em>, yellow arrow in <a href="#fig-initial" class="quarto-xref">Figure&nbsp;2</a>). You may have noticed in the figures above that there was code being used to take the screenshots. Here’s the full script that can help reproduce the figures above. I use reproducible scripts often. This is because I may want to make slight changes to a figure down the road. For example, if a reviewer overall likes an image but asks for the cell colors to be different, I just need to change the colors in the code and the script will pan and zoom where needed, set the IF channels and contrasts, and reproduce other layers programmatically.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>import imageio</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>output_path <span class="ot">=</span> <span class="st">'path/to/store/figures'</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="do">## Initial</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.show_widget</span>()</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.viewer.window.resize</span>(<span class="dv">1650</span>,<span class="dv">1100</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.center <span class="ot">=</span> (<span class="fl">0.0</span>, <span class="fl">0.6830708351616575</span>, <span class="sc">-</span><span class="fl">57.16103351264418</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.zoom <span class="ot">=</span> <span class="fl">128.0</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-initial.png"</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="do">## Cell types only</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'FOV labels'</span>].visible <span class="ot">=</span> False</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Segmentation'</span>].visible <span class="ot">=</span> False</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-cell-types-short.png"</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="do">## Niches</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.color_cells</span>(<span class="st">'spatialClusteringAssignments'</span>)</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-niches.png"</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="co"># IF only</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.color_cells</span>(<span class="st">'RNA_nbclust_clusters'</span>)</span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'RNA_nbclust_clusters'</span>].visible <span class="ot">=</span> False</span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.add_channel</span>(<span class="st">'GFAP'</span>, <span class="at">colormap =</span> <span class="st">'red'</span>)</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>gfap <span class="ot">=</span> gem.viewer.layers[<span class="st">'GFAP'</span>]</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.add_channel</span>(<span class="st">'DNA'</span>, <span class="at">colormap =</span> <span class="st">'cyan'</span>)</span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>dna <span class="ot">=</span> gem.viewer.layers[<span class="st">'DNA'</span>]</span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>dna.contrast_limits <span class="ot">=</span> [<span class="fl">208.39669421487605</span>, <span class="fl">1328.5289256198346</span>]</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>dna.gamma <span class="ot">=</span> <span class="fl">1.1682758620689655</span></span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.center <span class="ot">=</span> (<span class="fl">0.0</span>, <span class="sc">-</span><span class="fl">0.7181216373638928</span>, <span class="sc">-</span><span class="fl">55.314605674992876</span>)</span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.zoom <span class="ot">=</span> <span class="fl">1095.856465340922</span></span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Segmentation'</span>].visible <span class="ot">=</span> True</span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Segmentation'</span>].opacity <span class="ot">=</span> <span class="fl">0.371900826446281</span></span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-IF.png"</span></span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span>
+<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a><span class="co"># Transcripts</span></span>
+<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a>cell_type_layer <span class="ot">=</span> gem.viewer.layers[<span class="st">'RNA_nbclust_clusters'</span>]</span>
+<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a>cell_type_layer.opacity <span class="ot">=</span> <span class="fl">0.9</span></span>
+<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a>cell_type_layer.visible <span class="ot">=</span> True</span>
+<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.center <span class="ot">=</span> (<span class="fl">0.0</span>, <span class="sc">-</span><span class="fl">0.009723512204714457</span>, <span class="sc">-</span><span class="fl">59.25760232977486</span>)</span>
+<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.zoom <span class="ot">=</span> <span class="fl">1204.3755331686673</span></span>
+<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Segmentation'</span>].visible <span class="ot">=</span> True</span>
+<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Segmentation'</span>].opacity <span class="ot">=</span> <span class="fl">0.6</span></span>
+<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.plot_transcripts</span>(<span class="at">gene =</span> <span class="st">"Calb1"</span>, <span class="at">color =</span> <span class="st">'white'</span>, <span class="at">point_size=</span><span class="dv">50</span>) <span class="co"># I</span></span>
+<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-transcripts.png"</span></span>
+<span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>In practice, I use the GUI to adjust the settings (<em>e.g.</em>, zoom, opacity) and then “jot down” the results in my text editor. For example, when I zoom or pan to another location, that location can be found at:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.zoom</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.center</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Similarly, the contrast limits and gamma values for IF channels can be saved as well.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>dna <span class="ot">=</span> gem.viewer.layers[<span class="st">'DNA'</span>]</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>dna.contrast_limits <span class="ot">=</span> [<span class="fl">208.39669421487605</span>, <span class="fl">1328.5289256198346</span>]</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>dna.gamma <span class="ot">=</span> <span class="fl">1.1682758620689655</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Screenshots can be done programmatically with the napari’s <code>screenshot</code> method and there are additional settings you can change (<em>e.g.</em>, just the canvas, scale) that we won’t cover here.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-transcripts.png"</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>There are also methods available in <code>napari-cosmx</code> that do not have the GUI equivalent. We won’t be able to touch on all of these methods in this post but I want to highlight a few.</p>
+<section id="color-cells-with-outlines" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="color-cells-with-outlines"><span class="header-section-number">4.1</span> Color cells with outlines</h2>
+<p>We can plot the cell colors as boundaries instead of filled in polygons (<a href="#fig-contours" class="quarto-xref">Figure&nbsp;7</a>).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># gem.viewer.camera.center = (0.0, -0.5375926704126319, -54.7415680001114)</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># gem.viewer.camera.zoom = 1371.524539264374</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>gfap.visible <span class="ot">=</span> False</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>dna.visible <span class="ot">=</span> False</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Calb1'</span>].visible <span class="ot">=</span> False</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Npy'</span>].visible <span class="ot">=</span> False</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Targets'</span>].visible <span class="ot">=</span> False</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.center <span class="ot">=</span> (<span class="fl">0.0</span>, <span class="sc">-</span><span class="fl">0.6346878790298397</span>, <span class="sc">-</span><span class="fl">54.95271110236874</span>)</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.zoom <span class="ot">=</span> <span class="fl">2113.6387223301786</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.color_cells</span>(<span class="st">'RNA_nbclust_clusters'</span>, <span class="at">contour=</span><span class="dv">2</span>)</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-contours.png"</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>True)</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-contours" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-contours-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-contours.png" class="img-fluid figure-img" width="517">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-contours-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Cells types (or other metadata items) can be represented as cell boundaries.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="plot-transcripts-with-an-expanded-color-pallette" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="plot-transcripts-with-an-expanded-color-pallette"><span class="header-section-number">4.2</span> Plot transcripts with an expanded color pallette</h2>
+<p>The GUI offers a handful of colors to plot transcripts. We can specify which color, by name or by hexcode, to plot. For example:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.plot_transcripts</span>(<span class="at">gene =</span> <span class="st">"Calb1"</span>, <span class="at">color =</span> <span class="st">'pink'</span>, <span class="at">point_size=</span><span class="dv">20</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>which is the same as</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.plot_transcripts</span>(<span class="at">gene =</span> <span class="st">"Calb1"</span>, <span class="at">color =</span> <span class="st">'#FFC0CB'</span>, <span class="at">point_size=</span><span class="dv">20</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="plotting-genes-with-list-comprehensions" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="plotting-genes-with-list-comprehensions"><span class="header-section-number">4.3</span> Plotting genes with list comprehensions</h2>
+<p>We can plot similar genes or targets with the same color. For example, the code that generated <a href="#fig-negatives" class="quarto-xref">Figure&nbsp;8</a> is here.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.center <span class="ot">=</span> (<span class="fl">0.0</span>, <span class="sc">-</span><span class="fl">0.6346878790298397</span>, <span class="sc">-</span><span class="fl">54.95271110236874</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.zoom <span class="ot">=</span> <span class="fl">2113.6387223301786</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>df <span class="ot">=</span> gem.targets</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>filtered_df <span class="ot">=</span> df[<span class="fu">df.target.str.contains</span>(<span class="st">"NegPrb"</span>)]</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>pandas_df <span class="ot">=</span> <span class="fu">filtered_df.to_pandas_df</span>()</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>negatives <span class="ot">=</span> <span class="fu">pandas_df.target.unique</span>()<span class="fu">.tolist</span>()</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>[<span class="fu">gem.plot_transcripts</span>(<span class="at">gene =</span> x, <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">point_size=</span><span class="dv">20</span>) <span class="cf">for</span> x <span class="cf">in</span> negatives];</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-negatives.png"</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-negatives" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-negatives-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-negatives.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-negatives-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;8: Same extent as <a href="#fig-contours" class="quarto-xref">Figure&nbsp;7</a> but with negatives shown in white.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>We can also supply of list of tuples where each tuple is a target and a color.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>genes <span class="ot">=</span> [(<span class="st">'Npy'</span>, <span class="st">"magenta"</span>), (<span class="st">"Calb1"</span>, <span class="st">"white"</span>)]</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>[<span class="fu">gem.plot_transcripts</span>(<span class="at">gene =</span> x[<span class="dv">0</span>], <span class="at">color =</span> x[<span class="dv">1</span>], <span class="at">point_size=</span><span class="dv">20</span>) <span class="cf">for</span> x <span class="cf">in</span> genes];</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> x <span class="cf">in</span> negatives<span class="sc">:</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  gem.viewer.layers[x].visible <span class="ot">=</span> False</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.color_cells</span>(<span class="st">'RNA_nbclust_clusters'</span>) <span class="co"># reset to filled contours</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>cell_type_layer <span class="ot">=</span> gem.viewer.layers[<span class="st">'RNA_nbclust_clusters'</span>]</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>cell_type_layer.opacity <span class="ot">=</span> <span class="fl">0.9</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>cell_type_layer.visible <span class="ot">=</span> True</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.center <span class="ot">=</span> (<span class="fl">0.0</span>, <span class="sc">-</span><span class="fl">0.026937869510583412</span>, <span class="sc">-</span><span class="fl">59.20560304046731</span>)</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>gem.viewer.camera.zoom <span class="ot">=</span> <span class="fl">3820.667999302201</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Segmentation'</span>].visible <span class="ot">=</span> True</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Segmentation'</span>].opacity <span class="ot">=</span> <span class="fl">0.6</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-crowded-tx.png"</span></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-crowded-tx" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-crowded-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-crowded-tx.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-crowded-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;9: Cortical layer with <em>Npy</em> (magenta) and <em>Calb1</em> (white).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="changing-transcript-transparency" class="level2" data-number="4.4">
+<h2 data-number="4.4" class="anchored" data-anchor-id="changing-transcript-transparency"><span class="header-section-number">4.4</span> Changing transcript transparency</h2>
+<p>Sometimes transcripts can be stacked on top of each other to the ponit that it’s difficult to qualitatively determine the number of transcripts. Adjusting the transcript opacity of the layer in the GUI only changes the transparency of a single point. But it’s possible to change all points using the <code>ipython</code> interpreter.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Npy'</span>].opacity <span class="ot">=</span> <span class="fl">0.5</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-tx-opacity.png"</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-tx-opacity" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-tx-opacity-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-tx-opacity.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tx-opacity-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;10: Same extent as <a href="#fig-crowded-tx" class="quarto-xref">Figure&nbsp;9</a> but opacity of <em>Npy</em> reduced from 1 to 0.5.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="center-to-a-particular-fov" class="level2" data-number="4.5">
+<h2 data-number="4.5" class="anchored" data-anchor-id="center-to-a-particular-fov"><span class="header-section-number">4.5</span> Center to a particular FOV</h2>
+<p>While zooming (<code>gem.viewer.camera.zoom</code>) and panning (<code>gem.viewer.camera.center</code>) can control the exact location of the camera, you can programmatically go to a particular fov with the <code>center_fov</code> method.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># center to fov 123 and zoom in a little (i.e., buffer &gt; 1).</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.center_fov</span>(<span class="at">fov=</span><span class="dv">123</span>, <span class="at">buffer=</span><span class="fl">1.2</span>)</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-center-to-fov.png"</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-center-to-fov" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-center-to-fov-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-center-to-fov.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-center-to-fov-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;11: Centering to a particular FOV (123) using the <code>center_fov</code> method.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="plot-all-transcripts" class="level2" data-number="4.6">
+<h2 data-number="4.6" class="anchored" data-anchor-id="plot-all-transcripts"><span class="header-section-number">4.6</span> Plot all transcripts</h2>
+<p>This is not advised for resource-limited systems as it plots <em>all</em> transcripts. The method <code>add_points</code> plots all the points for a given FOV. If no FOV is specified, it will plot all transcripts (this can be taxing on resource-limited computers).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.add_points</span>(<span class="at">fov=</span><span class="dv">123</span>)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Targets'</span>].opacity <span class="ot">=</span> <span class="fl">0.4</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-tx-all.png"</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>False)</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-tx-all" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-tx-all-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-tx-all.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tx-all-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;12: All targets for FOV 123.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="changing-background-color" class="level2" data-number="4.7">
+<h2 data-number="4.7" class="anchored" data-anchor-id="changing-background-color"><span class="header-section-number">4.7</span> Changing background color</h2>
+<p>For some publication styles (<em>e.g.</em>, posters), turning the background a lighter color might be useful. However, when changing the background, some items might be more difficult to see (compare <a href="#fig-contours" class="quarto-xref">Figure&nbsp;7</a> with <a href="#fig-white" class="quarto-xref">Figure&nbsp;13</a>).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>gem.viewer.window.qt_viewer.canvas.background_color_override <span class="ot">=</span> <span class="st">'white'</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-white.png"</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>True)</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-white" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-white-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-white.png" class="img-fluid figure-img" width="517">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-white-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;13: Same extent as <a href="#fig-contours" class="quarto-xref">Figure&nbsp;7</a> but with a white background.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="scale-bar-location" class="level2" data-number="4.8">
+<h2 data-number="4.8" class="anchored" data-anchor-id="scale-bar-location"><span class="header-section-number">4.8</span> Scale Bar location</h2>
+<p>To reposition the scale bar to the bottom left:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>gem.viewer.window.qt_viewer.canvas.background_color_override <span class="ot">=</span> <span class="st">'black'</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>gem.viewer.scale_bar.position<span class="ot">=</span><span class="st">'bottom_left'</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-scale_bl.png"</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>True)</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-scale_bl" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-scale_bl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-scale_bl.png" class="img-fluid figure-img" width="517">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-scale_bl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;14: Same extent as <a href="#fig-contours" class="quarto-xref">Figure&nbsp;7</a> but with a scale bar moved to the bottom left.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="specify-individual-cell-types" class="level2" data-number="4.9">
+<h2 data-number="4.9" class="anchored" data-anchor-id="specify-individual-cell-types"><span class="header-section-number">4.9</span> Specify individual cell types</h2>
+<p>Here’s my last tip for this post. Using the <code>color_cells</code> method, one can choose the color of the cell types and which cells to color by supplying a dictionary. If a cell type is <em>not</em> in the supplied dictionary, it will not be shown as a color.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>custom_colors <span class="ot">=</span> {</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="st">"MOL"</span><span class="sc">:</span><span class="st">"#AA0DFE"</span>,</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="st">"GN"</span><span class="sc">:</span><span class="st">"#85660D"</span>,</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="st">"CHO_HB"</span><span class="sc">:</span><span class="st">"orange"</span> <span class="co"># need not be hexcode</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="fu">gem.color_cells</span>(<span class="st">'RNA_nbclust_clusters'</span>, <span class="at">color=</span>custom_colors)</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>fig_path <span class="ot">=</span> output_path <span class="sc">+</span> <span class="st">"/fig-color_three.png"</span></span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>with <span class="fu">imageio.get_writer</span>(fig_path, <span class="at">dpi=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) as writer<span class="sc">:</span></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="ot">=</span> <span class="fu">gem.viewer.screenshot</span>(<span class="at">canvas_only=</span>True)</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>        <span class="fu">writer.append_data</span>(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-color_three" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-color_three-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-color_three.png" class="img-fluid figure-img" width="517">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-color_three-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;15: Same extent as <a href="#fig-contours" class="quarto-xref">Figure&nbsp;7</a> highlighting three cell types only. MOL = mature oligodenrocytes = purple; GN = granule neurons = brown; CHO_HB = Cholinergic neurons Habenula = orange; cyan = all other cells.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="conclusion" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Conclusion</h1>
+<p>In this post I showed you some of my go-to <code>napari-cosmx</code> plugin features that I use when analyzing SMI data. In my workflow, I take advantage of the plugin’s interactivity as well as its underlying functions and methods. This comes in the form of “jotting down” settings for reproducibility or fine-tuning an image’s aesthetics ahead of publication. I couldn’t cover all the things this plugin can do but look for other tips in future posts.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/nanostring-biostats\.github\.io\/CosMx-Analysis-Scratch-Space");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+    <a class="nav-link" href="../../license.html">
+<p>License</p>
+</a>
+  </li>  
+</ul>
+    <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

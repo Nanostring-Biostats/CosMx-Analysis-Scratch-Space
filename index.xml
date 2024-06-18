@@ -10,7 +10,1570 @@
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
 <generator>quarto-1.4.555</generator>
-<lastBuildDate>Wed, 12 Jun 2024 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Mon, 17 Jun 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>napari-cosmx essentials</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/using-napari-cosmx.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-duality" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-duality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-duality.png" class="img-fluid figure-img" width="400">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-duality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Drawing that represents the duality of <code>napari-cosmx</code>. On the left side, cell types within a mouse coronal hemisphere are shown in an interactive Graphical User Interface. In addition to creating images interactively, the right side highlights that images can be generated programmatically. Both sides of <code>napari-cosmx</code> are discussed in this post.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<!-- napari-cosmx is flexible enough to quickly explore SMI data in a GUI -->
+<!--   yet robust enough to script reproducible results and tap into -->
+<!--   the underlying python objects.  -->
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>This post is the second installment of the napari series. In the <a href="../../posts/using-napari-for-cosmx-data/index.html" target="_blank">first blog post</a> I introduced the <code>napari-cosmx</code> plugin, how CosMx™ Spatial Molecular Imager (SMI) data can be viewed as layers within napari, and a method for processing, or “stitching”, raw data that are exported from AtoMx™ Spatial Informatics Portal (SIP).</p>
+<p>One of the things that I love about the <code>napari-cosmx</code> plugin is its duality. It’s flexible enough to quickly explore SMI data in a Graphical User Interface (GUI) yet robust enough to script reproducible results and tap into the underlying python objects. In this post, I’ll walk through some of the basic ways in which we can use <code>napari-cosmx</code>to view SMI data. I’ll make use of this duality by sharing a combination of GUI and programmatic tips.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This is not intended to be official documentation for the <code>napari-cosmx</code> plugin. The tips herein are not an exhaustive list of features and methods.</p>
+</div>
+</div>
+<ul>
+<li>Section&nbsp;2 shows how to preprocess the example dataset. If you are using your AtoMx-exported SMI data, this section is optional</li>
+<li>Section&nbsp;3 shows basic GUI tips for interacting with SMI data</li>
+<li>Section&nbsp;4 provides several examples of recapitulating the aesthetics seen with the GUI as well as advanced ways we can fine-tune images and more</li>
+</ul>
+</section>
+<section id="sec-example-data" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> The Example Dataset</h1>
+<p>The example dataset that I am using is the mouse coronal hemisphere FFPE that is available to download from NanoString’s website <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">here</a>. If you are following along with your AtoMx exported data, you can skip most of these pre-processing steps as they are not required (but see Section&nbsp;2.1.2 if you would like to view metadata).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Large memory (RAM) might be required to work with raw images. Stitching the example data on a laptop might not work for everyone. The raw data size for this example is 183 GBs. Not all raw data are needed to stitch, however, and users can exclude the <code>CellStatsDir/Morphology3D</code> folder if downloading locally. If excluding this folder, the raw data is closer to 35 GBs.</p>
+<p>The computer I used to stitch was an M1 Macbook Pro. Processing this 130 FOV, mouse 1K data set took about 10 minutes, ~700% CPU, and a peak memory usage of about 12 GBs (swap space was also used). The size of the napari files combined was an additional 22 GBs of disk space.</p>
+</div>
+</div>
+<section id="sec-preprocessing" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="sec-preprocessing"><span class="header-section-number">2.1</span> Pre-processing example data</h2>
+<p>Once downloaded, unzip the <code>HalfBrain.zip</code> file on your computer or external hard drive. The format for this dataset differs from the expected AtoMx SIP export so a preprocessing step is necessary.</p>
+<p>When uncompressed, the raw data in the HalfBrain folder are actually nested like this:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb1-1">tree -L 4</span>
+<span id="cb1-2"></span>
+<span id="cb1-3">├── AnalysisResult</span>
+<span id="cb1-4">│&nbsp;&nbsp; └── HalfBrain_20230406_205644_S1</span>
+<span id="cb1-5">│&nbsp;&nbsp;     └── AnalysisResults &lt;-- **Raw Data Folder**</span>
+<span id="cb1-6">|           └── cp7bjyp7pm</span>
+<span id="cb1-7">├── CellStatsDir</span>
+<span id="cb1-8">│&nbsp;&nbsp; └── HalfBrain_20230406_205644_S1</span>
+<span id="cb1-9">│&nbsp;&nbsp;     └── CellStatsDir &lt;-- **Raw Data Folder**</span>
+<span id="cb1-10">│           ├── CellComposite</span>
+<span id="cb1-11">│           ├── CellOverlay</span>
+<span id="cb1-12">│           ├── FOV001</span>
+<span id="cb1-13">│           ├── FOV002</span>
+<span id="cb1-14">|           ...</span>
+<span id="cb1-15">│           ├── Morphology2D</span>
+<span id="cb1-16">│           └── RnD</span>
+<span id="cb1-17">└── RunSummary</span>
+<span id="cb1-18">    └── HalfBrain_20230406_205644_S1</span>
+<span id="cb1-19">        └── RunSummary &lt;-- **Raw Data Folder**</span>
+<span id="cb1-20">            ├── Beta12_Affine_Transform_20221103.csv</span>
+<span id="cb1-21">            ├── FovTracking</span>
+<span id="cb1-22">            ├── Morphology_ChannelID_Dictionary.txt</span>
+<span id="cb1-23">            ├── Run1000_20230406_205644_S1_Beta12_ExptConfig.txt</span>
+<span id="cb1-24">            ├── Run1000_20230406_205644_S1_Beta12_SpatialBC_Metrics4D.csv</span>
+<span id="cb1-25">            ├── Shading</span>
+<span id="cb1-26">            ├── c902.fovs.csv</span>
+<span id="cb1-27">            └── latest.fovs.csv</span></code></pre></div>
+</div>
+</div>
+<section id="sec-expected-raw-format" class="level3" data-number="2.1.1">
+<h3 data-number="2.1.1" class="anchored" data-anchor-id="sec-expected-raw-format"><span class="header-section-number">2.1.1</span> Expected Raw Data Format</h3>
+<p>In order for <code>napari-cosmx</code> to stitch this non-AtoMx example dataset, we’ll need to rearrange the folders so that the nested raw data are at the top level. After rearrangement, the proper file structure should look like this:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb2-1">tree -L 2</span>
+<span id="cb2-2"></span>
+<span id="cb2-3">.</span>
+<span id="cb2-4">├── AnalysisResults</span>
+<span id="cb2-5">│&nbsp;&nbsp; └── cp7bjyp7pm</span>
+<span id="cb2-6">├── CellStatsDir</span>
+<span id="cb2-7">│&nbsp;&nbsp; ├── CellComposite</span>
+<span id="cb2-8">│&nbsp;&nbsp; ├── CellOverlay</span>
+<span id="cb2-9">│&nbsp;&nbsp; ├── FOV001</span>
+<span id="cb2-10">│&nbsp;&nbsp; ├── FOV002</span>
+<span id="cb2-11">...</span>
+<span id="cb2-12">│&nbsp;&nbsp; ├── Morphology2D</span>
+<span id="cb2-13">│&nbsp;&nbsp; └── RnD</span>
+<span id="cb2-14">└── RunSummary</span>
+<span id="cb2-15">    ├── Beta12_Affine_Transform_20221103.csv</span>
+<span id="cb2-16">    ├── FovTracking</span>
+<span id="cb2-17">    ├── Morphology_ChannelID_Dictionary.txt</span>
+<span id="cb2-18">    ├── Run1000_20230406_205644_S1_Beta12_ExptConfig.txt</span>
+<span id="cb2-19">    ├── Run1000_20230406_205644_S1_Beta12_SpatialBC_Metrics4D.csv</span>
+<span id="cb2-20">    ├── Shading</span>
+<span id="cb2-21">    ├── c902.fovs.csv</span>
+<span id="cb2-22">    └── latest.fovs.csv</span></code></pre></div>
+</div>
+</div>
+<p>There are a few ways to rearrange. The first method retains the original folder structure and simply makes symbolic links to the data in the expected format. Here’s how to do it in unix/mac (Windows not shown).</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb3-1"># Terminal in Mac/Linux</span>
+<span id="cb3-2"></span>
+<span id="cb3-3"># cd to folder containing HalfBrain. Then, </span>
+<span id="cb3-4"></span>
+<span id="cb3-5">mkdir -p RawFiles &amp;&amp; cd $_</span>
+<span id="cb3-6">ln -s ../HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults .</span>
+<span id="cb3-7">ln -s ../HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir .</span>
+<span id="cb3-8">ln -s ../HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary .</span></code></pre></div>
+</div>
+</div>
+<p>Alternatively, we could manually move folders. Specifically, in your Finder window, create a folder named <code>RawData</code>. Then, move:</p>
+<ul>
+<li><code>HalfBrain/AnalysisResult/HalfBrain_20230406_205644_S1/AnalysisResults</code> to <code>RawData/AnalysisResults</code></li>
+<li><code>HalfBrain/CellStatsDir/HalfBrain_20230406_205644_S1/CellStatsDir</code> to <code>RawData/CellStatsDir</code></li>
+<li><code>HalfBrain/RunSummary/HalfBrain_20230406_205644_S1/RunSummary</code> to <code>RawData/RunSummary</code></li>
+</ul>
+<p>Once the file structure is properly formatted, use the <a href="../../posts/using-napari-for-cosmx-data/index.html#sec-stitch-images" target="_blank">stitching widget method</a> for an earlier blog post to create the mouse brain napari files.</p>
+<!-- For this post, I named my output folder `mouse_brain_napari_files`. -->
+</section>
+<section id="sec-adding-metadata" class="level3" data-number="2.1.2">
+<h3 data-number="2.1.2" class="anchored" data-anchor-id="sec-adding-metadata"><span class="header-section-number">2.1.2</span> Adding metadata</h3>
+<p>We will also use the cell typing data from the Seurat file. Let’s include the following metadata columns:</p>
+<ul>
+<li><code>RNA_nbclust_clusters</code>: the cell typing results (with abbreviated names)</li>
+<li><code>RNA_nbclust_clusters_long</code>: (optional) human-readable cell type names</li>
+<li><code>spatialClusteringAssignments</code>: spatial niche assignments</li>
+</ul>
+<p>Note that the Seurat file contains two sections of mouse brain samples. We need to filter the metadata to include only those cells from <code>Run1000_S1_Half</code>. Note that when preparing the metadata for napari, the cell ID must be the first column (<em>i.e.</em>, see the <code>relocate</code> verb in the code below).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># This is R code</span></span>
+<span id="cb4-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(Seurat)</span>
+<span id="cb4-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(plyr)</span>
+<span id="cb4-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(dplyr)</span>
+<span id="cb4-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># sem_path will be wherever you downloaded your Seurat object</span></span>
+<span id="cb4-6">sem_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/path/to/your/muBrainRelease_seurat.RDS"</span></span>
+<span id="cb4-7">sem <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">readRDS</span>(sem_path)</span>
+<span id="cb4-8">meta <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> sem<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%&gt;%</span> </span>
+<span id="cb4-9">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">filter</span>(Run_Tissue_name<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Run1000_S1_Half"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%&gt;%</span></span>
+<span id="cb4-10">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">select</span>(RNA_nbclust_clusters, </span>
+<span id="cb4-11">  RNA_nbclust_clusters_long, </span>
+<span id="cb4-12">  spatialClusteringAssignments)</span>
+<span id="cb4-13">  </span>
+<span id="cb4-14">meta<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>cell_ID <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">row.names</span>(meta) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># adds cell_ID column</span></span>
+<span id="cb4-15"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(meta) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span></span>
+<span id="cb4-16">meta <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> meta <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%&gt;%</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">relocate</span>(cell_ID) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># moves cell_ID to first column position</span></span>
+<span id="cb4-17"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">write.table</span>(meta, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">file=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/path/to/inside/napari-ready-folder/_metadata.csv"</span>, </span>
+<span id="cb4-18">            <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">sep=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">","</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">col.names=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">row.names=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">FALSE</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">quote=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">FALSE</span>)</span></code></pre></div>
+</div>
+<p>Now that the data are ready, drag and drop the slide folder into napari to launch the plugin.</p>
+</section>
+</section>
+</section>
+<section id="sec-interacting-with-the-gui" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Interacting with the GUI</h1>
+<p>This section focuses on features relevant to the <code>napari-cosmx</code> plugin. Users new to napari may find napari’s general <a href="https://napari.org/stable/tutorials/fundamentals/viewer.html" target="_blank">viewer tutorial</a> helpful as well.</p>
+<p>When we open a slide with <code>napari-cosmx</code>, by default there will be a few napari layers visible (Initial View tab; Figure&nbsp;2). These include <code>FOV labels</code> and <code>Segmentation</code>. Clicking the eye icon next to a layer will change its visibility. Let’s turn off those layers for a moment and visualize the cell types from the <code>RNA_nbclust_clusters</code> column (Cell Types tab; Figure&nbsp;3). We can also color cells by their spatialClusteringAssignments values (Niches tab; Figure&nbsp;4). In the <code>Color Cells</code> widget, we can control which cell types or niches we would like to view. When we activate the <code>Metadata</code> layer, hovering over a given cell will display the metadata associated with it as a ribbon at the bottom of the application. To view the IF channels, use the <code>Morphology Images</code> widget, In Figure&nbsp;5 (IF Channels tab) I turned off the visibility of the cell types, added GFAP in red and DNA in cyan, and zoomed into the hippocampus. When I click on a layer, it becomes the activate layer and I can use the <code>layer controls</code> widget to adjust attributes to that layer such as contrast limits, gamma, layer blending, and more. Finally, we can view raw transcripts (or proteins). Simply select the target and the color and click <code>Add layer</code>. In Figure&nbsp;6 (Transcripts tab), I zoomed in on a section of the cortex and plotted <em>Calb1</em>.</p>
+<p>Like other programs that use layers, napari allows the layers to be moved up/down and to blend (not shown below).</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true">Initial View</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">Cell Types</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" aria-controls="tabset-1-3" aria-selected="false">Niches</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-4" aria-controls="tabset-1-4" aria-selected="false">IF Channels</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-5-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-5" aria-controls="tabset-1-5" aria-selected="false">Transcripts</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-initial" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-initial-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-initial.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-initial-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: The initial view of the tissue shows the location of FOVs and cell boundary layers. Yellow arrow shows location of ipython terminal.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-cell-types" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-cell-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-cell-types-short.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-cell-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Same extent as Figure&nbsp;2 and displaying the cell type from the ‘RNA_nbclust_clusters’.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-3" class="tab-pane" aria-labelledby="tabset-1-3-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-niches" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-niches-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-niches.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-niches-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Cells colored by niche
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-4" class="tab-pane" aria-labelledby="tabset-1-4-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-IF" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-IF-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-IF.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-IF-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Hippocampal region of tissue with GFAP (red) and DNA (cyan).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-5" class="tab-pane" aria-labelledby="tabset-1-5-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-tx" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-transcripts.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Expression of <em>Calb1</em> (white dots) in cortex layer I.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>To capture screenshots, simply click <code>File &gt; Save Screenshot...</code>. The images above are captured “with viewer” but that is optional.</p>
+</section>
+<section id="sec-scripting" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Scripting with <code>napari-cosmx</code></h1>
+<p>This section is for advanced users who want finer control of the aesthetics.</p>
+<p>Most of the items we’ve covered can also be accessed through various methods in the <code>gem</code> object that can found loaded in the <code>&gt;_</code> <code>ipython</code> interpreter (<em>i.e.</em>, yellow arrow in Figure&nbsp;2). You may have noticed in the figures above that there was code being used to take the screenshots. Here’s the full script that can help reproduce the figures above. I use reproducible scripts often. This is because I may want to make slight changes to a figure down the road. For example, if a reviewer overall likes an image but asks for the cell colors to be different, I just need to change the colors in the code and the script will pan and zoom where needed, set the IF channels and contrasts, and reproduce other layers programmatically.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1">import imageio</span>
+<span id="cb5-2"></span>
+<span id="cb5-3">output_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'path/to/store/figures'</span></span>
+<span id="cb5-4"></span>
+<span id="cb5-5"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## Initial</span></span>
+<span id="cb5-6"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.show_widget</span>()</span>
+<span id="cb5-7"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.window.resize</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1650</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1100</span>)</span>
+<span id="cb5-8">gem.viewer.camera.center <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> (<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.0</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6830708351616575</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">57.16103351264418</span>)</span>
+<span id="cb5-9">gem.viewer.camera.zoom <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">128.0</span></span>
+<span id="cb5-10"></span>
+<span id="cb5-11">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-initial.png"</span></span>
+<span id="cb5-12">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb5-13">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb5-14">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span>
+<span id="cb5-15"></span>
+<span id="cb5-16"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## Cell types only</span></span>
+<span id="cb5-17">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'FOV labels'</span>].visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> False</span>
+<span id="cb5-18">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Segmentation'</span>].visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> False</span>
+<span id="cb5-19"></span>
+<span id="cb5-20">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-cell-types-short.png"</span></span>
+<span id="cb5-21">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb5-22">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb5-23">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span>
+<span id="cb5-24"></span>
+<span id="cb5-25"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## Niches</span></span>
+<span id="cb5-26"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.color_cells</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'spatialClusteringAssignments'</span>)</span>
+<span id="cb5-27">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-niches.png"</span></span>
+<span id="cb5-28">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb5-29">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb5-30">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span>
+<span id="cb5-31"></span>
+<span id="cb5-32"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># IF only</span></span>
+<span id="cb5-33"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.color_cells</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RNA_nbclust_clusters'</span>)</span>
+<span id="cb5-34">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RNA_nbclust_clusters'</span>].visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> False</span>
+<span id="cb5-35"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.add_channel</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'GFAP'</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colormap =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'red'</span>)</span>
+<span id="cb5-36">gfap <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'GFAP'</span>]</span>
+<span id="cb5-37"></span>
+<span id="cb5-38"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.add_channel</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'DNA'</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colormap =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cyan'</span>)</span>
+<span id="cb5-39">dna <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'DNA'</span>]</span>
+<span id="cb5-40">dna.contrast_limits <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">208.39669421487605</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1328.5289256198346</span>]</span>
+<span id="cb5-41">dna.gamma <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.1682758620689655</span></span>
+<span id="cb5-42"></span>
+<span id="cb5-43">gem.viewer.camera.center <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> (<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.0</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.7181216373638928</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">55.314605674992876</span>)</span>
+<span id="cb5-44">gem.viewer.camera.zoom <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1095.856465340922</span></span>
+<span id="cb5-45">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Segmentation'</span>].visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> True</span>
+<span id="cb5-46">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Segmentation'</span>].opacity <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.371900826446281</span></span>
+<span id="cb5-47"></span>
+<span id="cb5-48">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-IF.png"</span></span>
+<span id="cb5-49">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb5-50">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb5-51">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span>
+<span id="cb5-52"></span>
+<span id="cb5-53"></span>
+<span id="cb5-54"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Transcripts</span></span>
+<span id="cb5-55">cell_type_layer <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RNA_nbclust_clusters'</span>]</span>
+<span id="cb5-56">cell_type_layer.opacity <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.9</span></span>
+<span id="cb5-57">cell_type_layer.visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> True</span>
+<span id="cb5-58">gem.viewer.camera.center <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> (<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.0</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.009723512204714457</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">59.25760232977486</span>)</span>
+<span id="cb5-59">gem.viewer.camera.zoom <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1204.3755331686673</span></span>
+<span id="cb5-60">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Segmentation'</span>].visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> True</span>
+<span id="cb5-61">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Segmentation'</span>].opacity <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span></span>
+<span id="cb5-62"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.plot_transcripts</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">gene =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Calb1"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'white'</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">point_size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># I</span></span>
+<span id="cb5-63"></span>
+<span id="cb5-64">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-transcripts.png"</span></span>
+<span id="cb5-65">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb5-66">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb5-67">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<p>In practice, I use the GUI to adjust the settings (<em>e.g.</em>, zoom, opacity) and then “jot down” the results in my text editor. For example, when I zoom or pan to another location, that location can be found at:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1">gem.viewer.camera.zoom</span>
+<span id="cb6-2">gem.viewer.camera.center</span></code></pre></div>
+</div>
+<p>Similarly, the contrast limits and gamma values for IF channels can be saved as well.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1">dna <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'DNA'</span>]</span>
+<span id="cb7-2">dna.contrast_limits <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">208.39669421487605</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1328.5289256198346</span>]</span>
+<span id="cb7-3">dna.gamma <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.1682758620689655</span></span></code></pre></div>
+</div>
+<p>Screenshots can be done programmatically with the napari’s <code>screenshot</code> method and there are additional settings you can change (<em>e.g.</em>, just the canvas, scale) that we won’t cover here.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-transcripts.png"</span></span>
+<span id="cb8-2">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb8-3">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb8-4">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<p>There are also methods available in <code>napari-cosmx</code> that do not have the GUI equivalent. We won’t be able to touch on all of these methods in this post but I want to highlight a few.</p>
+<section id="color-cells-with-outlines" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="color-cells-with-outlines"><span class="header-section-number">4.1</span> Color cells with outlines</h2>
+<p>We can plot the cell colors as boundaries instead of filled in polygons (Figure&nbsp;7).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># gem.viewer.camera.center = (0.0, -0.5375926704126319, -54.7415680001114)</span></span>
+<span id="cb9-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># gem.viewer.camera.zoom = 1371.524539264374</span></span>
+<span id="cb9-3"></span>
+<span id="cb9-4">gfap.visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> False</span>
+<span id="cb9-5">dna.visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> False</span>
+<span id="cb9-6">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Calb1'</span>].visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> False</span>
+<span id="cb9-7">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Npy'</span>].visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> False</span>
+<span id="cb9-8">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Targets'</span>].visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> False</span>
+<span id="cb9-9"></span>
+<span id="cb9-10">gem.viewer.camera.center <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> (<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.0</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6346878790298397</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">54.95271110236874</span>)</span>
+<span id="cb9-11">gem.viewer.camera.zoom <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2113.6387223301786</span></span>
+<span id="cb9-12"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.color_cells</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RNA_nbclust_clusters'</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">contour=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb9-13"></span>
+<span id="cb9-14">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-contours.png"</span></span>
+<span id="cb9-15">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb9-16">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>True)</span>
+<span id="cb9-17">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-contours" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-contours-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-contours.png" class="img-fluid figure-img" width="517">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-contours-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Cells types (or other metadata items) can be represented as cell boundaries.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="plot-transcripts-with-an-expanded-color-pallette" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="plot-transcripts-with-an-expanded-color-pallette"><span class="header-section-number">4.2</span> Plot transcripts with an expanded color pallette</h2>
+<p>The GUI offers a handful of colors to plot transcripts. We can specify which color, by name or by hexcode, to plot. For example:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.plot_transcripts</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">gene =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Calb1"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'pink'</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">point_size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)</span></code></pre></div>
+</div>
+<p>which is the same as</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.plot_transcripts</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">gene =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Calb1"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'#FFC0CB'</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">point_size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)</span></code></pre></div>
+</div>
+</section>
+<section id="plotting-genes-with-list-comprehensions" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="plotting-genes-with-list-comprehensions"><span class="header-section-number">4.3</span> Plotting genes with list comprehensions</h2>
+<p>We can plot similar genes or targets with the same color. For example, the code that generated Figure&nbsp;8 is here.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1">gem.viewer.camera.center <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> (<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.0</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6346878790298397</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">54.95271110236874</span>)</span>
+<span id="cb12-2">gem.viewer.camera.zoom <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2113.6387223301786</span></span>
+<span id="cb12-3"></span>
+<span id="cb12-4">df <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> gem.targets</span>
+<span id="cb12-5">filtered_df <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> df[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">df.target.str.contains</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"NegPrb"</span>)]</span>
+<span id="cb12-6"></span>
+<span id="cb12-7">pandas_df <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">filtered_df.to_pandas_df</span>()</span>
+<span id="cb12-8">negatives <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">pandas_df.target.unique</span>()<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">.tolist</span>()</span>
+<span id="cb12-9">[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.plot_transcripts</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">gene =</span> x, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"white"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">point_size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">for</span> x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">in</span> negatives];</span>
+<span id="cb12-10"></span>
+<span id="cb12-11">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-negatives.png"</span></span>
+<span id="cb12-12">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb12-13">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb12-14">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-negatives" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-negatives-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-negatives.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-negatives-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;8: Same extent as Figure&nbsp;7 but with negatives shown in white.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>We can also supply of list of tuples where each tuple is a target and a color.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1">genes <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> [(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Npy'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"magenta"</span>), (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Calb1"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"white"</span>)]</span>
+<span id="cb13-2">[<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.plot_transcripts</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">gene =</span> x[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> x[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">point_size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">for</span> x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">in</span> genes];</span>
+<span id="cb13-3"></span>
+<span id="cb13-4"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">for</span> x <span class="cf" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">in</span> negatives<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb13-5">  gem.viewer.layers[x].visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> False</span>
+<span id="cb13-6"></span>
+<span id="cb13-7"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.color_cells</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RNA_nbclust_clusters'</span>) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># reset to filled contours</span></span>
+<span id="cb13-8">cell_type_layer <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RNA_nbclust_clusters'</span>]</span>
+<span id="cb13-9">cell_type_layer.opacity <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.9</span></span>
+<span id="cb13-10">cell_type_layer.visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> True</span>
+<span id="cb13-11">gem.viewer.camera.center <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> (<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.0</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.026937869510583412</span>, <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">59.20560304046731</span>)</span>
+<span id="cb13-12">gem.viewer.camera.zoom <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3820.667999302201</span></span>
+<span id="cb13-13">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Segmentation'</span>].visible <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> True</span>
+<span id="cb13-14">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Segmentation'</span>].opacity <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span></span>
+<span id="cb13-15"></span>
+<span id="cb13-16">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-crowded-tx.png"</span></span>
+<span id="cb13-17">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb13-18">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb13-19">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-crowded-tx" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-crowded-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-crowded-tx.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-crowded-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;9: Cortical layer with <em>Npy</em> (magenta) and <em>Calb1</em> (white).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="changing-transcript-transparency" class="level2" data-number="4.4">
+<h2 data-number="4.4" class="anchored" data-anchor-id="changing-transcript-transparency"><span class="header-section-number">4.4</span> Changing transcript transparency</h2>
+<p>Sometimes transcripts can be stacked on top of each other to the ponit that it’s difficult to qualitatively determine the number of transcripts. Adjusting the transcript opacity of the layer in the GUI only changes the transparency of a single point. But it’s possible to change all points using the <code>ipython</code> interpreter.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Npy'</span>].opacity <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span></span>
+<span id="cb14-2">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-tx-opacity.png"</span></span>
+<span id="cb14-3">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb14-4">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb14-5">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-tx-opacity" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-tx-opacity-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-tx-opacity.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tx-opacity-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;10: Same extent as Figure&nbsp;9 but opacity of <em>Npy</em> reduced from 1 to 0.5.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="center-to-a-particular-fov" class="level2" data-number="4.5">
+<h2 data-number="4.5" class="anchored" data-anchor-id="center-to-a-particular-fov"><span class="header-section-number">4.5</span> Center to a particular FOV</h2>
+<p>While zooming (<code>gem.viewer.camera.zoom</code>) and panning (<code>gem.viewer.camera.center</code>) can control the exact location of the camera, you can programmatically go to a particular fov with the <code>center_fov</code> method.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># center to fov 123 and zoom in a little (i.e., buffer &gt; 1).</span></span>
+<span id="cb15-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.center_fov</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fov=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">123</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">buffer=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.2</span>)</span>
+<span id="cb15-3"></span>
+<span id="cb15-4">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-center-to-fov.png"</span></span>
+<span id="cb15-5">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb15-6">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb15-7">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-center-to-fov" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-center-to-fov-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-center-to-fov.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-center-to-fov-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;11: Centering to a particular FOV (123) using the <code>center_fov</code> method.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="plot-all-transcripts" class="level2" data-number="4.6">
+<h2 data-number="4.6" class="anchored" data-anchor-id="plot-all-transcripts"><span class="header-section-number">4.6</span> Plot all transcripts</h2>
+<p>This is not advised for resource-limited systems as it plots <em>all</em> transcripts. The method <code>add_points</code> plots all the points for a given FOV. If no FOV is specified, it will plot all transcripts (this can be taxing on resource-limited computers).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.add_points</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fov=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">123</span>)</span>
+<span id="cb16-2">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Targets'</span>].opacity <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.4</span></span>
+<span id="cb16-3">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-tx-all.png"</span></span>
+<span id="cb16-4">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb16-5">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>False)</span>
+<span id="cb16-6">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-tx-all" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-tx-all-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-tx-all.png" class="img-fluid figure-img" width="825">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tx-all-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;12: All targets for FOV 123.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="changing-background-color" class="level2" data-number="4.7">
+<h2 data-number="4.7" class="anchored" data-anchor-id="changing-background-color"><span class="header-section-number">4.7</span> Changing background color</h2>
+<p>For some publication styles (<em>e.g.</em>, posters), turning the background a lighter color might be useful. However, when changing the background, some items might be more difficult to see (compare Figure&nbsp;7 with Figure&nbsp;13).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1">gem.viewer.window.qt_viewer.canvas.background_color_override <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'white'</span></span>
+<span id="cb17-2">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-white.png"</span></span>
+<span id="cb17-3">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb17-4">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>True)</span>
+<span id="cb17-5">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-white" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-white-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-white.png" class="img-fluid figure-img" width="517">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-white-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;13: Same extent as Figure&nbsp;7 but with a white background.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="scale-bar-location" class="level2" data-number="4.8">
+<h2 data-number="4.8" class="anchored" data-anchor-id="scale-bar-location"><span class="header-section-number">4.8</span> Scale Bar location</h2>
+<p>To reposition the scale bar to the bottom left:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1">gem.viewer.window.qt_viewer.canvas.background_color_override <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'black'</span></span>
+<span id="cb18-2">gem.viewer.scale_bar.position<span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'bottom_left'</span></span>
+<span id="cb18-3">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-scale_bl.png"</span></span>
+<span id="cb18-4">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb18-5">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>True)</span>
+<span id="cb18-6">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-scale_bl" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-scale_bl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-scale_bl.png" class="img-fluid figure-img" width="517">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-scale_bl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;14: Same extent as Figure&nbsp;7 but with a scale bar moved to the bottom left.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="specify-individual-cell-types" class="level2" data-number="4.9">
+<h2 data-number="4.9" class="anchored" data-anchor-id="specify-individual-cell-types"><span class="header-section-number">4.9</span> Specify individual cell types</h2>
+<p>Here’s my last tip for this post. Using the <code>color_cells</code> method, one can choose the color of the cell types and which cells to color by supplying a dictionary. If a cell type is <em>not</em> in the supplied dictionary, it will not be shown as a color.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1">custom_colors <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> {</span>
+<span id="cb19-2"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"MOL"</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#AA0DFE"</span>,</span>
+<span id="cb19-3"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"GN"</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#85660D"</span>,</span>
+<span id="cb19-4"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CHO_HB"</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"orange"</span> <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># need not be hexcode</span></span>
+<span id="cb19-5">}</span>
+<span id="cb19-6"></span>
+<span id="cb19-7"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.color_cells</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'RNA_nbclust_clusters'</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span>custom_colors)</span>
+<span id="cb19-8">fig_path <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> output_path <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/fig-color_three.png"</span></span>
+<span id="cb19-9">with <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">imageio.get_writer</span>(fig_path, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">dpi=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">800</span>)) as writer<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span></span>
+<span id="cb19-10">        screenshot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gem.viewer.screenshot</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">canvas_only=</span>True)</span>
+<span id="cb19-11">        <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-color_three" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-color_three-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-color_three.png" class="img-fluid figure-img" width="517">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-color_three-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;15: Same extent as Figure&nbsp;7 highlighting three cell types only. MOL = mature oligodenrocytes = purple; GN = granule neurons = brown; CHO_HB = Cholinergic neurons Habenula = orange; cyan = all other cells.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="conclusion" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Conclusion</h1>
+<p>In this post I showed you some of my go-to <code>napari-cosmx</code> plugin features that I use when analyzing SMI data. In my workflow, I take advantage of the plugin’s interactivity as well as its underlying functions and methods. This comes in the form of “jotting down” settings for reproducibility or fine-tuning an image’s aesthetics ahead of publication. I couldn’t cover all the things this plugin can do but look for other tips in future posts.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>napari</category>
+  <category>how-tos</category>
+  <category>visualization</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/using-napari-cosmx.html</guid>
+  <pubDate>Mon, 17 Jun 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-duality.png" medium="image" type="image/png" height="144" width="144"/>
+</item>
 <item>
   <title>Making composite images from layered morphology 2D images</title>
   <dc:creator>Evelyn Metzger</dc:creator>
@@ -5351,7 +6914,7 @@ Figure&nbsp;12: Example showing a launched <code>napari-cosmx</code> plugin with
 <img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/stitch-widget2.png" class="img-fluid figure-img" width="805">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;13: Browsing to the location of the raw data that you want to stitched.
+Figure&nbsp;13: Browsing to the location of the raw data that you want to stitched. For more information on the structure of the raw data, see <a href="../../posts/napari-cosmx-basics/using-napari-cosmx.html#sec-expected-raw-format" target="_blank">the next post in the series</a>.
 </figcaption>
 </figure>
 </div>
