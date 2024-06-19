@@ -1,0 +1,120 @@
+---
+title: "Using Squidpy with AtoMx SIP exports"
+author:
+  - name: Evelyn Metzger
+    orcid: 0000-0002-4074-9003
+    affiliations: 
+      - ref: nstg
+      - ref: eveilyeverafter
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+number-sections: true
+number-depth: 4
+date: "2024-06-20"
+categories: [squidpy]
+draft: false
+# image: figures/fig-to-do.png
+description: In this blog post, I’ll show you how to prepare your AtoMx SIP-exported data for squidpy.
+code-fold: false
+# page-layout: full
+format: 
+  html:
+    theme: 
+      light: custom.scss
+      dark: darkly
+google-scholar: true
+---
+
+# Introduction
+
+The [AtoMx&#8482;](https://nanostring.com/products/atomx-spatial-informatics-platform/atomx-sip-overview/){target="blank"}
+Spatial Informatics Portal (SIP) is a fully-integrated and cloud-based 
+solution for analyzing spatial biology. It has
+several built-in analysis modules (_e.g._, QC, clustering, cell typing, 
+differential
+expression) and users can upload their own custom modules for expanded analysis.
+AtoMx SIP also has the ability to export data so that users can run fully custom
+analyses. 
+
+When it comes to open-sourced analysis solutions that can analyze SIP exports,
+there are a few options. For R users, [Giotto](https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html){target="_blank"} [@Dries2021] uses a range of algorithms and has
+way to visualize tissue built in. More recently, Seurat [@Hao2024], another R
+pacakge (and another artist!), has added image viewing capabilities into its workflow. For vignettes on how to analyze
+SMI data with Seurat, check out [Claire's recent blog post](../seurat-cosmx-basics/index.qmd){target="_blank"} or
+the vignette from [Seurat's website](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2#human-lung-nanostring-cosmx-spatial-molecular-imager){target="_blank"}. For python users, 
+I find [squidpy](https://squidpy.readthedocs.io/en/stable/){target="_blank"} [@Palla2022] works well, is feature-rich, and speedy. Part of this efficiency is
+thanks to the [anndata](https://anndata.readthedocs.io/en/stable/){target="_blank"} package. For more info on creating anndata
+objects with SMI data, see [Lidan's recent post](../h5ad_conversion/index.qmd){target="_blank"}. Squidpy also has a built-in method (function) to read in nanostring data, [`read.nanostring`](https://squidpy.readthedocs.io/en/stable/api/squidpy.read.nanostring.html){target="_blank"} that reads in the counts data, metadata, and optionally the field of view (FOV) file and image data. In this blog post, I'll show you how to
+prepare your AtoMx SIP-exported data for squidpy. 
+
+
+<!-- Elucidating the spatial distribution of RNA transcripts and protein is one  -->
+<!-- of the fundamental utilities of the CosMx&#8482; Spatial Molecular Imager (SMI). -->
+<!-- It has been about a year and a half since @He2022 released the first public -->
+<!-- [SMI dataset](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/){target="_blank"},  -->
+<!-- consisting of ~800k cells with 980 RNA targets from multiple  -->
+<!-- tissues of NSCLC FFPE. Now there are additional [public datasets](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/){targets="_blank"} -->
+<!-- that span two species (mouse, human), four tissues (lung, liver, brain, pancreas), and -->
+<!-- three levels of plex (1k, 6k, whole transcriptome).  -->
+
+# Exporting from AtoMx (1.3.2)
+
+To take fully advantage of squidpy's functionality, we'll need to export "flat 
+files" and the RawData. 
+
+
+
+  
+
+The two required input files for squidpy are: 
+
+- counts_file - cell (row) by target (column) expression matrix
+- meta_file - cell-level metadata file
+
+And an optional input file is
+
+- fov_file - containging coordinates of all FOVs
+
+These three files are part of the collection of "flat files" that
+Nanostring generates. They're called "flat files" since they are in a human-readable 
+and accessible format (_i.e._, comma separated files). These files aren't actually
+raw data but rather processed from the raw data. 
+
+
+# Appendix {.appendix .unnumbered}
+
+### Comparison between legacy formats and AtoMx 1.3.2 format {.unnumbered}
+
+In this section I compare the flat files created for `Lung5_rep1` of the NSCLC dataset
+side-by-side with the updated (AtoMx 1.3.2) flat file format. 
+
+#### Polygons file
+
+The polygons file, which was absent in the legacy format, shows the vertices
+of each cell's polygon. 
+
+```{r}
+library(plyr)
+library(dplyr)
+poly_file_new <- read.csv("/Volumes/Extreme_Pro/data/agbt_breast/AUG29_13INTEGR_6K_BRST_PS_S2/AUG29_13INTEGR_6K_BRST_PS_S2-polygons.csv", header=TRUE)
+poly_file_new <- head(poly_file_new, 10)
+```
+
+
+
+
+# more here
+
+as;dlfkja;s
+
+
+
+
+
+
+
+
+
