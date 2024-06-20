@@ -12,7 +12,7 @@ toc-depth: 3
 toc-expand: 2
 toc-location: left
 number-sections: true
-number-depth: 4
+number-depth: 3
 date: "2024-06-20"
 categories: [squidpy]
 draft: false
@@ -45,29 +45,49 @@ way to visualize tissue built in. More recently, Seurat [@Hao2024], another R
 pacakge (and another artist!), has added image viewing capabilities into its workflow. For vignettes on how to analyze
 SMI data with Seurat, check out [Claire's recent blog post](../seurat-cosmx-basics/index.qmd){target="_blank"} or
 the vignette from [Seurat's website](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2#human-lung-nanostring-cosmx-spatial-molecular-imager){target="_blank"}. For python users, 
+
 I find [squidpy](https://squidpy.readthedocs.io/en/stable/){target="_blank"} [@Palla2022] works well, is feature-rich, and speedy. Part of this efficiency is
 thanks to the [anndata](https://anndata.readthedocs.io/en/stable/){target="_blank"} package. For more info on creating anndata
-objects with SMI data, see [Lidan's recent post](../h5ad_conversion/index.qmd){target="_blank"}. Squidpy also has a built-in method (function) to read in nanostring data, [`read.nanostring`](https://squidpy.readthedocs.io/en/stable/api/squidpy.read.nanostring.html){target="_blank"} that reads in the counts data, metadata, and optionally the field of view (FOV) file and image data. In this blog post, I'll show you how to
+objects with SMI data, see [Lidan's recent post](../h5ad_conversion/index.qmd){target="_blank"}. Squidpy also has a built-in method (function) to read in nanostring data, [`read.nanostring`](https://squidpy.readthedocs.io/en/stable/api/squidpy.read.nanostring.html){target="_blank"} that reads in the counts data, metadata, and optionally the field of view (FOV) file and image data. The developers also have a [vignette](https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data){target="_blank"} that uses a slide from the [first public data release]((https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/){target="_blank"}) of SMI data [@He2022]. Note that the example dataset in that vignette uses a legacy file forma that differs slightly with AtoMx SIP.
+For more information on the differences, see the Appendix @sec-comparison).
+
+
+In this blog post, I'll show you how to
 prepare your AtoMx SIP-exported data for squidpy. 
 
 
 <!-- Elucidating the spatial distribution of RNA transcripts and protein is one  -->
 <!-- of the fundamental utilities of the CosMx&#8482; Spatial Molecular Imager (SMI). -->
 <!-- It has been about a year and a half since @He2022 released the first public -->
-<!-- [SMI dataset](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/){target="_blank"},  -->
+<!-- [SMI dataset],  -->
 <!-- consisting of ~800k cells with 980 RNA targets from multiple  -->
 <!-- tissues of NSCLC FFPE. Now there are additional [public datasets](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/){targets="_blank"} -->
 <!-- that span two species (mouse, human), four tissues (lung, liver, brain, pancreas), and -->
 <!-- three levels of plex (1k, 6k, whole transcriptome).  -->
 
-# Exporting from AtoMx (1.3.2)
+# Exporting data from AtoMx
 
-To take fully advantage of squidpy's functionality, we'll need to export "flat 
-files" and the RawData. 
+For this post I will be analyzing a single breast cancer slide that has about 80,000 cells, 
+64 FOVs, and with the 6k panel. I'm using the CosMx Data Analysis v1.3.2 software.
+To take full advantage of squidpy's functionality, I'll need to partially export 1) "flat 
+files" and 2) raw data (@fig-export). 
 
+:::{.callout-note}
+We call them "flat files" since they are in a human-readable 
+and accessible format (_i.e._, comma separated files). These files, 
+like Seurat files and Tiledb files, aren't actually
+raw data but rather processed from the raw data and versions may change with time.
+:::
 
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-export"
+#| fig-cap: "Selected flat files and raw data for exporting."
+knitr::include_graphics("./figures/fig-export1.png")
+```
 
-  
+Squidpy uses three of the five flat files: 
 
 The two required input files for squidpy are: 
 
@@ -76,39 +96,587 @@ The two required input files for squidpy are:
 
 And an optional input file is
 
-- fov_file - containging coordinates of all FOVs
+- fov_file - containging coordinates of all FOVs.
 
-These three files are part of the collection of "flat files" that
-Nanostring generates. They're called "flat files" since they are in a human-readable 
-and accessible format (_i.e._, comma separated files). These files aren't actually
-raw data but rather processed from the raw data. 
+Once export is complete, download the data
+using your SFTP application (_e.g._, cyberduck, FileZilla, WinSCP).
+
+@fig-export2 shows a screenshot of the data structure in Cyberduck. The flat files are nested
+within a folder named after the flow cell (_e.g._, `AUG29_13INTEGR_6k_BRST_PS_S2`) and are compressed in `gz` format. The raw data are in 
+a separate folder and nested within a folder named after the flow cell and 
+another folder named after the slide (_e.g._, `20230829_212648_S2`). Of the subfolders of
+the raw data, the data that we'll need for today are in `CellStatsDir`.
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-export2"
+#| fig-cap: "Folder structure following AtoMx SIP export."
+knitr::include_graphics("./figures/fig-export2.png")
+```
+
+# Install Squidpy
+
+Assuming you have Python3 installed on your system, squidpy can be installed 
+using `pip3` like this: 
+
+```{default filename="Terminal"}
+#| eval: false
+pip3 install squidpy
+```
+
+For installing within a virtual environment (recommended), see the Appendix (@sec-venv).
+
+# Analysis without imaging data
+
+In the simplest form, we can use squidpy without imaging data by reading
+the expression data, metadata, and optionally the FOV positions data. This analyses
+include normalization, PCA, umap, _etc._ I'll provide some code here but for more details please see the squidpy [vignette](https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data){target="_blank"}.
+
+## Reading expression and metadata only
+
+Create an anndata object like this:
+```{default filename="Python"}
+#| eval: false
+
+from pathlib import Path
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scanpy as sc
+import squidpy as sq
+
+flat_file_dir = '/Volumes/Extreme_Pro/data/Demo_AGBT_6K_Breast_19_06_2024_13_37_37_539/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2'
+meta_file = [item for item in os.listdir(flat_file_dir) if 'metadata_file' in item][0]
+counts_file = [item for item in os.listdir(flat_file_dir) if 'exprMat_file' in item][0]
+
+adata0 = sq.read.nanostring(
+    path=flat_file_dir,
+    counts_file=counts_file,
+    meta_file=meta_file
+)
+adata0
+```
+
+```
+AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'
+```
+
+## Including the FOV file
+
+If we try to read in the optional FOV file generated in AtoMx using squidpy v1.5.0, we might get an error
+stating "Index fov invalid". 
+
+```{default filename="Python"}
+#| eval: false
+
+fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
+
+adata = sq.read.nanostring(
+    path=flat_file_dir,
+    counts_file=counts_file,
+    meta_file=meta_file,
+    fov_file=fov_file
+)
+
+```
+
+```{default}
+#| code-fold: true
+#| code-summary: "Click to show error"
+---------------------------------------------------------------------------
+ValueError                                Traceback (most recent call last)
+Cell In[23], line 3
+      1 fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
+----> 3 adata = sq.read.nanostring(
+      4     path=flat_file_dir,
+      5     counts_file=counts_file,
+      6     meta_file=meta_file,
+      7     fov_file=fov_file
+      8 )
+
+File <project path>/.venv/lib/python3.10/site-packages/squidpy/read/_read.py:266, in nanostring(path, counts_file, meta_file, fov_file)
+    263                     continue
+    265 if fov_file is not None:
+--> 266     fov_positions = pd.read_csv(path / fov_file, header=0, index_col=fov_key)
+    267     for fov, row in fov_positions.iterrows():
+    268         try:
+
+File <project path>/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1026, in read_csv(filepath_or_buffer, sep, delimiter, header, names, index_col, usecols, dtype, engine, converters, true_values, false_values, skipinitialspace, skiprows, skipfooter, nrows, na_values, keep_default_na, na_filter, verbose, skip_blank_lines, parse_dates, infer_datetime_format, keep_date_col, date_parser, date_format, dayfirst, cache_dates, iterator, chunksize, compression, thousands, decimal, lineterminator, quotechar, quoting, doublequote, escapechar, comment, encoding, encoding_errors, dialect, on_bad_lines, delim_whitespace, low_memory, memory_map, float_precision, storage_options, dtype_backend)
+   1013 kwds_defaults = _refine_defaults_read(
+   1014     dialect,
+   1015     delimiter,
+   (...)
+   1022     dtype_backend=dtype_backend,
+   1023 )
+   1024 kwds.update(kwds_defaults)
+-> 1026 return _read(filepath_or_buffer, kwds)
+
+File <project path>/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:626, in _read(filepath_or_buffer, kwds)
+    623     return parser
+    625 with parser:
+--> 626     return parser.read(nrows)
+
+File <project path>/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1923, in TextFileReader.read(self, nrows)
+   1916 nrows = validate_integer("nrows", nrows)
+   1917 try:
+   1918     # error: "ParserBase" has no attribute "read"
+   1919     (
+   1920         index,
+   1921         columns,
+   1922         col_dict,
+-> 1923     ) = self._engine.read(  # type: ignore[attr-defined]
+   1924         nrows
+   1925     )
+   1926 except Exception:
+   1927     self.close()
+
+File <project path>/.venv/lib/python3.10/site-packages/pandas/io/parsers/c_parser_wrapper.py:333, in CParserWrapper.read(self, nrows)
+    330     data = {k: v for k, (i, v) in zip(names, data_tups)}
+    332     names, date_data = self._do_date_conversions(names, data)
+--> 333     index, column_names = self._make_index(date_data, alldata, names)
+    335 return index, column_names, date_data
+
+File <project path>/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:371, in ParserBase._make_index(self, data, alldata, columns, indexnamerow)
+    368     index = None
+    370 elif not self._has_complex_date_col:
+--> 371     simple_index = self._get_simple_index(alldata, columns)
+    372     index = self._agg_index(simple_index)
+    373 elif self._has_complex_date_col:
+
+File <project path>/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:403, in ParserBase._get_simple_index(self, data, columns)
+    401 index = []
+    402 for idx in self.index_col:
+--> 403     i = ix(idx)
+    404     to_remove.append(i)
+    405     index.append(data[i])
+
+File <project path>/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:398, in ParserBase._get_simple_index.<locals>.ix(col)
+    396 if not isinstance(col, str):
+    397     return col
+--> 398 raise ValueError(f"Index {col} invalid")
+
+ValueError: Index fov invalid
+```
+
+This error arises because of a format change (see Appendix @sec-comparison) for more
+info. A simple fix is to adjust the column name in the fov file from "FOV" to the legacy "fov" like this:
+
+```{default filename="Python"}
+#| eval: false
+fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
+
+fov_df = pd.read_csv(os.path.join(flat_file_dir, fov_file))
+if 'FOV' in fov_df.columns:
+  print("Refactoring file to older format.")
+  # Rename 'FOV' column to 'fov'
+  fov_df.rename(columns={'FOV': 'fov'}, inplace=True)
+  # have fov_file reference the new, formatted file and write it
+  fov_file = os.path.join(flat_file_dir,'fov_positions_formatted.csv')
+  fov_df.to_csv(fov_file, index=False)
+
+adata1 = sq.read.nanostring(
+    path=flat_file_dir,
+    counts_file=counts_file,
+    meta_file=meta_file,
+    fov_file=fov_file
+)
+
+```
+
+> Refactoring file to older format.
+
+```
+AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'
+```
+
+## Analysis
+
+:::{.callout-note}
+Please note that the 
+code in this section is examplar and not a recommendation for specific thresholding, 
+QC filtering, clustering parmaterization, _etc._ of SMI data.
+:::
+
+With the expression and metadata loaded, we can run exploratory data analysis similar
+to what was describe in the squidpy vignette. There are some adjustments to squidpy's vignette that are needed. These adjustments
+reflect the flat file format changes (Appendix @sec-comparison). 
 
 
-# Appendix {.appendix .unnumbered}
+```{default filename="Python"}
+#| eval: false
 
-### Comparison between legacy formats and AtoMx 1.3.2 format {.unnumbered}
+adata1.var["Negative"] = adata1.var_names.str.startswith("Negative")
+adata1.var["SystemControl"] = adata1.var_names.str.startswith("SystemControl")
+adata1
+```
+
+```
+AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
+    var: 'Negative', 'SystemControl'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'
+```
+
+We can calculate QC metrics with scanpy's [@Wolf2018] pre-processing tool [`calculate_qc_metrics` method](https://scanpy.readthedocs.io/en/latest/generated/scanpy.pp.calculate_qc_metrics.html){target="_blank"}. In the code below, we are going to add Negatives and SystemControls as the `qc_var` argument (which will add cell-level columns to `obs`). In addition, target-level columns are added to `var`. 
+
+```{default filename="Python"}
+sc.pp.calculate_qc_metrics(adata1, qc_vars=["Negative", "SystemControl"], inplace=True)
+adata1
+```
+
+```
+AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID', 'n_genes_by_counts', 'log1p_n_genes_by_counts', 'total_counts', 'log1p_total_counts', 'pct_counts_in_top_50_genes', 'pct_counts_in_top_100_genes', 'pct_counts_in_top_200_genes', 'pct_counts_in_top_500_genes', 'total_counts_Negative', 'log1p_total_counts_Negative', 'pct_counts_Negative', 'total_counts_SystemControl', 'log1p_total_counts_SystemControl', 'pct_counts_SystemControl'
+    var: 'Negative', 'SystemControl', 'n_cells_by_counts', 'mean_counts', 'log1p_mean_counts', 'pct_dropout_by_counts', 'total_counts', 'log1p_total_counts'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'
+```
+
+We can explore these cell-level and target-level QC metrics with visuals using
+the `seaborn` package. For example the code below generates @fig-qc and shows
+how the number of unique genes in a cell correlates with the total number of 
+transcripts in a cell.
+
+```{filename="Python"}
+
+sns.jointplot(
+    data=adata1.obs,
+    x="total_counts",
+    y="n_genes_by_counts",
+    kind="scatter",
+    alpha=0.2
+)
+plt.savefig("figures/fig-qc.png", dpi=200)
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-qc"
+#| fig-width: 4
+#| fig-cap: "Unique genes by total counts. Each dot represents a cell. Y-axis: the number of genes with postive counts in a cell. X-axis the sum of counts for a cell."
+
+knitr::include_graphics("./figures/fig-qc.png")
+```
+
+The total Negative probe counts by total counts is shown below and @fig-qc1.
+```{filename="Python"}
+
+sns.jointplot(
+    data=adata1.obs,
+    x="total_counts",
+    y="total_counts_Negative",
+    kind="scatter",
+    alpha=0.2
+)
+plt.savefig("figures/fig-qc1.png", dpi=200)
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-qc1"
+#| fig-width: 4
+#| fig-cap: "The number of negative counts (Y) relative to the total counts (X) per cell."
+
+knitr::include_graphics("./figures/fig-qc1.png")
+```
+
+We see that the proportion of negative counts relative to total counts is: 
+```{filename="Python"}
+adata1.obs["total_counts_Negative"].sum() / adata1.obs["total_counts"].sum()
+```
+> 0.00041567286608445926 (i.e., 0.04%)
+
+Histograms of total transcripts, total unique genes per cell, and total transcrips per FOV can be should in @fig-qc2.
+```{filename="Python"}
+fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+
+axs[0].set_title("Total transcripts per cell")
+sns.histplot(
+    adata1.obs["total_counts"],
+    kde=False,
+    ax=axs[0],
+)
+
+axs[1].set_title("Unique transcripts per cell")
+sns.histplot(
+    adata1.obs["n_genes_by_counts"],
+    kde=False,
+    ax=axs[1],
+)
+
+axs[2].set_title("Transcripts per FOV")
+sns.histplot(
+    adata1.obs.groupby("fov").sum()["total_counts"],
+    kde=False,
+    ax=axs[2],
+)
+plt.savefig("figures/fig-qc2.png", dpi=200)
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-qc2"
+#| fig-width: 4
+#| fig-cap: "Total counts per cell (left), total unique genes per cell (middle) and total transcripts per FOV (right)."
+
+knitr::include_graphics("./figures/fig-qc2.png")
+```
+
+We can filter, normalize, and cluster with scapny's functions. For a full list
+of available functions, see scapny's [API documentation](https://scanpy.readthedocs.io/en/latest/api/index.html){target="_blank"}.
+
+```{filename="Python"}
+adata1.shape
+```
+> (80073, 6524)
+
+```{filename="Python"}
+sc.pp.filter_cells(adata1, min_counts=250)
+sc.pp.filter_genes(adata1, min_cells=1000)
+adata1.shape
+```
+> (69293, 6177)
+
+```{filename="Python"}
+adata1.layers["counts"] = adata1.X.copy()
+sc.pp.normalize_total(adata1, inplace=True, exclude_highly_expressed=True)
+sc.pp.log1p(adata1)
+sc.pp.pca(adata1, n_comps=50)
+sc.pp.neighbors(adata1)
+sc.tl.umap(adata1, min_dist=0.2, spread=1)
+sc.tl.leiden(adata1)
+```
+
+
+```{filename="Python"}
+adata1.obs["log10Mean.PanCK"] = np.log1p(adata1.obs['Mean.PanCK'])
+sc.pl.umap(
+    adata1,
+    color=["log10Mean.PanCK","leiden"]
+)
+```
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-umap"
+#| fig-width: 4
+#| fig-cap: "UMAP figures with cells colored by log10 Mean PanCK expression (left) and Leiden clusters (right)."
+
+knitr::include_graphics("./figures/fig-umap.png")
+```
+
+# Image and Spatial Analysis
+
+Up until this point we haven't use image data. 
+
+
+## Pivot data
+
+## Reading data
+
+## Spatial Analysis Examples
+
+# Conclusion
+
+
+
+# Appendix {.appendix}
+
+
+## Create a virtual environment for squidpy {#sec-venv}
+
+I recommend creating a separate virtual environment to run squidpy and to keep
+packages isolated from the rest of your system. This can be operating system 
+and architecture specific so my (M1 Mac) specific example code below may not work with
+your configuration. 
+
+In general, 
+there are two main package management systems: the default one that ships with 
+python and conda. I'll use the former for this post. For more information, 
+please see the [Python Packaging User Guide](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#create-and-use-virtual-environments){target="_blank"} for examples on Windows and Mac/Linux.
+
+```{default filename="Terminal"}
+#| eval: false
+python3.10 -m venv .venv
+source .venv/bin/activate
+python --version
+```
+> Python 3.10.6
+
+```{default filename="Terminal"}
+#| eval: false
+pip install squidpy
+```
+
+Here are the packages that I used for this post:
+```{default filename="Terminal"}
+#| eval: false
+pip freeze > requirements.txt
+```
+
+```{default}
+#| code-fold: true
+#| code-summary: "Click to show contents of requirements.txt"
+aiobotocore==2.5.4
+aiohttp==3.9.5
+aioitertools==0.11.0
+aiosignal==1.3.1
+anndata==0.10.8
+array_api_compat==1.7.1
+asciitree==0.3.3
+async-timeout==4.0.3
+attrs==23.2.0
+botocore==1.31.17
+certifi==2024.6.2
+charset-normalizer==3.3.2
+click==8.1.7
+click-plugins==1.1.1
+cligj==0.7.2
+cloudpickle==3.0.0
+colorcet==3.1.0
+contourpy==1.2.1
+cycler==0.12.1
+dask==2024.6.1
+dask-expr==1.1.4
+dask-image==2024.5.3
+datashader==0.16.2
+distributed==2024.6.1
+docrep==0.3.2
+exceptiongroup==1.2.1
+fasteners==0.19
+fiona==1.9.6
+fonttools==4.53.0
+frozenlist==1.4.1
+fsspec==2023.6.0
+geopandas==0.14.4
+h5py==3.11.0
+idna==3.7
+igraph==0.11.5
+imageio==2.34.1
+importlib_metadata==7.2.0
+inflect==7.2.1
+Jinja2==3.1.4
+jmespath==1.0.1
+joblib==1.4.2
+kiwisolver==1.4.5
+lazy_loader==0.4
+legacy-api-wrap==1.4
+leidenalg==0.10.2
+llvmlite==0.43.0
+locket==1.0.0
+markdown-it-py==3.0.0
+MarkupSafe==2.1.5
+matplotlib==3.9.0
+matplotlib-scalebar==0.8.1
+mdurl==0.1.2
+more-itertools==10.3.0
+msgpack==1.0.8
+multidict==6.0.5
+multipledispatch==1.0.0
+multiscale_spatial_image==0.11.2
+natsort==8.4.0
+networkx==3.3
+numba==0.60.0
+numcodecs==0.12.1
+numpy==1.26.4
+ome-zarr==0.9.0
+omnipath==1.0.8
+packaging==24.1
+pandas==2.2.2
+param==2.1.0
+partd==1.4.2
+patsy==0.5.6
+pillow==10.3.0
+PIMS==0.7
+psutil==6.0.0
+pyarrow==16.1.0
+pyct==0.5.0
+pygeos==0.14
+Pygments==2.18.0
+pynndescent==0.5.13
+pyparsing==3.1.2
+pyproj==3.6.1
+python-dateutil==2.9.0.post0
+pytz==2024.1
+PyYAML==6.0.1
+requests==2.32.3
+rich==13.7.1
+s3fs==2023.6.0
+scanpy==1.10.1
+scikit-image==0.24.0
+scikit-learn==1.5.0
+scipy==1.13.1
+seaborn==0.13.2
+session-info==1.0.0
+shapely==2.0.4
+six==1.16.0
+slicerator==1.1.0
+sortedcontainers==2.4.0
+spatial_image==0.3.0
+spatialdata==0.0.15
+squidpy==1.5.0
+statsmodels==0.14.2
+stdlib-list==0.10.0
+tblib==3.0.0
+texttable==1.7.0
+threadpoolctl==3.5.0
+tifffile==2024.6.18
+toolz==0.12.1
+tornado==6.4.1
+tqdm==4.66.4
+typeguard==4.3.0
+typing_extensions==4.12.2
+tzdata==2024.1
+umap-learn==0.5.6
+urllib3==1.26.19
+validators==0.28.3
+wrapt==1.16.0
+xarray==2024.6.0
+xarray-dataclasses==1.8.0
+xarray-datatree==0.0.14
+xarray-schema==0.0.3
+xarray-spatial==0.4.0
+yarl==1.9.4
+zarr==2.18.2
+zict==3.0.0
+zipp==3.19.2
+```
+
+
+## Comparison between legacy formats and AtoMx 1.3.2 format {#sec-comparison}
 
 In this section I compare the flat files created for `Lung5_rep1` of the NSCLC dataset
 side-by-side with the updated (AtoMx 1.3.2) flat file format. 
 
-#### Polygons file
+### Polygons file
 
 The polygons file, which was absent in the legacy format, shows the vertices
 of each cell's polygon. 
 
 ```{r}
+#| eval: false
 library(plyr)
 library(dplyr)
 poly_file_new <- read.csv("/Volumes/Extreme_Pro/data/agbt_breast/AUG29_13INTEGR_6K_BRST_PS_S2/AUG29_13INTEGR_6K_BRST_PS_S2-polygons.csv", header=TRUE)
 poly_file_new <- head(poly_file_new, 10)
 ```
-
-
-
-
-# more here
-
-as;dlfkja;s
 
 
 
