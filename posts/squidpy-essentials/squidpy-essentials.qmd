@@ -52,9 +52,12 @@ objects with SMI data, see [Lidan's recent post](../h5ad_conversion/index.qmd){t
 For more information on the differences, see the Appendix @sec-comparison).
 
 
-In this blog post, I'll show you how to
-prepare your AtoMx SIP-exported data for squidpy. 
+In this blog post, I'll show you how to:
 
+- @sec-export export the squidpy-relavent files
+- @sec-install (and Appendix @sec-venv) tips for installing squidpy
+- @sec-noimage analysis examples without spatial images
+- @sec-imageanalysis how to pivot your AtoMx-exported data into a format that can be used with squidpy and image-based analysis examples
 
 <!-- Elucidating the spatial distribution of RNA transcripts and protein is one  -->
 <!-- of the fundamental utilities of the CosMx&#8482; Spatial Molecular Imager (SMI). -->
@@ -65,7 +68,7 @@ prepare your AtoMx SIP-exported data for squidpy.
 <!-- that span two species (mouse, human), four tissues (lung, liver, brain, pancreas), and -->
 <!-- three levels of plex (1k, 6k, whole transcriptome).  -->
 
-# Exporting data from AtoMx
+# Exporting data from AtoMx {#sec-export}
 
 For this post I will be analyzing a single breast cancer slide that has about 80,000 cells, 
 64 FOVs, and with the 6k panel. I'm using the CosMx Data Analysis v1.3.2 software.
@@ -115,7 +118,7 @@ the raw data, the data that we'll need for today are in `CellStatsDir`.
 knitr::include_graphics("./figures/fig-export2.png")
 ```
 
-# Install Squidpy
+# Install Squidpy {#sec-install}
 
 Assuming you have Python3 installed on your system, squidpy can be installed 
 using `pip3` like this: 
@@ -127,7 +130,7 @@ pip3 install squidpy
 
 For installing within a virtual environment (recommended), see the Appendix (@sec-venv).
 
-# Analysis without imaging data
+# Analysis without imaging data {#sec-noimage}
 
 In the simplest form, we can use squidpy without imaging data by reading
 the expression data, metadata, and optionally the FOV positions data. This analyses
@@ -136,7 +139,7 @@ include normalization, PCA, umap, _etc._ I'll provide some code here but for mor
 ## Reading expression and metadata only
 
 Create an anndata object like this:
-```{default filename="Python"}
+```{filename="Python"}
 #| eval: false
 
 from pathlib import Path
@@ -172,7 +175,7 @@ AnnData object with n_obs × n_vars = 80073 × 6524
 If we try to read in the optional FOV file generated in AtoMx using squidpy v1.5.0, we might get an error
 stating "Index fov invalid". 
 
-```{default filename="Python"}
+```{filename="Python"}
 #| eval: false
 
 fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
@@ -267,7 +270,7 @@ ValueError: Index fov invalid
 This error arises because of a format change (see Appendix @sec-comparison) for more
 info. A simple fix is to adjust the column name in the fov file from "FOV" to the legacy "fov" like this:
 
-```{default filename="Python"}
+```{filename="Python"}
 #| eval: false
 fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
 
@@ -311,7 +314,7 @@ to what was describe in the squidpy vignette. There are some adjustments to squi
 reflect the flat file format changes (Appendix @sec-comparison). 
 
 
-```{default filename="Python"}
+```{filename="Python"}
 #| eval: false
 
 adata1.var["Negative"] = adata1.var_names.str.startswith("Negative")
@@ -329,7 +332,7 @@ AnnData object with n_obs × n_vars = 80073 × 6524
 
 We can calculate QC metrics with scanpy's [@Wolf2018] pre-processing tool [`calculate_qc_metrics` method](https://scanpy.readthedocs.io/en/latest/generated/scanpy.pp.calculate_qc_metrics.html){target="_blank"}. In the code below, we are going to add Negatives and SystemControls as the `qc_var` argument (which will add cell-level columns to `obs`). In addition, target-level columns are added to `var`. 
 
-```{default filename="Python"}
+```{filename="Python"}
 sc.pp.calculate_qc_metrics(adata1, qc_vars=["Negative", "SystemControl"], inplace=True)
 adata1
 ```
@@ -482,20 +485,421 @@ sc.pl.umap(
 knitr::include_graphics("./figures/fig-umap.png")
 ```
 
-# Image and Spatial Analysis
+# Image and Spatial Analysis {#sec-imageanalysis}
 
-Up until this point we haven't use image data. 
+Up until this point we haven't use image data. In this section I'll show how
+to prepare a slide exported from AtoMx into squidpy, and touch on some of the
+image-based analyses that are possible.
+
+## Rearrange data files to match squidpy's layout
+
+If we take a look one of the NSCLC public datasets from @He2022 (Lung5_Rep1), we can see the
+expected file structure has four folders (`CellComposite`, `CellLabels`, 
+`CellOverlay`, and `CompartmentLabels`) and four flat files. 
+
+```{default filename="Terminal"}
+#| eval: false
+tree -L 3
+
+├── Lung5_Rep1-Flat_files_and_images
+│   ├── CellComposite
+│   │   ├── CellComposite_F001.jpg
+|   |   ...
+│   │   └── CellComposite_F032.jpg
+│   ├── CellLabels
+│   │   ├── CellLabels_F001.tif
+|   |   ...
+│   │   └── CellLabels_F032.tif
+│   ├── CellOverlay
+│   │   ├── CellOverlay_F001.jpg
+|   |   ...
+│   │   └── CellOverlay_F032.jpg
+│   ├── CompartmentLabels
+│   │   ├── CompartmentLabels_F001.tif
+|   |   ...
+│   │   └── CompartmentLabels_F032.tif
+│   ├── Lung5_Rep1_exprMat_file.csv
+│   ├── Lung5_Rep1_fov_positions_file.csv
+│   ├── Lung5_Rep1_metadata_file.csv
+│   └── Lung5_Rep1_tx_file.csv
+
+```
+
+This file structure is actually a subset of the raw data and flat files that are exported
+from AtoMx. 
+
+```{default filename="Terminal"}
+#| eval: false
+tree -L 3
+
+├── RawFiles
+│   └── <flow cell>
+│       └── <slide>
+│           ├── AnalysisResults
+│           │   └── muy2ybakqy
+│           ├── CellStatsDir
+│           │   ├── <slide>_C902_P02_To_P01_RegStats.csv
+│           │   ├── CellComposite
+│           │   ├── CellOverlay
+│           │   ├── FOV001
+│           │   │   ├── CellBoundaries_F001.csv
+│           │   │   ├── CellBoundaries_F001_935.fz
+│           │   │   ├── CellLabels_F001.tif
+│           │   │   ├── CompartmentLabels_F001.tif
+│           │   │   ├── Run_86906312-688f-4f31-9fc5-48b04db5f958_<slide>_Cell_Stats_F001.csv
+│           │   │   └── Run_86906312-688f-4f31-9fc5-48b04db5f958_FOV001__complete_code_cell_target_call_coord.cs
+│           │   ...
+│           │   ├── FOV064
+│           │   └── Morphology2D
+│           └── RunSummary
+│               ├── 75d021be-b81e-4d7d-ad28-d390a13da7ad.mkit
+│               ├── Beta15_Affine_Transform_20221118.csv
+│               ├── Distortion
+│               ├── FovTracking
+│               ├── Morphology_ChannelID_Dictionary.txt
+│               ├── Run86906312-688f-4f31-9fc5-48b04db5f958_<slide>_Beta15_RNA_SpatialBC_Metrics4D.csv
+│               ├── Run_86906312-688f-4f31-9fc5-48b04db5f958_<slide>_Beta15_ExptConfig.txt
+│               ├── SampleSlide_PlaneFit_<slide>_History.csv
+│               ├── Shading
+│               ├── c902.fovs.csv
+│               ├── latest.af.fovs.csv
+│               └── latest.fovs.csv
+├── flatFiles
+│   └── <flow cell>
+│       ├── <flow cell>_exprMat_file.csv.gz
+│       ├── <flow cell>_fov_positions_file.csv.gz
+│       ├── <flow cell>_metadata_file.csv.gz
+│       └── fov_positions_formatted.csv
+
+```
+
+So in order to read in image data into squidpy, we must first rearrange our folders. 
+We can do this manually by moving, copying, or linking files to match the expected
+format. Normally I am a big fan of symbolic links for just this situation. However, 
+I have noticed that `read.nanostring` can have an error when using symbolic links
+for some of the files (error not shown). So for simplicity of this post, I will make a copy of the 
+data and place them into a new folder `sample_dir_formatted`.
+
+```{default filename="Terminal"}
+#| eval: false
+
+# Note that this code works for a single slide. If exporting
+# multiple slides, some modification might be necessary.
+
+# cd to parent directory
+
+# create a directory adjacent to RawData and flatFiles
+mkdir -p sample_dir_formatted && cd $_
+
+# Add flat files
+for file in $(ls ../flatFiles/*/*csv*); do cp $file ./; done
+
+# Add folders
+cp -r ../RawFiles/*/*/CellStatsDir/CellComposite ./
+cp -r ../RawFiles/*/*/CellStatsDir/CellOverlay ./
+
+mkdir -p CellLabels
+for file in $(ls ../RawFiles/*/*/CellStatsDir/FOV*/CellLabels*); do cp $file ./CellLabels/ ; done
+rm ./CellLabels/._Cell*
+  
+mkdir -p CompartmentLabels
+for file in $(ls ../RawFiles/*/*/CellStatsDir/FOV*/CompartmentLabels*); do cp $file ./CompartmentLabels/ ; done
+```
 
 
-## Pivot data
+The file structure of `sample_dir_formatted` now looks like this:
 
-## Reading data
+```{default filename="Terminal"}
+#| eval: false
 
-## Spatial Analysis Examples
+tree -L 2
+
+.
+├── <flow cell>_exprMat_file.csv.gz
+├── <flow cell>_fov_positions_file.csv.gz
+├── <flow cell>_metadata_file.csv.gz
+├── CellComposite
+│   ├── CellComposite_F001.jpg
+|   ├── ...
+│   └── CellComposite_F064.jpg
+├── CellLabels
+│   ├── CellLabels_F001.tif
+|   ├── ...
+│   └── CellLabels_F064.tif
+├── CellOverlay
+│   ├── CellOverlay_F001.jpg
+|   ├── ...
+│   └── CellOverlay_F064.jpg
+└── CompartmentLabels
+    ├── CompartmentLabels_F001.tif
+    ...
+    └── CompartmentLabels_F064.tif
+
+```
+
+
+:::{.callout-note}
+If your flow cell was created prior to AtoMx v1.3.2, the CellComposite
+jpg files may not show the composites but instead just blank images. 
+They will still load into squidpy but will not show the expected tissue structure.
+This issues patched for samples created in v1.3.2+. If you have blank images and
+would like to replace them with composite images, check out [this post](../composite-images/making-composite-images.qmd){target="_blank"}. 
+:::
+
+
+## Read expression and image data into squidpy
+
+```{filename="Python"}
+#| eval: false
+
+from pathlib import Path
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scanpy as sc
+import squidpy as sq
+
+sample_dir = '/Volumes/Extreme_Pro/data/Demo_AGBT_6K_Breast_19_06_2024_13_37_37_539/sample_dir_formatted'
+meta_file = [item for item in os.listdir(sample_dir) if 'metadata_file' in item][0]
+counts_file = [item for item in os.listdir(sample_dir) if 'exprMat_file' in item][0]
+fov_file = [item for item in os.listdir(sample_dir) if 'fov_positions_file' in item][0]
+ 
+fov_df = pd.read_csv(os.path.join(sample_dir, fov_file))
+if 'FOV' in fov_df.columns:
+  print("Refactoring file to older format.")
+  # Rename 'FOV' column to 'fov'
+  fov_df.rename(columns={'FOV': 'fov'}, inplace=True)
+  # have fov_file reference the new, formatted file and write it
+  fov_file = os.path.join(sample_dir,'fov_positions_formatted.csv')
+  fov_df.to_csv(fov_file, index=False)
+
+adata2 = sq.read.nanostring(
+    path=sample_dir,
+    counts_file=counts_file,
+    meta_file=meta_file,
+    fov_file=fov_file
+)
+adata2.var["Negative"] = adata2.var_names.str.startswith("Negative")
+adata2.var["SystemControl"] = adata2.var_names.str.startswith("SystemControl")
+sc.pp.calculate_qc_metrics(adata2, qc_vars=["Negative", "SystemControl"], inplace=True)
+sc.pp.filter_cells(adata2, min_counts=250)
+sc.pp.filter_genes(adata2, min_cells=1000)
+adata2.layers["counts"] = adata2.X.copy()
+sc.pp.normalize_total(adata2, inplace=True, exclude_highly_expressed=True)
+sc.pp.log1p(adata2)
+sc.pp.pca(adata2, n_comps=50)
+sc.pp.neighbors(adata2)
+sc.tl.umap(adata2, min_dist=0.2, spread=1)
+sc.tl.leiden(adata2)
+
+```
+
+## Spatial Analysis
+
+In addition to the analysis code we've already covered, we can view and analyze our
+CosMx results with image data. 
+For a full list
+of features, please see [squidpy's documentation](https://squidpy.readthedocs.io/en/stable/api.html){target="_blank"}. 
+For some of examples below, I'll use a subset of the data -- a single FOV -- to 
+speed up computation and to make plotting easier. 
+
+```{filename="Python"}
+adata_subset = adata2[adata2.obs.fov == "35"].copy()
+```
+
+### Viewing results in space
+
+@fig-image1 shows a single FOV image data with
+cells drawn as contours that are colored based on their Leiden cluster.
+
+```{filename="Python"}
+#| eval: false
+
+sq.pl.spatial_segment(
+    adata2,
+    color="leiden",
+    seg_contourpx=20,
+    seg_cell_id="cell_ID",
+    library_key="fov",
+    library_id="35",
+    img=True,
+    size=60,
+    figsize = (4, 4),
+    dpi = 200,
+    save = "fig-image1.png"
+)
+
+
+```
+
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-image1"
+#| fig-width: 4
+#| fig-cap: "Leiden clusters in space for a single FOV of breast cancer tissue. Clusters are displayed as cell contous overlaid on morphology image (green = PanCK, magenta = DAPI). "
+
+knitr::include_graphics("./figures/fig-image1.png")
+```
+
+
+### Autocorrelation with Moran's _I_
+
+Moran's _I_ is a useful spatial statistic for measuring the extent that a gene's 
+expression is clustered in space (verus random or dispersed). Taking a look at the
+single-FOV subset, we genes with positive Moran's _I_. When we plot the expression
+of some of these genes (@fig-morans), we indeed see some how they are aggregated. 
+For example, _COX6C_, which have clinical significance with breast cancer [@Tian2021],
+is autocorrelated and co-occurs with cells high in _KRT19_.
+
+```{filename="Python"}
+
+sq.gr.spatial_neighbors(adata_subset, coord_type="generic", delaunay=True)
+sq.gr.spatial_autocorr(
+    adata_subset,
+    mode="moran",
+    n_perms=100,
+    n_jobs=1,
+)
+adata_subset.uns["moranI"].head(10)
+```
+
+```
+                I  pval_norm  var_norm  pval_z_sim  pval_sim   var_sim  pval_norm_fdr_bh  pval_z_sim_fdr_bh  pval_sim_fdr_bh
+CRIP1    0.634842        0.0  0.000279         0.0  0.009901  0.000460               0.0                0.0         0.044936
+COX6C    0.624853        0.0  0.000279         0.0  0.009901  0.000496               0.0                0.0         0.044936
+COL1A1   0.616015        0.0  0.000279         0.0  0.009901  0.000476               0.0                0.0         0.044936
+SCGB2A2  0.587074        0.0  0.000279         0.0  0.009901  0.000419               0.0                0.0         0.044936
+COL1A2   0.572189        0.0  0.000279         0.0  0.009901  0.000487               0.0                0.0         0.044936
+COL3A1   0.559603        0.0  0.000279         0.0  0.009901  0.000449               0.0                0.0         0.044936
+SPARC    0.547069        0.0  0.000279         0.0  0.009901  0.000394               0.0                0.0         0.044936
+KRT8     0.516281        0.0  0.000279         0.0  0.009901  0.000427               0.0                0.0         0.044936
+ERBB2    0.509171        0.0  0.000279         0.0  0.009901  0.000458               0.0                0.0         0.044936
+KRT19    0.502475        0.0  0.000279         0.0  0.009901  0.000529               0.0                0.0         0.044936
+
+```
+
+```{filename="Python"}
+
+sq.pl.spatial_segment(
+    adata_subset,
+    library_id="35",
+    seg_cell_id="cell_ID",
+    library_key="fov",
+    color=["COX6C", "COL1A1", "KRT19"],
+    size=60,
+    img=False,
+    figsize=(4, 4),
+    dpi = 200,
+    save = "fig-nhood-Morans-I.png"
+)
+```
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-morans"
+#| fig-width: 8
+#| fig.show: 'hold'
+#| fig-cap: "Expression for select genes showing relatively high Moran's _I_."
+
+knitr::include_graphics(c("./figures/fig-nhood-Morans-I.png"))
+```
+
+
+### Spatial co-occurance
+
+While Moran's _I_ quantifies autocorrelation of genes, spatial co-occurance with
+`gr.co_occurance` quantifies cell-level co-occurances. In example below, co-occurance
+of Leiden clusters was used (@fig-co-occurance).
+
+```{filename="Python"}
+
+sq.gr.co_occurrence(
+    adata_subset,
+    cluster_key="leiden",
+)
+
+sq.pl.co_occurrence(
+    adata_subset,
+    cluster_key="leiden",
+    clusters="1",
+    save = "fig-co-occurance1.png"
+)
+sq.pl.spatial_segment(
+    adata_subset,
+    shape="hex",
+    color="leiden",
+    library_id="35",
+    library_key="fov",
+    seg_cell_id="cell_ID",
+    img=False,
+    size=60,
+    ax = ax[1],
+    save = "fig-co-occurance2.png"
+)
+```
+
+
+
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-co-occurance"
+#| fig-width: 8
+#| fig.show: 'hold'
+#| fig-cap: "Co-occurance of Leiden clusters. Left: Leiden clusters in space for a single FOV of breast cancer tissue. Right: co-occurance probability ratio (Y) for each cluster relative to Leiden cluster 1 (orange cells in left plot) with increasing radius (X)."
+
+cowplot::ggdraw() + cowplot::draw_image("./figures/fig-co-occurance2.png", width=0.5) + 
+  cowplot::draw_image("./figures/fig-co-occurance1.png", width = 0.5, x = 0.5)
+```
+
+### Neighborhood enrichment
+
+We can take a look at neighborhood enrichment scores using `gr.nhood_enrichment` 
+and `pl.nhood_enrichment`(@fig-neighbors). 
+
+```{filename="Python"}
+#| echo: false
+
+sq.gr.nhood_enrichment(adata2, cluster_key="leiden")
+sq.pl.nhood_enrichment(
+    adata2,
+    cluster_key="leiden",
+    figsize=(5, 5),
+    dpi = 200,
+    title="Neighborhood enrichment",
+    save = "fig-nhood-enrichment.png"
+)
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-neighbors"
+#| fig-width: 8
+#| fig.show: 'hold'
+#| fig-cap: "Neighborhood enrichment across all FOVs for each pairwise combination of Leiden clusters."
+
+knitr::include_graphics(c("./figures/fig-nhood-enrichment.png"))
+```
+
+
+<!-- # Saving annData -->
+
+<!-- ```{filename="Python"} -->
+<!-- adata2.write("./adata2.h5ad") -->
+
+<!-- ``` -->
 
 # Conclusion
 
-
+to do.
 
 # Appendix {.appendix}
 
@@ -660,10 +1064,132 @@ zipp==3.19.2
 ```
 
 
-## Comparison between legacy formats and AtoMx 1.3.2 format {#sec-comparison}
+## Comparison between legacy formats and AtoMx 1.3.2 format for fov_positions {#sec-comparison}
 
 In this section I compare the flat files created for `Lung5_rep1` of the NSCLC dataset
-side-by-side with the updated (AtoMx 1.3.2) flat file format. 
+side-by-side with the updated (AtoMx 1.3.2) flat file format for fov_positions. The
+specific values will be different since they are different datasets but the side by
+sides should showj
+
+### FOV positions flat file
+
+When we compare the FOV positions between old and new, you can see that the column
+name 'fov' has been changed to 'FOV' and the newer format includes global positions
+of the FOVs in units of mm in addition to pixels.
+
+::: {.panel-tabset group="version"}
+
+#### Legacy
+
+```{r}
+#| eval: false
+
+fov_file_old <- read.csv("/Volumes/Extreme_Pro/data/public_data/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_fov_positions_file.csv", header=TRUE)
+head(fov_file_old, 10)
+```
+
+```
+   fov x_global_px y_global_px
+1    1    3188.889    155216.7
+2    2    8661.111    155216.7
+3    3   14133.333    155216.7
+4    4   19605.556    155216.7
+5    5   25077.778    155216.7
+6    6    3188.889    158866.7
+7    7    8661.111    158866.7
+8    8   14133.333    158866.7
+9    9   19605.556    158866.7
+10  10   25077.778    158866.7
+```
+
+#### AtoMx 1.3.2
+
+```{r}
+#| eval: false
+
+fov_file_new <- read.csv("/Volumes/Extreme_Pro/data/Demo_AGBT_6K_Breast_19_06_2024_13_37_37_539/sample_dir_formatted/AUG29_13INTEGR_6K_BRST_PS_S2_fov_positions_file.csv.gz", header=TRUE)
+head(fov_file_new, 10)
+```
+
+```
+   FOV x_global_px y_global_px x_global_mm y_global_mm
+1    1           0       29791   0.0000000    3.583410
+2    2        4255       29791   0.5119157    3.583410
+3    3        8511       29791   1.0238314    3.583410
+4    4       12767       29791   1.5357471    3.583410
+5    5       17023       29791   2.0476628    3.583410
+6    6       21279       29791   2.5595785    3.583410
+7    7       25535       29791   3.0714942    3.583410
+8    8       29791       29791   3.5834099    3.583410
+9    9           0       25535   0.0000000    3.071494
+10  10        4255       25535   0.5119157    3.071494
+```
+
+:::
+
+### Expression Matrix
+
+For expression matrices, we see that NegPrb<\\d+> is changed to Negative<\\d+> and
+the newer format has SystemControls.
+
+::: {.panel-tabset group="version"}
+
+#### Legacy
+
+```{r}
+#| eval: false
+library(plyr)
+library(dplyr)
+expr_file_old <- read.csv("/Volumes/Extreme_Pro/data/public_data/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_exprMat_file.csv", header=TRUE)
+
+expr_file_old %>% select(fov:AATK, ZFP36:NegPrb3, NegPrb23) %>% head(10)
+
+```
+
+```
+   fov cell_ID AATK ... ZFP36 NegPrb3 ... NegPrb23
+1    1       0   15 ...   184      12 ...       13
+2    1       1    0 ...     0       0 ...        0
+3    1       2    0 ...     1       0 ...        0
+4    1       3    0 ...     0       0 ...        0
+5    1       4    0 ...     0       0 ...        0
+6    1       5    0 ...     0       0 ...        0
+7    1       6    0 ...     0       0 ...        0
+8    1       7    0 ...     1       0 ...        0
+9    1       8    0 ...     0       0 ...        0
+10   1       9    0 ...     0       0 ...        0
+```
+
+#### AtoMx 1.3.2
+
+```{r}
+#| eval: false
+
+expr_file_new <- read.csv("/Volumes/Extreme_Pro/data/Demo_AGBT_6K_Breast_19_06_2024_13_37_37_539/sample_dir_formatted/AUG29_13INTEGR_6K_BRST_PS_S2_exprMat_file.csv.gz", header=TRUE)
+
+expr_file_new %>% select(fov:A1BG, ZZZ3:Negative1, Negative9:SystemControl1, SystemControl99) %>% head(10)
+
+```
+
+```
+   fov cell_ID A1BG ... ZZZ3 Negative1 ... Negative9 SystemControl1 ... SystemControl99
+1    1       1    0 ...    0         0 ...         0              0 ...               0
+2    1       2    0 ...    0         0 ...         0              0 ...               0
+3    1       3    0 ...    0         0 ...         0              0 ...               0
+4    1       4    1 ...    0         0 ...         0              0 ...               0
+5    1       5    0 ...    0         0 ...         0              0 ...               0
+6    1       6    0 ...    0         0 ...         0              0 ...               0
+7    1       7    0 ...    0         0 ...         0              0 ...               0
+8    1       8    0 ...    0         0 ...         0              0 ...               0
+9    1       9    1 ...    0         0 ...         0              0 ...               0
+10   1      10    0 ...    0         0 ...         0              0 ...               0
+```
+
+:::
+
+
+
+
 
 ### Polygons file
 
@@ -679,7 +1205,18 @@ poly_file_new <- head(poly_file_new, 10)
 ```
 
 
+<!-- ##  {#sec-cellcompositepatch} -->
 
+<!-- ```{default filename="Terminal"} -->
+<!-- #| eval: false -->
+
+<!-- # cd to sample dir -->
+
+<!-- mkdir -p CellComposite -->
+<!-- for file in $(ls ../RawFiles/*/*/CellStatsDir/Morphology2D/composite_autocontrast/*jpg); do extracted_id=$(echo "$file" | grep -Eo "F\d{3}"); cp $file ./CellComposite/CellComposite_"$extracted_id".jpg; done -->
+
+
+<!-- ``` -->
 
 
 
