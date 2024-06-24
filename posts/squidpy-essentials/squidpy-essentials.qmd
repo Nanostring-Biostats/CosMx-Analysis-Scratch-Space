@@ -1,5 +1,5 @@
 ---
-title: "Using Squidpy with AtoMx SIP exports"
+title: "Using Squidpy with AtoMx&#8482; SIP exports"
 author:
   - name: Evelyn Metzger
     orcid: 0000-0002-4074-9003
@@ -13,11 +13,11 @@ toc-expand: 2
 toc-location: left
 number-sections: true
 number-depth: 3
-date: "2024-06-20"
+date: "2024-06-24"
 categories: [squidpy]
 draft: false
-# image: figures/fig-to-do.png
-description: In this blog post, I’ll show you how to prepare your AtoMx SIP-exported data for squidpy.
+image: figures/fig-image1.png
+description: In this blog post, I’ll show how to prepare and analyze AtoMx SIP-exported CosMx&#8482; SMI data with python\'s squidpy package.
 code-fold: false
 # page-layout: full
 format: 
@@ -30,43 +30,40 @@ google-scholar: true
 
 # Introduction
 
-The [AtoMx&#8482;](https://nanostring.com/products/atomx-spatial-informatics-platform/atomx-sip-overview/){target="blank"}
-Spatial Informatics Portal (SIP) is a fully-integrated and cloud-based 
-solution for analyzing spatial biology. It has
-several built-in analysis modules (_e.g._, QC, clustering, cell typing, 
-differential
-expression) and users can upload their own custom modules for expanded analysis.
-AtoMx SIP also has the ability to export data so that users can run fully custom
-analyses. 
+Elucidating the spatial distribution of RNA transcripts and protein is one
+of the fundamental utilities of the CosMx&#8482; Spatial Molecular Imager (SMI).
+When it comes to analysis, the [AtoMx&#8482;](https://nanostring.com/products/atomx-spatial-informatics-platform/atomx-sip-overview/){target="blank"}
+Spatial Informatics Portal (SIP) is an end-to-end solution that has several advantages including built-in analysis modules, data storage, and the ability to analyze from a browser window. For fully custom analyses, the 
+SIP also has the ability to export the data.
 
-When it comes to open-sourced analysis solutions that can analyze SIP exports,
-there are a few options. For R users, [Giotto](https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html){target="_blank"} [@Dries2021] uses a range of algorithms and has
+There are a growing number of open-sourced analysis solutions that can analyze and
+visualize SMI data. For example, [Giotto](https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html){target="_blank"} [@Dries2021] has been available for a few years, uses a range of algorithms, and has
 way to visualize tissue built in. More recently, Seurat [@Hao2024], another R
-pacakge (and another artist!), has added image viewing capabilities into its workflow. For vignettes on how to analyze
+package (and another artist!), has added image viewing capabilities into its workflow. For vignettes on how to analyze
 SMI data with Seurat, check out [Claire's recent blog post](../seurat-cosmx-basics/index.qmd){target="_blank"} or
-the vignette from [Seurat's website](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2#human-lung-nanostring-cosmx-spatial-molecular-imager){target="_blank"}. For python users, 
+the vignette from [Seurat's website](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2#human-lung-nanostring-cosmx-spatial-molecular-imager){target="_blank"}. 
 
+For python users, 
 I find [squidpy](https://squidpy.readthedocs.io/en/stable/){target="_blank"} [@Palla2022] works well, is feature-rich, and speedy. Part of this efficiency is
 thanks to the [anndata](https://anndata.readthedocs.io/en/stable/){target="_blank"} package. For more info on creating anndata
-objects with SMI data, see [Lidan's recent post](../h5ad_conversion/index.qmd){target="_blank"}. Squidpy also has a built-in method (function) to read in nanostring data, [`read.nanostring`](https://squidpy.readthedocs.io/en/stable/api/squidpy.read.nanostring.html){target="_blank"} that reads in the counts data, metadata, and optionally the field of view (FOV) file and image data. The developers also have a [vignette](https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data){target="_blank"} that uses a slide from the [first public data release]((https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/){target="_blank"}) of SMI data [@He2022]. Note that the example dataset in that vignette uses a legacy file forma that differs slightly with AtoMx SIP.
-For more information on the differences, see the Appendix @sec-comparison).
-
+objects with SMI data, see [Lidan's recent post](../h5ad_conversion/index.qmd){target="_blank"}. Squidpy also has a built-in function to read in SMI data, [`read.nanostring`](https://squidpy.readthedocs.io/en/stable/api/squidpy.read.nanostring.html){target="_blank"}, that reads in the counts data, metadata, and optionally the field of view (FOV) file and image data. The developers also have a [vignette](https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data){target="_blank"} that uses a slide from the [first public data release]((https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/){target="_blank"}) of SMI data [@He2022]. Note that the example dataset in that vignette uses a legacy file format that differs slightly compared to AtoMx SIP.
+For more information on the differences, see the Appendix @sec-comparison.
 
 In this blog post, I'll show you how to:
 
-- @sec-export export the squidpy-relavent files
+- @sec-export export the squidpy-relavent files from AtoMx SIP
 - @sec-install (and Appendix @sec-venv) tips for installing squidpy
 - @sec-noimage analysis examples without spatial images
 - @sec-imageanalysis how to pivot your AtoMx-exported data into a format that can be used with squidpy and image-based analysis examples
 
-<!-- Elucidating the spatial distribution of RNA transcripts and protein is one  -->
-<!-- of the fundamental utilities of the CosMx&#8482; Spatial Molecular Imager (SMI). -->
-<!-- It has been about a year and a half since @He2022 released the first public -->
-<!-- [SMI dataset],  -->
-<!-- consisting of ~800k cells with 980 RNA targets from multiple  -->
-<!-- tissues of NSCLC FFPE. Now there are additional [public datasets](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/){targets="_blank"} -->
-<!-- that span two species (mouse, human), four tissues (lung, liver, brain, pancreas), and -->
-<!-- three levels of plex (1k, 6k, whole transcriptome).  -->
+:::{.callout-note}
+In this blog post I provide some analysis examples but this is not intended to
+provide recommendations of parameters, clustering approaches, _etc. I have not 
+tested my example dataset on all of the squidpy functions so there may be errors.
+
+Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
+the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
+:::
 
 # Exporting data from AtoMx {#sec-export}
 
@@ -133,7 +130,7 @@ For installing within a virtual environment (recommended), see the Appendix (@se
 # Analysis without imaging data {#sec-noimage}
 
 In the simplest form, we can use squidpy without imaging data by reading
-the expression data, metadata, and optionally the FOV positions data. This analyses
+the expression data, metadata, and optionally the FOV positions data. These analyses
 include normalization, PCA, umap, _etc._ I'll provide some code here but for more details please see the squidpy [vignette](https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data){target="_blank"}.
 
 ## Reading expression and metadata only
@@ -151,7 +148,7 @@ import seaborn as sns
 import scanpy as sc
 import squidpy as sq
 
-flat_file_dir = '/Volumes/Extreme_Pro/data/Demo_AGBT_6K_Breast_19_06_2024_13_37_37_539/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2'
+flat_file_dir = 'path/to/breast_cancer_example/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2'
 meta_file = [item for item in os.listdir(flat_file_dir) if 'metadata_file' in item][0]
 counts_file = [item for item in os.listdir(flat_file_dir) if 'exprMat_file' in item][0]
 
@@ -310,7 +307,7 @@ QC filtering, clustering parmaterization, _etc._ of SMI data.
 :::
 
 With the expression and metadata loaded, we can run exploratory data analysis similar
-to what was describe in the squidpy vignette. There are some adjustments to squidpy's vignette that are needed. These adjustments
+to what was described in the squidpy vignette. There are some adjustments to squidpy's vignette that are needed. These adjustments
 reflect the flat file format changes (Appendix @sec-comparison). 
 
 
@@ -577,7 +574,7 @@ So in order to read in image data into squidpy, we must first rearrange our fold
 We can do this manually by moving, copying, or linking files to match the expected
 format. Normally I am a big fan of symbolic links for just this situation. However, 
 I have noticed that `read.nanostring` can have an error when using symbolic links
-for some of the files (error not shown). So for simplicity of this post, I will make a copy of the 
+for some of the files (error not shown). So for simplicity I will make a copy of the 
 data and place them into a new folder `sample_dir_formatted`.
 
 ```{default filename="Terminal"}
@@ -642,7 +639,7 @@ tree -L 2
 If your flow cell was created prior to AtoMx v1.3.2, the CellComposite
 jpg files may not show the composites but instead just blank images. 
 They will still load into squidpy but will not show the expected tissue structure.
-This issues patched for samples created in v1.3.2+. If you have blank images and
+This issue was patched for samples created in v1.3.2+. If you have blank images and
 would like to replace them with composite images, check out [this post](../composite-images/making-composite-images.qmd){target="_blank"}. 
 :::
 
@@ -661,7 +658,7 @@ import seaborn as sns
 import scanpy as sc
 import squidpy as sq
 
-sample_dir = '/Volumes/Extreme_Pro/data/Demo_AGBT_6K_Breast_19_06_2024_13_37_37_539/sample_dir_formatted'
+sample_dir = 'path/to/breast_cancer_example/sample_dir_formatted'
 meta_file = [item for item in os.listdir(sample_dir) if 'metadata_file' in item][0]
 counts_file = [item for item in os.listdir(sample_dir) if 'exprMat_file' in item][0]
 fov_file = [item for item in os.listdir(sample_dir) if 'fov_positions_file' in item][0]
@@ -715,8 +712,6 @@ adata_subset = adata2[adata2.obs.fov == "35"].copy()
 cells drawn as contours that are colored based on their Leiden cluster.
 
 ```{filename="Python"}
-#| eval: false
-
 sq.pl.spatial_segment(
     adata2,
     color="leiden",
@@ -750,10 +745,7 @@ knitr::include_graphics("./figures/fig-image1.png")
 
 Moran's _I_ is a useful spatial statistic for measuring the extent that a gene's 
 expression is clustered in space (verus random or dispersed). Taking a look at the
-single-FOV subset, we genes with positive Moran's _I_. When we plot the expression
-of some of these genes (@fig-morans), we indeed see some how they are aggregated. 
-For example, _COX6C_, which have clinical significance with breast cancer [@Tian2021],
-is autocorrelated and co-occurs with cells high in _KRT19_.
+single-FOV subset, we see genes with positive Moran's _I_. 
 
 ```{filename="Python"}
 
@@ -781,6 +773,11 @@ ERBB2    0.509171        0.0  0.000279         0.0  0.009901  0.000458          
 KRT19    0.502475        0.0  0.000279         0.0  0.009901  0.000529               0.0                0.0         0.044936
 
 ```
+
+When we plot the expression
+of some of these genes (@fig-morans), we indeed see some how they are aggregated. 
+For example, _COX6C_ expression, which may have clinical significance with breast cancer [@Tian2021],
+is autocorrelated and co-occurs with cells high in _KRT19_.
 
 ```{filename="Python"}
 
@@ -899,7 +896,8 @@ knitr::include_graphics(c("./figures/fig-nhood-enrichment.png"))
 
 # Conclusion
 
-to do.
+In this post I showed how pivot CosMx SMI data that were exported from AtoMx SIP into a format that can be read with the open-sourced python package squidpy. 
+
 
 # Appendix {.appendix}
 
@@ -1064,12 +1062,14 @@ zipp==3.19.2
 ```
 
 
-## Comparison between legacy formats and AtoMx 1.3.2 format for fov_positions {#sec-comparison}
+## Comparison between legacy formats and AtoMx 1.3.2 format {#sec-comparison}
 
 In this section I compare the flat files created for `Lung5_rep1` of the NSCLC dataset
-side-by-side with the updated (AtoMx 1.3.2) flat file format for fov_positions. The
-specific values will be different since they are different datasets but the side by
-sides should showj
+side-by-side with the updated (AtoMx 1.3.2) flat file format. The
+specific values will be different since they are different datasets but the following
+side-by-sides show similarities and differences between the formats. Also note that
+flat files are not raw data. Indeed, the flat files exported from AtoMx -- in particular the metadata -- may include
+additional metrics following processing and analysis (_e.g._, QC flags, cell types).
 
 ### FOV positions flat file
 
@@ -1084,22 +1084,22 @@ of the FOVs in units of mm in addition to pixels.
 ```{r}
 #| eval: false
 
-fov_file_old <- read.csv("/Volumes/Extreme_Pro/data/public_data/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_fov_positions_file.csv", header=TRUE)
+fov_file_old <- read.csv("path/to/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_fov_positions_file.csv", header=TRUE)
 head(fov_file_old, 10)
 ```
 
 ```
-   fov x_global_px y_global_px
-1    1    3188.889    155216.7
-2    2    8661.111    155216.7
-3    3   14133.333    155216.7
-4    4   19605.556    155216.7
-5    5   25077.778    155216.7
-6    6    3188.889    158866.7
-7    7    8661.111    158866.7
-8    8   14133.333    158866.7
-9    9   19605.556    158866.7
-10  10   25077.778    158866.7
+  fov x_global_px y_global_px
+  1    3188.889    155216.7
+  2    8661.111    155216.7
+  3   14133.333    155216.7
+  4   19605.556    155216.7
+  5   25077.778    155216.7
+  6    3188.889    158866.7
+  7    8661.111    158866.7
+  8   14133.333    158866.7
+  9   19605.556    158866.7
+  10   25077.778    158866.7
 ```
 
 #### AtoMx 1.3.2
@@ -1107,22 +1107,22 @@ head(fov_file_old, 10)
 ```{r}
 #| eval: false
 
-fov_file_new <- read.csv("/Volumes/Extreme_Pro/data/Demo_AGBT_6K_Breast_19_06_2024_13_37_37_539/sample_dir_formatted/AUG29_13INTEGR_6K_BRST_PS_S2_fov_positions_file.csv.gz", header=TRUE)
+fov_file_new <- read.csv("path/to/breast_cancer_example/sample_dir_formatted/AUG29_13INTEGR_6K_BRST_PS_S2_fov_positions_file.csv.gz", header=TRUE)
 head(fov_file_new, 10)
 ```
 
 ```
-   FOV x_global_px y_global_px x_global_mm y_global_mm
-1    1           0       29791   0.0000000    3.583410
-2    2        4255       29791   0.5119157    3.583410
-3    3        8511       29791   1.0238314    3.583410
-4    4       12767       29791   1.5357471    3.583410
-5    5       17023       29791   2.0476628    3.583410
-6    6       21279       29791   2.5595785    3.583410
-7    7       25535       29791   3.0714942    3.583410
-8    8       29791       29791   3.5834099    3.583410
-9    9           0       25535   0.0000000    3.071494
-10  10        4255       25535   0.5119157    3.071494
+ FOV x_global_px y_global_px x_global_mm y_global_mm
+  1           0       29791   0.0000000    3.583410
+  2        4255       29791   0.5119157    3.583410
+  3        8511       29791   1.0238314    3.583410
+  4       12767       29791   1.5357471    3.583410
+  5       17023       29791   2.0476628    3.583410
+  6       21279       29791   2.5595785    3.583410
+  7       25535       29791   3.0714942    3.583410
+  8       29791       29791   3.5834099    3.583410
+  9           0       25535   0.0000000    3.071494
+  10        4255       25535   0.5119157    3.071494
 ```
 
 :::
@@ -1140,24 +1140,24 @@ the newer format has SystemControls.
 #| eval: false
 library(plyr)
 library(dplyr)
-expr_file_old <- read.csv("/Volumes/Extreme_Pro/data/public_data/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_exprMat_file.csv", header=TRUE)
+expr_file_old <- read.csv("path/to/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_exprMat_file.csv", header=TRUE)
 
 expr_file_old %>% select(fov:AATK, ZFP36:NegPrb3, NegPrb23) %>% head(10)
 
 ```
 
 ```
-   fov cell_ID AATK ... ZFP36 NegPrb3 ... NegPrb23
-1    1       0   15 ...   184      12 ...       13
-2    1       1    0 ...     0       0 ...        0
-3    1       2    0 ...     1       0 ...        0
-4    1       3    0 ...     0       0 ...        0
-5    1       4    0 ...     0       0 ...        0
-6    1       5    0 ...     0       0 ...        0
-7    1       6    0 ...     0       0 ...        0
-8    1       7    0 ...     1       0 ...        0
-9    1       8    0 ...     0       0 ...        0
-10   1       9    0 ...     0       0 ...        0
+  fov cell_ID AATK ... ZFP36 NegPrb3 ... NegPrb23
+  1       0   15 ...   184      12 ...       13
+  1       1    0 ...     0       0 ...        0
+  1       2    0 ...     1       0 ...        0
+  1       3    0 ...     0       0 ...        0
+  1       4    0 ...     0       0 ...        0
+  1       5    0 ...     0       0 ...        0
+  1       6    0 ...     0       0 ...        0
+  1       7    0 ...     1       0 ...        0
+  1       8    0 ...     0       0 ...        0
+  1       9    0 ...     0       0 ...        0
 ```
 
 #### AtoMx 1.3.2
@@ -1165,44 +1165,289 @@ expr_file_old %>% select(fov:AATK, ZFP36:NegPrb3, NegPrb23) %>% head(10)
 ```{r}
 #| eval: false
 
-expr_file_new <- read.csv("/Volumes/Extreme_Pro/data/Demo_AGBT_6K_Breast_19_06_2024_13_37_37_539/sample_dir_formatted/AUG29_13INTEGR_6K_BRST_PS_S2_exprMat_file.csv.gz", header=TRUE)
+expr_file_new <- read.csv("path/to/breast_cancer_example/sample_dir_formatted/AUG29_13INTEGR_6K_BRST_PS_S2_exprMat_file.csv.gz", header=TRUE)
 
 expr_file_new %>% select(fov:A1BG, ZZZ3:Negative1, Negative9:SystemControl1, SystemControl99) %>% head(10)
 
 ```
 
 ```
-   fov cell_ID A1BG ... ZZZ3 Negative1 ... Negative9 SystemControl1 ... SystemControl99
-1    1       1    0 ...    0         0 ...         0              0 ...               0
-2    1       2    0 ...    0         0 ...         0              0 ...               0
-3    1       3    0 ...    0         0 ...         0              0 ...               0
-4    1       4    1 ...    0         0 ...         0              0 ...               0
-5    1       5    0 ...    0         0 ...         0              0 ...               0
-6    1       6    0 ...    0         0 ...         0              0 ...               0
-7    1       7    0 ...    0         0 ...         0              0 ...               0
-8    1       8    0 ...    0         0 ...         0              0 ...               0
-9    1       9    1 ...    0         0 ...         0              0 ...               0
-10   1      10    0 ...    0         0 ...         0              0 ...               0
+  fov cell_ID A1BG ... ZZZ3 Negative1 ... Negative9 SystemControl1 ... SystemControl99
+  1       1    0 ...    0         0 ...         0              0 ...               0
+  1       2    0 ...    0         0 ...         0              0 ...               0
+  1       3    0 ...    0         0 ...         0              0 ...               0
+  1       4    1 ...    0         0 ...         0              0 ...               0
+  1       5    0 ...    0         0 ...         0              0 ...               0
+  1       6    0 ...    0         0 ...         0              0 ...               0
+  1       7    0 ...    0         0 ...         0              0 ...               0
+  1       8    0 ...    0         0 ...         0              0 ...               0
+  1       9    1 ...    0         0 ...         0              0 ...               0
+  1      10    0 ...    0         0 ...         0              0 ...               0
 ```
 
 :::
 
+### Metadata file
 
+The primary difference between legacy and AtoMx formats for the metadata is that the latter includes processed results (_i.e._, extra columns).
 
+::: {.panel-tabset group="version"}
 
-
-### Polygons file
-
-The polygons file, which was absent in the legacy format, shows the vertices
-of each cell's polygon. 
+#### Legacy
 
 ```{r}
 #| eval: false
 library(plyr)
 library(dplyr)
-poly_file_new <- read.csv("/Volumes/Extreme_Pro/data/agbt_breast/AUG29_13INTEGR_6K_BRST_PS_S2/AUG29_13INTEGR_6K_BRST_PS_S2-polygons.csv", header=TRUE)
-poly_file_new <- head(poly_file_new, 10)
+meta_file_old <- read.csv("path/to/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_metadata_file.csv", header=TRUE)
+head(meta_file_old) %>% str
 ```
+
+```
+'data.frame':	6 obs. of  20 variables:
+ $ fov               : int  1 1 1 1 1 1
+ $ cell_ID           : int  1 2 3 4 5 6
+ $ Area              : int  1259 3723 2010 3358 1213 2647
+ $ AspectRatio       : num  1.34 1.45 1.62 0.47 1 1.38
+ $ CenterX_local_px  : int  1027 2904 4026 4230 4258 66
+ $ CenterY_local_px  : int  3631 3618 3627 3597 3629 3622
+ $ CenterX_global_px : num  4216 6093 7215 7419 7447 ...
+ $ CenterY_global_px : num  158848 158835 158844 158814 158846 ...
+ $ Width             : int  47 87 68 48 38 72
+ $ Height            : int  35 60 42 102 38 52
+ $ Mean.MembraneStain: int  3473 3895 2892 6189 8138 5713
+ $ Max.MembraneStain : int  7354 13832 6048 16091 19281 12617
+ $ Mean.PanCK        : int  715 18374 3265 485 549 1220
+ $ Max.PanCK         : int  5755 53158 37522 964 874 5107
+ $ Mean.CD45         : int  361 260 378 679 566 433
+ $ Max.CD45          : int  845 1232 908 2322 1242 957
+ $ Mean.CD3          : int  22 13 19 5 17 11
+ $ Max.CD3           : int  731 686 654 582 674 547
+ $ Mean.DAPI         : int  4979 1110 10482 6065 3311 4151
+ $ Max.DAPI          : int  26374 13229 33824 39512 30136 19269
+```
+
+
+#### AtoMx 1.3.2
+
+
+```{r}
+#| eval: false
+library(plyr)
+library(dplyr)
+meta_file_new <- read.csv("path/to/breast_cancer_example/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2/AUG29_13INTEGR_6K_BRST_PS_S2_metadata_file.csv.gz", header=TRUE)
+head(meta_file_new) %>% str
+```
+
+
+```
+'data.frame':	6 obs. of  68 variables:
+ $ RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters             : chr  "CAFs.myCAF.like" "CAFs.myCAF.like" "Cancer.Her2.SC" "Cancer.Her2.SC" ...
+ $ RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability: num  0.828 0.999 1 0.992 1 ...
+ $ RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters             : chr  "CAFs.myCAF.like" "CAFs.myCAF.like" "Cancer.Her2.SC" "Cancer.Her2.SC" ...
+ $ RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability: num  1 1 1 0.997 0.938 ...
+ $ cell                                                                    : chr  "c_1_1_1" "c_1_1_2" "c_1_1_3" "c_1_1_4" ...
+ $ nCount_RNA                                                              : int  33 200 1230 874 565 490
+ $ nFeature_RNA                                                            : int  22 139 731 532 352 287
+ $ nCount_negprobes                                                        : int  0 0 0 0 1 0
+ $ nFeature_negprobes                                                      : int  0 0 0 0 1 0
+ $ fov                                                                     : int  1 1 1 1 1 1
+ $ Area                                                                    : int  8254 10079 10993 13811 12530 9130
+ $ AspectRatio                                                             : num  0.9 1.7 0.65 1.22 1.39 2.21
+ $ CenterX_local_px                                                        : int  51 344 595 711 1376 1537
+ $ CenterY_local_px                                                        : int  57 41 73 60 59 38
+ $ Width                                                                   : int  103 141 96 149 166 170
+ $ Height                                                                  : int  115 83 148 122 119 77
+ $ Mean.PanCK                                                              : int  197 205 719 689 102 200
+ $ Max.PanCK                                                               : int  600 1892 2140 2760 480 1204
+ $ Mean.CD68_CK8_18                                                        : int  52 39 120 62 34 39
+ $ Max.CD68_CK8_18                                                         : int  180 140 348 268 120 168
+ $ Mean.CD298_B2M                                                          : int  41 28 121 54 24 24
+ $ Max.CD298_B2M                                                           : int  144 212 792 408 208 304
+ $ Mean.CD45                                                               : int  5 5 22 10 7 8
+ $ Max.CD45                                                                : int  96 64 112 80 176 84
+ $ Mean.DAPI                                                               : int  1451 379 2742 1325 1830 1412
+ $ Max.DAPI                                                                : int  3868 5672 7196 5420 7152 5136
+ $ cell_id                                                                 : chr  "c_1_1_1" "c_1_1_2" "c_1_1_3" "c_1_1_4" ...
+ $ assay_type                                                              : chr  "RNA" "RNA" "RNA" "RNA" ...
+ $ version                                                                 : chr  "v6" "v6" "v6" "v6" ...
+ $ Run_Tissue_name                                                         : chr  "AUG29_1.3INTEGR_6K_BRST_PS_S2" "AUG29_1.3INTEGR_6K_BRST_PS_S2" "AUG29_1.3INTEGR_6K_BRST_PS_S2" "AUG29_1.3INTEGR_6K_BRST_PS_S2" ...
+ $ Panel                                                                   : chr  "panel name" "panel name" "panel name" "panel name" ...
+ $ cellSegmentationSetId                                                   : chr  " a4b3bb56-ce7d-4299-a684-2a57bb307538" " a4b3bb56-ce7d-4299-a684-2a57bb307538" " a4b3bb56-ce7d-4299-a684-2a57bb307538" " a4b3bb56-ce7d-4299-a684-2a57bb307538" ...
+ $ cellSegmentationSetName                                                 : chr  " CPA All FOVs PS1" " CPA All FOVs PS1" " CPA All FOVs PS1" " CPA All FOVs PS1" ...
+ $ slide_ID                                                                : int  1 1 1 1 1 1
+ $ CenterX_global_px                                                       : int  51 344 595 711 1376 1537
+ $ CenterY_global_px                                                       : int  29734 29750 29718 29731 29732 29753
+ $ cell_ID                                                                 : int  1 2 3 4 5 6
+ $ unassignedTranscripts                                                   : num  0.0646 0.0646 0.0646 0.0646 0.0646 ...
+ $ nCount_falsecode                                                        : int  0 0 6 4 1 0
+ $ nFeature_falsecode                                                      : int  0 0 6 4 1 0
+ $ Area.um2                                                                : num  119 146 159 200 181 ...
+ $ propNegative                                                            : num  0 0 0 0 0.00177 ...
+ $ complexity                                                              : num  1.5 1.44 1.68 1.64 1.61 ...
+ $ errorCtEstimate                                                         : int  0 0 0 0 309 0
+ $ percOfDataFromError                                                     : num  0 0 0 0 0.547 ...
+ $ qcFlagsRNACounts                                                        : chr  "Pass" "Pass" "Pass" "Pass" ...
+ $ qcFlagsCellCounts                                                       : chr  "Pass" "Pass" "Pass" "Pass" ...
+ $ qcFlagsCellPropNeg                                                      : chr  "Pass" "Pass" "Pass" "Pass" ...
+ $ qcFlagsCellComplex                                                      : chr  "Pass" "Pass" "Pass" "Pass" ...
+ $ qcFlagsCellArea                                                         : chr  "Pass" "Pass" "Pass" "Pass" ...
+ $ qcCellsFlagged                                                          : logi  FALSE FALSE FALSE FALSE FALSE FALSE
+ $ median_negprobes                                                        : num  14 14 14 14 14 14
+ $ negprobes_quantile_0.9                                                  : num  25.1 25.1 25.1 25.1 25.1 25.1
+ $ median_RNA                                                              : int  51 51 51 51 51 51
+ $ RNA_quantile_0.9                                                        : num  166 166 166 166 166 166
+ $ nCell                                                                   : int  932 932 932 932 932 932
+ $ nCount                                                                  : int  614735 614735 614735 614735 614735 614735
+ $ nCountPerCell                                                           : num  660 660 660 660 660 ...
+ $ nFeaturePerCell                                                         : num  404 404 404 404 404 ...
+ $ propNegativeCellAvg                                                     : num  0.00058 0.00058 0.00058 0.00058 0.00058 ...
+ $ complexityCellAvg                                                       : num  1.54 1.54 1.54 1.54 1.54 ...
+ $ errorCtPerCellEstimate                                                  : num  100 100 100 100 100 ...
+ $ percOfDataFromErrorPerCell                                              : num  0.152 0.152 0.152 0.152 0.152 ...
+ $ qcFlagsFOV                                                              : chr  "Pass" "Pass" "Pass" "Pass" ...
+ $ i.median_negprobes                                                      : num  14 14 14 14 14 14
+ $ i.negprobes_quantile_0.9                                                : num  25.1 25.1 25.1 25.1 25.1 25.1
+ $ i.median_RNA                                                            : int  51 51 51 51 51 51
+ $ i.RNA_quantile_0.9                                                      : num  166 166 166 166 166 166
+```
+
+
+:::
+
+### Transcript coordinates file
+
+
+
+::: {.panel-tabset group="version"}
+
+#### Legacy
+
+
+```{r}
+#| eval: false
+
+tx_file_old <- read.csv("path/to/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_tx_file.csv", header=TRUE)
+tx_file_old %>% head(10)
+```
+
+
+```
+  fov cell_ID x_global_px y_global_px x_local_px y_local_px  z  target CellComp
+  1       0    6757.402    158836.4   3568.513  3619.7375 11   NEAT1        0
+  1       0    5111.389    156060.2   1922.500   843.5334 11   NEAT1        0
+  1       0    7860.461    157809.3   4671.572  2592.6715 11    CCR2        0
+  1       0    3790.489    155553.9    601.600   337.2168 11 HLA-DRA        0
+  1       0    3290.639    158023.6    101.750  2806.9750 11 HLA-DRA Membrane
+  1       0    7020.160    158656.3   3831.271  3439.6000 11     VHL        0
+  1       0    4252.914    157003.0   1064.025  1786.3376 11    FZD5  Nuclear
+  1       0    5987.309    157572.5   2798.420  2355.8000 11    CD37        0
+  1       0    5586.849    157774.2   2397.960  2557.5599 11   ATG12 Membrane
+```
+
+```{r}
+#| eval: false
+tx_file_old %>% select(CellComp) %>% unique()
+```
+
+```
+  CellComp
+  0
+  Membrane
+  Nuclear
+  Cytoplasm
+
+```
+#### AtoMx 1.3.2
+
+
+```{r}
+#| eval: false
+library(plyr)
+library(dplyr)
+tx_file_new <- read.csv("path/to/breast_cancer_example/flatFiles/tmp_tx.csv", header=TRUE)
+tx_file_new %>% tail(10)
+```
+
+
+```
+  fov cell_ID             cell x_local_px y_local_px x_global_px y_global_px        z    target CellComp
+  30    4755 29337.6332465278   173483.2  4259.8555    16.57764           3      B2M Cytoplasm         
+  30    4755 29340.4174262153   173488.4  4262.6396    21.71997           3   COL3A1 Cytoplasm         
+  30    4757 29593.4975043403   173480.9  4515.7197    14.27002           8    RPL32 Cytoplasm         
+  30    4759 25211.3444434272   173477.6   133.5667    10.95020           6   COL1A1 Cytoplasm         
+  30    4759 25224.5611029731   173483.9   146.7833    17.28320           6   COL1A2 Cytoplasm         
+  30    4760 25902.6278143989   173480.8   824.8500    14.11694           7   TPSAB1 Cytoplasm         
+  30    4760 25924.0527411567   173477.8   846.2750    11.10010           1 HSP90AB1 Cytoplasm         
+  30    4760 25925.7694159614   173478.0   847.9916    11.34155           6     GLUL Cytoplasm         
+  30    4760 25914.4152899848   173478.9   836.6375    12.27515           6   ADGRE2 Cytoplasm         
+  30    4760 25902.9277411567   173480.7   825.1500    14.07520           8   TPSAB1 Cytoplasm   
+```
+
+```{r}
+#| eval: false
+tx_file_new %>% select(CellComp) %>% unique()
+```
+
+
+```
+  CellComp
+  None
+  Membrane
+  Nuclear
+  Cytoplasm
+```
+
+:::
+
+### Polygons file
+
+The polygons file was added to the list of flat files and shows the vertices
+of each cell's polygon. 
+
+::: {.panel-tabset group="version"}
+
+#### Legacy
+
+(Not applicable)
+
+
+#### AtoMx 1.3.2
+
+This example below shows the vertices of cell `c_1_2_3` (_i.e._, **c**ell_slide_FOV_cell number).
+
+```{r}
+#| eval: false
+library(plyr)
+library(dplyr)
+poly_file_new <- read.csv("path/to/breast_cancer_example/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2-polygons.csv.gz", header=TRUE)
+poly_file_new %>% filter(cell=="c_1_2_3")
+```
+
+
+```
+  fov cellID    cell x_local_px y_local_px x_global_px y_global_px
+  2      3 c_1_2_3        279          0        4535       29792
+  2      3 c_1_2_3        279          1        4535       29791
+  2      3 c_1_2_3        270         15        4526       29777
+  2      3 c_1_2_3        266         20        4522       29772
+  2      3 c_1_2_3        234         53        4490       29739
+  2      3 c_1_2_3        223         64        4479       29728
+  2      3 c_1_2_3        214         71        4470       29721
+  2      3 c_1_2_3        210         72        4466       29720
+  2      3 c_1_2_3        199         72        4455       29720
+  2      3 c_1_2_3        186         66        4442       29726
+  2      3 c_1_2_3        182         64        4438       29728
+  2      3 c_1_2_3        179         62        4435       29730
+  2      3 c_1_2_3        176         31        4432       29761
+  2      3 c_1_2_3        176          4        4432       29788
+  2      3 c_1_2_3        179          0        4435       29792
+```
+
+
+:::
+
+
 
 
 <!-- ##  {#sec-cellcompositepatch} -->
