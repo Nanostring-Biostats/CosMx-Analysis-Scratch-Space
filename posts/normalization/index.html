@@ -242,7 +242,7 @@ cookieconsent.run({
       <div>
       <div class="quarto-title-meta-heading">Modified</div>
       <div class="quarto-title-meta-contents">
-        <p class="date-modified">April 17, 2024</p>
+        <p class="date-modified">June 19, 2024</p>
       </div>
     </div>
       
@@ -274,6 +274,7 @@ cookieconsent.run({
 <section id="qc-and-normalization-of-cosmx-rna-data" class="level1">
 <h1>QC and normalization of CosMx RNA data</h1>
 <p>We’ve tried a lot of options here, and we’ve settled on very simple procedures for most cases.</p>
+<p>We discuss them here. To see them implemented in an R-based analysis workflow, see the <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/assets/2.-QC-and-normalization.html">QC and normalization page</a> of our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/">basic analysis vignette</a></p>
 <p><img src="figures/puzzle.png" class="center"> <!-- ![](figures/puzzle.png =250x) --></p>
 <section id="qc" class="level2">
 <h2 class="anchored" data-anchor-id="qc">QC</h2>
@@ -287,7 +288,7 @@ cookieconsent.run({
 </ul>
 <p><strong>QC logic would then proceed as follows:</strong></p>
 <ol type="1">
-<li>Remove cells with too few counts. For our 1000plex assay, we use a pretty generous threshold of 20 counts. A higher threshold would be reasonable.</li>
+<li>Remove cells with too few counts. We use fairly generous thresholds of 20 counts for our 1000plex assay and 50 counts for the 6000plex assay. Higher / more stringent thresholds would also be reasonable.</li>
 </ol>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># counts is the matrix of raw expression profiles, cells in rows, genes in columns</span></span>
@@ -297,7 +298,7 @@ cookieconsent.run({
 <ol start="2" type="1">
 <li><p>Remove cells with high outlier areas. You can use Grubb’s test to detect outliers, or you can draw a histogram of cell areas and choose a cutoff on your own.</p></li>
 <li><p>Remove FOVs with poor counts. AtoMx removes FOVs based on their mean count per cell, or by a user-specified quantile of counts per cell. Filtering on % of cells flagged by the above criteria would also be reasonable.</p></li>
-<li><p>Flag FOVs with distorted expression profiles. AtoMx now flags FOVs where z-stack registration is highly unstable, but older runs won’t benefit from this update, and other effects, namely background fluorescence, can still distort FOV expression profiles. Unfortunately, there’s no easy automated way to flag outlier FOVs (yet). Fortunately, they do tend to stand out in spatial analyses. If you e.g.&nbsp;plot cell typing results in space, or plot spatial clustering results in space, outlier FOVs stand out strongly. They can then be manually flagged and removed.</p></li>
+<li><p>Flag FOVs with distorted expression profiles. AtoMx now flags FOVs where z-stack registration is highly unstable, but older runs won’t benefit from this update, and other effects, namely background fluorescence, can still distort FOV expression profiles. To implement steps 3 and 4, you can find our FOV QC tool <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/">here</a>.</p></li>
 </ol>
 </section>
 <section id="normalization" class="level2">
@@ -308,13 +309,15 @@ cookieconsent.run({
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>totalcounts <span class="ot">&lt;-</span> Matrix<span class="sc">::</span><span class="fu">rowSums</span>(counts)  </span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>norm <span class="ot">&lt;-</span> <span class="fu">sweep</span>(counts, <span class="dv">1</span>, <span class="fu">pmax</span>(totalcounts, <span class="dv">20</span>), <span class="st">"/"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>…note the <code>pmax(totalcounts, 20)</code> term in the above. This puts a floor on how much we’ll up-scale a cell. This prevents us from taking cells with very few counts and drastically scaling them up, which gives them undeserved highly-distinct expression profiles.</p>
-<p>(Note: some authors have pointed out that there’s information to be had in a cell’s total counts. For example, cancer cells tend to have high overall RNA expression. When we normalize, we lose this information. But we’ve usually found that a small price to pay to control the variability in total counts that arises from unwanted technical sources.)</p>
+<p>Note the <code>pmax(totalcounts, 20)</code> term in the above. This puts a floor on how much we’ll up-scale a cell. This prevents us from taking cells with very few counts and drastically scaling them up, which gives them misleadingly distinct expression profiles.</p>
+<p>(Note: some authors have pointed out that there’s information to be had in a cell’s total counts. For example, cancer cells tend to have high overall RNA expression. When we normalize, we lose this information. But we’ve usually found that a small price to pay to control the variability in total counts that arises from unwanted technical sources. Discerning between highly distinct cell types like cancer vs.&nbsp;immune cells is generally easy, while uncovering trends within a cell type is a harder task where controlling technical variability can be enabling.)</p>
 </section>
 <section id="other-transformations" class="level2">
 <h2 class="anchored" data-anchor-id="other-transformations">Other transformations</h2>
-<p>We generally do not perform non-linear transformations on our data.</p>
-<p>Exception: UMAPs often look better when drawn from log- and sqrt-transformed data or from Pearson residuals. Pearson residuals are problematic for big datasets, however, since they convert your data from a sparse matrix to a dense matrix.</p>
+<p>For most cases, we recommend keeping data on the linear scale, i.e.&nbsp;normalizing without further transformation. This approach keeps the data on an easily-interpretable scale and tends to perform well in analyses.</p>
+<p>For some purposes, further transformations can make sense. Transformations like square root or “log1p” (log(1 + x)) inflate the variability of low counts and shrink the variability of high counts. In some datasets, this can make UMAPs and distance-based clustering methods like Leiden and Louvain perform better. Seurat and AtoMx both offer a log1p transformation.</p>
+<p>AtoMx also offers a “Pearson residuals” transformation. This transformation can produce great UMAPs, but is only viable in small studies: because it creates a dense (not sparse) expression matrix, it produces an expression matrix with a huge memory footprint, potentially crashing your analysis environment.</p>
+<p>If you do perform a non-linear transformation to run UMAP or Leiden clustering, consider using linear-scale data elsewhere in your analysis.</p>
 
 
 </section>
