@@ -1,3 +1,5 @@
+# Copyright ©2024 Bruker Spatial Biology, Inc. All rights reserved. Subject to additional license terms and conditions provided separately by Bruker Spatial Biology, Inc.
+
 #' Arrange tissues in xy space to reduce whitespace
 #' 
 #' Uses a shelf algorithm: places tallest tissues on the bottom shelf, and so on. 

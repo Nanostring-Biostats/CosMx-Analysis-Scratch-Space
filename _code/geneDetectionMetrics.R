@@ -1,4 +1,6 @@
 
+# Copyright ©2024 Bruker Spatial Biology, Inc. All rights reserved. Subject to additional license terms and conditions provided separately by Bruker Spatial Biology, Inc.
+
 
 #' Wrapper function to call genes on all metrics:
 #' @param counts Matrix of single cell gene expression profiles,  cells x genes
