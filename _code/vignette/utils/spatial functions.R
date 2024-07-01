@@ -1,3 +1,5 @@
+# Copyright ©2024 Bruker Spatial Biology, Inc. All rights reserved. Subject to additional license terms and conditions provided separately by Bruker Spatial Biology, Inc.
+
 #' Create spatial network from N nearest neighbors
 #'
 #' For each cell identify \code{N} nearest neighbors in Euclidean space and

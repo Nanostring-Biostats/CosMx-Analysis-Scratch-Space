@@ -1,3 +1,4 @@
+# Copyright ©2024 Bruker Spatial Biology, Inc. All rights reserved. Subject to additional license terms and conditions provided separately by Bruker Spatial Biology, Inc.
 
 #### README:
 # This script: functions for performing FOV QC of CosMx data. 
