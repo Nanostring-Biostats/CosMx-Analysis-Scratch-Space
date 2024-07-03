@@ -1,0 +1,604 @@
+---
+title: "Comparing AtoMx&#8482; SIP flat files with the legacy format"
+author:
+  - name: Evelyn Metzger
+    orcid: 0000-0002-4074-9003
+    affiliations: 
+      - ref: nstg
+      - ref: eveilyeverafter
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+number-sections: true
+number-depth: 3
+date: "2024-07-03"
+categories: [flat files]
+draft: false
+image: figures/fig-fig1.png
+description: This short post shows differences between the AtoMx&#8482; SIP-exported and legacy CosMx&#8482; SMI \"flat files\"
+code-fold: false
+format: 
+  html:
+    theme: 
+      light: custom.scss
+      dark: darkly
+google-scholar: true
+---
+
+There are different data formats and structures that can be exported from the [AtoMx&#8482;](https://nanostring.com/products/atomx-spatial-informatics-platform/atomx-sip-overview/){target="blank"} Spatial Informatics Portal (SIP). These include
+the raw data (_i.e._, with CellStatsDir, RunSummary, and AnalysisResults folders), 
+Seurat (with or without images), Tiledb, and "flat files". The flat files get
+their name because they are in a human-readable 
+and accessible format (_i.e._, comma separated files). These files, 
+like Seurat files and Tiledb files, aren't actually
+raw data but are processed data and can include additional analysis results (_e.g._, cell typing data).
+
+The first use of the flat file format was about a year and a half ago when @He2022 released the first public
+[CosMx&#8482; SMI dataset](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/){target="_blank"},
+consisting of ~800k cells with 980 RNA targets from multiple
+tissues of NSCLC FFPE. Now there are additional [public datasets](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/){targets="_blank"}
+that span two species (mouse, human), four tissues (lung, liver, brain, pancreas), and
+three levels of plex (1k, 6k, whole transcriptome). Because the flat files generated
+in AtoMx SIP differ from the flat files in these public data releases, I thought it might
+be helpful to show a comparison.
+
+Specifically, in this post I compare the flat files created for `Lung5_rep1` of the NSCLC dataset
+side-by-side with the updated (AtoMx 1.3.2) flat file format from an unrelated tissue. The
+specific values will be different since they are different datasets, of course, but the following
+side-by-sides show similarities and differences between the formats. 
+
+# FOV positions flat file {#sec-fov-pos}
+
+When we compare the FOV positions between old and new, you can see that the column
+name 'fov' has been changed to 'FOV' and the newer format includes global positions
+of the FOVs in units of mm in addition to pixels.
+
+::: {.panel-tabset group="version"}
+
+## Legacy
+
+
+| **Column Name** 	| **Type** 	| **Description** 	|
+|----------	|----------	|-----------------	|
+|     fov$^{Δ}$     	|     Int     	|     The field of view (FOV) number            	|
+|     x_global_px     	|    float      	|    The x location (in pixels) of the FOV relative to other FOVs             	|
+|     y_global_px     	|    float      	|    The y location (in pixels) of the FOV relative to other FOVs             	|
+
+: Description of the legacy FOV positions file format. Δ = column name change between versions {#tbl-fov-leg tbl-colwidths="[10, 10, 80]"}
+
+
+Example: 
+
+```{r}
+#| eval: false
+#| echo: false
+fov_file_old <- read.csv("path/to/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_fov_positions_file.csv", header=TRUE)
+head(fov_file_old, 10)
+```
+
+
+```
+  fov x_global_px y_global_px
+  1    3188.889    155216.7
+  2    8661.111    155216.7
+  3   14133.333    155216.7
+  4   19605.556    155216.7
+  5   25077.778    155216.7
+  6    3188.889    158866.7
+  7    8661.111    158866.7
+  8   14133.333    158866.7
+  9   19605.556    158866.7
+  10   25077.778    158866.7
+```
+
+## AtoMx SIP v1.3.2
+
+
+| **Column Name** 	| **Type** 	| **Description** 	|
+|----------	|----------	|-----------------	|
+|     FOV$^{Δ}$     	|     Int     	|     The field of view (FOV) number            	|
+|     x_global_px     	|    float      	|    The x location (in pixels) of the FOV relative to other FOVs             	|
+|     y_global_px     	|    float      	|    The y location (in pixels) of the FOV relative to other FOVs             	|
+|     x_global_mm$^{*}$     	|    float      	|    The x location (in millimeters) of the FOV relative to other FOVs             	|
+|     y_global_mm$^{*}$     	|    float      	|    The y location (in millimeters) of the FOV relative to other FOVs             	|
+
+: Description of the baseline FOV file format for AtoMx SIP v1.3.2. Δ = column name change between versions; * = new column in 1.3.2 compared to legacy {#tbl-fov-new tbl-colwidths="[10, 10, 80]"}
+
+```{r}
+#| eval: false
+#| echo: false
+fov_file_new <- read.csv("path/to/breast_cancer_example/sample_dir_formatted/AUG29_13INTEGR_6K_BRST_PS_S2_fov_positions_file.csv.gz", header=TRUE)
+head(fov_file_new, 10)
+```
+
+```
+FOV x_global_px y_global_px x_global_mm y_global_mm
+  1           0       29791   0.0000000    3.583410
+  2        4255       29791   0.5119157    3.583410
+  3        8511       29791   1.0238314    3.583410
+  4       12767       29791   1.5357471    3.583410
+  5       17023       29791   2.0476628    3.583410
+  6       21279       29791   2.5595785    3.583410
+  7       25535       29791   3.0714942    3.583410
+  8       29791       29791   3.5834099    3.583410
+  9           0       25535   0.0000000    3.071494
+  10        4255       25535   0.5119157    3.071494
+```
+
+:::
+
+# Expression Matrix
+
+For expression matrices, we see that NegPrb(\\d+) is changed to Negative(\\d+) and
+the newer format has SystemControls.
+
+::: {.panel-tabset group="version"}
+
+## Legacy
+
+| **Column Name** 	| **Type** 	| **Description** 	|
+|----------	|----------	|-----------------	|
+|     fov     	|     Int     	|     The field of view (FOV) number            	|
+|     cell_ID     	|    Int      	|    Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the `fov` and `cell_ID` columns. All transcripts not assigned to a cell are show with a `cell_ID` value of 0.            	|
+|     (Gene expression target)     	|    Int      	|    The number of transcripts observed for a given gene target for a given cell.             	|
+|     (Negative Probe; _e.g._ NegPrb1)$^{Δ}$    	|    Int      	| Negative probes, which do not match any sequence within the transcriptome or genome. These can be used to assess background levels. | 
+
+
+: Description of the legacy expression matrix file format. Δ = column name change between versions {#tbl-fov-leg tbl-colwidths="[15, 15, 70]"}
+
+
+Example:
+```{r}
+#| eval: false
+#| echo: false
+library(plyr)
+library(dplyr)
+expr_file_old <- read.csv("path/to/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_exprMat_file.csv", header=TRUE)
+
+expr_file_old %>% select(fov:AATK, ZFP36:NegPrb3, NegPrb23) %>% head(10)
+
+```
+
+```
+fov cell_ID AATK ... ZFP36 NegPrb3 ... NegPrb23
+  1       0   15 ...   184      12 ...       13
+  1       1    0 ...     0       0 ...        0
+  1       2    0 ...     1       0 ...        0
+  1       3    0 ...     0       0 ...        0
+  1       4    0 ...     0       0 ...        0
+  1       5    0 ...     0       0 ...        0
+  1       6    0 ...     0       0 ...        0
+  1       7    0 ...     1       0 ...        0
+  1       8    0 ...     0       0 ...        0
+  1       9    0 ...     0       0 ...        0
+```
+
+## AtoMx SIP v1.3.2
+
+| **Column Name** 	| **Type** 	| **Description** 	|
+|----------	|----------	|-----------------	|
+|     fov     	|     Int     	|     The field of view (FOV) number            	|
+|     cell_ID     	|    Int      	|    Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the `fov` and `cell_ID` columns. All transcripts not assigned to a cell are show with a `cell_ID` value of 0.            	|
+|     (Gene expression target)     	|    Int      	|    The number of transcripts observed for a given gene target for a given cell.             	|
+|     (Negative Probe, _e.g.,_ Negative1)$^{Δ}$    	|    Int      	| Negative probes, which do not match any sequence within the transcriptome or genome. These can be used to assess background levels. | 
+|     (System Control)$^{*}$     	|    Int      	| System Control codes are codes which do not have any physical probe associated with them.
+ | 
+
+: Description of the baseline expression matrix file format for AtoMx SIP v1.3.2. * = new column in 1.3.2 compared to legacy {#tbl-exp-leg tbl-colwidths="[15, 15, 70]"}
+
+Example:
+```{r}
+#| eval: false
+#| echo: false
+
+expr_file_new <- read.csv("path/to/breast_cancer_example/sample_dir_formatted/AUG29_13INTEGR_6K_BRST_PS_S2_exprMat_file.csv.gz", header=TRUE)
+expr_file_new %>% select(fov:A1BG, ZZZ3:Negative1, Negative9:SystemControl1, SystemControl99) %>% head(10)
+
+```
+
+```
+fov cell_ID A1BG ... ZZZ3 Negative1 ... Negative9 SystemControl1 ... SystemControl99
+  1       1    0 ...    0         0 ...         0              0 ...               0
+  1       2    0 ...    0         0 ...         0              0 ...               0
+  1       3    0 ...    0         0 ...         0              0 ...               0
+  1       4    1 ...    0         0 ...         0              0 ...               0
+  1       5    0 ...    0         0 ...         0              0 ...               0
+  1       6    0 ...    0         0 ...         0              0 ...               0
+  1       7    0 ...    0         0 ...         0              0 ...               0
+  1       8    0 ...    0         0 ...         0              0 ...               0
+  1       9    1 ...    0         0 ...         0              0 ...               0
+  1      10    0 ...    0         0 ...         0              0 ...               0
+```
+
+:::
+
+# Metadata file {#sec-meta}
+
+There are several differences to the metadata files between the legacy and current
+versions and I'll highlight a few new additions below. One thing to note is that
+exported data from AtoMx SIP can have columns with analysis results in addition to the "baseline"
+columns.
+
+_Cell shape metrics_ -- In the legacy version, basic cell shape was described
+with `Area`, `Width`, `Height`, and `AspectRaio` (@tbl-meta-leg). The new version
+of the metadata includes these plus four additional metrics that
+describe the cell shape (@tbl-meta-132). These are `perimeter`, `circularity`, `eccentricity`,
+and `solidity`. Perimeter is simply the perimeter of the cell in pixels and the latter
+three are defined in @Fu2024.
+
+_`SplitRatioToLocal`_ -- for cells that are adjacent to the FOV boundaries, the
+`SplitRatioToLocal` metric measures the cell area relative to the mean area of cells
+in the FOVs. For 0 < SplitRatioToLocal < 1, the cell is smaller than average and for 
+`SplitRatioToLocal` > 1 the cell is larger than average. Note that a value of 0 means
+the cell is not along the border. 
+
+_FOV-level metrics_ -- there are some columns that are added as FOV-level metrics. 
+For example, `median_RNA` provides the median RNA target probe expression across 
+all cells within a given FOV.
+
+::: {.panel-tabset group="version"}
+
+## Legacy Columns
+
+| **Column Name** 	| **Type** 	| **Description** 	|
+|----------	|----------	|-----------------	|
+| fov                | Int | The field of view (FOV) number.  |
+| cell_ID            | Int | Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the `fov` and `cell_ID` columns. |
+| Area               | Int | Number of pixels assigned to a given cell. |
+| AspectRatio        | float | Width divided by height. |
+| CenterX_local_px   | Int | The x position of this cell within the FOV, measured in pixels. The pixel edge length is 120 nm. Thus, to convert to microns multiply the pixel value by 0.12028 $\mu$m per pixel. |
+| CenterY_local_px   | Int | Same as `CenterX_local_px` but for the y dimension. |
+| CenterX_global_px  | float | See `CenterX_local_px` description. The global positions describes the relative position of this cell within the large sample reference frame. |
+| CenterY_global_px  | float | Same as `CenterX_global_px` but for the y dimension. |
+| Width              | Int | Cell's maximum length in x dimension (pixels). |
+| Height             | Int | Cell's maximum length in y dimension (pixels). |
+| Mean.(IF) | Int | The mean fluorescence intensity for a given cell. |
+| Max.(IF)  | Int | The max fluorescence intensity for a given cell. |
+
+
+: Description of the legacy metadata file format. Δ = column name change between versions; * = new column in 1.3.2 compared to legacy {#tbl-meta-leg tbl-colwidths="[10, 10, 80]"}
+
+
+Example:
+```{r}
+#| eval: false
+#| echo: false
+library(plyr)
+library(dplyr)
+meta_file_old <- read.csv("path/to/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_metadata_file.csv", header=TRUE)
+head(meta_file_old) %>% str
+```
+
+```
+'data.frame':	6 obs. of  20 variables:
+ $ fov               : int  1 1 1 1 1 1
+ $ cell_ID           : int  1 2 3 4 5 6
+ $ Area              : int  1259 3723 2010 3358 1213 2647
+ $ AspectRatio       : num  1.34 1.45 1.62 0.47 1 1.38
+ $ CenterX_local_px  : int  1027 2904 4026 4230 4258 66
+ $ CenterY_local_px  : int  3631 3618 3627 3597 3629 3622
+ $ CenterX_global_px : num  4216 6093 7215 7419 7447 ...
+ $ CenterY_global_px : num  158848 158835 158844 158814 158846 ...
+ $ Width             : int  47 87 68 48 38 72
+ $ Height            : int  35 60 42 102 38 52
+ $ Mean.MembraneStain: int  3473 3895 2892 6189 8138 5713
+ $ Max.MembraneStain : int  7354 13832 6048 16091 19281 12617
+ $ Mean.PanCK        : int  715 18374 3265 485 549 1220
+ $ Max.PanCK         : int  5755 53158 37522 964 874 5107
+ $ Mean.CD45         : int  361 260 378 679 566 433
+ $ Max.CD45          : int  845 1232 908 2322 1242 957
+ $ Mean.CD3          : int  22 13 19 5 17 11
+ $ Max.CD3           : int  731 686 654 582 674 547
+ $ Mean.DAPI         : int  4979 1110 10482 6065 3311 4151
+ $ Max.DAPI          : int  26374 13229 33824 39512 30136 19269
+```
+
+
+## AtoMx SIP v1.3.2
+
+:::{.callout-note}
+If analysis has been performed on AtoMx SIP prior to export, additional columns
+not presented here may be added to the metadata file. For example, if cell typing
+has been performed, there may be a column named `RNA_nbclust_[GUID]_1_clusters` containing
+the estimated cell type.
+:::
+
+
+| **Column Name** 	| **Type** 	| **Description** 	|
+|----------	|----------	|-----------------	|
+| fov                | Int | The field of view (FOV) number.  |
+| Area               | Int | Number of pixels assigned to a given cell. |
+| AspectRatio        | float | Width divided by height. |
+| CenterX_local_px   | Int | The x position of this cell within the FOV, measured in pixels. The pixel edge length is 120 nm. Thus, to convert to microns multiply the pixel value by 0.12028 $\mu$m per pixel. |
+| CenterY_local_px   | Int | Same as `CenterX_local_px` but for the y dimension. |
+| Width              | Int | Cell's maximum length in x dimension (pixels). |
+| Height             | Int | Cell's maximum length in y dimension (pixels). |
+| Mean.(IF) | Int | The mean fluorescence intensity for a given cell. |
+| Max.(IF)  | Int | The max fluorescence intensity for a given cell. |
+| SplitRatioToLocal$^{*}$       | float | If cell abuts the FOV border: the ratio of `Area` to mean cell area for that FOV. If cell does not border the FOV boundary: 0.  |
+| NucArea$^{*}$                 | Int | Number of pixels assigned to a given nucleus.  |
+| NucAspectRatio$^{*}$         | float |  Width divided by height of nucleus. |
+| Circularity$^{*}$             | float | Area to perimeter ratio. 1 = circle; < 1 less circular [@Fu2024]. |
+| Eccentricity$^{*}$            | float | A cell's minor axis divided by its major axis [@Fu2024].|
+| Perimeter$^{*}$               | Int | The perimeter of the cell (in pixels)  |
+| Solidity$^{*}$                | float | The `Area` of the cell divided by its convex area. A measure of the "density" of a cell with values < 1 indicating increased cell irregularity [@Fu2024] |
+| cell_id$^{*}$                 | string | A study-wide unique cell identifier. Combination of c(ell), `slide_ID`, `fov`, and `cell_ID`. Note that this is equivalent to `cell_ID` in `napari-cosmx`.  |
+| assay_type$^{*}$              | string | The assay type (Protein or RNA)  |
+| version$^{*}$                 | string | The version of the target decoding used.  |
+| Run_Tissue_name$^{*}$         | string | The name of the slide. |
+| Panel$^{*}$                   | string | The panel that was assayed.  |
+| cellSegmentationSetId$^{*}$.  | string | The cell segmentation set ID.     
+| cellSegmentationSetName$^{*}$ | string | The cell segmentation set name.  |
+| slide_ID$^{*}$                | Int | Unique identifier for the slide.  |
+| CenterX_global_px  | float | See `CenterX_local_px` description. The global positions describes the relative position of this cell within the large sample reference frame. |
+| CenterY_global_px  | float | Same as `CenterX_global_px` but for the y dimension. |
+| cell_ID            | Int | Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the `fov` and `cell_ID` columns. |
+| unassignedTranscripts$^{*}$   | float | Proportion of transcripts in the FOV the cell resides in that are not assigned within any cell. This value is an FOV-level metric that is repeated for each cell (excluding cell 0).  |
+| median_RNA$^{*}$              | float | FOV-level statistic. Median RNA target probe expression across all cells within a given FOV.  |
+| RNA_quantile_(proportion)$^{*}$       | float | FOV-level statistic. The (proportion*100) percentile of RNA target expression across all cells within a given FOV.  |
+| nCount_RNA$^{*}$              | Int | Total RNA transcripts observed.  |
+| nFeature_RNA$^{*}$            | Int | Total number of unique RNA transcripts observed.  |
+| median_negprobes$^{*}$        | float | FOV-level statistic. Median negative probe expression across all cells within a given FOV.  |
+| negprobes_quantile_(proportion)$^{*}$       | float | FOV-level statistic. The (proportion*100) percentile of negative probe expression across all cells within a given FOV.  |
+| nCount_negprobes$^{*}$        | Int | Total Negative Control Probe counts observed.  |
+| nFeature_negprobes$^{*}$      | Int | Total number of unique Negative Control Probe counts observed.  |
+| median_falsecode$^{*}$        | float | FOV-level statistic. Median System Control counts across all cells within a given FOV.  |
+| falsecode_quantile_(proportion)$^{*}$       | float | FOV-level statistic. The (proportion*100) percentile of System Control counts across all cells within a given FOV.  |
+| nCount_falsecode$^{*}$        | Int | Total System Control codes counts observed. These codes do not have a physical probe in the experiment.  |
+| nFeature_falsecode$^{*}$      | Int | Total number of unique System Control codes counts observed.  |
+| Area.um2$^{*}$                | float | The cell area in units of $\mu m^{2}$  |
+| cell$^{*}$                    | string | Redundant with `cell_id`  |
+
+: Description of the baseline metadata file format for AtoMx SIP v1.3.2. Δ = column name change between versions; * = new column in 1.3.2 compared to legacy {#tbl-meta-132 tbl-colwidths="[10, 10, 80]"}
+
+Example:
+```{r}
+#| eval: false
+#| echo: false
+library(plyr)
+library(dplyr)
+meta_file_new <- read.csv("path/to/breast_cancer_example/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2/AUG29_13INTEGR_6K_BRST_PS_S2_metadata_file.csv.gz", header=TRUE)
+head(meta_file_new) %>% str
+```
+
+```
+'data.frame':	6 obs. of  65 variables:
+ $ fov                    : int  1 1 1 1 1 1
+ $ Area                   : int  3037 8790 5552 5822 4008 3603
+ $ AspectRatio            : num  0.67 0.95 0.77 0.9 0.97 0.88
+ $ CenterX_local_px       : int  3938 2741 3888 4214 4137 4163
+ $ CenterY_local_px       : int  25 52 57 73 152 187
+ $ Width                  : int  76 110 96 81 78 83
+ $ Height                 : int  51 104 74 90 76 73
+ $ Mean.B                 : int  41 425 88 197 73 91
+ $ Max.B                  : int  252 2308 952 604 552 364
+ $ Mean.G                 : int  50 1270 154 48 22 26
+ $ Max.G                  : int  1192 6960 4192 184 380 160
+ $ Mean.Y                 : int  106 366 254 235 97 196
+ $ Max.Y                  : int  1228 2864 3884 1340 828 904
+ $ Mean.R                 : int  36 62 221 20 4 16
+ $ Max.R                  : int  2360 1044 5604 104 60 232
+ $ Mean.DAPI              : int  92 37 181 288 237 324
+ $ Max.DAPI               : int  408 236 924 1060 800 928
+ $ SplitRatioToLocal      : num  0.7 2.01 0 1.33 0 0
+ $ NucArea                : int  1252 0 1180 2384 1284 1536
+ $ NucAspectRatio         : num  0.77 0 1 0.94 0.95 0.81
+ $ Circularity            : num  0.92 1.05 1.03 1.03 0.94 0.83
+ $ Eccentricity           : num  0.76 0.82 0.79 0.71 0.9 0.82
+ $ Perimeter              : int  204 324 260 266 231 233
+ $ Solidity               : num  14.9 27.1 21.4 21.9 17.4 ...
+ $ cell_id                : chr  "c_1_1_1" "c_1_1_2" "c_1_1_3" "c_1_1_4" ...
+ $ assay_type             : chr  "RNA" "RNA" "RNA" "RNA" ...
+ $ version                : chr  "v6" "v6" "v6" "v6" ...
+ $ Run_Tissue_name        : chr  "example_tissue" "example_tissue" "example_tissue" "example_tissue" ...
+ $ Panel                  : chr  "Human RNA 6k Discovery" "Human RNA 6k Discovery" "Human RNA 6k Discovery" "Human RNA 6k Discovery" ...
+ $ cellSegmentationSetId  : chr  " a343598a-ed40-4a93-a655-49bc7688021d" " a343598a-ed40-4a93-a655-49bc7688021d" " a343598a-ed40-4a93-a655-49bc7688021d" " a343598a-ed40-4a93-a655-49bc7688021d" ...
+ $ cellSegmentationSetName: chr  " Initial Segmentation" " Initial Segmentation" " Initial Segmentation" " Initial Segmentation" ...
+ $ slide_ID               : int  1 1 1 1 1 1
+ $ CenterX_global_px      : int  21057 19860 21007 21333 21256 21282
+ $ CenterY_global_px      : int  68070 68043 68038 68022 67943 67908
+ $ cell_ID                : int  1 2 3 4 5 6
+ $ unassignedTranscripts  : num  0.0349 0.0349 0.0349 0.0349 0.0349 ...
+ $ median_RNA             : int  86 86 86 86 86 86
+ $ RNA_quantile_0.75      : int  126 126 126 126 126 126
+ $ RNA_quantile_0.8       : int  139 139 139 139 139 139
+ $ RNA_quantile_0.85      : int  157 157 157 157 157 157
+ $ RNA_quantile_0.9       : int  182 182 182 182 182 182
+ $ RNA_quantile_0.95      : int  240 240 240 240 240 240
+ $ RNA_quantile_0.99      : num  512 512 512 512 512 ...
+ $ nCount_RNA             : int  138 295 234 344 230 249
+ $ nFeature_RNA           : int  86 182 152 217 148 132
+ $ median_negprobes       : int  9 9 9 9 9 9
+ $ negprobes_quantile_0.75: int  126 126 126 126 126 126
+ $ negprobes_quantile_0.8 : int  139 139 139 139 139 139
+ $ negprobes_quantile_0.85: int  157 157 157 157 157 157
+ $ negprobes_quantile_0.9 : int  182 182 182 182 182 182
+ $ negprobes_quantile_0.95: int  240 240 240 240 240 240
+ $ negprobes_quantile_0.99: num  512 512 512 512 512 ...
+ $ nCount_negprobes       : int  0 0 1 0 0 0
+ $ nFeature_negprobes     : int  0 0 1 0 0 0
+ $ median_falsecode       : int  4 4 4 4 4 4
+ $ falsecode_quantile_0.75: int  126 126 126 126 126 126
+ $ falsecode_quantile_0.8 : int  139 139 139 139 139 139
+ $ falsecode_quantile_0.85: int  157 157 157 157 157 157
+ $ falsecode_quantile_0.9 : int  182 182 182 182 182 182
+ $ falsecode_quantile_0.95: int  240 240 240 240 240 240
+ $ falsecode_quantile_0.99: num  512 512 512 512 512 ...
+ $ nCount_falsecode       : int  1 0 0 1 1 1
+ $ nFeature_falsecode     : int  1 0 0 1 1 1
+ $ Area.um2               : num  43.9 127.2 80.3 84.2 58 ...
+ $ cell                   : chr  "c_1_1_1" "c_1_1_2" "c_1_1_3" "c_1_1_4" ...
+```
+
+
+:::
+
+# Transcript coordinates file
+
+Main differences between versions: 
+
+- The contents of the `CellComp` column differ between version. In the current version
+"None" replaces "0". The other three regions--Membrane, Nuclear, Cytoplasm--are
+unchanged.
+- `cell` column is added to the newer version.
+
+::: {.panel-tabset group="version"}
+
+## Legacy
+
+
+| **Column Name** 	| **Type** 	| **Description** 	|
+|----------	|----------	|-----------------	|
+| fov                | Int | The field of view (FOV) number.  |
+| cell_ID            | Int | Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the `fov` and `cell_ID` columns. |
+| x_global_px |float | The x position (in pixels) relative to the tissue.  | 
+| y_global_px |float | The y position (in pixels) relative to the tissue. | 
+| x_local_px |float | The x position (in pixels) relative to the given FOV. | 
+| y_local_px | float |The y position (in pixels) relative to the given FOV. | 
+| z | Int | The z plane. | 
+| target | string | The name of the target. | 
+| CellComp&#x2021; | string | Subcellular location of target. | 
+
+: Description of the legacy transcripts file format. &#x2021; = contents changed between versions {#tbl-tx-leg tbl-colwidths="[10, 10, 80]"}
+
+
+Example:
+```{r}
+#| eval: false
+#| echo: false
+
+tx_file_old <- read.csv("path/to/NSCLC/Lung5_Rep1/Lung5_Rep1-Flat_files_and_images/Lung5_Rep1_tx_file.csv", header=TRUE)
+tx_file_old %>% head(10)
+```
+
+
+```
+fov cell_ID x_global_px y_global_px x_local_px y_local_px  z  target CellComp
+  1       0    6757.402    158836.4   3568.513  3619.7375 11   NEAT1        0
+  1       0    5111.389    156060.2   1922.500   843.5334 11   NEAT1        0
+  1       0    7860.461    157809.3   4671.572  2592.6715 11    CCR2        0
+  1       0    3790.489    155553.9    601.600   337.2168 11 HLA-DRA        0
+  1       0    3290.639    158023.6    101.750  2806.9750 11 HLA-DRA Membrane
+  1       0    7020.160    158656.3   3831.271  3439.6000 11     VHL        0
+  1       0    4252.914    157003.0   1064.025  1786.3376 11    FZD5  Nuclear
+  1       0    5987.309    157572.5   2798.420  2355.8000 11    CD37        0
+  1       0    5586.849    157774.2   2397.960  2557.5599 11   ATG12 Membrane
+```
+
+## AtoMx SIP v1.3.2
+
+| **Column Name** 	| **Type** 	| **Description** 	|
+|----------	|----------	|-----------------	|
+| fov                | Int | The field of view (FOV) number.  |
+| cell_ID            | Int | Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the `fov` and `cell_ID` columns. |
+| cell$^{*}$                 | string | A study-wide unique cell identifier. Combination of c(ell), slide ID, `fov`, and `cell_ID`. Note that this is equivalent to `cell_ID` in `napari-cosmx`.  |
+| x_local_px |float | The x position (in pixels) relative to the given FOV. | 
+| y_local_px | float |The y position (in pixels) relative to the given FOV. | 
+| x_global_px |float | The x position (in pixels) relative to the tissue.  | 
+| y_global_px |float | The y position (in pixels) relative to the tissue. | 
+| z | Int | The z plane. | 
+| target | string | The name of the target. | 
+| CellComp&#x2021; | string | Subcellular location of target. | 
+
+: Description of the baseline transcripts file format for AtoMx SIP v1.3.2. * = new column in 1.3.2 compared to legacy; &#x2021; = contents changed between versions {#tbl-tx-132 tbl-colwidths="[10, 10, 80]"}
+
+Example:
+```{r}
+#| eval: false
+#| echo: false
+
+library(plyr)
+library(dplyr)
+tx_file_new <- read.csv("path/to/breast_cancer_example/flatFiles/tmp_tx.csv", header=TRUE)
+
+tx_file_new %>% tail(10)
+```
+
+
+```
+ fov cell_ID        cell       x_local_px y_local_px x_global_px y_global_px   z   target  CellComp
+  30    4755 c_1_30_4755 29337.6332465278   173483.2   4259.8555    16.57764   3      B2M Cytoplasm         
+  30    4755 c_1_30_4755 29340.4174262153   173488.4   4262.6396    21.71997   3   COL3A1 Cytoplasm         
+  30    4757 c_1_30_4757 29593.4975043403   173480.9   4515.7197    14.27002   8    RPL32 Cytoplasm         
+  30    4759 c_1_30_4759 25211.3444434272   173477.6    133.5667    10.95020   6   COL1A1 Cytoplasm         
+  30    4759 c_1_30_4759 25224.5611029731   173483.9    146.7833    17.28320   6   COL1A2 Cytoplasm         
+  30    4760 c_1_30_4760 25902.6278143989   173480.8    824.8500    14.11694   7   TPSAB1 Cytoplasm         
+  30    4760 c_1_30_4760 25924.0527411567   173477.8    846.2750    11.10010   1 HSP90AB1 Cytoplasm         
+  30    4760 c_1_30_4760 25925.7694159614   173478.0    847.9916    11.34155   6     GLUL Cytoplasm         
+  30    4760 c_1_30_4760 25914.4152899848   173478.9    836.6375    12.27515   6   ADGRE2 Cytoplasm         
+  30    4760 c_1_30_4760 25902.9277411567   173480.7    825.1500    14.07520   8   TPSAB1 Cytoplasm   
+```
+
+:::
+
+# Polygons file
+
+The polygons file was added to the list of flat files and shows the vertices
+of each cell's polygon. 
+
+::: {.panel-tabset group="version"}
+
+## Legacy
+
+(Not applicable)
+
+
+## AtoMx SIP v1.3.2
+
+| **Column Name** 	| **Type** 	| **Description** 	|
+|----------	|----------	|-----------------	|
+| fov                | Int | The field of view (FOV) number.  |
+| cell_ID            | Int | Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the `fov` and `cell_ID` columns. |
+| cell                 | string | A study-wide unique cell identifier. Combination of c(ell), slide ID, and `cell_ID`. Note that this is equivalent to `cell_ID` in `napari-cosmx`.  |
+| x_local_px |float | The x position (in pixels) of vertex relative to the given FOV. | 
+| y_local_px | float |The y position (in pixels) of vertex  relative to the given FOV. | 
+| x_global_px |float | The x position (in pixels) of vertex  relative to the tissue.  | 
+| y_global_px |float | The y position (in pixels) of vertex  relative to the tissue. | 
+
+
+: Description of the baseline polygons file format for AtoMx SIP v1.3.2. {#tbl-poly-132 tbl-colwidths="[10, 10, 80]"}
+
+Example:
+
+This example below shows the vertices of cell `c_1_2_3`.
+```{r}
+#| eval: false
+#| echo: false
+
+library(plyr)
+library(dplyr)
+poly_file_new <- read.csv("path/to/breast_cancer_example/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2-polygons.csv.gz", header=TRUE)
+poly_file_new %>% filter(cell=="c_1_2_3")
+```
+
+
+```
+  fov cellID    cell x_local_px y_local_px x_global_px y_global_px
+  2      3 c_1_2_3        279          0        4535       29792
+  2      3 c_1_2_3        279          1        4535       29791
+  2      3 c_1_2_3        270         15        4526       29777
+  2      3 c_1_2_3        266         20        4522       29772
+  2      3 c_1_2_3        234         53        4490       29739
+  2      3 c_1_2_3        223         64        4479       29728
+  2      3 c_1_2_3        214         71        4470       29721
+  2      3 c_1_2_3        210         72        4466       29720
+  2      3 c_1_2_3        199         72        4455       29720
+  2      3 c_1_2_3        186         66        4442       29726
+  2      3 c_1_2_3        182         64        4438       29728
+  2      3 c_1_2_3        179         62        4435       29730
+  2      3 c_1_2_3        176         31        4432       29761
+  2      3 c_1_2_3        176          4        4432       29788
+  2      3 c_1_2_3        179          0        4435       29792
+```
+
+
+:::
+
+
+
+
+
+
+
