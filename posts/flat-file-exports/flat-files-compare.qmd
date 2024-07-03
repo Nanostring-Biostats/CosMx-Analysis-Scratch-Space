@@ -45,7 +45,7 @@ in AtoMx SIP differ from the flat files in these public data releases, I thought
 be helpful to show a comparison.
 
 Specifically, in this post I compare the flat files created for `Lung5_rep1` of the NSCLC dataset
-side-by-side with the updated (AtoMx 1.3.2) flat file format from on unrelated tissue. The
+side-by-side with the updated (AtoMx 1.3.2) flat file format from an unrelated tissue. The
 specific values will be different since they are different datasets, of course, but the following
 side-by-sides show similarities and differences between the formats. 
 
@@ -114,7 +114,7 @@ head(fov_file_new, 10)
 ```
 
 ```
- FOV x_global_px y_global_px x_global_mm y_global_mm
+FOV x_global_px y_global_px x_global_mm y_global_mm
   1           0       29791   0.0000000    3.583410
   2        4255       29791   0.5119157    3.583410
   3        8511       29791   1.0238314    3.583410
@@ -162,7 +162,7 @@ expr_file_old %>% select(fov:AATK, ZFP36:NegPrb3, NegPrb23) %>% head(10)
 ```
 
 ```
-  fov cell_ID AATK ... ZFP36 NegPrb3 ... NegPrb23
+fov cell_ID AATK ... ZFP36 NegPrb3 ... NegPrb23
   1       0   15 ...   184      12 ...       13
   1       1    0 ...     0       0 ...        0
   1       2    0 ...     1       0 ...        0
@@ -183,7 +183,7 @@ expr_file_old %>% select(fov:AATK, ZFP36:NegPrb3, NegPrb23) %>% head(10)
 |     cell_ID     	|    Int      	|    Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the `fov` and `cell_ID` columns. All transcripts not assigned to a cell are show with a `cell_ID` value of 0.            	|
 |     (Gene expression target)     	|    Int      	|    The number of transcripts observed for a given gene target for a given cell.             	|
 |     (Negative Probe, _e.g.,_ Negative1)$^{Δ}$    	|    Int      	| Negative probes, which do not match any sequence within the transcriptome or genome. These can be used to assess background levels. | 
-|     (System Control)$^{*}$     	|    Int      	| System Control codes and codes which do not have any physical probe associated with them.
+|     (System Control)$^{*}$     	|    Int      	| System Control codes are codes which do not have any physical probe associated with them.
  | 
 
 : Description of the baseline expression matrix file format for AtoMx SIP v1.3.2. * = new column in 1.3.2 compared to legacy {#tbl-exp-leg tbl-colwidths="[15, 15, 70]"}
@@ -199,7 +199,7 @@ expr_file_new %>% select(fov:A1BG, ZZZ3:Negative1, Negative9:SystemControl1, Sys
 ```
 
 ```
-  fov cell_ID A1BG ... ZZZ3 Negative1 ... Negative9 SystemControl1 ... SystemControl99
+fov cell_ID A1BG ... ZZZ3 Negative1 ... Negative9 SystemControl1 ... SystemControl99
   1       1    0 ...    0         0 ...         0              0 ...               0
   1       2    0 ...    0         0 ...         0              0 ...               0
   1       3    0 ...    0         0 ...         0              0 ...               0
@@ -319,12 +319,12 @@ the estimated cell type.
 | Max.(IF)  | Int | The max fluorescence intensity for a given cell. |
 | SplitRatioToLocal$^{*}$       | float | If cell abuts the FOV border: the ratio of `Area` to mean cell area for that FOV. If cell does not border the FOV boundary: 0.  |
 | NucArea$^{*}$                 | Int | Number of pixels assigned to a given nucleus.  |
-| NucAspectRatio$^{*}$         | float |  Width divided by height of nucleas. |
+| NucAspectRatio$^{*}$         | float |  Width divided by height of nucleus. |
 | Circularity$^{*}$             | float | Area to perimeter ratio. 1 = circle; < 1 less circular [@Fu2024]. |
-| Eccentricity$^{*}$            | float | A cells minor axis divided by its major axis [@Fu2024].|
-| Perimeter$^{*}$               | Int | The perimeter of the cel (in pixels)  |
+| Eccentricity$^{*}$            | float | A cell's minor axis divided by its major axis [@Fu2024].|
+| Perimeter$^{*}$               | Int | The perimeter of the cell (in pixels)  |
 | Solidity$^{*}$                | float | The `Area` of the cell divided by its convex area. A measure of the "density" of a cell with values < 1 indicating increased cell irregularity [@Fu2024] |
-| cell_id$^{*}$                 | string | A study-wide unique cell identifier. Combination of c(ell), `slide_ID`, and `cell_ID`. Note that this is equivalent to `cell_ID` in `napari-cosmx`.  |
+| cell_id$^{*}$                 | string | A study-wide unique cell identifier. Combination of c(ell), `slide_ID`, `fov`, and `cell_ID`. Note that this is equivalent to `cell_ID` in `napari-cosmx`.  |
 | assay_type$^{*}$              | string | The assay type (Protein or RNA)  |
 | version$^{*}$                 | string | The version of the target decoding used.  |
 | Run_Tissue_name$^{*}$         | string | The name of the slide. |
@@ -475,7 +475,7 @@ tx_file_old %>% head(10)
 
 
 ```
-  fov cell_ID x_global_px y_global_px x_local_px y_local_px  z  target CellComp
+fov cell_ID x_global_px y_global_px x_local_px y_local_px  z  target CellComp
   1       0    6757.402    158836.4   3568.513  3619.7375 11   NEAT1        0
   1       0    5111.389    156060.2   1922.500   843.5334 11   NEAT1        0
   1       0    7860.461    157809.3   4671.572  2592.6715 11    CCR2        0
@@ -493,7 +493,7 @@ tx_file_old %>% head(10)
 |----------	|----------	|-----------------	|
 | fov                | Int | The field of view (FOV) number.  |
 | cell_ID            | Int | Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the `fov` and `cell_ID` columns. |
-| cell$^{*}$                 | string | A study-wide unique cell identifier. Combination of c(ell), slide ID, and `cell_ID`. Note that this is equivalent to `cell_ID` in `napari-cosmx`.  |
+| cell$^{*}$                 | string | A study-wide unique cell identifier. Combination of c(ell), slide ID, `fov`, and `cell_ID`. Note that this is equivalent to `cell_ID` in `napari-cosmx`.  |
 | x_local_px |float | The x position (in pixels) relative to the given FOV. | 
 | y_local_px | float |The y position (in pixels) relative to the given FOV. | 
 | x_global_px |float | The x position (in pixels) relative to the tissue.  | 
@@ -502,7 +502,7 @@ tx_file_old %>% head(10)
 | target | string | The name of the target. | 
 | CellComp&#x2021; | string | Subcellular location of target. | 
 
-: Description of the baseline transcripts file format for AtoMx SIP v1.3.2. Δ = column name change between versions; * = new column in 1.3.2 compared to legacy {#tbl-tx-132 tbl-colwidths="[10, 10, 80]"}
+: Description of the baseline transcripts file format for AtoMx SIP v1.3.2. * = new column in 1.3.2 compared to legacy; &#x2021; = contents changed between versions {#tbl-tx-132 tbl-colwidths="[10, 10, 80]"}
 
 Example:
 ```{r}
