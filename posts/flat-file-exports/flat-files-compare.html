@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.53">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Evelyn Metzger">
+<meta name="dcterms.date" content="2024-07-03">
+<meta name="description" content="This short post shows differences between the AtoMx™ SIP-exported and legacy CosMx™ SMI &quot;flat files&quot;">
+
+<title>Comparing AtoMx™ SIP flat files with the legacy format – Blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../assets/cropped-NS_Favicon_512x512-32x32.png" rel="icon" type="image/png">
+<script src="../../site_libs/cookie-consent/cookie-consent.js"></script>
+<link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-29W4MW0Y2W"></script>
+
+<script type="text/plain" cookie-consent="tracking">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-29W4MW0Y2W', { 'anonymize_ip': true});
+</script>
+
+<script type="text/javascript" charset="UTF-8">
+document.addEventListener('DOMContentLoaded', function () {
+cookieconsent.run({
+  "notice_banner_type":"simple",
+  "consent_type":"implied",
+  "palette":"light",
+  "language":"en",
+  "page_load_consent_levels":["strictly-necessary","functionality","tracking","targeting"],
+  "notice_banner_reject_button_hide":false,
+  "preferences_center_close_button_hide":false,
+  "website_name":""
+  ,
+"language":"en"
+  });
+});
+</script> 
+  
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<meta name="citation_title" content="Comparing AtoMx&amp;amp;#8482; SIP flat files with the legacy format">
+<meta name="citation_author" content="Evelyn Metzger">
+<meta name="citation_publication_date" content="2024-07-03">
+<meta name="citation_cover_date" content="2024-07-03">
+<meta name="citation_year" content="2024">
+<meta name="citation_online_date" content="2024-07-03">
+<meta name="citation_fulltext_html_url" content="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/flat-file-exports/flat-files-compare.html">
+<meta name="citation_language" content="en">
+<meta name="citation_reference" content="citation_title=Insitutype: Likelihood-based cell typing for single cell spatial transcriptomics;,citation_abstract=Accurate cell typing is fundamental to analysis of spatial single-cell transcriptomics, but legacy scRNA-seq algorithms can underperform in this new type of data. We have developed a cell typing algorithm, Insitutype, designed for statistical and computational efficiency in spatial transcriptomics data.Insitutype is based on a likelihood model that weighs the evidence from every expression value, extracting all the information available in each cell’s expression profile. This likelihood model underlies a Bayes classifier for supervised cell typing, and an Expectation-Maximization algorithm for unsupervised and semi-supervised clustering. Insitutype also leverages alternative data types collected in spatial studies, such as cell images and spatial context, by using them to inform prior probabilities of cell type calls. We demonstrate rapid clustering of millions of cells and accurate fine-grained cell typing of kidney and non-small cell lung cancer samples.Competing Interest StatementPD, EZ, ZY, DR, MG, ZR, TKK, SH, DH and JMB are current/former employees and shareholders of NanoString.;,citation_author=Patrick Danaher;,citation_author=Edward Zhao;,citation_author=Zhi Yang;,citation_author=David Ross;,citation_author=Mark Gregory;,citation_author=Zach Reitz;,citation_author=Tae K. Kim;,citation_author=Sarah Baxter;,citation_author=Shaun Jackson;,citation_author=Shanshan He;,citation_author=Dave Henderson;,citation_author=Joseph M. Beechem;,citation_publication_date=2022;,citation_cover_date=2022;,citation_year=2022;,citation_fulltext_html_url=https://www.biorxiv.org/content/early/2022/10/21/2022.10.19.512902;,citation_doi=10.1101/2022.10.19.512902;,citation_journal_title=bioRxiv;,citation_publisher=Cold Spring Harbor Laboratory;">
+<meta name="citation_reference" content="citation_title=Analytic pearson residuals for normalization of single-cell RNA-seq UMI data;,citation_author=Jan Lause;,citation_author=Philipp Berens;,citation_author=Dmitry Kobak;,citation_publication_date=2021-09;,citation_cover_date=2021-09;,citation_year=2021;,citation_doi=10.1186/s13059-021-02451-7;,citation_issn=1474-760X;,citation_volume=22;,citation_journal_title=Genome Biology;">
+<meta name="citation_reference" content="citation_title=High-plex imaging of RNA and proteins at subcellular resolution in fixed tissue by spatial molecular imaging.;,citation_abstract=Resolving the spatial distribution of RNA and protein in tissues at subcellular resolution is a challenge in the field of spatial biology. We describe spatial molecular imaging, a system that measures RNAs and proteins in intact biological samples at subcellular resolution by performing multiple cycles of nucleic acid hybridization of fluorescent molecular barcodes. We demonstrate that spatial molecular imaging has high sensitivity (one or two copies per cell) and very low error rate (0.0092 false calls per cell) and background (&nbsp;0.04 counts per cell). The imaging system generates three-dimensional, super-resolution localization of analytes at &nbsp;2 million cells per sample. Cell segmentation is morphology based using antibodies, compatible with formalin-fixed, paraffin-embedded samples. We measured multiomic data (980 RNAs and 108 proteins) at subcellular resolution in formalin-fixed, paraffin-embedded tissues (nonsmall cell lung and breast cancer) and identified &amp;amp;amp;gt;18 distinct cell types, ten unique tumor microenvironments and 100 pairwise ligand-receptor interactions. Data on &amp;gt;800,000 single cells and &nbsp;260 million transcripts can be accessed at http://nanostring.com/CosMx-dataset .;,citation_author=Shanshan He;,citation_author=Ruchir Bhatt;,citation_author=Carl Brown;,citation_author=Emily A Brown;,citation_author=Derek L Buhr;,citation_author=Kan Chantranuvatana;,citation_author=Patrick Danaher;,citation_author=Dwayne Dunaway;,citation_author=Ryan G Garrison;,citation_author=Gary Geiss;,citation_author=Mark T Gregory;,citation_author=Margaret L Hoang;,citation_author=Rustem Khafizov;,citation_author=Emily E Killingbeck;,citation_author=Dae Kim;,citation_author=Tae Kyung Kim;,citation_author=Youngmi Kim;,citation_author=Andrew Klock;,citation_author=Mithra Korukonda;,citation_author=Alecksandr Kutchma;,citation_author=Zachary R Lewis;,citation_author=Yan Liang;,citation_author=Jeffrey S Nelson;,citation_author=Giang T Ong;,citation_author=Evan P Perillo;,citation_author=Joseph C Phan;,citation_author=Tien Phan-Everson;,citation_author=Erin Piazza;,citation_author=Tushar Rane;,citation_author=Zachary Reitz;,citation_author=Michael Rhodes;,citation_author=Alyssa Rosenbloom;,citation_author=David Ross;,citation_author=Hiromi Sato;,citation_author=Aster W Wardhani;,citation_author=Corey A Williams-Wietzikoski;,citation_author=Lidan Wu;,citation_author=Joseph M Beechem;,citation_publication_date=2022-12;,citation_cover_date=2022-12;,citation_year=2022;,citation_doi=10.1038/s41587-022-01483-z;,citation_issn=1546-1696;,citation_pmid=36203011;,citation_volume=40;,citation_journal_title=Nature biotechnology;">
+<meta name="citation_reference" content="citation_title=Squidpy: A scalable framework for spatial omics analysis;,citation_abstract=Spatial omics data are advancing the study of tissue organization and cellular communication at an unprecedented scale. Flexible tools are required to store, integrate and visualize the large diversity of spatial omics data. Here, we present Squidpy, a Python framework that brings together tools from omics and image analysis to enable scalable description of spatial molecular data, such as transcriptome or multivariate proteins. Squidpy provides efficient infrastructure and numerous analysis methods that allow to efficiently store, manipulate and interactively visualize spatial omics data. Squidpy is extensible and can be interfaced with a variety of already existing libraries for the scalable analysis of spatial omics data.;,citation_author=Giovanni Palla;,citation_author=Hannah Spitzer;,citation_author=Michal Klein;,citation_author=David Fischer;,citation_author=Anna Christina Schaar;,citation_author=Louis Benedikt Kuemmerle;,citation_author=Sergei Rybakov;,citation_author=Ignacio L. Ibarra;,citation_author=Olle Holmberg;,citation_author=Isaac Virshup;,citation_author=Mohammad Lotfollahi;,citation_author=Sabrina Richter;,citation_author=Fabian J. Theis;,citation_publication_date=2022-02;,citation_cover_date=2022-02;,citation_year=2022;,citation_doi=10.1038/s41592-021-01358-2;,citation_issn=1548-7091;,citation_volume=19;,citation_journal_title=Nature Methods;">
+<meta name="citation_reference" content="citation_title=Dictionary learning for integrative, multimodal and scalable single-cell analysis;,citation_author=Yuhan Hao;,citation_author=Tim Stuart;,citation_author=Madeline H. Kowalski;,citation_author=Saket Choudhary;,citation_author=Paul Hoffman;,citation_author=Austin Hartman;,citation_author=Avi Srivastava;,citation_author=Gesmira Molla;,citation_author=Shaista Madad;,citation_author=Carlos Fernandez-Granda;,citation_author=Rahul Satija;,citation_publication_date=2024-02;,citation_cover_date=2024-02;,citation_year=2024;,citation_doi=10.1038/s41587-023-01767-y;,citation_issn=1087-0156;,citation_volume=42;,citation_journal_title=Nature Biotechnology;">
+<meta name="citation_reference" content="citation_title=Giotto: A toolbox for integrative analysis and visualization of spatial expression data;,citation_abstract=Spatial transcriptomic and proteomic technologies have provided new opportunities to investigate cells in their native microenvironment. Here we present Giotto, a comprehensive and open-source toolbox for spatial data analysis and visualization. The analysis module provides end-to-end analysis by implementing a wide range of algorithms for characterizing tissue composition, spatial expression patterns, and cellular interactions. Furthermore, single-cell RNAseq data can be integrated for spatial cell-type enrichment analysis. The visualization module allows users to interactively visualize analysis outputs and imaging features. To demonstrate its general applicability, we apply Giotto to a wide range of datasets encompassing diverse technologies and platforms.;,citation_author=Ruben Dries;,citation_author=Qian Zhu;,citation_author=Rui Dong;,citation_author=Chee-Huat Linus Eng;,citation_author=Huipeng Li;,citation_author=Kan Liu;,citation_author=Yuntian Fu;,citation_author=Tianxiao Zhao;,citation_author=Arpan Sarkar;,citation_author=Feng Bao;,citation_author=Rani E. George;,citation_author=Nico Pierson;,citation_author=Long Cai;,citation_author=Guo-Cheng Yuan;,citation_publication_date=2021-12;,citation_cover_date=2021-12;,citation_year=2021;,citation_doi=10.1186/s13059-021-02286-2;,citation_issn=1474-760X;,citation_volume=22;,citation_journal_title=Genome Biology;">
+<meta name="citation_reference" content="citation_title=SCANPY: Large-scale single-cell gene expression data analysis;,citation_abstract=Scanpy is a scalable toolkit for analyzing single-cell gene expression data. It includes methods for preprocessing, visualization, clustering, pseudotime and trajectory inference, differential expression testing, and simulation of gene regulatory networks. Its Python-based implementation efficiently deals with data sets of more than one million cells (https://github.com/theislab/Scanpy). Along with Scanpy, we present AnnData, a generic class for handling annotated data matrices (https://github.com/theislab/anndata).;,citation_author=F Alexander Wolf;,citation_author=Philipp Angerer;,citation_author=Fabian J Theis;,citation_publication_date=2018;,citation_cover_date=2018;,citation_year=2018;,citation_fulltext_html_url=https://doi.org/10.1186/s13059-017-1382-0;,citation_doi=10.1186/s13059-017-1382-0;,citation_issn=1474-760X;,citation_volume=19;,citation_journal_title=Genome Biology;">
+<meta name="citation_reference" content="citation_title=Differential expression and clinical significance of COX6C in human diseases.;,citation_abstract=Mitochondria, independent double-membrane organelles, are intracellular power plants that feed most eukaryotic cells with the ATP produced via the oxidative phosphorylation (OXPHOS). Consistently, cytochrome c oxidase (COX) catalyzes the electron transfer chain’s final step. Electrons are transferred from reduced cytochrome c to molecular oxygen and play an indispensable role in oxidative phosphorylation of cells. Cytochrome c oxidase subunit 6c (COX6C) is encoded by the nuclear genome in the ribosome after translation and is transported to mitochondria via different pathways, and eventually forms the COX complex. In recent years, many studies have shown the abnormal level of COX6C in familial hypercholesterolemia, chronic kidney disease, diabetes, breast cancer, prostate cancer, uterine leiomyoma, follicular thyroid cancer, melanoma tissues, and other conditions. Its underlying mechanism may be related to the cellular oxidative phosphorylation pathway in tissue injury disease. Here reviews the varied function of COX6C in non-tumor and tumor diseases.;,citation_author=Bi-Xia Tian;,citation_author=Wei Sun;,citation_author=Shu-Hong Wang;,citation_author=Pei-Jun Liu;,citation_author=Yao-Chun Wang;,citation_publication_date=2021;,citation_cover_date=2021;,citation_year=2021;,citation_issn=1943-8141;,citation_pmid=33527004;,citation_volume=13;,citation_journal_title=American journal of translational research;">
+<meta name="citation_reference" content="citation_title=BIDCell: Biologically-informed self-supervised learning for segmentation of subcellular spatial transcriptomics data;,citation_abstract=Recent advances in subcellular imaging transcriptomics platforms have enabled high-resolution spatial mapping of gene expression, while also introducing significant analytical challenges in accurately identifying cells and assigning transcripts. Existing methods grapple with cell segmentation, frequently leading to fragmented cells or oversized cells that capture contaminated expression. To this end, we present BIDCell, a self-supervised deep learning-based framework with biologically-informed loss functions that learn relationships between spatially resolved gene expression and cell morphology. BIDCell incorporates cell-type data, including single-cell transcriptomics data from public repositories, with cell morphology information. Using a comprehensive evaluation framework consisting of metrics in five complementary categories for cell segmentation performance, we demonstrate that BIDCell outperforms other state-of-the-art methods according to many metrics across a variety of tissue types and technology platforms. Our findings underscore the potential of BIDCell to significantly enhance single-cell spatial expression analyses, enabling great potential in biological discovery.;,citation_author=Xiaohang Fu;,citation_author=Yingxin Lin;,citation_author=David M. Lin;,citation_author=Daniel Mechtersheimer;,citation_author=Chuhan Wang;,citation_author=Farhan Ameen;,citation_author=Shila Ghazanfar;,citation_author=Ellis Patrick;,citation_author=Jinman Kim;,citation_author=Jean Y. H. Yang;,citation_publication_date=2024-01;,citation_cover_date=2024-01;,citation_year=2024;,citation_doi=10.1038/s41467-023-44560-w;,citation_issn=2041-1723;,citation_volume=15;,citation_journal_title=Nature Communications;">
+</head>
+
+<body class="floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../.././assets/NS_Logo@3x_Bruker_gray 1.png" alt="" class="navbar-logo">
+    </a>
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../license.html"> 
+<span class="menu-text">License</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../link-to-code.html"> 
+<span class="menu-text">Code</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">Browse Posts by Topic</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/nanostringtech"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/company/nanostring-technologies"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Comparing AtoMx™ SIP flat files with the legacy format</h1>
+                  <div>
+        <div class="description">
+          This short post shows differences between the AtoMx™ SIP-exported and legacy CosMx™ SMI "flat files"
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">flat files</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliations</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author">Evelyn Metzger <a href="https://orcid.org/0000-0002-4074-9003" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              NanoString, a Bruker Company
+            </p>
+          <p class="affiliation">
+              Github: <a href="https://github.com/eveilyeverafter" target="_blank">eveilyeverafter</a>
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">July 3, 2024</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="2">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#sec-fov-pos" id="toc-sec-fov-pos" class="nav-link active" data-scroll-target="#sec-fov-pos"><span class="header-section-number">1</span> FOV positions flat file</a></li>
+  <li><a href="#expression-matrix" id="toc-expression-matrix" class="nav-link" data-scroll-target="#expression-matrix"><span class="header-section-number">2</span> Expression Matrix</a></li>
+  <li><a href="#sec-meta" id="toc-sec-meta" class="nav-link" data-scroll-target="#sec-meta"><span class="header-section-number">3</span> Metadata file</a></li>
+  <li><a href="#transcript-coordinates-file" id="toc-transcript-coordinates-file" class="nav-link" data-scroll-target="#transcript-coordinates-file"><span class="header-section-number">4</span> Transcript coordinates file</a></li>
+  <li><a href="#polygons-file" id="toc-polygons-file" class="nav-link" data-scroll-target="#polygons-file"><span class="header-section-number">5</span> Polygons file</a></li>
+  </ul>
+</nav>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<p>There are different data formats and structures that can be exported from the <a href="https://nanostring.com/products/atomx-spatial-informatics-platform/atomx-sip-overview/" target="blank">AtoMx™</a> Spatial Informatics Portal (SIP). These include the raw data (<em>i.e.</em>, with CellStatsDir, RunSummary, and AnalysisResults folders), Seurat (with or without images), Tiledb, and “flat files”. The flat files get their name because they are in a human-readable and accessible format (<em>i.e.</em>, comma separated files). These files, like Seurat files and Tiledb files, aren’t actually raw data but are processed data and can include additional analysis results (<em>e.g.</em>, cell typing data).</p>
+<p>The first use of the flat file format was about a year and a half ago when <span class="citation" data-cites="He2022">He et al. (<a href="#ref-He2022" role="doc-biblioref">2022</a>)</span> released the first public <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/" target="_blank">CosMx™ SMI dataset</a>, consisting of ~800k cells with 980 RNA targets from multiple tissues of NSCLC FFPE. Now there are additional <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/" data-targets="_blank">public datasets</a> that span two species (mouse, human), four tissues (lung, liver, brain, pancreas), and three levels of plex (1k, 6k, whole transcriptome). Because the flat files generated in AtoMx SIP differ from the flat files in these public data releases, I thought it might be helpful to show a comparison.</p>
+<p>Specifically, in this post I compare the flat files created for <code>Lung5_rep1</code> of the NSCLC dataset side-by-side with the updated (AtoMx 1.3.2) flat file format from an unrelated tissue. The specific values will be different since they are different datasets, of course, but the following side-by-sides show similarities and differences between the formats.</p>
+<section id="sec-fov-pos" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> FOV positions flat file</h1>
+<p>When we compare the FOV positions between old and new, you can see that the column name ‘fov’ has been changed to ‘FOV’ and the newer format includes global positions of the FOVs in units of mm in addition to pixels.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="version">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true">Legacy</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false">AtoMx SIP v1.3.2</a></li></ul>
+<div class="tab-content" data-group="version">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<div id="tbl-fov-leg" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-fov-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: Description of the legacy FOV positions file format. Δ = column name change between versions
+</figcaption>
+<div aria-describedby="tbl-fov-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov<span class="math inline">\(^{Δ}\)</span></td>
+<td>Int</td>
+<td>The field of view (FOV) number</td>
+</tr>
+<tr class="even">
+<td>x_global_px</td>
+<td>float</td>
+<td>The x location (in pixels) of the FOV relative to other FOVs</td>
+</tr>
+<tr class="odd">
+<td>y_global_px</td>
+<td>float</td>
+<td>The y location (in pixels) of the FOV relative to other FOVs</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>  fov x_global_px y_global_px
+  1    3188.889    155216.7
+  2    8661.111    155216.7
+  3   14133.333    155216.7
+  4   19605.556    155216.7
+  5   25077.778    155216.7
+  6    3188.889    158866.7
+  7    8661.111    158866.7
+  8   14133.333    158866.7
+  9   19605.556    158866.7
+  10   25077.778    158866.7</code></pre>
+</div>
+<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<div id="tbl-fov-new" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-fov-new-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;2: Description of the baseline FOV file format for AtoMx SIP v1.3.2. Δ = column name change between versions; * = new column in 1.3.2 compared to legacy
+</figcaption>
+<div aria-describedby="tbl-fov-new-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>FOV<span class="math inline">\(^{Δ}\)</span></td>
+<td>Int</td>
+<td>The field of view (FOV) number</td>
+</tr>
+<tr class="even">
+<td>x_global_px</td>
+<td>float</td>
+<td>The x location (in pixels) of the FOV relative to other FOVs</td>
+</tr>
+<tr class="odd">
+<td>y_global_px</td>
+<td>float</td>
+<td>The y location (in pixels) of the FOV relative to other FOVs</td>
+</tr>
+<tr class="even">
+<td>x_global_mm<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>The x location (in millimeters) of the FOV relative to other FOVs</td>
+</tr>
+<tr class="odd">
+<td>y_global_mm<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>The y location (in millimeters) of the FOV relative to other FOVs</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<pre><code>FOV x_global_px y_global_px x_global_mm y_global_mm
+  1           0       29791   0.0000000    3.583410
+  2        4255       29791   0.5119157    3.583410
+  3        8511       29791   1.0238314    3.583410
+  4       12767       29791   1.5357471    3.583410
+  5       17023       29791   2.0476628    3.583410
+  6       21279       29791   2.5595785    3.583410
+  7       25535       29791   3.0714942    3.583410
+  8       29791       29791   3.5834099    3.583410
+  9           0       25535   0.0000000    3.071494
+  10        4255       25535   0.5119157    3.071494</code></pre>
+</div>
+</div>
+</div>
+</section>
+<section id="expression-matrix" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Expression Matrix</h1>
+<p>For expression matrices, we see that NegPrb(\d+) is changed to Negative(\d+) and the newer format has SystemControls.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="version">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true">Legacy</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false">AtoMx SIP v1.3.2</a></li></ul>
+<div class="tab-content" data-group="version">
+<div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
+<div id="tbl-fov-leg" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[15, 15, 70]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-fov-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;3: Description of the legacy expression matrix file format. Δ = column name change between versions
+</figcaption>
+<div aria-describedby="tbl-fov-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 70%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns. All transcripts not assigned to a cell are show with a <code>cell_ID</code> value of 0.</td>
+</tr>
+<tr class="odd">
+<td>(Gene expression target)</td>
+<td>Int</td>
+<td>The number of transcripts observed for a given gene target for a given cell.</td>
+</tr>
+<tr class="even">
+<td>(Negative Probe; <em>e.g.</em> NegPrb1)<span class="math inline">\(^{Δ}\)</span></td>
+<td>Int</td>
+<td>Negative probes, which do not match any sequence within the transcriptome or genome. These can be used to assess background levels.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>fov cell_ID AATK ... ZFP36 NegPrb3 ... NegPrb23
+  1       0   15 ...   184      12 ...       13
+  1       1    0 ...     0       0 ...        0
+  1       2    0 ...     1       0 ...        0
+  1       3    0 ...     0       0 ...        0
+  1       4    0 ...     0       0 ...        0
+  1       5    0 ...     0       0 ...        0
+  1       6    0 ...     0       0 ...        0
+  1       7    0 ...     1       0 ...        0
+  1       8    0 ...     0       0 ...        0
+  1       9    0 ...     0       0 ...        0</code></pre>
+</div>
+<div id="tabset-2-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-2-tab">
+<div id="tbl-exp-leg" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[15, 15, 70]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-exp-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;4: Description of the baseline expression matrix file format for AtoMx SIP v1.3.2. * = new column in 1.3.2 compared to legacy
+</figcaption>
+<div aria-describedby="tbl-exp-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 70%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns. All transcripts not assigned to a cell are show with a <code>cell_ID</code> value of 0.</td>
+</tr>
+<tr class="odd">
+<td>(Gene expression target)</td>
+<td>Int</td>
+<td>The number of transcripts observed for a given gene target for a given cell.</td>
+</tr>
+<tr class="even">
+<td>(Negative Probe, <em>e.g.,</em> Negative1)<span class="math inline">\(^{Δ}\)</span></td>
+<td>Int</td>
+<td>Negative probes, which do not match any sequence within the transcriptome or genome. These can be used to assess background levels.</td>
+</tr>
+<tr class="odd">
+<td>(System Control)<span class="math inline">\(^{*}\)</span></td>
+<td>Int</td>
+<td>System Control codes are codes which do not have any physical probe associated with them.</td>
+</tr>
+<tr class="even">
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>fov cell_ID A1BG ... ZZZ3 Negative1 ... Negative9 SystemControl1 ... SystemControl99
+  1       1    0 ...    0         0 ...         0              0 ...               0
+  1       2    0 ...    0         0 ...         0              0 ...               0
+  1       3    0 ...    0         0 ...         0              0 ...               0
+  1       4    1 ...    0         0 ...         0              0 ...               0
+  1       5    0 ...    0         0 ...         0              0 ...               0
+  1       6    0 ...    0         0 ...         0              0 ...               0
+  1       7    0 ...    0         0 ...         0              0 ...               0
+  1       8    0 ...    0         0 ...         0              0 ...               0
+  1       9    1 ...    0         0 ...         0              0 ...               0
+  1      10    0 ...    0         0 ...         0              0 ...               0</code></pre>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-meta" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Metadata file</h1>
+<p>There are several differences to the metadata files between the legacy and current versions and I’ll highlight a few new additions below. One thing to note is that exported data from AtoMx SIP can have columns with analysis results in addition to the “baseline” columns.</p>
+<p><em>Cell shape metrics</em> – In the legacy version, basic cell shape was described with <code>Area</code>, <code>Width</code>, <code>Height</code>, and <code>AspectRaio</code> (<a href="#tbl-meta-leg" class="quarto-xref">Table&nbsp;5</a>). The new version of the metadata includes these plus four additional metrics that describe the cell shape (<a href="#tbl-meta-132" class="quarto-xref">Table&nbsp;6</a>). These are <code>perimeter</code>, <code>circularity</code>, <code>eccentricity</code>, and <code>solidity</code>. Perimeter is simply the perimeter of the cell in pixels and the latter three are defined in <span class="citation" data-cites="Fu2024">Fu et al. (<a href="#ref-Fu2024" role="doc-biblioref">2024</a>)</span>.</p>
+<p><em><code>SplitRatioToLocal</code></em> – for cells that are adjacent to the FOV boundaries, the <code>SplitRatioToLocal</code> metric measures the cell area relative to the mean area of cells in the FOVs. For 0 &lt; SplitRatioToLocal &lt; 1, the cell is smaller than average and for <code>SplitRatioToLocal</code> &gt; 1 the cell is larger than average. Note that a value of 0 means the cell is not along the border.</p>
+<p><em>FOV-level metrics</em> – there are some columns that are added as FOV-level metrics. For example, <code>median_RNA</code> provides the median RNA target probe expression across all cells within a given FOV.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="version">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true">Legacy Columns</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" role="tab" aria-controls="tabset-3-2" aria-selected="false">AtoMx SIP v1.3.2</a></li></ul>
+<div class="tab-content" data-group="version">
+<div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
+<div id="tbl-meta-leg" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-meta-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;5: Description of the legacy metadata file format. Δ = column name change between versions; * = new column in 1.3.2 compared to legacy
+</figcaption>
+<div aria-describedby="tbl-meta-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number.</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns.</td>
+</tr>
+<tr class="odd">
+<td>Area</td>
+<td>Int</td>
+<td>Number of pixels assigned to a given cell.</td>
+</tr>
+<tr class="even">
+<td>AspectRatio</td>
+<td>float</td>
+<td>Width divided by height.</td>
+</tr>
+<tr class="odd">
+<td>CenterX_local_px</td>
+<td>Int</td>
+<td>The x position of this cell within the FOV, measured in pixels. The pixel edge length is 120 nm. Thus, to convert to microns multiply the pixel value by 0.12028 <span class="math inline">\(\mu\)</span>m per pixel.</td>
+</tr>
+<tr class="even">
+<td>CenterY_local_px</td>
+<td>Int</td>
+<td>Same as <code>CenterX_local_px</code> but for the y dimension.</td>
+</tr>
+<tr class="odd">
+<td>CenterX_global_px</td>
+<td>float</td>
+<td>See <code>CenterX_local_px</code> description. The global positions describes the relative position of this cell within the large sample reference frame.</td>
+</tr>
+<tr class="even">
+<td>CenterY_global_px</td>
+<td>float</td>
+<td>Same as <code>CenterX_global_px</code> but for the y dimension.</td>
+</tr>
+<tr class="odd">
+<td>Width</td>
+<td>Int</td>
+<td>Cell’s maximum length in x dimension (pixels).</td>
+</tr>
+<tr class="even">
+<td>Height</td>
+<td>Int</td>
+<td>Cell’s maximum length in y dimension (pixels).</td>
+</tr>
+<tr class="odd">
+<td>Mean.(IF)</td>
+<td>Int</td>
+<td>The mean fluorescence intensity for a given cell.</td>
+</tr>
+<tr class="even">
+<td>Max.(IF)</td>
+<td>Int</td>
+<td>The max fluorescence intensity for a given cell.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>'data.frame':   6 obs. of  20 variables:
+ $ fov               : int  1 1 1 1 1 1
+ $ cell_ID           : int  1 2 3 4 5 6
+ $ Area              : int  1259 3723 2010 3358 1213 2647
+ $ AspectRatio       : num  1.34 1.45 1.62 0.47 1 1.38
+ $ CenterX_local_px  : int  1027 2904 4026 4230 4258 66
+ $ CenterY_local_px  : int  3631 3618 3627 3597 3629 3622
+ $ CenterX_global_px : num  4216 6093 7215 7419 7447 ...
+ $ CenterY_global_px : num  158848 158835 158844 158814 158846 ...
+ $ Width             : int  47 87 68 48 38 72
+ $ Height            : int  35 60 42 102 38 52
+ $ Mean.MembraneStain: int  3473 3895 2892 6189 8138 5713
+ $ Max.MembraneStain : int  7354 13832 6048 16091 19281 12617
+ $ Mean.PanCK        : int  715 18374 3265 485 549 1220
+ $ Max.PanCK         : int  5755 53158 37522 964 874 5107
+ $ Mean.CD45         : int  361 260 378 679 566 433
+ $ Max.CD45          : int  845 1232 908 2322 1242 957
+ $ Mean.CD3          : int  22 13 19 5 17 11
+ $ Max.CD3           : int  731 686 654 582 674 547
+ $ Mean.DAPI         : int  4979 1110 10482 6065 3311 4151
+ $ Max.DAPI          : int  26374 13229 33824 39512 30136 19269</code></pre>
+</div>
+<div id="tabset-3-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-2-tab">
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If analysis has been performed on AtoMx SIP prior to export, additional columns not presented here may be added to the metadata file. For example, if cell typing has been performed, there may be a column named <code>RNA_nbclust_[GUID]_1_clusters</code> containing the estimated cell type.</p>
+</div>
+</div>
+<div id="tbl-meta-132" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-meta-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;6: Description of the baseline metadata file format for AtoMx SIP v1.3.2. Δ = column name change between versions; * = new column in 1.3.2 compared to legacy
+</figcaption>
+<div aria-describedby="tbl-meta-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number.</td>
+</tr>
+<tr class="even">
+<td>Area</td>
+<td>Int</td>
+<td>Number of pixels assigned to a given cell.</td>
+</tr>
+<tr class="odd">
+<td>AspectRatio</td>
+<td>float</td>
+<td>Width divided by height.</td>
+</tr>
+<tr class="even">
+<td>CenterX_local_px</td>
+<td>Int</td>
+<td>The x position of this cell within the FOV, measured in pixels. The pixel edge length is 120 nm. Thus, to convert to microns multiply the pixel value by 0.12028 <span class="math inline">\(\mu\)</span>m per pixel.</td>
+</tr>
+<tr class="odd">
+<td>CenterY_local_px</td>
+<td>Int</td>
+<td>Same as <code>CenterX_local_px</code> but for the y dimension.</td>
+</tr>
+<tr class="even">
+<td>Width</td>
+<td>Int</td>
+<td>Cell’s maximum length in x dimension (pixels).</td>
+</tr>
+<tr class="odd">
+<td>Height</td>
+<td>Int</td>
+<td>Cell’s maximum length in y dimension (pixels).</td>
+</tr>
+<tr class="even">
+<td>Mean.(IF)</td>
+<td>Int</td>
+<td>The mean fluorescence intensity for a given cell.</td>
+</tr>
+<tr class="odd">
+<td>Max.(IF)</td>
+<td>Int</td>
+<td>The max fluorescence intensity for a given cell.</td>
+</tr>
+<tr class="even">
+<td>SplitRatioToLocal<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>If cell abuts the FOV border: the ratio of <code>Area</code> to mean cell area for that FOV. If cell does not border the FOV boundary: 0.</td>
+</tr>
+<tr class="odd">
+<td>NucArea<span class="math inline">\(^{*}\)</span></td>
+<td>Int</td>
+<td>Number of pixels assigned to a given nucleus.</td>
+</tr>
+<tr class="even">
+<td>NucAspectRatio<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>Width divided by height of nucleus.</td>
+</tr>
+<tr class="odd">
+<td>Circularity<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>Area to perimeter ratio. 1 = circle; &lt; 1 less circular <span class="citation" data-cites="Fu2024">(<a href="#ref-Fu2024" role="doc-biblioref">Fu et al. 2024</a>)</span>.</td>
+</tr>
+<tr class="even">
+<td>Eccentricity<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>A cell’s minor axis divided by its major axis <span class="citation" data-cites="Fu2024">(<a href="#ref-Fu2024" role="doc-biblioref">Fu et al. 2024</a>)</span>.</td>
+</tr>
+<tr class="odd">
+<td>Perimeter<span class="math inline">\(^{*}\)</span></td>
+<td>Int</td>
+<td>The perimeter of the cell (in pixels)</td>
+</tr>
+<tr class="even">
+<td>Solidity<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>The <code>Area</code> of the cell divided by its convex area. A measure of the “density” of a cell with values &lt; 1 indicating increased cell irregularity <span class="citation" data-cites="Fu2024">(<a href="#ref-Fu2024" role="doc-biblioref">Fu et al. 2024</a>)</span></td>
+</tr>
+<tr class="odd">
+<td>cell_id<span class="math inline">\(^{*}\)</span></td>
+<td>string</td>
+<td>A study-wide unique cell identifier. Combination of c(ell), <code>slide_ID</code>, <code>fov</code>, and <code>cell_ID</code>. Note that this is equivalent to <code>cell_ID</code> in <code>napari-cosmx</code>.</td>
+</tr>
+<tr class="even">
+<td>assay_type<span class="math inline">\(^{*}\)</span></td>
+<td>string</td>
+<td>The assay type (Protein or RNA)</td>
+</tr>
+<tr class="odd">
+<td>version<span class="math inline">\(^{*}\)</span></td>
+<td>string</td>
+<td>The version of the target decoding used.</td>
+</tr>
+<tr class="even">
+<td>Run_Tissue_name<span class="math inline">\(^{*}\)</span></td>
+<td>string</td>
+<td>The name of the slide.</td>
+</tr>
+<tr class="odd">
+<td>Panel<span class="math inline">\(^{*}\)</span></td>
+<td>string</td>
+<td>The panel that was assayed.</td>
+</tr>
+<tr class="even">
+<td>cellSegmentationSetId<span class="math inline">\(^{*}\)</span>.</td>
+<td>string</td>
+<td>The cell segmentation set ID.</td>
+</tr>
+<tr class="odd">
+<td>cellSegmentationSetName<span class="math inline">\(^{*}\)</span></td>
+<td>string</td>
+<td>The cell segmentation set name.</td>
+</tr>
+<tr class="even">
+<td>slide_ID<span class="math inline">\(^{*}\)</span></td>
+<td>Int</td>
+<td>Unique identifier for the slide.</td>
+</tr>
+<tr class="odd">
+<td>CenterX_global_px</td>
+<td>float</td>
+<td>See <code>CenterX_local_px</code> description. The global positions describes the relative position of this cell within the large sample reference frame.</td>
+</tr>
+<tr class="even">
+<td>CenterY_global_px</td>
+<td>float</td>
+<td>Same as <code>CenterX_global_px</code> but for the y dimension.</td>
+</tr>
+<tr class="odd">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns.</td>
+</tr>
+<tr class="even">
+<td>unassignedTranscripts<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>Proportion of transcripts in the FOV the cell resides in that are not assigned within any cell. This value is an FOV-level metric that is repeated for each cell (excluding cell 0).</td>
+</tr>
+<tr class="odd">
+<td>median_RNA<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>FOV-level statistic. Median RNA target probe expression across all cells within a given FOV.</td>
+</tr>
+<tr class="even">
+<td>RNA_quantile_(proportion)<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>FOV-level statistic. The (proportion*100) percentile of RNA target expression across all cells within a given FOV.</td>
+</tr>
+<tr class="odd">
+<td>nCount_RNA<span class="math inline">\(^{*}\)</span></td>
+<td>Int</td>
+<td>Total RNA transcripts observed.</td>
+</tr>
+<tr class="even">
+<td>nFeature_RNA<span class="math inline">\(^{*}\)</span></td>
+<td>Int</td>
+<td>Total number of unique RNA transcripts observed.</td>
+</tr>
+<tr class="odd">
+<td>median_negprobes<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>FOV-level statistic. Median negative probe expression across all cells within a given FOV.</td>
+</tr>
+<tr class="even">
+<td>negprobes_quantile_(proportion)<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>FOV-level statistic. The (proportion*100) percentile of negative probe expression across all cells within a given FOV.</td>
+</tr>
+<tr class="odd">
+<td>nCount_negprobes<span class="math inline">\(^{*}\)</span></td>
+<td>Int</td>
+<td>Total Negative Control Probe counts observed.</td>
+</tr>
+<tr class="even">
+<td>nFeature_negprobes<span class="math inline">\(^{*}\)</span></td>
+<td>Int</td>
+<td>Total number of unique Negative Control Probe counts observed.</td>
+</tr>
+<tr class="odd">
+<td>median_falsecode<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>FOV-level statistic. Median System Control counts across all cells within a given FOV.</td>
+</tr>
+<tr class="even">
+<td>falsecode_quantile_(proportion)<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>FOV-level statistic. The (proportion*100) percentile of System Control counts across all cells within a given FOV.</td>
+</tr>
+<tr class="odd">
+<td>nCount_falsecode<span class="math inline">\(^{*}\)</span></td>
+<td>Int</td>
+<td>Total System Control codes counts observed. These codes do not have a physical probe in the experiment.</td>
+</tr>
+<tr class="even">
+<td>nFeature_falsecode<span class="math inline">\(^{*}\)</span></td>
+<td>Int</td>
+<td>Total number of unique System Control codes counts observed.</td>
+</tr>
+<tr class="odd">
+<td>Area.um2<span class="math inline">\(^{*}\)</span></td>
+<td>float</td>
+<td>The cell area in units of <span class="math inline">\(\mu m^{2}\)</span></td>
+</tr>
+<tr class="even">
+<td>cell<span class="math inline">\(^{*}\)</span></td>
+<td>string</td>
+<td>Redundant with <code>cell_id</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>'data.frame':   6 obs. of  65 variables:
+ $ fov                    : int  1 1 1 1 1 1
+ $ Area                   : int  3037 8790 5552 5822 4008 3603
+ $ AspectRatio            : num  0.67 0.95 0.77 0.9 0.97 0.88
+ $ CenterX_local_px       : int  3938 2741 3888 4214 4137 4163
+ $ CenterY_local_px       : int  25 52 57 73 152 187
+ $ Width                  : int  76 110 96 81 78 83
+ $ Height                 : int  51 104 74 90 76 73
+ $ Mean.B                 : int  41 425 88 197 73 91
+ $ Max.B                  : int  252 2308 952 604 552 364
+ $ Mean.G                 : int  50 1270 154 48 22 26
+ $ Max.G                  : int  1192 6960 4192 184 380 160
+ $ Mean.Y                 : int  106 366 254 235 97 196
+ $ Max.Y                  : int  1228 2864 3884 1340 828 904
+ $ Mean.R                 : int  36 62 221 20 4 16
+ $ Max.R                  : int  2360 1044 5604 104 60 232
+ $ Mean.DAPI              : int  92 37 181 288 237 324
+ $ Max.DAPI               : int  408 236 924 1060 800 928
+ $ SplitRatioToLocal      : num  0.7 2.01 0 1.33 0 0
+ $ NucArea                : int  1252 0 1180 2384 1284 1536
+ $ NucAspectRatio         : num  0.77 0 1 0.94 0.95 0.81
+ $ Circularity            : num  0.92 1.05 1.03 1.03 0.94 0.83
+ $ Eccentricity           : num  0.76 0.82 0.79 0.71 0.9 0.82
+ $ Perimeter              : int  204 324 260 266 231 233
+ $ Solidity               : num  14.9 27.1 21.4 21.9 17.4 ...
+ $ cell_id                : chr  "c_1_1_1" "c_1_1_2" "c_1_1_3" "c_1_1_4" ...
+ $ assay_type             : chr  "RNA" "RNA" "RNA" "RNA" ...
+ $ version                : chr  "v6" "v6" "v6" "v6" ...
+ $ Run_Tissue_name        : chr  "example_tissue" "example_tissue" "example_tissue" "example_tissue" ...
+ $ Panel                  : chr  "Human RNA 6k Discovery" "Human RNA 6k Discovery" "Human RNA 6k Discovery" "Human RNA 6k Discovery" ...
+ $ cellSegmentationSetId  : chr  " a343598a-ed40-4a93-a655-49bc7688021d" " a343598a-ed40-4a93-a655-49bc7688021d" " a343598a-ed40-4a93-a655-49bc7688021d" " a343598a-ed40-4a93-a655-49bc7688021d" ...
+ $ cellSegmentationSetName: chr  " Initial Segmentation" " Initial Segmentation" " Initial Segmentation" " Initial Segmentation" ...
+ $ slide_ID               : int  1 1 1 1 1 1
+ $ CenterX_global_px      : int  21057 19860 21007 21333 21256 21282
+ $ CenterY_global_px      : int  68070 68043 68038 68022 67943 67908
+ $ cell_ID                : int  1 2 3 4 5 6
+ $ unassignedTranscripts  : num  0.0349 0.0349 0.0349 0.0349 0.0349 ...
+ $ median_RNA             : int  86 86 86 86 86 86
+ $ RNA_quantile_0.75      : int  126 126 126 126 126 126
+ $ RNA_quantile_0.8       : int  139 139 139 139 139 139
+ $ RNA_quantile_0.85      : int  157 157 157 157 157 157
+ $ RNA_quantile_0.9       : int  182 182 182 182 182 182
+ $ RNA_quantile_0.95      : int  240 240 240 240 240 240
+ $ RNA_quantile_0.99      : num  512 512 512 512 512 ...
+ $ nCount_RNA             : int  138 295 234 344 230 249
+ $ nFeature_RNA           : int  86 182 152 217 148 132
+ $ median_negprobes       : int  9 9 9 9 9 9
+ $ negprobes_quantile_0.75: int  126 126 126 126 126 126
+ $ negprobes_quantile_0.8 : int  139 139 139 139 139 139
+ $ negprobes_quantile_0.85: int  157 157 157 157 157 157
+ $ negprobes_quantile_0.9 : int  182 182 182 182 182 182
+ $ negprobes_quantile_0.95: int  240 240 240 240 240 240
+ $ negprobes_quantile_0.99: num  512 512 512 512 512 ...
+ $ nCount_negprobes       : int  0 0 1 0 0 0
+ $ nFeature_negprobes     : int  0 0 1 0 0 0
+ $ median_falsecode       : int  4 4 4 4 4 4
+ $ falsecode_quantile_0.75: int  126 126 126 126 126 126
+ $ falsecode_quantile_0.8 : int  139 139 139 139 139 139
+ $ falsecode_quantile_0.85: int  157 157 157 157 157 157
+ $ falsecode_quantile_0.9 : int  182 182 182 182 182 182
+ $ falsecode_quantile_0.95: int  240 240 240 240 240 240
+ $ falsecode_quantile_0.99: num  512 512 512 512 512 ...
+ $ nCount_falsecode       : int  1 0 0 1 1 1
+ $ nFeature_falsecode     : int  1 0 0 1 1 1
+ $ Area.um2               : num  43.9 127.2 80.3 84.2 58 ...
+ $ cell                   : chr  "c_1_1_1" "c_1_1_2" "c_1_1_3" "c_1_1_4" ...</code></pre>
+</div>
+</div>
+</div>
+</section>
+<section id="transcript-coordinates-file" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Transcript coordinates file</h1>
+<p>Main differences between versions:</p>
+<ul>
+<li>The contents of the <code>CellComp</code> column differ between version. In the current version “None” replaces “0”. The other three regions–Membrane, Nuclear, Cytoplasm–are unchanged.</li>
+<li><code>cell</code> column is added to the newer version.</li>
+</ul>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="version">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" role="tab" aria-controls="tabset-4-1" aria-selected="true">Legacy</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" role="tab" aria-controls="tabset-4-2" aria-selected="false">AtoMx SIP v1.3.2</a></li></ul>
+<div class="tab-content" data-group="version">
+<div id="tabset-4-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-4-1-tab">
+<div id="tbl-tx-leg" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-tx-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;7: Description of the legacy transcripts file format. ‡ = contents changed between versions
+</figcaption>
+<div aria-describedby="tbl-tx-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number.</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns.</td>
+</tr>
+<tr class="odd">
+<td>x_global_px</td>
+<td>float</td>
+<td>The x position (in pixels) relative to the tissue.</td>
+</tr>
+<tr class="even">
+<td>y_global_px</td>
+<td>float</td>
+<td>The y position (in pixels) relative to the tissue.</td>
+</tr>
+<tr class="odd">
+<td>x_local_px</td>
+<td>float</td>
+<td>The x position (in pixels) relative to the given FOV.</td>
+</tr>
+<tr class="even">
+<td>y_local_px</td>
+<td>float</td>
+<td>The y position (in pixels) relative to the given FOV.</td>
+</tr>
+<tr class="odd">
+<td>z</td>
+<td>Int</td>
+<td>The z plane.</td>
+</tr>
+<tr class="even">
+<td>target</td>
+<td>string</td>
+<td>The name of the target.</td>
+</tr>
+<tr class="odd">
+<td>CellComp‡</td>
+<td>string</td>
+<td>Subcellular location of target.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>fov cell_ID x_global_px y_global_px x_local_px y_local_px  z  target CellComp
+  1       0    6757.402    158836.4   3568.513  3619.7375 11   NEAT1        0
+  1       0    5111.389    156060.2   1922.500   843.5334 11   NEAT1        0
+  1       0    7860.461    157809.3   4671.572  2592.6715 11    CCR2        0
+  1       0    3790.489    155553.9    601.600   337.2168 11 HLA-DRA        0
+  1       0    3290.639    158023.6    101.750  2806.9750 11 HLA-DRA Membrane
+  1       0    7020.160    158656.3   3831.271  3439.6000 11     VHL        0
+  1       0    4252.914    157003.0   1064.025  1786.3376 11    FZD5  Nuclear
+  1       0    5987.309    157572.5   2798.420  2355.8000 11    CD37        0
+  1       0    5586.849    157774.2   2397.960  2557.5599 11   ATG12 Membrane</code></pre>
+</div>
+<div id="tabset-4-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-2-tab">
+<div id="tbl-tx-132" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-tx-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;8: Description of the baseline transcripts file format for AtoMx SIP v1.3.2. * = new column in 1.3.2 compared to legacy; ‡ = contents changed between versions
+</figcaption>
+<div aria-describedby="tbl-tx-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number.</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns.</td>
+</tr>
+<tr class="odd">
+<td>cell<span class="math inline">\(^{*}\)</span></td>
+<td>string</td>
+<td>A study-wide unique cell identifier. Combination of c(ell), slide ID, <code>fov</code>, and <code>cell_ID</code>. Note that this is equivalent to <code>cell_ID</code> in <code>napari-cosmx</code>.</td>
+</tr>
+<tr class="even">
+<td>x_local_px</td>
+<td>float</td>
+<td>The x position (in pixels) relative to the given FOV.</td>
+</tr>
+<tr class="odd">
+<td>y_local_px</td>
+<td>float</td>
+<td>The y position (in pixels) relative to the given FOV.</td>
+</tr>
+<tr class="even">
+<td>x_global_px</td>
+<td>float</td>
+<td>The x position (in pixels) relative to the tissue.</td>
+</tr>
+<tr class="odd">
+<td>y_global_px</td>
+<td>float</td>
+<td>The y position (in pixels) relative to the tissue.</td>
+</tr>
+<tr class="even">
+<td>z</td>
+<td>Int</td>
+<td>The z plane.</td>
+</tr>
+<tr class="odd">
+<td>target</td>
+<td>string</td>
+<td>The name of the target.</td>
+</tr>
+<tr class="even">
+<td>CellComp‡</td>
+<td>string</td>
+<td>Subcellular location of target.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code> fov cell_ID        cell       x_local_px y_local_px x_global_px y_global_px   z   target  CellComp
+  30    4755 c_1_30_4755 29337.6332465278   173483.2   4259.8555    16.57764   3      B2M Cytoplasm         
+  30    4755 c_1_30_4755 29340.4174262153   173488.4   4262.6396    21.71997   3   COL3A1 Cytoplasm         
+  30    4757 c_1_30_4757 29593.4975043403   173480.9   4515.7197    14.27002   8    RPL32 Cytoplasm         
+  30    4759 c_1_30_4759 25211.3444434272   173477.6    133.5667    10.95020   6   COL1A1 Cytoplasm         
+  30    4759 c_1_30_4759 25224.5611029731   173483.9    146.7833    17.28320   6   COL1A2 Cytoplasm         
+  30    4760 c_1_30_4760 25902.6278143989   173480.8    824.8500    14.11694   7   TPSAB1 Cytoplasm         
+  30    4760 c_1_30_4760 25924.0527411567   173477.8    846.2750    11.10010   1 HSP90AB1 Cytoplasm         
+  30    4760 c_1_30_4760 25925.7694159614   173478.0    847.9916    11.34155   6     GLUL Cytoplasm         
+  30    4760 c_1_30_4760 25914.4152899848   173478.9    836.6375    12.27515   6   ADGRE2 Cytoplasm         
+  30    4760 c_1_30_4760 25902.9277411567   173480.7    825.1500    14.07520   8   TPSAB1 Cytoplasm   </code></pre>
+</div>
+</div>
+</div>
+</section>
+<section id="polygons-file" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Polygons file</h1>
+<p>The polygons file was added to the list of flat files and shows the vertices of each cell’s polygon.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="version">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" role="tab" aria-controls="tabset-5-1" aria-selected="true">Legacy</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" role="tab" aria-controls="tabset-5-2" aria-selected="false">AtoMx SIP v1.3.2</a></li></ul>
+<div class="tab-content" data-group="version">
+<div id="tabset-5-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-5-1-tab">
+<p>(Not applicable)</p>
+</div>
+<div id="tabset-5-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-2-tab">
+<div id="tbl-poly-132" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-poly-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;9: Description of the baseline polygons file format for AtoMx SIP v1.3.2.
+</figcaption>
+<div aria-describedby="tbl-poly-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number.</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns.</td>
+</tr>
+<tr class="odd">
+<td>cell</td>
+<td>string</td>
+<td>A study-wide unique cell identifier. Combination of c(ell), slide ID, and <code>cell_ID</code>. Note that this is equivalent to <code>cell_ID</code> in <code>napari-cosmx</code>.</td>
+</tr>
+<tr class="even">
+<td>x_local_px</td>
+<td>float</td>
+<td>The x position (in pixels) of vertex relative to the given FOV.</td>
+</tr>
+<tr class="odd">
+<td>y_local_px</td>
+<td>float</td>
+<td>The y position (in pixels) of vertex relative to the given FOV.</td>
+</tr>
+<tr class="even">
+<td>x_global_px</td>
+<td>float</td>
+<td>The x position (in pixels) of vertex relative to the tissue.</td>
+</tr>
+<tr class="odd">
+<td>y_global_px</td>
+<td>float</td>
+<td>The y position (in pixels) of vertex relative to the tissue.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<p>This example below shows the vertices of cell <code>c_1_2_3</code>.</p>
+<pre><code>  fov cellID    cell x_local_px y_local_px x_global_px y_global_px
+  2      3 c_1_2_3        279          0        4535       29792
+  2      3 c_1_2_3        279          1        4535       29791
+  2      3 c_1_2_3        270         15        4526       29777
+  2      3 c_1_2_3        266         20        4522       29772
+  2      3 c_1_2_3        234         53        4490       29739
+  2      3 c_1_2_3        223         64        4479       29728
+  2      3 c_1_2_3        214         71        4470       29721
+  2      3 c_1_2_3        210         72        4466       29720
+  2      3 c_1_2_3        199         72        4455       29720
+  2      3 c_1_2_3        186         66        4442       29726
+  2      3 c_1_2_3        182         64        4438       29728
+  2      3 c_1_2_3        179         62        4435       29730
+  2      3 c_1_2_3        176         31        4432       29761
+  2      3 c_1_2_3        176          4        4432       29788
+  2      3 c_1_2_3        179          0        4435       29792</code></pre>
+</div>
+</div>
+</div>
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-Fu2024" class="csl-entry" role="listitem">
+Fu, Xiaohang, Yingxin Lin, David M. Lin, Daniel Mechtersheimer, Chuhan Wang, Farhan Ameen, Shila Ghazanfar, Ellis Patrick, Jinman Kim, and Jean Y. H. Yang. 2024. <span>“BIDCell: Biologically-Informed Self-Supervised Learning for Segmentation of Subcellular Spatial Transcriptomics Data.”</span> <em>Nature Communications</em> 15 (January): 509. <a href="https://doi.org/10.1038/s41467-023-44560-w">https://doi.org/10.1038/s41467-023-44560-w</a>.
+</div>
+<div id="ref-He2022" class="csl-entry" role="listitem">
+He, Shanshan, Ruchir Bhatt, Carl Brown, Emily A Brown, Derek L Buhr, Kan Chantranuvatana, Patrick Danaher, et al. 2022. <span>“High-Plex Imaging of RNA and Proteins at Subcellular Resolution in Fixed Tissue by Spatial Molecular Imaging.”</span> <em>Nature Biotechnology</em> 40 (December): 1794–1806. <a href="https://doi.org/10.1038/s41587-022-01483-z">https://doi.org/10.1038/s41587-022-01483-z</a>.
+</div>
+</div></section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/nanostring-biostats\.github\.io\/CosMx-Analysis-Scratch-Space");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+    <a class="nav-link" href="../../license.html">
+<p>License</p>
+</a>
+  </li>  
+</ul>
+    <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

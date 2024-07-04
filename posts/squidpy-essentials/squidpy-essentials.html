@@ -1,0 +1,2036 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.53">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Evelyn Metzger">
+<meta name="dcterms.date" content="2024-07-03">
+<meta name="description" content="In this blog post, I’ll show how to prepare and analyze AtoMx™ SIP-exported CosMx™ SMI data with python's squidpy package.">
+
+<title>Using Squidpy with AtoMx™ SIP exports – Blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../assets/cropped-NS_Favicon_512x512-32x32.png" rel="icon" type="image/png">
+<script src="../../site_libs/cookie-consent/cookie-consent.js"></script>
+<link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-29W4MW0Y2W"></script>
+
+<script type="text/plain" cookie-consent="tracking">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-29W4MW0Y2W', { 'anonymize_ip': true});
+</script>
+
+<script type="text/javascript" charset="UTF-8">
+document.addEventListener('DOMContentLoaded', function () {
+cookieconsent.run({
+  "notice_banner_type":"simple",
+  "consent_type":"implied",
+  "palette":"light",
+  "language":"en",
+  "page_load_consent_levels":["strictly-necessary","functionality","tracking","targeting"],
+  "notice_banner_reject_button_hide":false,
+  "preferences_center_close_button_hide":false,
+  "website_name":""
+  ,
+"language":"en"
+  });
+});
+</script> 
+  
+
+
+<meta name="citation_title" content="Using Squidpy with AtoMx&amp;amp;#8482; SIP exports">
+<meta name="citation_author" content="Evelyn Metzger">
+<meta name="citation_publication_date" content="2024-07-03">
+<meta name="citation_cover_date" content="2024-07-03">
+<meta name="citation_year" content="2024">
+<meta name="citation_online_date" content="2024-07-03">
+<meta name="citation_fulltext_html_url" content="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/squidpy-essentials.html">
+<meta name="citation_language" content="en">
+<meta name="citation_reference" content="citation_title=Insitutype: Likelihood-based cell typing for single cell spatial transcriptomics;,citation_abstract=Accurate cell typing is fundamental to analysis of spatial single-cell transcriptomics, but legacy scRNA-seq algorithms can underperform in this new type of data. We have developed a cell typing algorithm, Insitutype, designed for statistical and computational efficiency in spatial transcriptomics data.Insitutype is based on a likelihood model that weighs the evidence from every expression value, extracting all the information available in each cell’s expression profile. This likelihood model underlies a Bayes classifier for supervised cell typing, and an Expectation-Maximization algorithm for unsupervised and semi-supervised clustering. Insitutype also leverages alternative data types collected in spatial studies, such as cell images and spatial context, by using them to inform prior probabilities of cell type calls. We demonstrate rapid clustering of millions of cells and accurate fine-grained cell typing of kidney and non-small cell lung cancer samples.Competing Interest StatementPD, EZ, ZY, DR, MG, ZR, TKK, SH, DH and JMB are current/former employees and shareholders of NanoString.;,citation_author=Patrick Danaher;,citation_author=Edward Zhao;,citation_author=Zhi Yang;,citation_author=David Ross;,citation_author=Mark Gregory;,citation_author=Zach Reitz;,citation_author=Tae K. Kim;,citation_author=Sarah Baxter;,citation_author=Shaun Jackson;,citation_author=Shanshan He;,citation_author=Dave Henderson;,citation_author=Joseph M. Beechem;,citation_publication_date=2022;,citation_cover_date=2022;,citation_year=2022;,citation_fulltext_html_url=https://www.biorxiv.org/content/early/2022/10/21/2022.10.19.512902;,citation_doi=10.1101/2022.10.19.512902;,citation_journal_title=bioRxiv;,citation_publisher=Cold Spring Harbor Laboratory;">
+<meta name="citation_reference" content="citation_title=Analytic pearson residuals for normalization of single-cell RNA-seq UMI data;,citation_author=Jan Lause;,citation_author=Philipp Berens;,citation_author=Dmitry Kobak;,citation_publication_date=2021-09;,citation_cover_date=2021-09;,citation_year=2021;,citation_doi=10.1186/s13059-021-02451-7;,citation_issn=1474-760X;,citation_volume=22;,citation_journal_title=Genome Biology;">
+<meta name="citation_reference" content="citation_title=High-plex imaging of RNA and proteins at subcellular resolution in fixed tissue by spatial molecular imaging.;,citation_abstract=Resolving the spatial distribution of RNA and protein in tissues at subcellular resolution is a challenge in the field of spatial biology. We describe spatial molecular imaging, a system that measures RNAs and proteins in intact biological samples at subcellular resolution by performing multiple cycles of nucleic acid hybridization of fluorescent molecular barcodes. We demonstrate that spatial molecular imaging has high sensitivity (one or two copies per cell) and very low error rate (0.0092 false calls per cell) and background (&nbsp;0.04 counts per cell). The imaging system generates three-dimensional, super-resolution localization of analytes at &nbsp;2 million cells per sample. Cell segmentation is morphology based using antibodies, compatible with formalin-fixed, paraffin-embedded samples. We measured multiomic data (980 RNAs and 108 proteins) at subcellular resolution in formalin-fixed, paraffin-embedded tissues (nonsmall cell lung and breast cancer) and identified &amp;amp;amp;gt;18 distinct cell types, ten unique tumor microenvironments and 100 pairwise ligand-receptor interactions. Data on &amp;gt;800,000 single cells and &nbsp;260 million transcripts can be accessed at http://nanostring.com/CosMx-dataset .;,citation_author=Shanshan He;,citation_author=Ruchir Bhatt;,citation_author=Carl Brown;,citation_author=Emily A Brown;,citation_author=Derek L Buhr;,citation_author=Kan Chantranuvatana;,citation_author=Patrick Danaher;,citation_author=Dwayne Dunaway;,citation_author=Ryan G Garrison;,citation_author=Gary Geiss;,citation_author=Mark T Gregory;,citation_author=Margaret L Hoang;,citation_author=Rustem Khafizov;,citation_author=Emily E Killingbeck;,citation_author=Dae Kim;,citation_author=Tae Kyung Kim;,citation_author=Youngmi Kim;,citation_author=Andrew Klock;,citation_author=Mithra Korukonda;,citation_author=Alecksandr Kutchma;,citation_author=Zachary R Lewis;,citation_author=Yan Liang;,citation_author=Jeffrey S Nelson;,citation_author=Giang T Ong;,citation_author=Evan P Perillo;,citation_author=Joseph C Phan;,citation_author=Tien Phan-Everson;,citation_author=Erin Piazza;,citation_author=Tushar Rane;,citation_author=Zachary Reitz;,citation_author=Michael Rhodes;,citation_author=Alyssa Rosenbloom;,citation_author=David Ross;,citation_author=Hiromi Sato;,citation_author=Aster W Wardhani;,citation_author=Corey A Williams-Wietzikoski;,citation_author=Lidan Wu;,citation_author=Joseph M Beechem;,citation_publication_date=2022-12;,citation_cover_date=2022-12;,citation_year=2022;,citation_doi=10.1038/s41587-022-01483-z;,citation_issn=1546-1696;,citation_pmid=36203011;,citation_volume=40;,citation_journal_title=Nature biotechnology;">
+<meta name="citation_reference" content="citation_title=Squidpy: A scalable framework for spatial omics analysis;,citation_abstract=Spatial omics data are advancing the study of tissue organization and cellular communication at an unprecedented scale. Flexible tools are required to store, integrate and visualize the large diversity of spatial omics data. Here, we present Squidpy, a Python framework that brings together tools from omics and image analysis to enable scalable description of spatial molecular data, such as transcriptome or multivariate proteins. Squidpy provides efficient infrastructure and numerous analysis methods that allow to efficiently store, manipulate and interactively visualize spatial omics data. Squidpy is extensible and can be interfaced with a variety of already existing libraries for the scalable analysis of spatial omics data.;,citation_author=Giovanni Palla;,citation_author=Hannah Spitzer;,citation_author=Michal Klein;,citation_author=David Fischer;,citation_author=Anna Christina Schaar;,citation_author=Louis Benedikt Kuemmerle;,citation_author=Sergei Rybakov;,citation_author=Ignacio L. Ibarra;,citation_author=Olle Holmberg;,citation_author=Isaac Virshup;,citation_author=Mohammad Lotfollahi;,citation_author=Sabrina Richter;,citation_author=Fabian J. Theis;,citation_publication_date=2022-02;,citation_cover_date=2022-02;,citation_year=2022;,citation_doi=10.1038/s41592-021-01358-2;,citation_issn=1548-7091;,citation_volume=19;,citation_journal_title=Nature Methods;">
+<meta name="citation_reference" content="citation_title=Dictionary learning for integrative, multimodal and scalable single-cell analysis;,citation_author=Yuhan Hao;,citation_author=Tim Stuart;,citation_author=Madeline H. Kowalski;,citation_author=Saket Choudhary;,citation_author=Paul Hoffman;,citation_author=Austin Hartman;,citation_author=Avi Srivastava;,citation_author=Gesmira Molla;,citation_author=Shaista Madad;,citation_author=Carlos Fernandez-Granda;,citation_author=Rahul Satija;,citation_publication_date=2024-02;,citation_cover_date=2024-02;,citation_year=2024;,citation_doi=10.1038/s41587-023-01767-y;,citation_issn=1087-0156;,citation_volume=42;,citation_journal_title=Nature Biotechnology;">
+<meta name="citation_reference" content="citation_title=Giotto: A toolbox for integrative analysis and visualization of spatial expression data;,citation_abstract=Spatial transcriptomic and proteomic technologies have provided new opportunities to investigate cells in their native microenvironment. Here we present Giotto, a comprehensive and open-source toolbox for spatial data analysis and visualization. The analysis module provides end-to-end analysis by implementing a wide range of algorithms for characterizing tissue composition, spatial expression patterns, and cellular interactions. Furthermore, single-cell RNAseq data can be integrated for spatial cell-type enrichment analysis. The visualization module allows users to interactively visualize analysis outputs and imaging features. To demonstrate its general applicability, we apply Giotto to a wide range of datasets encompassing diverse technologies and platforms.;,citation_author=Ruben Dries;,citation_author=Qian Zhu;,citation_author=Rui Dong;,citation_author=Chee-Huat Linus Eng;,citation_author=Huipeng Li;,citation_author=Kan Liu;,citation_author=Yuntian Fu;,citation_author=Tianxiao Zhao;,citation_author=Arpan Sarkar;,citation_author=Feng Bao;,citation_author=Rani E. George;,citation_author=Nico Pierson;,citation_author=Long Cai;,citation_author=Guo-Cheng Yuan;,citation_publication_date=2021-12;,citation_cover_date=2021-12;,citation_year=2021;,citation_doi=10.1186/s13059-021-02286-2;,citation_issn=1474-760X;,citation_volume=22;,citation_journal_title=Genome Biology;">
+<meta name="citation_reference" content="citation_title=SCANPY: Large-scale single-cell gene expression data analysis;,citation_abstract=Scanpy is a scalable toolkit for analyzing single-cell gene expression data. It includes methods for preprocessing, visualization, clustering, pseudotime and trajectory inference, differential expression testing, and simulation of gene regulatory networks. Its Python-based implementation efficiently deals with data sets of more than one million cells (https://github.com/theislab/Scanpy). Along with Scanpy, we present AnnData, a generic class for handling annotated data matrices (https://github.com/theislab/anndata).;,citation_author=F Alexander Wolf;,citation_author=Philipp Angerer;,citation_author=Fabian J Theis;,citation_publication_date=2018;,citation_cover_date=2018;,citation_year=2018;,citation_fulltext_html_url=https://doi.org/10.1186/s13059-017-1382-0;,citation_doi=10.1186/s13059-017-1382-0;,citation_issn=1474-760X;,citation_volume=19;,citation_journal_title=Genome Biology;">
+<meta name="citation_reference" content="citation_title=Differential expression and clinical significance of COX6C in human diseases.;,citation_abstract=Mitochondria, independent double-membrane organelles, are intracellular power plants that feed most eukaryotic cells with the ATP produced via the oxidative phosphorylation (OXPHOS). Consistently, cytochrome c oxidase (COX) catalyzes the electron transfer chain’s final step. Electrons are transferred from reduced cytochrome c to molecular oxygen and play an indispensable role in oxidative phosphorylation of cells. Cytochrome c oxidase subunit 6c (COX6C) is encoded by the nuclear genome in the ribosome after translation and is transported to mitochondria via different pathways, and eventually forms the COX complex. In recent years, many studies have shown the abnormal level of COX6C in familial hypercholesterolemia, chronic kidney disease, diabetes, breast cancer, prostate cancer, uterine leiomyoma, follicular thyroid cancer, melanoma tissues, and other conditions. Its underlying mechanism may be related to the cellular oxidative phosphorylation pathway in tissue injury disease. Here reviews the varied function of COX6C in non-tumor and tumor diseases.;,citation_author=Bi-Xia Tian;,citation_author=Wei Sun;,citation_author=Shu-Hong Wang;,citation_author=Pei-Jun Liu;,citation_author=Yao-Chun Wang;,citation_publication_date=2021;,citation_cover_date=2021;,citation_year=2021;,citation_issn=1943-8141;,citation_pmid=33527004;,citation_volume=13;,citation_journal_title=American journal of translational research;">
+<meta name="citation_reference" content="citation_title=BIDCell: Biologically-informed self-supervised learning for segmentation of subcellular spatial transcriptomics data;,citation_abstract=Recent advances in subcellular imaging transcriptomics platforms have enabled high-resolution spatial mapping of gene expression, while also introducing significant analytical challenges in accurately identifying cells and assigning transcripts. Existing methods grapple with cell segmentation, frequently leading to fragmented cells or oversized cells that capture contaminated expression. To this end, we present BIDCell, a self-supervised deep learning-based framework with biologically-informed loss functions that learn relationships between spatially resolved gene expression and cell morphology. BIDCell incorporates cell-type data, including single-cell transcriptomics data from public repositories, with cell morphology information. Using a comprehensive evaluation framework consisting of metrics in five complementary categories for cell segmentation performance, we demonstrate that BIDCell outperforms other state-of-the-art methods according to many metrics across a variety of tissue types and technology platforms. Our findings underscore the potential of BIDCell to significantly enhance single-cell spatial expression analyses, enabling great potential in biological discovery.;,citation_author=Xiaohang Fu;,citation_author=Yingxin Lin;,citation_author=David M. Lin;,citation_author=Daniel Mechtersheimer;,citation_author=Chuhan Wang;,citation_author=Farhan Ameen;,citation_author=Shila Ghazanfar;,citation_author=Ellis Patrick;,citation_author=Jinman Kim;,citation_author=Jean Y. H. Yang;,citation_publication_date=2024-01;,citation_cover_date=2024-01;,citation_year=2024;,citation_doi=10.1038/s41467-023-44560-w;,citation_issn=2041-1723;,citation_volume=15;,citation_journal_title=Nature Communications;">
+</head>
+
+<body class="floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../.././assets/NS_Logo@3x_Bruker_gray 1.png" alt="" class="navbar-logo">
+    </a>
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../license.html"> 
+<span class="menu-text">License</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../link-to-code.html"> 
+<span class="menu-text">Code</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">Browse Posts by Topic</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/nanostringtech"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/company/nanostring-technologies"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Using Squidpy with AtoMx™ SIP exports</h1>
+                  <div>
+        <div class="description">
+          In this blog post, I’ll show how to prepare and analyze AtoMx™ SIP-exported CosMx™ SMI data with python's squidpy package.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">squidpy</div>
+                <div class="quarto-category">python</div>
+                <div class="quarto-category">visualization</div>
+                <div class="quarto-category">anndata</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliations</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author">Evelyn Metzger <a href="https://orcid.org/0000-0002-4074-9003" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              NanoString, a Bruker Company
+            </p>
+          <p class="affiliation">
+              Github: <a href="https://github.com/eveilyeverafter" target="_blank">eveilyeverafter</a>
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">July 3, 2024</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="2">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
+  <li><a href="#sec-export" id="toc-sec-export" class="nav-link" data-scroll-target="#sec-export"><span class="header-section-number">2</span> Exporting data from AtoMx™ SIP</a></li>
+  <li><a href="#sec-install" id="toc-sec-install" class="nav-link" data-scroll-target="#sec-install"><span class="header-section-number">3</span> Install Squidpy</a></li>
+  <li><a href="#sec-noimage" id="toc-sec-noimage" class="nav-link" data-scroll-target="#sec-noimage"><span class="header-section-number">4</span> Analysis without imaging data</a>
+  <ul class="collapse">
+  <li><a href="#reading-expression-and-metadata-only" id="toc-reading-expression-and-metadata-only" class="nav-link" data-scroll-target="#reading-expression-and-metadata-only"><span class="header-section-number">4.1</span> Reading expression and metadata only</a></li>
+  <li><a href="#including-the-fov-file" id="toc-including-the-fov-file" class="nav-link" data-scroll-target="#including-the-fov-file"><span class="header-section-number">4.2</span> Including the FOV file</a></li>
+  <li><a href="#analysis" id="toc-analysis" class="nav-link" data-scroll-target="#analysis"><span class="header-section-number">4.3</span> Analysis</a></li>
+  </ul></li>
+  <li><a href="#sec-imageanalysis" id="toc-sec-imageanalysis" class="nav-link" data-scroll-target="#sec-imageanalysis"><span class="header-section-number">5</span> Image and Spatial Analysis</a>
+  <ul class="collapse">
+  <li><a href="#rearrange-data-files-to-match-squidpys-layout" id="toc-rearrange-data-files-to-match-squidpys-layout" class="nav-link" data-scroll-target="#rearrange-data-files-to-match-squidpys-layout"><span class="header-section-number">5.1</span> Rearrange data files to match squidpy’s layout</a></li>
+  <li><a href="#read-expression-and-image-data-into-squidpy" id="toc-read-expression-and-image-data-into-squidpy" class="nav-link" data-scroll-target="#read-expression-and-image-data-into-squidpy"><span class="header-section-number">5.2</span> Read expression and image data into squidpy</a></li>
+  <li><a href="#spatial-analysis" id="toc-spatial-analysis" class="nav-link" data-scroll-target="#spatial-analysis"><span class="header-section-number">5.3</span> Spatial Analysis</a>
+  <ul class="collapse">
+  <li><a href="#viewing-results-in-space" id="toc-viewing-results-in-space" class="nav-link" data-scroll-target="#viewing-results-in-space"><span class="header-section-number">5.3.1</span> Viewing results in space</a></li>
+  <li><a href="#autocorrelation-with-morans-i" id="toc-autocorrelation-with-morans-i" class="nav-link" data-scroll-target="#autocorrelation-with-morans-i"><span class="header-section-number">5.3.2</span> Autocorrelation with Moran’s <em>I</em></a></li>
+  <li><a href="#spatial-co-occurence" id="toc-spatial-co-occurence" class="nav-link" data-scroll-target="#spatial-co-occurence"><span class="header-section-number">5.3.3</span> Spatial co-occurence</a></li>
+  <li><a href="#neighborhood-enrichment" id="toc-neighborhood-enrichment" class="nav-link" data-scroll-target="#neighborhood-enrichment"><span class="header-section-number">5.3.4</span> Neighborhood enrichment</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion"><span class="header-section-number">6</span> Conclusion</a></li>
+  <li><a href="#appendix" id="toc-appendix" class="nav-link" data-scroll-target="#appendix"><span class="header-section-number">7</span> Appendix</a>
+  <ul class="collapse">
+  <li><a href="#sec-venv" id="toc-sec-venv" class="nav-link" data-scroll-target="#sec-venv"><span class="header-section-number">7.1</span> Create a virtual environment for squidpy</a></li>
+  </ul></li>
+  </ul>
+</nav>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Elucidating the spatial distribution of RNA transcripts and protein is one of the fundamental utilities of the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/single-cell-imaging-overview/" target="_blank">CosMx™</a> Spatial Molecular Imager (SMI). When it comes to analysis, the <a href="https://nanostring.com/products/atomx-spatial-informatics-platform/atomx-sip-overview/" target="blank">AtoMx™</a> Spatial Informatics Portal (SIP) is an end-to-end solution that has several advantages including built-in analysis modules, data storage, and the ability to analyze from a browser window. For fully custom analyses, the SIP also has the ability to export the data.</p>
+<p>There are a growing number of open-sourced analysis solutions that can analyze and visualize SMI data. For example, <a href="https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html" target="_blank">Giotto</a> <span class="citation" data-cites="Dries2021">(<a href="#ref-Dries2021" role="doc-biblioref">Dries et al. 2021</a>)</span> has been available for a few years, uses a range of algorithms, and has ways to visualize tissue images built in. More recently, Seurat <span class="citation" data-cites="Hao2024">(<a href="#ref-Hao2024" role="doc-biblioref">Hao et al. 2024</a>)</span>, another R package (and another artist!), has added image viewing capabilities into its workflow. For vignettes on how to analyze and visualize SMI data with Seurat, check out <a href="../../posts/seurat-cosmx-basics/index.html" target="_blank">our recent blog post</a> or the vignette from <a href="https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2#human-lung-nanostring-cosmx-spatial-molecular-imager" target="_blank">Seurat’s website</a>.</p>
+<p>For python users, I find <a href="https://squidpy.readthedocs.io/en/stable/" target="_blank">squidpy</a> <span class="citation" data-cites="Palla2022">(<a href="#ref-Palla2022" role="doc-biblioref">Palla et al. 2022</a>)</span> works well, is feature-rich, and is speedy. Part of this efficiency is thanks to the <a href="https://anndata.readthedocs.io/en/stable/" target="_blank">anndata</a> package. For more info on creating anndata objects with SMI data, see <a href="../../posts/h5ad_conversion/index.html">this post</a>. Squidpy also has a built-in function to read in SMI data, <a href="https://squidpy.readthedocs.io/en/stable/api/squidpy.read.nanostring.html" target="_blank"><code>read.nanostring</code></a>, that reads in the counts data, metadata, and optionally the field of view (FOV) file and image data. The developers also have a <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data" target="_blank">vignette</a> that uses a slide from the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/" target="_blank">first public data release</a> of SMI data <span class="citation" data-cites="He2022">(<a href="#ref-He2022" role="doc-biblioref">He et al. 2022</a>)</span>. Note that the example dataset in that vignette uses a legacy file format that differs slightly compared to AtoMx SIP. For more information on the differences, see <a href="../../posts/flat-file-exports/flat-files-compare.html">this post</a>.</p>
+<p>In this blog post, I’ll show you how to:</p>
+<ul>
+<li><a href="#sec-export" class="quarto-xref">Section&nbsp;2</a> export the squidpy-relevant files from AtoMx SIP</li>
+<li><a href="#sec-install" class="quarto-xref">Section&nbsp;3</a> (and Appendix <a href="#sec-venv" class="quarto-xref">Section&nbsp;7.1</a>) tips for installing squidpy</li>
+<li><a href="#sec-noimage" class="quarto-xref">Section&nbsp;4</a> analysis examples without spatial images</li>
+<li><a href="#sec-imageanalysis" class="quarto-xref">Section&nbsp;5</a> how to pivot your AtoMx SIP-exported data into a format that can be used with squidpy and image-based analysis examples</li>
+</ul>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>In this blog post I provide some analysis examples but this is not intended to provide recommendations of parameters, clustering approaches, <em>etc</em>. I have not tested my example dataset on all of the squidpy functions so there may be errors.</p>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+</div>
+</div>
+</section>
+<section id="sec-export" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Exporting data from AtoMx™ SIP</h1>
+<p>For this post I will be analyzing a single breast cancer slide that has about 80,000 cells, 64 FOVs, and with the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/cosmx-rna-assays/human-6k-discovery-panel/">6K Discovery Panel</a>. I’m using the CosMx Data Analysis v1.3.2 software in AtoMx SIP. To take full advantage of squidpy’s functionality, I’ll need to partially export 1) “flat files” and 2) raw data (<a href="#fig-export" class="quarto-xref">Figure&nbsp;1</a>).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>We call them “flat files” since they are in a human-readable and accessible format (<em>i.e.</em>, comma separated files). These files, like Seurat files and Tiledb files, aren’t actually raw data but rather processed from the raw data. Versions of flat files may change with time and over the course of an analysis (<em>e.g.</em>, cell type column added to the metadata file as highlighted in <a href="../../posts/flat-file-exports/flat-files-compare.html">this post</a>).</p>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-export" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-export-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-export1.png" class="img-fluid figure-img" width="1320">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Selected flat files and raw data for exporting.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Squidpy uses three of the five flat files:</p>
+<p>The two required input files for squidpy are:</p>
+<ul>
+<li>counts_file - cell (row) by target (column) expression matrix</li>
+<li>meta_file - cell-level metadata file</li>
+</ul>
+<p>And an optional input file is:</p>
+<ul>
+<li>fov_file - containing coordinates of all FOVs.</li>
+</ul>
+<p>Once export is complete, download the data using your SFTP application (<em>e.g.</em>, cyberduck, FileZilla, WinSCP).</p>
+<p><a href="#fig-export2" class="quarto-xref">Figure&nbsp;2</a> shows a screenshot of the data structure in Cyberduck. The flat files are nested within a folder named after the flow cell (<em>e.g.</em>, <code>AUG29_13INTEGR_6k_BRST_PS_S2</code>) and are compressed in <code>gz</code> format. The raw data are in a separate folder and nested within a folder named after the flow cell and another folder named after the slide (<em>e.g.</em>, <code>20230829_212648_S2</code>). Of the subfolders of the raw data, the data that we’ll need for today are in <code>CellStatsDir</code>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-export2" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-export2.png" class="img-fluid figure-img" width="446">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Folder structure following AtoMx SIP export.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-install" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Install Squidpy</h1>
+<p>Assuming you have Python3 installed on your system, squidpy can be installed using <code>pip3</code> like this:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>pip3 install squidpy</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>For installing within a virtual environment (recommended), see the Appendix (<a href="#sec-venv" class="quarto-xref">Section&nbsp;7.1</a>).</p>
+</section>
+<section id="sec-noimage" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Analysis without imaging data</h1>
+<p>In the simplest form, we can use squidpy without imaging data by reading the expression data, metadata, and optionally the FOV positions data. These analyses include normalization, PCA, umap, <em>etc.</em> I’ll provide some code here but for more details please see the squidpy <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data" target="_blank">vignette</a>.</p>
+<section id="reading-expression-and-metadata-only" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="reading-expression-and-metadata-only"><span class="header-section-number">4.1</span> Reading expression and metadata only</h2>
+<p>Create an anndata object like this:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+from pathlib import Path
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scanpy as sc
+import squidpy as sq
+
+flat_file_dir = 'path/to/breast_cancer_example/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2'
+meta_file = [item for item in os.listdir(flat_file_dir) if 'metadata_file' in item][0]
+counts_file = [item for item in os.listdir(flat_file_dir) if 'exprMat_file' in item][0]
+
+adata0 = sq.read.nanostring(
+    path=flat_file_dir,
+    counts_file=counts_file,
+    meta_file=meta_file
+)
+adata0</code></pre>
+</div>
+<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'</code></pre>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The column names that you have may differ from the ones above. That’s because the example dataset has been processed in AtoMx SIP which created additional columns (<em>e.g.</em>, RNA_nbclust_[GUID]_1_clusters). For more information on the expected columns from flat file exports, see the <a href="../../posts/flat-file-exports/flat-files-compare.html#sec-meta">metadata column descriptions</a>.</p>
+</div>
+</div>
+</section>
+<section id="including-the-fov-file" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="including-the-fov-file"><span class="header-section-number">4.2</span> Including the FOV file</h2>
+<p>If we try to read in the optional FOV file generated in AtoMx SIP using squidpy v1.5.0, we might get an error stating “Index fov invalid”.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
+
+adata = sq.read.nanostring(
+    path=flat_file_dir,
+    counts_file=counts_file,
+    meta_file=meta_file,
+    fov_file=fov_file
+)
+</code></pre>
+</div>
+<div class="cell">
+<details class="code-fold">
+<summary>Click to show error</summary>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>---------------------------------------------------------------------------</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>ValueError                                Traceback (most recent call last)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>Cell In[23], line 3</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>      1 fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>----&gt; 3 adata = sq.read.nanostring(</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>      4     path=flat_file_dir,</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>      5     counts_file=counts_file,</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>      6     meta_file=meta_file,</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>      7     fov_file=fov_file</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>      8 )</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>File &lt;project path&gt;/.venv/lib/python3.10/site-packages/squidpy/read/_read.py:266, in nanostring(path, counts_file, meta_file, fov_file)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    263                     continue</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    265 if fov_file is not None:</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>--&gt; 266     fov_positions = pd.read_csv(path / fov_file, header=0, index_col=fov_key)</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    267     for fov, row in fov_positions.iterrows():</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    268         try:</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1026, in read_csv(filepath_or_buffer, sep, delimiter, header, names, index_col, usecols, dtype, engine, converters, true_values, false_values, skipinitialspace, skiprows, skipfooter, nrows, na_values, keep_default_na, na_filter, verbose, skip_blank_lines, parse_dates, infer_datetime_format, keep_date_col, date_parser, date_format, dayfirst, cache_dates, iterator, chunksize, compression, thousands, decimal, lineterminator, quotechar, quoting, doublequote, escapechar, comment, encoding, encoding_errors, dialect, on_bad_lines, delim_whitespace, low_memory, memory_map, float_precision, storage_options, dtype_backend)</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>   1013 kwds_defaults = _refine_defaults_read(</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>   1014     dialect,</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>   1015     delimiter,</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>   (...)</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>   1022     dtype_backend=dtype_backend,</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>   1023 )</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>   1024 kwds.update(kwds_defaults)</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>-&gt; 1026 return _read(filepath_or_buffer, kwds)</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:626, in _read(filepath_or_buffer, kwds)</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>    623     return parser</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>    625 with parser:</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>--&gt; 626     return parser.read(nrows)</span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1923, in TextFileReader.read(self, nrows)</span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>   1916 nrows = validate_integer("nrows", nrows)</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>   1917 try:</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>   1918     # error: "ParserBase" has no attribute "read"</span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>   1919     (</span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>   1920         index,</span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>   1921         columns,</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>   1922         col_dict,</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>-&gt; 1923     ) = self._engine.read(  # type: ignore[attr-defined]</span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>   1924         nrows</span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a>   1925     )</span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a>   1926 except Exception:</span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>   1927     self.close()</span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/c_parser_wrapper.py:333, in CParserWrapper.read(self, nrows)</span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>    330     data = {k: v for k, (i, v) in zip(names, data_tups)}</span>
+<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a>    332     names, date_data = self._do_date_conversions(names, data)</span>
+<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a>--&gt; 333     index, column_names = self._make_index(date_data, alldata, names)</span>
+<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a>    335 return index, column_names, date_data</span>
+<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a>File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:371, in ParserBase._make_index(self, data, alldata, columns, indexnamerow)</span>
+<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a>    368     index = None</span>
+<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a>    370 elif not self._has_complex_date_col:</span>
+<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a>--&gt; 371     simple_index = self._get_simple_index(alldata, columns)</span>
+<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a>    372     index = self._agg_index(simple_index)</span>
+<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a>    373 elif self._has_complex_date_col:</span>
+<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a>File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:403, in ParserBase._get_simple_index(self, data, columns)</span>
+<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a>    401 index = []</span>
+<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a>    402 for idx in self.index_col:</span>
+<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a>--&gt; 403     i = ix(idx)</span>
+<span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a>    404     to_remove.append(i)</span>
+<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a>    405     index.append(data[i])</span>
+<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a>File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:398, in ParserBase._get_simple_index.&lt;locals&gt;.ix(col)</span>
+<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a>    396 if not isinstance(col, str):</span>
+<span id="cb5-70"><a href="#cb5-70" aria-hidden="true" tabindex="-1"></a>    397     return col</span>
+<span id="cb5-71"><a href="#cb5-71" aria-hidden="true" tabindex="-1"></a>--&gt; 398 raise ValueError(f"Index {col} invalid")</span>
+<span id="cb5-72"><a href="#cb5-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-73"><a href="#cb5-73" aria-hidden="true" tabindex="-1"></a>ValueError: Index fov invalid</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>This error arises because of a format change that is detailed in <a href="../../posts/flat-file-exports/flat-files-compare.html#sec-fov-pos">this post</a>. A simple fix is to adjust the column name in the fov file from “FOV” to the legacy “fov” like this:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
+
+fov_df = pd.read_csv(os.path.join(flat_file_dir, fov_file))
+if 'FOV' in fov_df.columns:
+  print("Refactoring file to older format.")
+  # Rename 'FOV' column to 'fov'
+  fov_df.rename(columns={'FOV': 'fov'}, inplace=True)
+  # have fov_file reference the new, formatted file and write it
+  fov_file = os.path.join(flat_file_dir,'fov_positions_formatted.csv')
+  fov_df.to_csv(fov_file, index=False)
+
+adata1 = sq.read.nanostring(
+    path=flat_file_dir,
+    counts_file=counts_file,
+    meta_file=meta_file,
+    fov_file=fov_file
+)
+</code></pre>
+</div>
+<blockquote class="blockquote">
+<p>Refactoring file to older format.</p>
+</blockquote>
+<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'</code></pre>
+</section>
+<section id="analysis" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="analysis"><span class="header-section-number">4.3</span> Analysis</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Please note that the code in this section is an example and not a recommendation for specific thresholding, QC filtering, clustering parmaterization, <em>etc.</em> of SMI data.</p>
+</div>
+</div>
+<p>With the expression and metadata loaded, we can run exploratory data analysis similar to what was described in the squidpy vignette. There are some adjustments to squidpy’s vignette that are needed. These adjustments reflect the flat file format changes (<a href="../../posts/flat-file-exports/flat-files-compare.html#sec-fov-pos">detailed here</a>).</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+# Place control targets into separate variables
+adata1.var["Negative"] = adata1.var_names.str.startswith("Negative")
+adata1.var["SystemControl"] = adata1.var_names.str.startswith("SystemControl")
+adata1</code></pre>
+</div>
+<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
+    var: 'Negative', 'SystemControl'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'</code></pre>
+<p>We can calculate QC metrics with scanpy’s <span class="citation" data-cites="Wolf2018">(<a href="#ref-Wolf2018" role="doc-biblioref">Wolf, Angerer, and Theis 2018</a>)</span> pre-processing tool <a href="https://scanpy.readthedocs.io/en/latest/generated/scanpy.pp.calculate_qc_metrics.html" target="_blank"><code>calculate_qc_metrics</code> method</a>. In the code below, we are going to add Negatives and SystemControls as the <code>qc_var</code> argument (which will add cell-level columns to <code>obs</code>). In addition, target-level columns are added to <code>var</code>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>sc.pp.calculate_qc_metrics(adata1, qc_vars=["Negative", "SystemControl"], inplace=True)
+adata1</code></pre>
+</div>
+<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID', 'n_genes_by_counts', 'log1p_n_genes_by_counts', 'total_counts', 'log1p_total_counts', 'pct_counts_in_top_50_genes', 'pct_counts_in_top_100_genes', 'pct_counts_in_top_200_genes', 'pct_counts_in_top_500_genes', 'total_counts_Negative', 'log1p_total_counts_Negative', 'pct_counts_Negative', 'total_counts_SystemControl', 'log1p_total_counts_SystemControl', 'pct_counts_SystemControl'
+    var: 'Negative', 'SystemControl', 'n_cells_by_counts', 'mean_counts', 'log1p_mean_counts', 'pct_dropout_by_counts', 'total_counts', 'log1p_total_counts'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'</code></pre>
+<p>We can explore these cell-level and target-level QC metrics with visuals using the <a href="https://seaborn.pydata.org/" target="_blank"><code>seaborn</code></a> package. For example the code below generates <a href="#fig-qc" class="quarto-xref">Figure&nbsp;3</a> and shows how the number of unique genes in a cell correlates with the total number of transcripts in a cell.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sns.jointplot(
+    data=adata1.obs,
+    x="total_counts",
+    y="n_genes_by_counts",
+    kind="scatter",
+    alpha=0.2
+)
+plt.savefig("figures/fig-qc.png", dpi=200)
+</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-qc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-qc.png" class="img-fluid figure-img" width="600">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Unique genes by total counts. Each dot represents a cell. Y-axis: the number of genes with postive counts in a cell. X-axis the sum of counts for a cell.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>The total Negative probe counts by total counts is shown below and <a href="#fig-qc1" class="quarto-xref">Figure&nbsp;4</a>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sns.jointplot(
+    data=adata1.obs,
+    x="total_counts",
+    y="total_counts_Negative",
+    kind="scatter",
+    alpha=0.2
+)
+plt.savefig("figures/fig-qc1.png", dpi=200)
+</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-qc1" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-qc1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-qc1.png" class="img-fluid figure-img" width="600">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: The number of negative counts (Y) relative to the total counts (X) per cell.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>We see that the proportion of negative counts relative to total counts is:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>adata1.obs["total_counts_Negative"].sum() / adata1.obs["total_counts"].sum()</code></pre>
+</div>
+<blockquote class="blockquote">
+<p>0.00041567286608445926 (i.e., 0.04%)</p>
+</blockquote>
+<p>Histograms of total transcripts, total unique genes per cell, and total transcrips per FOV can be seen in <a href="#fig-qc2" class="quarto-xref">Figure&nbsp;5</a>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+
+axs[0].set_title("Total transcripts per cell")
+sns.histplot(
+    adata1.obs["total_counts"],
+    kde=False,
+    ax=axs[0],
+)
+
+axs[1].set_title("Unique transcripts per cell")
+sns.histplot(
+    adata1.obs["n_genes_by_counts"],
+    kde=False,
+    ax=axs[1],
+)
+
+axs[2].set_title("Transcripts per FOV")
+sns.histplot(
+    adata1.obs.groupby("fov").sum()["total_counts"],
+    kde=False,
+    ax=axs[2],
+)
+plt.savefig("figures/fig-qc2.png", dpi=200)
+</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-qc2" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-qc2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-qc2.png" class="img-fluid figure-img" width="1500">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Total counts per cell (left), total unique genes per cell (middle) and total transcripts per FOV (right).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>We can filter, normalize, and cluster with scanpy’s functions. For a full list of available functions, see scanpy’s <a href="https://scanpy.readthedocs.io/en/latest/api/index.html" target="_blank">API documentation</a>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>adata1.shape</code></pre>
+</div>
+<blockquote class="blockquote">
+<p>(80073, 6524)</p>
+</blockquote>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>sc.pp.filter_cells(adata1, min_counts=250)
+sc.pp.filter_genes(adata1, min_cells=1000)
+adata1.shape</code></pre>
+</div>
+<blockquote class="blockquote">
+<p>(69293, 6177)</p>
+</blockquote>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>adata1.layers["counts"] = adata1.X.copy()
+sc.pp.normalize_total(adata1, inplace=True, exclude_highly_expressed=True)
+sc.pp.log1p(adata1)
+sc.pp.pca(adata1, n_comps=50)
+sc.pp.neighbors(adata1)
+sc.tl.umap(adata1, min_dist=0.2, spread=1)
+sc.tl.leiden(adata1)</code></pre>
+</div>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>adata1.obs["logpMean.PanCK"] = np.log1p(adata1.obs['Mean.PanCK'])
+sc.pl.umap(
+    adata1,
+    color=["logpMean.PanCK","leiden"]
+)</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-umap" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-umap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-umap.png" class="img-fluid figure-img" width="1441">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-umap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: UMAP figures with cells colored by natural log Mean PanCK expression (left) and Leiden clusters (right).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="sec-imageanalysis" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Image and Spatial Analysis</h1>
+<p>Up until this point we haven’t use image data. In this section I’ll show how to prepare a slide exported from AtoMx SIP into squidpy, and touch on some of the image-based analyses that are possible.</p>
+<section id="rearrange-data-files-to-match-squidpys-layout" class="level2" data-number="5.1">
+<h2 data-number="5.1" class="anchored" data-anchor-id="rearrange-data-files-to-match-squidpys-layout"><span class="header-section-number">5.1</span> Rearrange data files to match squidpy’s layout</h2>
+<p>If we take a look one of the NSCLC public datasets from <span class="citation" data-cites="He2022">He et al. (<a href="#ref-He2022" role="doc-biblioref">2022</a>)</span> (Lung5_Rep1), we can see the expected file structure has four folders (<code>CellComposite</code>, <code>CellLabels</code>, <code>CellOverlay</code>, and <code>CompartmentLabels</code>) and four flat files.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>tree -L 3</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>├── Lung5_Rep1-Flat_files_and_images</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── CellComposite</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellComposite_F001.jpg</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>|   |   ...</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellComposite_F032.jpg</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── CellLabels</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>|   |   ...</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellLabels_F032.tif</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── CellOverlay</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellOverlay_F001.jpg</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>|   |   ...</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellOverlay_F032.jpg</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── CompartmentLabels</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CompartmentLabels_F001.tif</span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a>|   |   ...</span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; │&nbsp;&nbsp; └── CompartmentLabels_F032.tif</span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── Lung5_Rep1_exprMat_file.csv</span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── Lung5_Rep1_fov_positions_file.csv</span>
+<span id="cb20-22"><a href="#cb20-22" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── Lung5_Rep1_metadata_file.csv</span>
+<span id="cb20-23"><a href="#cb20-23" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; └── Lung5_Rep1_tx_file.csv</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>This file structure is actually a subset of the raw data and flat files that are exported from AtoMx SIP.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>tree -L 3</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>├── RawFiles</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; └── &lt;flow cell&gt;</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;     └── &lt;slide&gt;</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         ├── AnalysisResults</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; └── muy2ybakqy</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         ├── CellStatsDir</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── &lt;slide&gt;_C902_P02_To_P01_RegStats.csv</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── CellComposite</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── CellOverlay</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── FOV001</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellBoundaries_F001.csv</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellBoundaries_F001_935.fz</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CompartmentLabels_F001.tif</span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── Run_86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Cell_Stats_F001.csv</span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; └── Run_86906312-688f-4f31-9fc5-48b04db5f958_FOV001__complete_code_cell_target_call_coord.cs</span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; ...</span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── FOV064</span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         │&nbsp;&nbsp; └── Morphology2D</span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;         └── RunSummary</span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── 75d021be-b81e-4d7d-ad28-d390a13da7ad.mkit</span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── Beta15_Affine_Transform_20221118.csv</span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── Distortion</span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── FovTracking</span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── Morphology_ChannelID_Dictionary.txt</span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── Run86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Beta15_RNA_SpatialBC_Metrics4D.csv</span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── Run_86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Beta15_ExptConfig.txt</span>
+<span id="cb21-30"><a href="#cb21-30" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── SampleSlide_PlaneFit_&lt;slide&gt;_History.csv</span>
+<span id="cb21-31"><a href="#cb21-31" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── Shading</span>
+<span id="cb21-32"><a href="#cb21-32" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── c902.fovs.csv</span>
+<span id="cb21-33"><a href="#cb21-33" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             ├── latest.af.fovs.csv</span>
+<span id="cb21-34"><a href="#cb21-34" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;             └── latest.fovs.csv</span>
+<span id="cb21-35"><a href="#cb21-35" aria-hidden="true" tabindex="-1"></a>├── flatFiles</span>
+<span id="cb21-36"><a href="#cb21-36" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; └── &lt;flow cell&gt;</span>
+<span id="cb21-37"><a href="#cb21-37" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_exprMat_file.csv.gz</span>
+<span id="cb21-38"><a href="#cb21-38" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_fov_positions_file.csv.gz</span>
+<span id="cb21-39"><a href="#cb21-39" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_metadata_file.csv.gz</span>
+<span id="cb21-40"><a href="#cb21-40" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp;     └── fov_positions_formatted.csv</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>So in order to read in image data into squidpy, we must first rearrange our folders. We can do this manually by moving, copying, or linking files to match the expected format. Normally I am a big fan of symbolic links for just this situation. However, I have noticed that <code>read.nanostring</code> can have an error when using symbolic links for some of the files (error not shown). So for simplicity I will make a copy of the data and place them into a new folder <code>sample_dir_formatted</code>.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a># Note that this code works for a single slide. If exporting</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a># multiple slides, some modification might be necessary.</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a># cd to parent directory</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a># create a directory adjacent to RawData and flatFiles</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>mkdir -p sample_dir_formatted &amp;&amp; cd $_</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a># Add flat files</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>for file in $(ls ../flatFiles/*/*csv*); do cp $file ./; done</span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a># Add folders</span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>cp -r ../RawFiles/*/*/CellStatsDir/CellComposite ./</span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a>cp -r ../RawFiles/*/*/CellStatsDir/CellOverlay ./</span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-16"><a href="#cb22-16" aria-hidden="true" tabindex="-1"></a>mkdir -p CellLabels</span>
+<span id="cb22-17"><a href="#cb22-17" aria-hidden="true" tabindex="-1"></a>for file in $(ls ../RawFiles/*/*/CellStatsDir/FOV*/CellLabels*); do cp $file ./CellLabels/ ; done</span>
+<span id="cb22-18"><a href="#cb22-18" aria-hidden="true" tabindex="-1"></a>rm ./CellLabels/._Cell*</span>
+<span id="cb22-19"><a href="#cb22-19" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb22-20"><a href="#cb22-20" aria-hidden="true" tabindex="-1"></a>mkdir -p CompartmentLabels</span>
+<span id="cb22-21"><a href="#cb22-21" aria-hidden="true" tabindex="-1"></a>for file in $(ls ../RawFiles/*/*/CellStatsDir/FOV*/CompartmentLabels*); do cp $file ./CompartmentLabels/ ; done</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>The file structure of <code>sample_dir_formatted</code> now looks like this:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>tree -L 2</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>.</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>├── &lt;flow cell&gt;_exprMat_file.csv.gz</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>├── &lt;flow cell&gt;_fov_positions_file.csv.gz</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>├── &lt;flow cell&gt;_metadata_file.csv.gz</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>├── CellComposite</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── CellComposite_F001.jpg</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>|   ├── ...</span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; └── CellComposite_F064.jpg</span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>├── CellLabels</span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>|   ├── ...</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; └── CellLabels_F064.tif</span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>├── CellOverlay</span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; ├── CellOverlay_F001.jpg</span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>|   ├── ...</span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>│&nbsp;&nbsp; └── CellOverlay_F064.jpg</span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>└── CompartmentLabels</span>
+<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>    ├── CompartmentLabels_F001.tif</span>
+<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>    ...</span>
+<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>    └── CompartmentLabels_F064.tif</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If your flow cell was created prior to AtoMx v1.3.2, the CellComposite jpg files may not show the composites but instead just blank images. They will still load into squidpy but will not show the expected tissue structure. This issue was patched for samples created in v1.3.2+. If you have blank images and would like to replace them with composite images, check out <a href="../../posts/composite-images/making-composite-images.html" target="_blank">this post</a>.</p>
+</div>
+</div>
+</section>
+<section id="read-expression-and-image-data-into-squidpy" class="level2" data-number="5.2">
+<h2 data-number="5.2" class="anchored" data-anchor-id="read-expression-and-image-data-into-squidpy"><span class="header-section-number">5.2</span> Read expression and image data into squidpy</h2>
+<p>The block of code below reads the flat files <em>and images</em> now that the image data are in the specified format. The location of the data in the example code below is <code>sample_dir</code> and is provided as the argument for the <code>path</code> parameter of <code>read.nanostring</code>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+from pathlib import Path
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scanpy as sc
+import squidpy as sq
+
+sample_dir = 'path/to/breast_cancer_example/sample_dir_formatted'
+meta_file = [item for item in os.listdir(sample_dir) if 'metadata_file' in item][0]
+counts_file = [item for item in os.listdir(sample_dir) if 'exprMat_file' in item][0]
+fov_file = [item for item in os.listdir(sample_dir) if 'fov_positions_file' in item][0]
+ 
+fov_df = pd.read_csv(os.path.join(sample_dir, fov_file))
+if 'FOV' in fov_df.columns:
+  print("Refactoring file to older format.")
+  # Rename 'FOV' column to 'fov'
+  fov_df.rename(columns={'FOV': 'fov'}, inplace=True)
+  # have fov_file reference the new, formatted file and write it
+  fov_file = os.path.join(sample_dir,'fov_positions_formatted.csv')
+  fov_df.to_csv(fov_file, index=False)
+
+adata2 = sq.read.nanostring(
+    path=sample_dir,
+    counts_file=counts_file,
+    meta_file=meta_file,
+    fov_file=fov_file
+)
+
+# This part of the analyis is similar to above
+adata2.var["Negative"] = adata2.var_names.str.startswith("Negative")
+adata2.var["SystemControl"] = adata2.var_names.str.startswith("SystemControl")
+sc.pp.calculate_qc_metrics(adata2, qc_vars=["Negative", "SystemControl"], inplace=True)
+sc.pp.filter_cells(adata2, min_counts=250)
+sc.pp.filter_genes(adata2, min_cells=1000)
+adata2.layers["counts"] = adata2.X.copy()
+sc.pp.normalize_total(adata2, inplace=True, exclude_highly_expressed=True)
+sc.pp.log1p(adata2)
+sc.pp.pca(adata2, n_comps=50)
+sc.pp.neighbors(adata2)
+sc.tl.umap(adata2, min_dist=0.2, spread=1)
+sc.tl.leiden(adata2)
+</code></pre>
+</div>
+</section>
+<section id="spatial-analysis" class="level2" data-number="5.3">
+<h2 data-number="5.3" class="anchored" data-anchor-id="spatial-analysis"><span class="header-section-number">5.3</span> Spatial Analysis</h2>
+<p>In addition to the analysis code we’ve already covered, we can view and analyze our CosMx results with image data. For a full list of features, please see <a href="https://squidpy.readthedocs.io/en/stable/api.html" target="_blank">squidpy’s documentation</a>. For some of the examples below, I’ll use a subset of the data – a single FOV – to speed up computation and to make plotting easier.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>adata_subset = adata2[adata2.obs.fov == "35"].copy()</code></pre>
+</div>
+<section id="viewing-results-in-space" class="level3" data-number="5.3.1">
+<h3 data-number="5.3.1" class="anchored" data-anchor-id="viewing-results-in-space"><span class="header-section-number">5.3.1</span> Viewing results in space</h3>
+<p><a href="#fig-image1" class="quarto-xref">Figure&nbsp;7</a> shows a single FOV image data with cells drawn as contours that are colored based on their Leiden cluster.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>sq.pl.spatial_segment(
+    adata2,
+    color="leiden",
+    seg_contourpx=20,
+    seg_cell_id="cell_ID",
+    library_key="fov",
+    library_id="35",
+    img=True,
+    size=60,
+    figsize = (4, 4),
+    dpi = 200,
+    save = "fig-image1.png"
+)
+
+</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-image1" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-image1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-image1.png" class="img-fluid figure-img" width="412">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-image1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Leiden clusters in space for a single FOV of breast cancer tissue. Clusters are displayed as cell contours overlaid on morphology image (green = PanCK, magenta = DAPI).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="autocorrelation-with-morans-i" class="level3" data-number="5.3.2">
+<h3 data-number="5.3.2" class="anchored" data-anchor-id="autocorrelation-with-morans-i"><span class="header-section-number">5.3.2</span> Autocorrelation with Moran’s <em>I</em></h3>
+<p>Moran’s <em>I</em> is a useful spatial statistic for measuring the extent that a gene’s expression is clustered in space (verus random or dispersed). Taking a look at the single-FOV subset, we see genes with positive Moran’s <em>I</em>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sq.gr.spatial_neighbors(adata_subset, coord_type="generic", delaunay=True)
+sq.gr.spatial_autocorr(
+    adata_subset,
+    mode="moran",
+    n_perms=100,
+    n_jobs=1,
+)
+adata_subset.uns["moranI"].head(10)</code></pre>
+</div>
+<pre><code>                I  pval_norm  var_norm  pval_z_sim  pval_sim   var_sim  pval_norm_fdr_bh  pval_z_sim_fdr_bh  pval_sim_fdr_bh
+CRIP1    0.634842        0.0  0.000279         0.0  0.009901  0.000460               0.0                0.0         0.044936
+COX6C    0.624853        0.0  0.000279         0.0  0.009901  0.000496               0.0                0.0         0.044936
+COL1A1   0.616015        0.0  0.000279         0.0  0.009901  0.000476               0.0                0.0         0.044936
+SCGB2A2  0.587074        0.0  0.000279         0.0  0.009901  0.000419               0.0                0.0         0.044936
+COL1A2   0.572189        0.0  0.000279         0.0  0.009901  0.000487               0.0                0.0         0.044936
+COL3A1   0.559603        0.0  0.000279         0.0  0.009901  0.000449               0.0                0.0         0.044936
+SPARC    0.547069        0.0  0.000279         0.0  0.009901  0.000394               0.0                0.0         0.044936
+KRT8     0.516281        0.0  0.000279         0.0  0.009901  0.000427               0.0                0.0         0.044936
+ERBB2    0.509171        0.0  0.000279         0.0  0.009901  0.000458               0.0                0.0         0.044936
+KRT19    0.502475        0.0  0.000279         0.0  0.009901  0.000529               0.0                0.0         0.044936
+</code></pre>
+<p>When we plot the expression of some of these genes (<a href="#fig-morans" class="quarto-xref">Figure&nbsp;8</a>), we indeed see some how they are aggregated. For example, <em>COX6C</em> expression, which may have clinical significance with breast cancer <span class="citation" data-cites="Tian2021">(<a href="#ref-Tian2021" role="doc-biblioref">Tian et al. 2021</a>)</span>, is autocorrelated and co-occurs with cells high in <em>KRT19</em>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sq.pl.spatial_segment(
+    adata_subset,
+    library_id="35",
+    seg_cell_id="cell_ID",
+    library_key="fov",
+    color=["COX6C", "COL1A1", "KRT19"],
+    size=60,
+    img=False,
+    figsize=(4, 4),
+    dpi = 200,
+    save = "fig-nhood-Morans-I.png"
+)</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-morans" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-morans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-nhood-Morans-I.png" class="img-fluid figure-img" width="1142">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-morans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;8: Expression for select genes showing relatively high Moran’s <em>I</em>.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="spatial-co-occurence" class="level3" data-number="5.3.3">
+<h3 data-number="5.3.3" class="anchored" data-anchor-id="spatial-co-occurence"><span class="header-section-number">5.3.3</span> Spatial co-occurence</h3>
+<p>While Moran’s <em>I</em> quantifies autocorrelation of genes, spatial co-occurence with <code>gr.co_occurence</code> quantifies cell-level co-occurences. In example below, co-occurence of Leiden clusters was used (<a href="#fig-co-occurence" class="quarto-xref">Figure&nbsp;9</a>).</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sq.gr.co_occurrence(
+    adata_subset,
+    cluster_key="leiden",
+)
+
+sq.pl.co_occurrence(
+    adata_subset,
+    cluster_key="leiden",
+    clusters="1",
+    save = "fig-co-occurence1.png"
+)
+sq.pl.spatial_segment(
+    adata_subset,
+    shape="hex",
+    color="leiden",
+    library_id="35",
+    library_key="fov",
+    seg_cell_id="cell_ID",
+    img=False,
+    size=60,
+    ax = ax[1],
+    save = "fig-co-occurence2.png"
+)</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: Package `magick` is required to draw images. Image not drawn.
+
+Warning: Package `magick` is required to draw images. Image not drawn.</code></pre>
+</div>
+<div class="cell-output-display">
+<div id="fig-co-occurence" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-co-occurence-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="squidpy-essentials_files/figure-html/fig-co-occurence-1.png" class="img-fluid figure-img" width="768">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-co-occurence-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;9: Co-occurence of Leiden clusters. Left: Leiden clusters in space for a single FOV of breast cancer tissue. Right: co-occurence probability ratio (Y) for each cluster relative to Leiden cluster 1 (orange cells in left plot) with increasing radius (X).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="neighborhood-enrichment" class="level3" data-number="5.3.4">
+<h3 data-number="5.3.4" class="anchored" data-anchor-id="neighborhood-enrichment"><span class="header-section-number">5.3.4</span> Neighborhood enrichment</h3>
+<p>We can take a look at neighborhood enrichment scores using <code>gr.nhood_enrichment</code> and <code>pl.nhood_enrichment</code>(<a href="#fig-neighbors" class="quarto-xref">Figure&nbsp;10</a>).</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sq.gr.nhood_enrichment(adata2, cluster_key="leiden")
+sq.pl.nhood_enrichment(
+    adata2,
+    cluster_key="leiden",
+    figsize=(5, 5),
+    dpi = 200,
+    title="Neighborhood enrichment",
+    save = "fig-nhood-enrichment.png"
+)
+</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-neighbors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-neighbors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="./figures/fig-nhood-enrichment.png" class="img-fluid figure-img" width="613">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-neighbors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;10: Neighborhood enrichment across all FOVs for each pairwise combination of Leiden clusters.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<!-- # Saving annData -->
+<!-- ```{filename="Python"} -->
+<!-- adata2.write("./adata2.h5ad") -->
+<!-- ``` -->
+</section>
+</section>
+</section>
+<section id="conclusion" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Conclusion</h1>
+<p>In this post I showed how to pivot CosMx SMI data that were exported from AtoMx SIP into a format that can be read with the open-sourced python package squidpy. A full analysis of SMI data in squidpy was beyond the scope of this post but look for additional blog post that utilize squidpy’s functions.</p>
+</section>
+<section id="appendix" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Appendix</h1>
+<section id="sec-venv" class="level2" data-number="7.1">
+<h2 data-number="7.1" class="anchored" data-anchor-id="sec-venv"><span class="header-section-number">7.1</span> Create a virtual environment for squidpy</h2>
+<p>I recommend creating a separate virtual environment to run squidpy and to keep packages isolated from the rest of your system. This can be operating system and architecture specific so my (M1 Mac) specific example code below may not work with your configuration.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Troubleshooting or assistance with squidpy installation is beyond the scope of this post. Please see <a href="https://squidpy.readthedocs.io/en/stable/api.html" target="_blank">squidpy’s documentation</a>.</p>
+</div>
+</div>
+<p>In general, there are two main package management systems: the default one that ships with python and conda. I’ll use the former for this post. For more information, please see the <a href="https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#create-and-use-virtual-environments" target="_blank">Python Packaging User Guide</a> for examples on Windows and Mac/Linux.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>python3.10 -m venv .venv</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>source .venv/bin/activate</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>python --version</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<blockquote class="blockquote">
+<p>Python 3.10.6</p>
+</blockquote>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>pip install squidpy</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>Here are the packages that I used for this post:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>pip freeze &gt; requirements.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<div class="cell">
+<details class="code-fold">
+<summary>Click to show contents of requirements.txt</summary>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>aiobotocore==2.5.4</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>aiohttp==3.9.5</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>aioitertools==0.11.0</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>aiosignal==1.3.1</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>anndata==0.10.8</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>array_api_compat==1.7.1</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>asciitree==0.3.3</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>async-timeout==4.0.3</span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>attrs==23.2.0</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>botocore==1.31.17</span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>certifi==2024.6.2</span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a>charset-normalizer==3.3.2</span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>click==8.1.7</span>
+<span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a>click-plugins==1.1.1</span>
+<span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a>cligj==0.7.2</span>
+<span id="cb36-16"><a href="#cb36-16" aria-hidden="true" tabindex="-1"></a>cloudpickle==3.0.0</span>
+<span id="cb36-17"><a href="#cb36-17" aria-hidden="true" tabindex="-1"></a>colorcet==3.1.0</span>
+<span id="cb36-18"><a href="#cb36-18" aria-hidden="true" tabindex="-1"></a>contourpy==1.2.1</span>
+<span id="cb36-19"><a href="#cb36-19" aria-hidden="true" tabindex="-1"></a>cycler==0.12.1</span>
+<span id="cb36-20"><a href="#cb36-20" aria-hidden="true" tabindex="-1"></a>dask==2024.6.1</span>
+<span id="cb36-21"><a href="#cb36-21" aria-hidden="true" tabindex="-1"></a>dask-expr==1.1.4</span>
+<span id="cb36-22"><a href="#cb36-22" aria-hidden="true" tabindex="-1"></a>dask-image==2024.5.3</span>
+<span id="cb36-23"><a href="#cb36-23" aria-hidden="true" tabindex="-1"></a>datashader==0.16.2</span>
+<span id="cb36-24"><a href="#cb36-24" aria-hidden="true" tabindex="-1"></a>distributed==2024.6.1</span>
+<span id="cb36-25"><a href="#cb36-25" aria-hidden="true" tabindex="-1"></a>docrep==0.3.2</span>
+<span id="cb36-26"><a href="#cb36-26" aria-hidden="true" tabindex="-1"></a>exceptiongroup==1.2.1</span>
+<span id="cb36-27"><a href="#cb36-27" aria-hidden="true" tabindex="-1"></a>fasteners==0.19</span>
+<span id="cb36-28"><a href="#cb36-28" aria-hidden="true" tabindex="-1"></a>fiona==1.9.6</span>
+<span id="cb36-29"><a href="#cb36-29" aria-hidden="true" tabindex="-1"></a>fonttools==4.53.0</span>
+<span id="cb36-30"><a href="#cb36-30" aria-hidden="true" tabindex="-1"></a>frozenlist==1.4.1</span>
+<span id="cb36-31"><a href="#cb36-31" aria-hidden="true" tabindex="-1"></a>fsspec==2023.6.0</span>
+<span id="cb36-32"><a href="#cb36-32" aria-hidden="true" tabindex="-1"></a>geopandas==0.14.4</span>
+<span id="cb36-33"><a href="#cb36-33" aria-hidden="true" tabindex="-1"></a>h5py==3.11.0</span>
+<span id="cb36-34"><a href="#cb36-34" aria-hidden="true" tabindex="-1"></a>idna==3.7</span>
+<span id="cb36-35"><a href="#cb36-35" aria-hidden="true" tabindex="-1"></a>igraph==0.11.5</span>
+<span id="cb36-36"><a href="#cb36-36" aria-hidden="true" tabindex="-1"></a>imageio==2.34.1</span>
+<span id="cb36-37"><a href="#cb36-37" aria-hidden="true" tabindex="-1"></a>importlib_metadata==7.2.0</span>
+<span id="cb36-38"><a href="#cb36-38" aria-hidden="true" tabindex="-1"></a>inflect==7.2.1</span>
+<span id="cb36-39"><a href="#cb36-39" aria-hidden="true" tabindex="-1"></a>Jinja2==3.1.4</span>
+<span id="cb36-40"><a href="#cb36-40" aria-hidden="true" tabindex="-1"></a>jmespath==1.0.1</span>
+<span id="cb36-41"><a href="#cb36-41" aria-hidden="true" tabindex="-1"></a>joblib==1.4.2</span>
+<span id="cb36-42"><a href="#cb36-42" aria-hidden="true" tabindex="-1"></a>kiwisolver==1.4.5</span>
+<span id="cb36-43"><a href="#cb36-43" aria-hidden="true" tabindex="-1"></a>lazy_loader==0.4</span>
+<span id="cb36-44"><a href="#cb36-44" aria-hidden="true" tabindex="-1"></a>legacy-api-wrap==1.4</span>
+<span id="cb36-45"><a href="#cb36-45" aria-hidden="true" tabindex="-1"></a>leidenalg==0.10.2</span>
+<span id="cb36-46"><a href="#cb36-46" aria-hidden="true" tabindex="-1"></a>llvmlite==0.43.0</span>
+<span id="cb36-47"><a href="#cb36-47" aria-hidden="true" tabindex="-1"></a>locket==1.0.0</span>
+<span id="cb36-48"><a href="#cb36-48" aria-hidden="true" tabindex="-1"></a>markdown-it-py==3.0.0</span>
+<span id="cb36-49"><a href="#cb36-49" aria-hidden="true" tabindex="-1"></a>MarkupSafe==2.1.5</span>
+<span id="cb36-50"><a href="#cb36-50" aria-hidden="true" tabindex="-1"></a>matplotlib==3.9.0</span>
+<span id="cb36-51"><a href="#cb36-51" aria-hidden="true" tabindex="-1"></a>matplotlib-scalebar==0.8.1</span>
+<span id="cb36-52"><a href="#cb36-52" aria-hidden="true" tabindex="-1"></a>mdurl==0.1.2</span>
+<span id="cb36-53"><a href="#cb36-53" aria-hidden="true" tabindex="-1"></a>more-itertools==10.3.0</span>
+<span id="cb36-54"><a href="#cb36-54" aria-hidden="true" tabindex="-1"></a>msgpack==1.0.8</span>
+<span id="cb36-55"><a href="#cb36-55" aria-hidden="true" tabindex="-1"></a>multidict==6.0.5</span>
+<span id="cb36-56"><a href="#cb36-56" aria-hidden="true" tabindex="-1"></a>multipledispatch==1.0.0</span>
+<span id="cb36-57"><a href="#cb36-57" aria-hidden="true" tabindex="-1"></a>multiscale_spatial_image==0.11.2</span>
+<span id="cb36-58"><a href="#cb36-58" aria-hidden="true" tabindex="-1"></a>natsort==8.4.0</span>
+<span id="cb36-59"><a href="#cb36-59" aria-hidden="true" tabindex="-1"></a>networkx==3.3</span>
+<span id="cb36-60"><a href="#cb36-60" aria-hidden="true" tabindex="-1"></a>numba==0.60.0</span>
+<span id="cb36-61"><a href="#cb36-61" aria-hidden="true" tabindex="-1"></a>numcodecs==0.12.1</span>
+<span id="cb36-62"><a href="#cb36-62" aria-hidden="true" tabindex="-1"></a>numpy==1.26.4</span>
+<span id="cb36-63"><a href="#cb36-63" aria-hidden="true" tabindex="-1"></a>ome-zarr==0.9.0</span>
+<span id="cb36-64"><a href="#cb36-64" aria-hidden="true" tabindex="-1"></a>omnipath==1.0.8</span>
+<span id="cb36-65"><a href="#cb36-65" aria-hidden="true" tabindex="-1"></a>packaging==24.1</span>
+<span id="cb36-66"><a href="#cb36-66" aria-hidden="true" tabindex="-1"></a>pandas==2.2.2</span>
+<span id="cb36-67"><a href="#cb36-67" aria-hidden="true" tabindex="-1"></a>param==2.1.0</span>
+<span id="cb36-68"><a href="#cb36-68" aria-hidden="true" tabindex="-1"></a>partd==1.4.2</span>
+<span id="cb36-69"><a href="#cb36-69" aria-hidden="true" tabindex="-1"></a>patsy==0.5.6</span>
+<span id="cb36-70"><a href="#cb36-70" aria-hidden="true" tabindex="-1"></a>pillow==10.3.0</span>
+<span id="cb36-71"><a href="#cb36-71" aria-hidden="true" tabindex="-1"></a>PIMS==0.7</span>
+<span id="cb36-72"><a href="#cb36-72" aria-hidden="true" tabindex="-1"></a>psutil==6.0.0</span>
+<span id="cb36-73"><a href="#cb36-73" aria-hidden="true" tabindex="-1"></a>pyarrow==16.1.0</span>
+<span id="cb36-74"><a href="#cb36-74" aria-hidden="true" tabindex="-1"></a>pyct==0.5.0</span>
+<span id="cb36-75"><a href="#cb36-75" aria-hidden="true" tabindex="-1"></a>pygeos==0.14</span>
+<span id="cb36-76"><a href="#cb36-76" aria-hidden="true" tabindex="-1"></a>Pygments==2.18.0</span>
+<span id="cb36-77"><a href="#cb36-77" aria-hidden="true" tabindex="-1"></a>pynndescent==0.5.13</span>
+<span id="cb36-78"><a href="#cb36-78" aria-hidden="true" tabindex="-1"></a>pyparsing==3.1.2</span>
+<span id="cb36-79"><a href="#cb36-79" aria-hidden="true" tabindex="-1"></a>pyproj==3.6.1</span>
+<span id="cb36-80"><a href="#cb36-80" aria-hidden="true" tabindex="-1"></a>python-dateutil==2.9.0.post0</span>
+<span id="cb36-81"><a href="#cb36-81" aria-hidden="true" tabindex="-1"></a>pytz==2024.1</span>
+<span id="cb36-82"><a href="#cb36-82" aria-hidden="true" tabindex="-1"></a>PyYAML==6.0.1</span>
+<span id="cb36-83"><a href="#cb36-83" aria-hidden="true" tabindex="-1"></a>requests==2.32.3</span>
+<span id="cb36-84"><a href="#cb36-84" aria-hidden="true" tabindex="-1"></a>rich==13.7.1</span>
+<span id="cb36-85"><a href="#cb36-85" aria-hidden="true" tabindex="-1"></a>s3fs==2023.6.0</span>
+<span id="cb36-86"><a href="#cb36-86" aria-hidden="true" tabindex="-1"></a>scanpy==1.10.1</span>
+<span id="cb36-87"><a href="#cb36-87" aria-hidden="true" tabindex="-1"></a>scikit-image==0.24.0</span>
+<span id="cb36-88"><a href="#cb36-88" aria-hidden="true" tabindex="-1"></a>scikit-learn==1.5.0</span>
+<span id="cb36-89"><a href="#cb36-89" aria-hidden="true" tabindex="-1"></a>scipy==1.13.1</span>
+<span id="cb36-90"><a href="#cb36-90" aria-hidden="true" tabindex="-1"></a>seaborn==0.13.2</span>
+<span id="cb36-91"><a href="#cb36-91" aria-hidden="true" tabindex="-1"></a>session-info==1.0.0</span>
+<span id="cb36-92"><a href="#cb36-92" aria-hidden="true" tabindex="-1"></a>shapely==2.0.4</span>
+<span id="cb36-93"><a href="#cb36-93" aria-hidden="true" tabindex="-1"></a>six==1.16.0</span>
+<span id="cb36-94"><a href="#cb36-94" aria-hidden="true" tabindex="-1"></a>slicerator==1.1.0</span>
+<span id="cb36-95"><a href="#cb36-95" aria-hidden="true" tabindex="-1"></a>sortedcontainers==2.4.0</span>
+<span id="cb36-96"><a href="#cb36-96" aria-hidden="true" tabindex="-1"></a>spatial_image==0.3.0</span>
+<span id="cb36-97"><a href="#cb36-97" aria-hidden="true" tabindex="-1"></a>spatialdata==0.0.15</span>
+<span id="cb36-98"><a href="#cb36-98" aria-hidden="true" tabindex="-1"></a>squidpy==1.5.0</span>
+<span id="cb36-99"><a href="#cb36-99" aria-hidden="true" tabindex="-1"></a>statsmodels==0.14.2</span>
+<span id="cb36-100"><a href="#cb36-100" aria-hidden="true" tabindex="-1"></a>stdlib-list==0.10.0</span>
+<span id="cb36-101"><a href="#cb36-101" aria-hidden="true" tabindex="-1"></a>tblib==3.0.0</span>
+<span id="cb36-102"><a href="#cb36-102" aria-hidden="true" tabindex="-1"></a>texttable==1.7.0</span>
+<span id="cb36-103"><a href="#cb36-103" aria-hidden="true" tabindex="-1"></a>threadpoolctl==3.5.0</span>
+<span id="cb36-104"><a href="#cb36-104" aria-hidden="true" tabindex="-1"></a>tifffile==2024.6.18</span>
+<span id="cb36-105"><a href="#cb36-105" aria-hidden="true" tabindex="-1"></a>toolz==0.12.1</span>
+<span id="cb36-106"><a href="#cb36-106" aria-hidden="true" tabindex="-1"></a>tornado==6.4.1</span>
+<span id="cb36-107"><a href="#cb36-107" aria-hidden="true" tabindex="-1"></a>tqdm==4.66.4</span>
+<span id="cb36-108"><a href="#cb36-108" aria-hidden="true" tabindex="-1"></a>typeguard==4.3.0</span>
+<span id="cb36-109"><a href="#cb36-109" aria-hidden="true" tabindex="-1"></a>typing_extensions==4.12.2</span>
+<span id="cb36-110"><a href="#cb36-110" aria-hidden="true" tabindex="-1"></a>tzdata==2024.1</span>
+<span id="cb36-111"><a href="#cb36-111" aria-hidden="true" tabindex="-1"></a>umap-learn==0.5.6</span>
+<span id="cb36-112"><a href="#cb36-112" aria-hidden="true" tabindex="-1"></a>urllib3==1.26.19</span>
+<span id="cb36-113"><a href="#cb36-113" aria-hidden="true" tabindex="-1"></a>validators==0.28.3</span>
+<span id="cb36-114"><a href="#cb36-114" aria-hidden="true" tabindex="-1"></a>wrapt==1.16.0</span>
+<span id="cb36-115"><a href="#cb36-115" aria-hidden="true" tabindex="-1"></a>xarray==2024.6.0</span>
+<span id="cb36-116"><a href="#cb36-116" aria-hidden="true" tabindex="-1"></a>xarray-dataclasses==1.8.0</span>
+<span id="cb36-117"><a href="#cb36-117" aria-hidden="true" tabindex="-1"></a>xarray-datatree==0.0.14</span>
+<span id="cb36-118"><a href="#cb36-118" aria-hidden="true" tabindex="-1"></a>xarray-schema==0.0.3</span>
+<span id="cb36-119"><a href="#cb36-119" aria-hidden="true" tabindex="-1"></a>xarray-spatial==0.4.0</span>
+<span id="cb36-120"><a href="#cb36-120" aria-hidden="true" tabindex="-1"></a>yarl==1.9.4</span>
+<span id="cb36-121"><a href="#cb36-121" aria-hidden="true" tabindex="-1"></a>zarr==2.18.2</span>
+<span id="cb36-122"><a href="#cb36-122" aria-hidden="true" tabindex="-1"></a>zict==3.0.0</span>
+<span id="cb36-123"><a href="#cb36-123" aria-hidden="true" tabindex="-1"></a>zipp==3.19.2</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+
+
+
+</section>
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-Dries2021" class="csl-entry" role="listitem">
+Dries, Ruben, Qian Zhu, Rui Dong, Chee-Huat Linus Eng, Huipeng Li, Kan Liu, Yuntian Fu, et al. 2021. <span>“Giotto: A Toolbox for Integrative Analysis and Visualization of Spatial Expression Data.”</span> <em>Genome Biology</em> 22 (December): 78. <a href="https://doi.org/10.1186/s13059-021-02286-2">https://doi.org/10.1186/s13059-021-02286-2</a>.
+</div>
+<div id="ref-Hao2024" class="csl-entry" role="listitem">
+Hao, Yuhan, Tim Stuart, Madeline H. Kowalski, Saket Choudhary, Paul Hoffman, Austin Hartman, Avi Srivastava, et al. 2024. <span>“Dictionary Learning for Integrative, Multimodal and Scalable Single-Cell Analysis.”</span> <em>Nature Biotechnology</em> 42 (February): 293–304. <a href="https://doi.org/10.1038/s41587-023-01767-y">https://doi.org/10.1038/s41587-023-01767-y</a>.
+</div>
+<div id="ref-He2022" class="csl-entry" role="listitem">
+He, Shanshan, Ruchir Bhatt, Carl Brown, Emily A Brown, Derek L Buhr, Kan Chantranuvatana, Patrick Danaher, et al. 2022. <span>“High-Plex Imaging of RNA and Proteins at Subcellular Resolution in Fixed Tissue by Spatial Molecular Imaging.”</span> <em>Nature Biotechnology</em> 40 (December): 1794–1806. <a href="https://doi.org/10.1038/s41587-022-01483-z">https://doi.org/10.1038/s41587-022-01483-z</a>.
+</div>
+<div id="ref-Palla2022" class="csl-entry" role="listitem">
+Palla, Giovanni, Hannah Spitzer, Michal Klein, David Fischer, Anna Christina Schaar, Louis Benedikt Kuemmerle, Sergei Rybakov, et al. 2022. <span>“Squidpy: A Scalable Framework for Spatial Omics Analysis.”</span> <em>Nature Methods</em> 19 (February): 171–78. <a href="https://doi.org/10.1038/s41592-021-01358-2">https://doi.org/10.1038/s41592-021-01358-2</a>.
+</div>
+<div id="ref-Tian2021" class="csl-entry" role="listitem">
+Tian, Bi-Xia, Wei Sun, Shu-Hong Wang, Pei-Jun Liu, and Yao-Chun Wang. 2021. <span>“<a href="https://www.ncbi.nlm.nih.gov/pubmed/33527004">Differential Expression and Clinical Significance of COX6C in Human Diseases.</a>”</span> <em>American Journal of Translational Research</em> 13: 1–10.
+</div>
+<div id="ref-Wolf2018" class="csl-entry" role="listitem">
+Wolf, F Alexander, Philipp Angerer, and Fabian J Theis. 2018. <span>“SCANPY: Large-Scale Single-Cell Gene Expression Data Analysis.”</span> <em>Genome Biology</em> 19: 15. <a href="https://doi.org/10.1186/s13059-017-1382-0">https://doi.org/10.1186/s13059-017-1382-0</a>.
+</div>
+</div></section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/nanostring-biostats\.github\.io\/CosMx-Analysis-Scratch-Space");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+    <a class="nav-link" href="../../license.html">
+<p>License</p>
+</a>
+  </li>  
+</ul>
+    <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

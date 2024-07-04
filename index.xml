@@ -9,8 +9,2145 @@
 <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/</link>
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
-<generator>quarto-1.5.52</generator>
-<lastBuildDate>Wed, 19 Jun 2024 00:00:00 GMT</lastBuildDate>
+<generator>quarto-1.5.53</generator>
+<lastBuildDate>Wed, 03 Jul 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Comparing AtoMx™ SIP flat files with the legacy format</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/flat-file-exports/flat-files-compare.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<p>There are different data formats and structures that can be exported from the <a href="https://nanostring.com/products/atomx-spatial-informatics-platform/atomx-sip-overview/" target="blank">AtoMx™</a> Spatial Informatics Portal (SIP). These include the raw data (<em>i.e.</em>, with CellStatsDir, RunSummary, and AnalysisResults folders), Seurat (with or without images), Tiledb, and “flat files”. The flat files get their name because they are in a human-readable and accessible format (<em>i.e.</em>, comma separated files). These files, like Seurat files and Tiledb files, aren’t actually raw data but are processed data and can include additional analysis results (<em>e.g.</em>, cell typing data).</p>
+<p>The first use of the flat file format was about a year and a half ago when <span class="citation" data-cites="He2022">He et al. (2022)</span> released the first public <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/" target="_blank">CosMx™ SMI dataset</a>, consisting of ~800k cells with 980 RNA targets from multiple tissues of NSCLC FFPE. Now there are additional <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/" data-targets="_blank">public datasets</a> that span two species (mouse, human), four tissues (lung, liver, brain, pancreas), and three levels of plex (1k, 6k, whole transcriptome). Because the flat files generated in AtoMx SIP differ from the flat files in these public data releases, I thought it might be helpful to show a comparison.</p>
+<p>Specifically, in this post I compare the flat files created for <code>Lung5_rep1</code> of the NSCLC dataset side-by-side with the updated (AtoMx 1.3.2) flat file format from an unrelated tissue. The specific values will be different since they are different datasets, of course, but the following side-by-sides show similarities and differences between the formats.</p>
+<section id="sec-fov-pos" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> FOV positions flat file</h1>
+<p>When we compare the FOV positions between old and new, you can see that the column name ‘fov’ has been changed to ‘FOV’ and the newer format includes global positions of the FOVs in units of mm in addition to pixels.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="version">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true">Legacy</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">AtoMx SIP v1.3.2</a></li></ul>
+<div class="tab-content" data-group="version">
+<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
+<div id="tbl-fov-leg" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-fov-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: Description of the legacy FOV positions file format. Δ = column name change between versions
+</figcaption>
+<div aria-describedby="tbl-fov-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov<img src="https://latex.codecogs.com/png.latex?%5E%7B%CE%94%7D"></td>
+<td>Int</td>
+<td>The field of view (FOV) number</td>
+</tr>
+<tr class="even">
+<td>x_global_px</td>
+<td>float</td>
+<td>The x location (in pixels) of the FOV relative to other FOVs</td>
+</tr>
+<tr class="odd">
+<td>y_global_px</td>
+<td>float</td>
+<td>The y location (in pixels) of the FOV relative to other FOVs</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>  fov x_global_px y_global_px
+  1    3188.889    155216.7
+  2    8661.111    155216.7
+  3   14133.333    155216.7
+  4   19605.556    155216.7
+  5   25077.778    155216.7
+  6    3188.889    158866.7
+  7    8661.111    158866.7
+  8   14133.333    158866.7
+  9   19605.556    158866.7
+  10   25077.778    158866.7</code></pre>
+</div>
+<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
+<div id="tbl-fov-new" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-fov-new-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;2: Description of the baseline FOV file format for AtoMx SIP v1.3.2. Δ = column name change between versions; * = new column in 1.3.2 compared to legacy
+</figcaption>
+<div aria-describedby="tbl-fov-new-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>FOV<img src="https://latex.codecogs.com/png.latex?%5E%7B%CE%94%7D"></td>
+<td>Int</td>
+<td>The field of view (FOV) number</td>
+</tr>
+<tr class="even">
+<td>x_global_px</td>
+<td>float</td>
+<td>The x location (in pixels) of the FOV relative to other FOVs</td>
+</tr>
+<tr class="odd">
+<td>y_global_px</td>
+<td>float</td>
+<td>The y location (in pixels) of the FOV relative to other FOVs</td>
+</tr>
+<tr class="even">
+<td>x_global_mm<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>The x location (in millimeters) of the FOV relative to other FOVs</td>
+</tr>
+<tr class="odd">
+<td>y_global_mm<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>The y location (in millimeters) of the FOV relative to other FOVs</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<pre><code>FOV x_global_px y_global_px x_global_mm y_global_mm
+  1           0       29791   0.0000000    3.583410
+  2        4255       29791   0.5119157    3.583410
+  3        8511       29791   1.0238314    3.583410
+  4       12767       29791   1.5357471    3.583410
+  5       17023       29791   2.0476628    3.583410
+  6       21279       29791   2.5595785    3.583410
+  7       25535       29791   3.0714942    3.583410
+  8       29791       29791   3.5834099    3.583410
+  9           0       25535   0.0000000    3.071494
+  10        4255       25535   0.5119157    3.071494</code></pre>
+</div>
+</div>
+</div>
+</section>
+<section id="expression-matrix" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Expression Matrix</h1>
+<p>For expression matrices, we see that NegPrb(\d+) is changed to Negative(\d+) and the newer format has SystemControls.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="version">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" aria-controls="tabset-2-1" aria-selected="true">Legacy</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" aria-controls="tabset-2-2" aria-selected="false">AtoMx SIP v1.3.2</a></li></ul>
+<div class="tab-content" data-group="version">
+<div id="tabset-2-1" class="tab-pane active" aria-labelledby="tabset-2-1-tab">
+<div id="tbl-fov-leg" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[15, 15, 70]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-fov-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;3: Description of the legacy expression matrix file format. Δ = column name change between versions
+</figcaption>
+<div aria-describedby="tbl-fov-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 70%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns. All transcripts not assigned to a cell are show with a <code>cell_ID</code> value of 0.</td>
+</tr>
+<tr class="odd">
+<td>(Gene expression target)</td>
+<td>Int</td>
+<td>The number of transcripts observed for a given gene target for a given cell.</td>
+</tr>
+<tr class="even">
+<td>(Negative Probe; <em>e.g.</em> NegPrb1)<img src="https://latex.codecogs.com/png.latex?%5E%7B%CE%94%7D"></td>
+<td>Int</td>
+<td>Negative probes, which do not match any sequence within the transcriptome or genome. These can be used to assess background levels.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>fov cell_ID AATK ... ZFP36 NegPrb3 ... NegPrb23
+  1       0   15 ...   184      12 ...       13
+  1       1    0 ...     0       0 ...        0
+  1       2    0 ...     1       0 ...        0
+  1       3    0 ...     0       0 ...        0
+  1       4    0 ...     0       0 ...        0
+  1       5    0 ...     0       0 ...        0
+  1       6    0 ...     0       0 ...        0
+  1       7    0 ...     1       0 ...        0
+  1       8    0 ...     0       0 ...        0
+  1       9    0 ...     0       0 ...        0</code></pre>
+</div>
+<div id="tabset-2-2" class="tab-pane" aria-labelledby="tabset-2-2-tab">
+<div id="tbl-exp-leg" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[15, 15, 70]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-exp-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;4: Description of the baseline expression matrix file format for AtoMx SIP v1.3.2. * = new column in 1.3.2 compared to legacy
+</figcaption>
+<div aria-describedby="tbl-exp-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 70%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns. All transcripts not assigned to a cell are show with a <code>cell_ID</code> value of 0.</td>
+</tr>
+<tr class="odd">
+<td>(Gene expression target)</td>
+<td>Int</td>
+<td>The number of transcripts observed for a given gene target for a given cell.</td>
+</tr>
+<tr class="even">
+<td>(Negative Probe, <em>e.g.,</em> Negative1)<img src="https://latex.codecogs.com/png.latex?%5E%7B%CE%94%7D"></td>
+<td>Int</td>
+<td>Negative probes, which do not match any sequence within the transcriptome or genome. These can be used to assess background levels.</td>
+</tr>
+<tr class="odd">
+<td>(System Control)<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>Int</td>
+<td>System Control codes are codes which do not have any physical probe associated with them.</td>
+</tr>
+<tr class="even">
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>fov cell_ID A1BG ... ZZZ3 Negative1 ... Negative9 SystemControl1 ... SystemControl99
+  1       1    0 ...    0         0 ...         0              0 ...               0
+  1       2    0 ...    0         0 ...         0              0 ...               0
+  1       3    0 ...    0         0 ...         0              0 ...               0
+  1       4    1 ...    0         0 ...         0              0 ...               0
+  1       5    0 ...    0         0 ...         0              0 ...               0
+  1       6    0 ...    0         0 ...         0              0 ...               0
+  1       7    0 ...    0         0 ...         0              0 ...               0
+  1       8    0 ...    0         0 ...         0              0 ...               0
+  1       9    1 ...    0         0 ...         0              0 ...               0
+  1      10    0 ...    0         0 ...         0              0 ...               0</code></pre>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-meta" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Metadata file</h1>
+<p>There are several differences to the metadata files between the legacy and current versions and I’ll highlight a few new additions below. One thing to note is that exported data from AtoMx SIP can have columns with analysis results in addition to the “baseline” columns.</p>
+<p><em>Cell shape metrics</em> – In the legacy version, basic cell shape was described with <code>Area</code>, <code>Width</code>, <code>Height</code>, and <code>AspectRaio</code> (Table&nbsp;5). The new version of the metadata includes these plus four additional metrics that describe the cell shape (Table&nbsp;6). These are <code>perimeter</code>, <code>circularity</code>, <code>eccentricity</code>, and <code>solidity</code>. Perimeter is simply the perimeter of the cell in pixels and the latter three are defined in <span class="citation" data-cites="Fu2024">Fu et al. (2024)</span>.</p>
+<p><em><code>SplitRatioToLocal</code></em> – for cells that are adjacent to the FOV boundaries, the <code>SplitRatioToLocal</code> metric measures the cell area relative to the mean area of cells in the FOVs. For 0 &lt; SplitRatioToLocal &lt; 1, the cell is smaller than average and for <code>SplitRatioToLocal</code> &gt; 1 the cell is larger than average. Note that a value of 0 means the cell is not along the border.</p>
+<p><em>FOV-level metrics</em> – there are some columns that are added as FOV-level metrics. For example, <code>median_RNA</code> provides the median RNA target probe expression across all cells within a given FOV.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="version">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" aria-controls="tabset-3-1" aria-selected="true">Legacy Columns</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" aria-controls="tabset-3-2" aria-selected="false">AtoMx SIP v1.3.2</a></li></ul>
+<div class="tab-content" data-group="version">
+<div id="tabset-3-1" class="tab-pane active" aria-labelledby="tabset-3-1-tab">
+<div id="tbl-meta-leg" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-meta-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;5: Description of the legacy metadata file format. Δ = column name change between versions; * = new column in 1.3.2 compared to legacy
+</figcaption>
+<div aria-describedby="tbl-meta-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number.</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns.</td>
+</tr>
+<tr class="odd">
+<td>Area</td>
+<td>Int</td>
+<td>Number of pixels assigned to a given cell.</td>
+</tr>
+<tr class="even">
+<td>AspectRatio</td>
+<td>float</td>
+<td>Width divided by height.</td>
+</tr>
+<tr class="odd">
+<td>CenterX_local_px</td>
+<td>Int</td>
+<td>The x position of this cell within the FOV, measured in pixels. The pixel edge length is 120 nm. Thus, to convert to microns multiply the pixel value by 0.12028 <img src="https://latex.codecogs.com/png.latex?%5Cmu">m per pixel.</td>
+</tr>
+<tr class="even">
+<td>CenterY_local_px</td>
+<td>Int</td>
+<td>Same as <code>CenterX_local_px</code> but for the y dimension.</td>
+</tr>
+<tr class="odd">
+<td>CenterX_global_px</td>
+<td>float</td>
+<td>See <code>CenterX_local_px</code> description. The global positions describes the relative position of this cell within the large sample reference frame.</td>
+</tr>
+<tr class="even">
+<td>CenterY_global_px</td>
+<td>float</td>
+<td>Same as <code>CenterX_global_px</code> but for the y dimension.</td>
+</tr>
+<tr class="odd">
+<td>Width</td>
+<td>Int</td>
+<td>Cell’s maximum length in x dimension (pixels).</td>
+</tr>
+<tr class="even">
+<td>Height</td>
+<td>Int</td>
+<td>Cell’s maximum length in y dimension (pixels).</td>
+</tr>
+<tr class="odd">
+<td>Mean.(IF)</td>
+<td>Int</td>
+<td>The mean fluorescence intensity for a given cell.</td>
+</tr>
+<tr class="even">
+<td>Max.(IF)</td>
+<td>Int</td>
+<td>The max fluorescence intensity for a given cell.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>'data.frame':   6 obs. of  20 variables:
+ $ fov               : int  1 1 1 1 1 1
+ $ cell_ID           : int  1 2 3 4 5 6
+ $ Area              : int  1259 3723 2010 3358 1213 2647
+ $ AspectRatio       : num  1.34 1.45 1.62 0.47 1 1.38
+ $ CenterX_local_px  : int  1027 2904 4026 4230 4258 66
+ $ CenterY_local_px  : int  3631 3618 3627 3597 3629 3622
+ $ CenterX_global_px : num  4216 6093 7215 7419 7447 ...
+ $ CenterY_global_px : num  158848 158835 158844 158814 158846 ...
+ $ Width             : int  47 87 68 48 38 72
+ $ Height            : int  35 60 42 102 38 52
+ $ Mean.MembraneStain: int  3473 3895 2892 6189 8138 5713
+ $ Max.MembraneStain : int  7354 13832 6048 16091 19281 12617
+ $ Mean.PanCK        : int  715 18374 3265 485 549 1220
+ $ Max.PanCK         : int  5755 53158 37522 964 874 5107
+ $ Mean.CD45         : int  361 260 378 679 566 433
+ $ Max.CD45          : int  845 1232 908 2322 1242 957
+ $ Mean.CD3          : int  22 13 19 5 17 11
+ $ Max.CD3           : int  731 686 654 582 674 547
+ $ Mean.DAPI         : int  4979 1110 10482 6065 3311 4151
+ $ Max.DAPI          : int  26374 13229 33824 39512 30136 19269</code></pre>
+</div>
+<div id="tabset-3-2" class="tab-pane" aria-labelledby="tabset-3-2-tab">
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If analysis has been performed on AtoMx SIP prior to export, additional columns not presented here may be added to the metadata file. For example, if cell typing has been performed, there may be a column named <code>RNA_nbclust_[GUID]_1_clusters</code> containing the estimated cell type.</p>
+</div>
+</div>
+<div id="tbl-meta-132" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-meta-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;6: Description of the baseline metadata file format for AtoMx SIP v1.3.2. Δ = column name change between versions; * = new column in 1.3.2 compared to legacy
+</figcaption>
+<div aria-describedby="tbl-meta-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number.</td>
+</tr>
+<tr class="even">
+<td>Area</td>
+<td>Int</td>
+<td>Number of pixels assigned to a given cell.</td>
+</tr>
+<tr class="odd">
+<td>AspectRatio</td>
+<td>float</td>
+<td>Width divided by height.</td>
+</tr>
+<tr class="even">
+<td>CenterX_local_px</td>
+<td>Int</td>
+<td>The x position of this cell within the FOV, measured in pixels. The pixel edge length is 120 nm. Thus, to convert to microns multiply the pixel value by 0.12028 <img src="https://latex.codecogs.com/png.latex?%5Cmu">m per pixel.</td>
+</tr>
+<tr class="odd">
+<td>CenterY_local_px</td>
+<td>Int</td>
+<td>Same as <code>CenterX_local_px</code> but for the y dimension.</td>
+</tr>
+<tr class="even">
+<td>Width</td>
+<td>Int</td>
+<td>Cell’s maximum length in x dimension (pixels).</td>
+</tr>
+<tr class="odd">
+<td>Height</td>
+<td>Int</td>
+<td>Cell’s maximum length in y dimension (pixels).</td>
+</tr>
+<tr class="even">
+<td>Mean.(IF)</td>
+<td>Int</td>
+<td>The mean fluorescence intensity for a given cell.</td>
+</tr>
+<tr class="odd">
+<td>Max.(IF)</td>
+<td>Int</td>
+<td>The max fluorescence intensity for a given cell.</td>
+</tr>
+<tr class="even">
+<td>SplitRatioToLocal<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>If cell abuts the FOV border: the ratio of <code>Area</code> to mean cell area for that FOV. If cell does not border the FOV boundary: 0.</td>
+</tr>
+<tr class="odd">
+<td>NucArea<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>Int</td>
+<td>Number of pixels assigned to a given nucleus.</td>
+</tr>
+<tr class="even">
+<td>NucAspectRatio<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>Width divided by height of nucleus.</td>
+</tr>
+<tr class="odd">
+<td>Circularity<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>Area to perimeter ratio. 1 = circle; &lt; 1 less circular <span class="citation" data-cites="Fu2024">(Fu et al. 2024)</span>.</td>
+</tr>
+<tr class="even">
+<td>Eccentricity<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>A cell’s minor axis divided by its major axis <span class="citation" data-cites="Fu2024">(Fu et al. 2024)</span>.</td>
+</tr>
+<tr class="odd">
+<td>Perimeter<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>Int</td>
+<td>The perimeter of the cell (in pixels)</td>
+</tr>
+<tr class="even">
+<td>Solidity<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>The <code>Area</code> of the cell divided by its convex area. A measure of the “density” of a cell with values &lt; 1 indicating increased cell irregularity <span class="citation" data-cites="Fu2024">(Fu et al. 2024)</span></td>
+</tr>
+<tr class="odd">
+<td>cell_id<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>string</td>
+<td>A study-wide unique cell identifier. Combination of c(ell), <code>slide_ID</code>, <code>fov</code>, and <code>cell_ID</code>. Note that this is equivalent to <code>cell_ID</code> in <code>napari-cosmx</code>.</td>
+</tr>
+<tr class="even">
+<td>assay_type<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>string</td>
+<td>The assay type (Protein or RNA)</td>
+</tr>
+<tr class="odd">
+<td>version<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>string</td>
+<td>The version of the target decoding used.</td>
+</tr>
+<tr class="even">
+<td>Run_Tissue_name<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>string</td>
+<td>The name of the slide.</td>
+</tr>
+<tr class="odd">
+<td>Panel<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>string</td>
+<td>The panel that was assayed.</td>
+</tr>
+<tr class="even">
+<td>cellSegmentationSetId<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D">.</td>
+<td>string</td>
+<td>The cell segmentation set ID.</td>
+</tr>
+<tr class="odd">
+<td>cellSegmentationSetName<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>string</td>
+<td>The cell segmentation set name.</td>
+</tr>
+<tr class="even">
+<td>slide_ID<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>Int</td>
+<td>Unique identifier for the slide.</td>
+</tr>
+<tr class="odd">
+<td>CenterX_global_px</td>
+<td>float</td>
+<td>See <code>CenterX_local_px</code> description. The global positions describes the relative position of this cell within the large sample reference frame.</td>
+</tr>
+<tr class="even">
+<td>CenterY_global_px</td>
+<td>float</td>
+<td>Same as <code>CenterX_global_px</code> but for the y dimension.</td>
+</tr>
+<tr class="odd">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns.</td>
+</tr>
+<tr class="even">
+<td>unassignedTranscripts<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>Proportion of transcripts in the FOV the cell resides in that are not assigned within any cell. This value is an FOV-level metric that is repeated for each cell (excluding cell 0).</td>
+</tr>
+<tr class="odd">
+<td>median_RNA<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>FOV-level statistic. Median RNA target probe expression across all cells within a given FOV.</td>
+</tr>
+<tr class="even">
+<td>RNA_quantile_(proportion)<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>FOV-level statistic. The (proportion*100) percentile of RNA target expression across all cells within a given FOV.</td>
+</tr>
+<tr class="odd">
+<td>nCount_RNA<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>Int</td>
+<td>Total RNA transcripts observed.</td>
+</tr>
+<tr class="even">
+<td>nFeature_RNA<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>Int</td>
+<td>Total number of unique RNA transcripts observed.</td>
+</tr>
+<tr class="odd">
+<td>median_negprobes<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>FOV-level statistic. Median negative probe expression across all cells within a given FOV.</td>
+</tr>
+<tr class="even">
+<td>negprobes_quantile_(proportion)<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>FOV-level statistic. The (proportion*100) percentile of negative probe expression across all cells within a given FOV.</td>
+</tr>
+<tr class="odd">
+<td>nCount_negprobes<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>Int</td>
+<td>Total Negative Control Probe counts observed.</td>
+</tr>
+<tr class="even">
+<td>nFeature_negprobes<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>Int</td>
+<td>Total number of unique Negative Control Probe counts observed.</td>
+</tr>
+<tr class="odd">
+<td>median_falsecode<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>FOV-level statistic. Median System Control counts across all cells within a given FOV.</td>
+</tr>
+<tr class="even">
+<td>falsecode_quantile_(proportion)<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>FOV-level statistic. The (proportion*100) percentile of System Control counts across all cells within a given FOV.</td>
+</tr>
+<tr class="odd">
+<td>nCount_falsecode<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>Int</td>
+<td>Total System Control codes counts observed. These codes do not have a physical probe in the experiment.</td>
+</tr>
+<tr class="even">
+<td>nFeature_falsecode<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>Int</td>
+<td>Total number of unique System Control codes counts observed.</td>
+</tr>
+<tr class="odd">
+<td>Area.um2<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>float</td>
+<td>The cell area in units of <img src="https://latex.codecogs.com/png.latex?%5Cmu%20m%5E%7B2%7D"></td>
+</tr>
+<tr class="even">
+<td>cell<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>string</td>
+<td>Redundant with <code>cell_id</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>'data.frame':   6 obs. of  65 variables:
+ $ fov                    : int  1 1 1 1 1 1
+ $ Area                   : int  3037 8790 5552 5822 4008 3603
+ $ AspectRatio            : num  0.67 0.95 0.77 0.9 0.97 0.88
+ $ CenterX_local_px       : int  3938 2741 3888 4214 4137 4163
+ $ CenterY_local_px       : int  25 52 57 73 152 187
+ $ Width                  : int  76 110 96 81 78 83
+ $ Height                 : int  51 104 74 90 76 73
+ $ Mean.B                 : int  41 425 88 197 73 91
+ $ Max.B                  : int  252 2308 952 604 552 364
+ $ Mean.G                 : int  50 1270 154 48 22 26
+ $ Max.G                  : int  1192 6960 4192 184 380 160
+ $ Mean.Y                 : int  106 366 254 235 97 196
+ $ Max.Y                  : int  1228 2864 3884 1340 828 904
+ $ Mean.R                 : int  36 62 221 20 4 16
+ $ Max.R                  : int  2360 1044 5604 104 60 232
+ $ Mean.DAPI              : int  92 37 181 288 237 324
+ $ Max.DAPI               : int  408 236 924 1060 800 928
+ $ SplitRatioToLocal      : num  0.7 2.01 0 1.33 0 0
+ $ NucArea                : int  1252 0 1180 2384 1284 1536
+ $ NucAspectRatio         : num  0.77 0 1 0.94 0.95 0.81
+ $ Circularity            : num  0.92 1.05 1.03 1.03 0.94 0.83
+ $ Eccentricity           : num  0.76 0.82 0.79 0.71 0.9 0.82
+ $ Perimeter              : int  204 324 260 266 231 233
+ $ Solidity               : num  14.9 27.1 21.4 21.9 17.4 ...
+ $ cell_id                : chr  "c_1_1_1" "c_1_1_2" "c_1_1_3" "c_1_1_4" ...
+ $ assay_type             : chr  "RNA" "RNA" "RNA" "RNA" ...
+ $ version                : chr  "v6" "v6" "v6" "v6" ...
+ $ Run_Tissue_name        : chr  "example_tissue" "example_tissue" "example_tissue" "example_tissue" ...
+ $ Panel                  : chr  "Human RNA 6k Discovery" "Human RNA 6k Discovery" "Human RNA 6k Discovery" "Human RNA 6k Discovery" ...
+ $ cellSegmentationSetId  : chr  " a343598a-ed40-4a93-a655-49bc7688021d" " a343598a-ed40-4a93-a655-49bc7688021d" " a343598a-ed40-4a93-a655-49bc7688021d" " a343598a-ed40-4a93-a655-49bc7688021d" ...
+ $ cellSegmentationSetName: chr  " Initial Segmentation" " Initial Segmentation" " Initial Segmentation" " Initial Segmentation" ...
+ $ slide_ID               : int  1 1 1 1 1 1
+ $ CenterX_global_px      : int  21057 19860 21007 21333 21256 21282
+ $ CenterY_global_px      : int  68070 68043 68038 68022 67943 67908
+ $ cell_ID                : int  1 2 3 4 5 6
+ $ unassignedTranscripts  : num  0.0349 0.0349 0.0349 0.0349 0.0349 ...
+ $ median_RNA             : int  86 86 86 86 86 86
+ $ RNA_quantile_0.75      : int  126 126 126 126 126 126
+ $ RNA_quantile_0.8       : int  139 139 139 139 139 139
+ $ RNA_quantile_0.85      : int  157 157 157 157 157 157
+ $ RNA_quantile_0.9       : int  182 182 182 182 182 182
+ $ RNA_quantile_0.95      : int  240 240 240 240 240 240
+ $ RNA_quantile_0.99      : num  512 512 512 512 512 ...
+ $ nCount_RNA             : int  138 295 234 344 230 249
+ $ nFeature_RNA           : int  86 182 152 217 148 132
+ $ median_negprobes       : int  9 9 9 9 9 9
+ $ negprobes_quantile_0.75: int  126 126 126 126 126 126
+ $ negprobes_quantile_0.8 : int  139 139 139 139 139 139
+ $ negprobes_quantile_0.85: int  157 157 157 157 157 157
+ $ negprobes_quantile_0.9 : int  182 182 182 182 182 182
+ $ negprobes_quantile_0.95: int  240 240 240 240 240 240
+ $ negprobes_quantile_0.99: num  512 512 512 512 512 ...
+ $ nCount_negprobes       : int  0 0 1 0 0 0
+ $ nFeature_negprobes     : int  0 0 1 0 0 0
+ $ median_falsecode       : int  4 4 4 4 4 4
+ $ falsecode_quantile_0.75: int  126 126 126 126 126 126
+ $ falsecode_quantile_0.8 : int  139 139 139 139 139 139
+ $ falsecode_quantile_0.85: int  157 157 157 157 157 157
+ $ falsecode_quantile_0.9 : int  182 182 182 182 182 182
+ $ falsecode_quantile_0.95: int  240 240 240 240 240 240
+ $ falsecode_quantile_0.99: num  512 512 512 512 512 ...
+ $ nCount_falsecode       : int  1 0 0 1 1 1
+ $ nFeature_falsecode     : int  1 0 0 1 1 1
+ $ Area.um2               : num  43.9 127.2 80.3 84.2 58 ...
+ $ cell                   : chr  "c_1_1_1" "c_1_1_2" "c_1_1_3" "c_1_1_4" ...</code></pre>
+</div>
+</div>
+</div>
+</section>
+<section id="transcript-coordinates-file" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Transcript coordinates file</h1>
+<p>Main differences between versions:</p>
+<ul>
+<li>The contents of the <code>CellComp</code> column differ between version. In the current version “None” replaces “0”. The other three regions–Membrane, Nuclear, Cytoplasm–are unchanged.</li>
+<li><code>cell</code> column is added to the newer version.</li>
+</ul>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="version">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" aria-controls="tabset-4-1" aria-selected="true">Legacy</a></li><li class="nav-item"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" aria-controls="tabset-4-2" aria-selected="false">AtoMx SIP v1.3.2</a></li></ul>
+<div class="tab-content" data-group="version">
+<div id="tabset-4-1" class="tab-pane active" aria-labelledby="tabset-4-1-tab">
+<div id="tbl-tx-leg" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-tx-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;7: Description of the legacy transcripts file format. ‡ = contents changed between versions
+</figcaption>
+<div aria-describedby="tbl-tx-leg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number.</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns.</td>
+</tr>
+<tr class="odd">
+<td>x_global_px</td>
+<td>float</td>
+<td>The x position (in pixels) relative to the tissue.</td>
+</tr>
+<tr class="even">
+<td>y_global_px</td>
+<td>float</td>
+<td>The y position (in pixels) relative to the tissue.</td>
+</tr>
+<tr class="odd">
+<td>x_local_px</td>
+<td>float</td>
+<td>The x position (in pixels) relative to the given FOV.</td>
+</tr>
+<tr class="even">
+<td>y_local_px</td>
+<td>float</td>
+<td>The y position (in pixels) relative to the given FOV.</td>
+</tr>
+<tr class="odd">
+<td>z</td>
+<td>Int</td>
+<td>The z plane.</td>
+</tr>
+<tr class="even">
+<td>target</td>
+<td>string</td>
+<td>The name of the target.</td>
+</tr>
+<tr class="odd">
+<td>CellComp‡</td>
+<td>string</td>
+<td>Subcellular location of target.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code>fov cell_ID x_global_px y_global_px x_local_px y_local_px  z  target CellComp
+  1       0    6757.402    158836.4   3568.513  3619.7375 11   NEAT1        0
+  1       0    5111.389    156060.2   1922.500   843.5334 11   NEAT1        0
+  1       0    7860.461    157809.3   4671.572  2592.6715 11    CCR2        0
+  1       0    3790.489    155553.9    601.600   337.2168 11 HLA-DRA        0
+  1       0    3290.639    158023.6    101.750  2806.9750 11 HLA-DRA Membrane
+  1       0    7020.160    158656.3   3831.271  3439.6000 11     VHL        0
+  1       0    4252.914    157003.0   1064.025  1786.3376 11    FZD5  Nuclear
+  1       0    5987.309    157572.5   2798.420  2355.8000 11    CD37        0
+  1       0    5586.849    157774.2   2397.960  2557.5599 11   ATG12 Membrane</code></pre>
+</div>
+<div id="tabset-4-2" class="tab-pane" aria-labelledby="tabset-4-2-tab">
+<div id="tbl-tx-132" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-tx-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;8: Description of the baseline transcripts file format for AtoMx SIP v1.3.2. * = new column in 1.3.2 compared to legacy; ‡ = contents changed between versions
+</figcaption>
+<div aria-describedby="tbl-tx-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number.</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns.</td>
+</tr>
+<tr class="odd">
+<td>cell<img src="https://latex.codecogs.com/png.latex?%5E%7B*%7D"></td>
+<td>string</td>
+<td>A study-wide unique cell identifier. Combination of c(ell), slide ID, <code>fov</code>, and <code>cell_ID</code>. Note that this is equivalent to <code>cell_ID</code> in <code>napari-cosmx</code>.</td>
+</tr>
+<tr class="even">
+<td>x_local_px</td>
+<td>float</td>
+<td>The x position (in pixels) relative to the given FOV.</td>
+</tr>
+<tr class="odd">
+<td>y_local_px</td>
+<td>float</td>
+<td>The y position (in pixels) relative to the given FOV.</td>
+</tr>
+<tr class="even">
+<td>x_global_px</td>
+<td>float</td>
+<td>The x position (in pixels) relative to the tissue.</td>
+</tr>
+<tr class="odd">
+<td>y_global_px</td>
+<td>float</td>
+<td>The y position (in pixels) relative to the tissue.</td>
+</tr>
+<tr class="even">
+<td>z</td>
+<td>Int</td>
+<td>The z plane.</td>
+</tr>
+<tr class="odd">
+<td>target</td>
+<td>string</td>
+<td>The name of the target.</td>
+</tr>
+<tr class="even">
+<td>CellComp‡</td>
+<td>string</td>
+<td>Subcellular location of target.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<pre><code> fov cell_ID        cell       x_local_px y_local_px x_global_px y_global_px   z   target  CellComp
+  30    4755 c_1_30_4755 29337.6332465278   173483.2   4259.8555    16.57764   3      B2M Cytoplasm         
+  30    4755 c_1_30_4755 29340.4174262153   173488.4   4262.6396    21.71997   3   COL3A1 Cytoplasm         
+  30    4757 c_1_30_4757 29593.4975043403   173480.9   4515.7197    14.27002   8    RPL32 Cytoplasm         
+  30    4759 c_1_30_4759 25211.3444434272   173477.6    133.5667    10.95020   6   COL1A1 Cytoplasm         
+  30    4759 c_1_30_4759 25224.5611029731   173483.9    146.7833    17.28320   6   COL1A2 Cytoplasm         
+  30    4760 c_1_30_4760 25902.6278143989   173480.8    824.8500    14.11694   7   TPSAB1 Cytoplasm         
+  30    4760 c_1_30_4760 25924.0527411567   173477.8    846.2750    11.10010   1 HSP90AB1 Cytoplasm         
+  30    4760 c_1_30_4760 25925.7694159614   173478.0    847.9916    11.34155   6     GLUL Cytoplasm         
+  30    4760 c_1_30_4760 25914.4152899848   173478.9    836.6375    12.27515   6   ADGRE2 Cytoplasm         
+  30    4760 c_1_30_4760 25902.9277411567   173480.7    825.1500    14.07520   8   TPSAB1 Cytoplasm   </code></pre>
+</div>
+</div>
+</div>
+</section>
+<section id="polygons-file" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Polygons file</h1>
+<p>The polygons file was added to the list of flat files and shows the vertices of each cell’s polygon.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset" data-group="version">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" aria-controls="tabset-5-1" aria-selected="true">Legacy</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" aria-controls="tabset-5-2" aria-selected="false">AtoMx SIP v1.3.2</a></li></ul>
+<div class="tab-content" data-group="version">
+<div id="tabset-5-1" class="tab-pane active" aria-labelledby="tabset-5-1-tab">
+<p>(Not applicable)</p>
+</div>
+<div id="tabset-5-2" class="tab-pane" aria-labelledby="tabset-5-2-tab">
+<div id="tbl-poly-132" class="quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[10, 10, 80]">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-poly-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;9: Description of the baseline polygons file format for AtoMx SIP v1.3.2.
+</figcaption>
+<div aria-describedby="tbl-poly-132-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 80%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Column Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>fov</td>
+<td>Int</td>
+<td>The field of view (FOV) number.</td>
+</tr>
+<tr class="even">
+<td>cell_ID</td>
+<td>Int</td>
+<td>Unique identifier for a single cell within a given FOV. To make a unique identifier for a cell within the whole sample use both the <code>fov</code> and <code>cell_ID</code> columns.</td>
+</tr>
+<tr class="odd">
+<td>cell</td>
+<td>string</td>
+<td>A study-wide unique cell identifier. Combination of c(ell), slide ID, and <code>cell_ID</code>. Note that this is equivalent to <code>cell_ID</code> in <code>napari-cosmx</code>.</td>
+</tr>
+<tr class="even">
+<td>x_local_px</td>
+<td>float</td>
+<td>The x position (in pixels) of vertex relative to the given FOV.</td>
+</tr>
+<tr class="odd">
+<td>y_local_px</td>
+<td>float</td>
+<td>The y position (in pixels) of vertex relative to the given FOV.</td>
+</tr>
+<tr class="even">
+<td>x_global_px</td>
+<td>float</td>
+<td>The x position (in pixels) of vertex relative to the tissue.</td>
+</tr>
+<tr class="odd">
+<td>y_global_px</td>
+<td>float</td>
+<td>The y position (in pixels) of vertex relative to the tissue.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Example:</p>
+<p>This example below shows the vertices of cell <code>c_1_2_3</code>.</p>
+<pre><code>  fov cellID    cell x_local_px y_local_px x_global_px y_global_px
+  2      3 c_1_2_3        279          0        4535       29792
+  2      3 c_1_2_3        279          1        4535       29791
+  2      3 c_1_2_3        270         15        4526       29777
+  2      3 c_1_2_3        266         20        4522       29772
+  2      3 c_1_2_3        234         53        4490       29739
+  2      3 c_1_2_3        223         64        4479       29728
+  2      3 c_1_2_3        214         71        4470       29721
+  2      3 c_1_2_3        210         72        4466       29720
+  2      3 c_1_2_3        199         72        4455       29720
+  2      3 c_1_2_3        186         66        4442       29726
+  2      3 c_1_2_3        182         64        4438       29728
+  2      3 c_1_2_3        179         62        4435       29730
+  2      3 c_1_2_3        176         31        4432       29761
+  2      3 c_1_2_3        176          4        4432       29788
+  2      3 c_1_2_3        179          0        4435       29792</code></pre>
+</div>
+</div>
+</div>
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-Fu2024" class="csl-entry">
+Fu, Xiaohang, Yingxin Lin, David M. Lin, Daniel Mechtersheimer, Chuhan Wang, Farhan Ameen, Shila Ghazanfar, Ellis Patrick, Jinman Kim, and Jean Y. H. Yang. 2024. <span>“BIDCell: Biologically-Informed Self-Supervised Learning for Segmentation of Subcellular Spatial Transcriptomics Data.”</span> <em>Nature Communications</em> 15 (January): 509. <a href="https://doi.org/10.1038/s41467-023-44560-w">https://doi.org/10.1038/s41467-023-44560-w</a>.
+</div>
+<div id="ref-He2022" class="csl-entry">
+He, Shanshan, Ruchir Bhatt, Carl Brown, Emily A Brown, Derek L Buhr, Kan Chantranuvatana, Patrick Danaher, et al. 2022. <span>“High-Plex Imaging of RNA and Proteins at Subcellular Resolution in Fixed Tissue by Spatial Molecular Imaging.”</span> <em>Nature Biotechnology</em> 40 (December): 1794–1806. <a href="https://doi.org/10.1038/s41587-022-01483-z">https://doi.org/10.1038/s41587-022-01483-z</a>.
+</div>
+</div></section></div> ]]></description>
+  <category>flat files</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/flat-file-exports/flat-files-compare.html</guid>
+  <pubDate>Wed, 03 Jul 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/flat-file-exports/figures/fig-fig1.png" medium="image" type="image/png" height="79" width="144"/>
+</item>
+<item>
+  <title>Using Squidpy with AtoMx™ SIP exports</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/squidpy-essentials.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Elucidating the spatial distribution of RNA transcripts and protein is one of the fundamental utilities of the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/single-cell-imaging-overview/" target="_blank">CosMx™</a> Spatial Molecular Imager (SMI). When it comes to analysis, the <a href="https://nanostring.com/products/atomx-spatial-informatics-platform/atomx-sip-overview/" target="blank">AtoMx™</a> Spatial Informatics Portal (SIP) is an end-to-end solution that has several advantages including built-in analysis modules, data storage, and the ability to analyze from a browser window. For fully custom analyses, the SIP also has the ability to export the data.</p>
+<p>There are a growing number of open-sourced analysis solutions that can analyze and visualize SMI data. For example, <a href="https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html" target="_blank">Giotto</a> <span class="citation" data-cites="Dries2021">(Dries et al. 2021)</span> has been available for a few years, uses a range of algorithms, and has ways to visualize tissue images built in. More recently, Seurat <span class="citation" data-cites="Hao2024">(Hao et al. 2024)</span>, another R package (and another artist!), has added image viewing capabilities into its workflow. For vignettes on how to analyze and visualize SMI data with Seurat, check out <a href="../../posts/seurat-cosmx-basics/index.html" target="_blank">our recent blog post</a> or the vignette from <a href="https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2#human-lung-nanostring-cosmx-spatial-molecular-imager" target="_blank">Seurat’s website</a>.</p>
+<p>For python users, I find <a href="https://squidpy.readthedocs.io/en/stable/" target="_blank">squidpy</a> <span class="citation" data-cites="Palla2022">(Palla et al. 2022)</span> works well, is feature-rich, and is speedy. Part of this efficiency is thanks to the <a href="https://anndata.readthedocs.io/en/stable/" target="_blank">anndata</a> package. For more info on creating anndata objects with SMI data, see <a href="../../posts/h5ad_conversion/index.html">this post</a>. Squidpy also has a built-in function to read in SMI data, <a href="https://squidpy.readthedocs.io/en/stable/api/squidpy.read.nanostring.html" target="_blank"><code>read.nanostring</code></a>, that reads in the counts data, metadata, and optionally the field of view (FOV) file and image data. The developers also have a <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data" target="_blank">vignette</a> that uses a slide from the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/" target="_blank">first public data release</a> of SMI data <span class="citation" data-cites="He2022">(He et al. 2022)</span>. Note that the example dataset in that vignette uses a legacy file format that differs slightly compared to AtoMx SIP. For more information on the differences, see <a href="../../posts/flat-file-exports/flat-files-compare.html">this post</a>.</p>
+<p>In this blog post, I’ll show you how to:</p>
+<ul>
+<li>Section&nbsp;2 export the squidpy-relevant files from AtoMx SIP</li>
+<li>Section&nbsp;3 (and Appendix Section&nbsp;7.1) tips for installing squidpy</li>
+<li>Section&nbsp;4 analysis examples without spatial images</li>
+<li>Section&nbsp;5 how to pivot your AtoMx SIP-exported data into a format that can be used with squidpy and image-based analysis examples</li>
+</ul>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>In this blog post I provide some analysis examples but this is not intended to provide recommendations of parameters, clustering approaches, <em>etc</em>. I have not tested my example dataset on all of the squidpy functions so there may be errors.</p>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+</div>
+</div>
+</section>
+<section id="sec-export" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Exporting data from AtoMx™ SIP</h1>
+<p>For this post I will be analyzing a single breast cancer slide that has about 80,000 cells, 64 FOVs, and with the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/cosmx-rna-assays/human-6k-discovery-panel/">6K Discovery Panel</a>. I’m using the CosMx Data Analysis v1.3.2 software in AtoMx SIP. To take full advantage of squidpy’s functionality, I’ll need to partially export 1) “flat files” and 2) raw data (Figure&nbsp;1).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>We call them “flat files” since they are in a human-readable and accessible format (<em>i.e.</em>, comma separated files). These files, like Seurat files and Tiledb files, aren’t actually raw data but rather processed from the raw data. Versions of flat files may change with time and over the course of an analysis (<em>e.g.</em>, cell type column added to the metadata file as highlighted in <a href="../../posts/flat-file-exports/flat-files-compare.html">this post</a>).</p>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-export" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-export-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-export1.png" class="img-fluid figure-img" width="1320">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Selected flat files and raw data for exporting.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Squidpy uses three of the five flat files:</p>
+<p>The two required input files for squidpy are:</p>
+<ul>
+<li>counts_file - cell (row) by target (column) expression matrix</li>
+<li>meta_file - cell-level metadata file</li>
+</ul>
+<p>And an optional input file is:</p>
+<ul>
+<li>fov_file - containing coordinates of all FOVs.</li>
+</ul>
+<p>Once export is complete, download the data using your SFTP application (<em>e.g.</em>, cyberduck, FileZilla, WinSCP).</p>
+<p>Figure&nbsp;2 shows a screenshot of the data structure in Cyberduck. The flat files are nested within a folder named after the flow cell (<em>e.g.</em>, <code>AUG29_13INTEGR_6k_BRST_PS_S2</code>) and are compressed in <code>gz</code> format. The raw data are in a separate folder and nested within a folder named after the flow cell and another folder named after the slide (<em>e.g.</em>, <code>20230829_212648_S2</code>). Of the subfolders of the raw data, the data that we’ll need for today are in <code>CellStatsDir</code>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-export2" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-export2.png" class="img-fluid figure-img" width="446">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Folder structure following AtoMx SIP export.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-install" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Install Squidpy</h1>
+<p>Assuming you have Python3 installed on your system, squidpy can be installed using <code>pip3</code> like this:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb1-1">pip3 install squidpy</span></code></pre></div>
+</div>
+</div>
+<p>For installing within a virtual environment (recommended), see the Appendix (Section&nbsp;7.1).</p>
+</section>
+<section id="sec-noimage" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Analysis without imaging data</h1>
+<p>In the simplest form, we can use squidpy without imaging data by reading the expression data, metadata, and optionally the FOV positions data. These analyses include normalization, PCA, umap, <em>etc.</em> I’ll provide some code here but for more details please see the squidpy <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data" target="_blank">vignette</a>.</p>
+<section id="reading-expression-and-metadata-only" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="reading-expression-and-metadata-only"><span class="header-section-number">4.1</span> Reading expression and metadata only</h2>
+<p>Create an anndata object like this:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+from pathlib import Path
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scanpy as sc
+import squidpy as sq
+
+flat_file_dir = 'path/to/breast_cancer_example/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2'
+meta_file = [item for item in os.listdir(flat_file_dir) if 'metadata_file' in item][0]
+counts_file = [item for item in os.listdir(flat_file_dir) if 'exprMat_file' in item][0]
+
+adata0 = sq.read.nanostring(
+    path=flat_file_dir,
+    counts_file=counts_file,
+    meta_file=meta_file
+)
+adata0</code></pre>
+</div>
+<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'</code></pre>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The column names that you have may differ from the ones above. That’s because the example dataset has been processed in AtoMx SIP which created additional columns (<em>e.g.</em>, RNA_nbclust_[GUID]_1_clusters). For more information on the expected columns from flat file exports, see the <a href="../../posts/flat-file-exports/flat-files-compare.html#sec-meta">metadata column descriptions</a>.</p>
+</div>
+</div>
+</section>
+<section id="including-the-fov-file" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="including-the-fov-file"><span class="header-section-number">4.2</span> Including the FOV file</h2>
+<p>If we try to read in the optional FOV file generated in AtoMx SIP using squidpy v1.5.0, we might get an error stating “Index fov invalid”.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
+
+adata = sq.read.nanostring(
+    path=flat_file_dir,
+    counts_file=counts_file,
+    meta_file=meta_file,
+    fov_file=fov_file
+)
+</code></pre>
+</div>
+<div class="cell">
+<details class="code-fold">
+<summary>Click to show error</summary>
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb5-1">---------------------------------------------------------------------------</span>
+<span id="cb5-2">ValueError                                Traceback (most recent call last)</span>
+<span id="cb5-3">Cell In[23], line 3</span>
+<span id="cb5-4">      1 fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]</span>
+<span id="cb5-5">----&gt; 3 adata = sq.read.nanostring(</span>
+<span id="cb5-6">      4     path=flat_file_dir,</span>
+<span id="cb5-7">      5     counts_file=counts_file,</span>
+<span id="cb5-8">      6     meta_file=meta_file,</span>
+<span id="cb5-9">      7     fov_file=fov_file</span>
+<span id="cb5-10">      8 )</span>
+<span id="cb5-11"></span>
+<span id="cb5-12">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/squidpy/read/_read.py:266, in nanostring(path, counts_file, meta_file, fov_file)</span>
+<span id="cb5-13">    263                     continue</span>
+<span id="cb5-14">    265 if fov_file is not None:</span>
+<span id="cb5-15">--&gt; 266     fov_positions = pd.read_csv(path / fov_file, header=0, index_col=fov_key)</span>
+<span id="cb5-16">    267     for fov, row in fov_positions.iterrows():</span>
+<span id="cb5-17">    268         try:</span>
+<span id="cb5-18"></span>
+<span id="cb5-19">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1026, in read_csv(filepath_or_buffer, sep, delimiter, header, names, index_col, usecols, dtype, engine, converters, true_values, false_values, skipinitialspace, skiprows, skipfooter, nrows, na_values, keep_default_na, na_filter, verbose, skip_blank_lines, parse_dates, infer_datetime_format, keep_date_col, date_parser, date_format, dayfirst, cache_dates, iterator, chunksize, compression, thousands, decimal, lineterminator, quotechar, quoting, doublequote, escapechar, comment, encoding, encoding_errors, dialect, on_bad_lines, delim_whitespace, low_memory, memory_map, float_precision, storage_options, dtype_backend)</span>
+<span id="cb5-20">   1013 kwds_defaults = _refine_defaults_read(</span>
+<span id="cb5-21">   1014     dialect,</span>
+<span id="cb5-22">   1015     delimiter,</span>
+<span id="cb5-23">   (...)</span>
+<span id="cb5-24">   1022     dtype_backend=dtype_backend,</span>
+<span id="cb5-25">   1023 )</span>
+<span id="cb5-26">   1024 kwds.update(kwds_defaults)</span>
+<span id="cb5-27">-&gt; 1026 return _read(filepath_or_buffer, kwds)</span>
+<span id="cb5-28"></span>
+<span id="cb5-29">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:626, in _read(filepath_or_buffer, kwds)</span>
+<span id="cb5-30">    623     return parser</span>
+<span id="cb5-31">    625 with parser:</span>
+<span id="cb5-32">--&gt; 626     return parser.read(nrows)</span>
+<span id="cb5-33"></span>
+<span id="cb5-34">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1923, in TextFileReader.read(self, nrows)</span>
+<span id="cb5-35">   1916 nrows = validate_integer("nrows", nrows)</span>
+<span id="cb5-36">   1917 try:</span>
+<span id="cb5-37">   1918     # error: "ParserBase" has no attribute "read"</span>
+<span id="cb5-38">   1919     (</span>
+<span id="cb5-39">   1920         index,</span>
+<span id="cb5-40">   1921         columns,</span>
+<span id="cb5-41">   1922         col_dict,</span>
+<span id="cb5-42">-&gt; 1923     ) = self._engine.read(  # type: ignore[attr-defined]</span>
+<span id="cb5-43">   1924         nrows</span>
+<span id="cb5-44">   1925     )</span>
+<span id="cb5-45">   1926 except Exception:</span>
+<span id="cb5-46">   1927     self.close()</span>
+<span id="cb5-47"></span>
+<span id="cb5-48">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/c_parser_wrapper.py:333, in CParserWrapper.read(self, nrows)</span>
+<span id="cb5-49">    330     data = {k: v for k, (i, v) in zip(names, data_tups)}</span>
+<span id="cb5-50">    332     names, date_data = self._do_date_conversions(names, data)</span>
+<span id="cb5-51">--&gt; 333     index, column_names = self._make_index(date_data, alldata, names)</span>
+<span id="cb5-52">    335 return index, column_names, date_data</span>
+<span id="cb5-53"></span>
+<span id="cb5-54">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:371, in ParserBase._make_index(self, data, alldata, columns, indexnamerow)</span>
+<span id="cb5-55">    368     index = None</span>
+<span id="cb5-56">    370 elif not self._has_complex_date_col:</span>
+<span id="cb5-57">--&gt; 371     simple_index = self._get_simple_index(alldata, columns)</span>
+<span id="cb5-58">    372     index = self._agg_index(simple_index)</span>
+<span id="cb5-59">    373 elif self._has_complex_date_col:</span>
+<span id="cb5-60"></span>
+<span id="cb5-61">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:403, in ParserBase._get_simple_index(self, data, columns)</span>
+<span id="cb5-62">    401 index = []</span>
+<span id="cb5-63">    402 for idx in self.index_col:</span>
+<span id="cb5-64">--&gt; 403     i = ix(idx)</span>
+<span id="cb5-65">    404     to_remove.append(i)</span>
+<span id="cb5-66">    405     index.append(data[i])</span>
+<span id="cb5-67"></span>
+<span id="cb5-68">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:398, in ParserBase._get_simple_index.&lt;locals&gt;.ix(col)</span>
+<span id="cb5-69">    396 if not isinstance(col, str):</span>
+<span id="cb5-70">    397     return col</span>
+<span id="cb5-71">--&gt; 398 raise ValueError(f"Index {col} invalid")</span>
+<span id="cb5-72"></span>
+<span id="cb5-73">ValueError: Index fov invalid</span></code></pre></div>
+</details>
+</div>
+<p>This error arises because of a format change that is detailed in <a href="../../posts/flat-file-exports/flat-files-compare.html#sec-fov-pos">this post</a>. A simple fix is to adjust the column name in the fov file from “FOV” to the legacy “fov” like this:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
+
+fov_df = pd.read_csv(os.path.join(flat_file_dir, fov_file))
+if 'FOV' in fov_df.columns:
+  print("Refactoring file to older format.")
+  # Rename 'FOV' column to 'fov'
+  fov_df.rename(columns={'FOV': 'fov'}, inplace=True)
+  # have fov_file reference the new, formatted file and write it
+  fov_file = os.path.join(flat_file_dir,'fov_positions_formatted.csv')
+  fov_df.to_csv(fov_file, index=False)
+
+adata1 = sq.read.nanostring(
+    path=flat_file_dir,
+    counts_file=counts_file,
+    meta_file=meta_file,
+    fov_file=fov_file
+)
+</code></pre>
+</div>
+<blockquote class="blockquote">
+<p>Refactoring file to older format.</p>
+</blockquote>
+<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'</code></pre>
+</section>
+<section id="analysis" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="analysis"><span class="header-section-number">4.3</span> Analysis</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Please note that the code in this section is an example and not a recommendation for specific thresholding, QC filtering, clustering parmaterization, <em>etc.</em> of SMI data.</p>
+</div>
+</div>
+<p>With the expression and metadata loaded, we can run exploratory data analysis similar to what was described in the squidpy vignette. There are some adjustments to squidpy’s vignette that are needed. These adjustments reflect the flat file format changes (<a href="../../posts/flat-file-exports/flat-files-compare.html#sec-fov-pos">detailed here</a>).</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+# Place control targets into separate variables
+adata1.var["Negative"] = adata1.var_names.str.startswith("Negative")
+adata1.var["SystemControl"] = adata1.var_names.str.startswith("SystemControl")
+adata1</code></pre>
+</div>
+<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
+    var: 'Negative', 'SystemControl'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'</code></pre>
+<p>We can calculate QC metrics with scanpy’s <span class="citation" data-cites="Wolf2018">(Wolf, Angerer, and Theis 2018)</span> pre-processing tool <a href="https://scanpy.readthedocs.io/en/latest/generated/scanpy.pp.calculate_qc_metrics.html" target="_blank"><code>calculate_qc_metrics</code> method</a>. In the code below, we are going to add Negatives and SystemControls as the <code>qc_var</code> argument (which will add cell-level columns to <code>obs</code>). In addition, target-level columns are added to <code>var</code>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>sc.pp.calculate_qc_metrics(adata1, qc_vars=["Negative", "SystemControl"], inplace=True)
+adata1</code></pre>
+</div>
+<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
+    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID', 'n_genes_by_counts', 'log1p_n_genes_by_counts', 'total_counts', 'log1p_total_counts', 'pct_counts_in_top_50_genes', 'pct_counts_in_top_100_genes', 'pct_counts_in_top_200_genes', 'pct_counts_in_top_500_genes', 'total_counts_Negative', 'log1p_total_counts_Negative', 'pct_counts_Negative', 'total_counts_SystemControl', 'log1p_total_counts_SystemControl', 'pct_counts_SystemControl'
+    var: 'Negative', 'SystemControl', 'n_cells_by_counts', 'mean_counts', 'log1p_mean_counts', 'pct_dropout_by_counts', 'total_counts', 'log1p_total_counts'
+    uns: 'spatial'
+    obsm: 'spatial', 'spatial_fov'</code></pre>
+<p>We can explore these cell-level and target-level QC metrics with visuals using the <a href="https://seaborn.pydata.org/" target="_blank"><code>seaborn</code></a> package. For example the code below generates Figure&nbsp;3 and shows how the number of unique genes in a cell correlates with the total number of transcripts in a cell.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sns.jointplot(
+    data=adata1.obs,
+    x="total_counts",
+    y="n_genes_by_counts",
+    kind="scatter",
+    alpha=0.2
+)
+plt.savefig("figures/fig-qc.png", dpi=200)
+</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-qc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc.png" class="img-fluid figure-img" width="600">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Unique genes by total counts. Each dot represents a cell. Y-axis: the number of genes with postive counts in a cell. X-axis the sum of counts for a cell.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>The total Negative probe counts by total counts is shown below and Figure&nbsp;4.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sns.jointplot(
+    data=adata1.obs,
+    x="total_counts",
+    y="total_counts_Negative",
+    kind="scatter",
+    alpha=0.2
+)
+plt.savefig("figures/fig-qc1.png", dpi=200)
+</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-qc1" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-qc1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc1.png" class="img-fluid figure-img" width="600">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: The number of negative counts (Y) relative to the total counts (X) per cell.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>We see that the proportion of negative counts relative to total counts is:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>adata1.obs["total_counts_Negative"].sum() / adata1.obs["total_counts"].sum()</code></pre>
+</div>
+<blockquote class="blockquote">
+<p>0.00041567286608445926 (i.e., 0.04%)</p>
+</blockquote>
+<p>Histograms of total transcripts, total unique genes per cell, and total transcrips per FOV can be seen in Figure&nbsp;5.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+
+axs[0].set_title("Total transcripts per cell")
+sns.histplot(
+    adata1.obs["total_counts"],
+    kde=False,
+    ax=axs[0],
+)
+
+axs[1].set_title("Unique transcripts per cell")
+sns.histplot(
+    adata1.obs["n_genes_by_counts"],
+    kde=False,
+    ax=axs[1],
+)
+
+axs[2].set_title("Transcripts per FOV")
+sns.histplot(
+    adata1.obs.groupby("fov").sum()["total_counts"],
+    kde=False,
+    ax=axs[2],
+)
+plt.savefig("figures/fig-qc2.png", dpi=200)
+</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-qc2" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-qc2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc2.png" class="img-fluid figure-img" width="1500">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Total counts per cell (left), total unique genes per cell (middle) and total transcripts per FOV (right).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>We can filter, normalize, and cluster with scanpy’s functions. For a full list of available functions, see scanpy’s <a href="https://scanpy.readthedocs.io/en/latest/api/index.html" target="_blank">API documentation</a>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>adata1.shape</code></pre>
+</div>
+<blockquote class="blockquote">
+<p>(80073, 6524)</p>
+</blockquote>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>sc.pp.filter_cells(adata1, min_counts=250)
+sc.pp.filter_genes(adata1, min_cells=1000)
+adata1.shape</code></pre>
+</div>
+<blockquote class="blockquote">
+<p>(69293, 6177)</p>
+</blockquote>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>adata1.layers["counts"] = adata1.X.copy()
+sc.pp.normalize_total(adata1, inplace=True, exclude_highly_expressed=True)
+sc.pp.log1p(adata1)
+sc.pp.pca(adata1, n_comps=50)
+sc.pp.neighbors(adata1)
+sc.tl.umap(adata1, min_dist=0.2, spread=1)
+sc.tl.leiden(adata1)</code></pre>
+</div>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>adata1.obs["logpMean.PanCK"] = np.log1p(adata1.obs['Mean.PanCK'])
+sc.pl.umap(
+    adata1,
+    color=["logpMean.PanCK","leiden"]
+)</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-umap" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-umap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-umap.png" class="img-fluid figure-img" width="1441">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-umap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: UMAP figures with cells colored by natural log Mean PanCK expression (left) and Leiden clusters (right).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="sec-imageanalysis" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Image and Spatial Analysis</h1>
+<p>Up until this point we haven’t use image data. In this section I’ll show how to prepare a slide exported from AtoMx SIP into squidpy, and touch on some of the image-based analyses that are possible.</p>
+<section id="rearrange-data-files-to-match-squidpys-layout" class="level2" data-number="5.1">
+<h2 data-number="5.1" class="anchored" data-anchor-id="rearrange-data-files-to-match-squidpys-layout"><span class="header-section-number">5.1</span> Rearrange data files to match squidpy’s layout</h2>
+<p>If we take a look one of the NSCLC public datasets from <span class="citation" data-cites="He2022">He et al. (2022)</span> (Lung5_Rep1), we can see the expected file structure has four folders (<code>CellComposite</code>, <code>CellLabels</code>, <code>CellOverlay</code>, and <code>CompartmentLabels</code>) and four flat files.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb20-1">tree -L 3</span>
+<span id="cb20-2"></span>
+<span id="cb20-3">├── Lung5_Rep1-Flat_files_and_images</span>
+<span id="cb20-4">│&nbsp;&nbsp; ├── CellComposite</span>
+<span id="cb20-5">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellComposite_F001.jpg</span>
+<span id="cb20-6">|   |   ...</span>
+<span id="cb20-7">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellComposite_F032.jpg</span>
+<span id="cb20-8">│&nbsp;&nbsp; ├── CellLabels</span>
+<span id="cb20-9">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
+<span id="cb20-10">|   |   ...</span>
+<span id="cb20-11">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellLabels_F032.tif</span>
+<span id="cb20-12">│&nbsp;&nbsp; ├── CellOverlay</span>
+<span id="cb20-13">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellOverlay_F001.jpg</span>
+<span id="cb20-14">|   |   ...</span>
+<span id="cb20-15">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellOverlay_F032.jpg</span>
+<span id="cb20-16">│&nbsp;&nbsp; ├── CompartmentLabels</span>
+<span id="cb20-17">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CompartmentLabels_F001.tif</span>
+<span id="cb20-18">|   |   ...</span>
+<span id="cb20-19">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CompartmentLabels_F032.tif</span>
+<span id="cb20-20">│&nbsp;&nbsp; ├── Lung5_Rep1_exprMat_file.csv</span>
+<span id="cb20-21">│&nbsp;&nbsp; ├── Lung5_Rep1_fov_positions_file.csv</span>
+<span id="cb20-22">│&nbsp;&nbsp; ├── Lung5_Rep1_metadata_file.csv</span>
+<span id="cb20-23">│&nbsp;&nbsp; └── Lung5_Rep1_tx_file.csv</span></code></pre></div>
+</div>
+</div>
+<p>This file structure is actually a subset of the raw data and flat files that are exported from AtoMx SIP.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb21-1">tree -L 3</span>
+<span id="cb21-2"></span>
+<span id="cb21-3">├── RawFiles</span>
+<span id="cb21-4">│&nbsp;&nbsp; └── &lt;flow cell&gt;</span>
+<span id="cb21-5">│&nbsp;&nbsp;     └── &lt;slide&gt;</span>
+<span id="cb21-6">│&nbsp;&nbsp;         ├── AnalysisResults</span>
+<span id="cb21-7">│&nbsp;&nbsp;         │&nbsp;&nbsp; └── muy2ybakqy</span>
+<span id="cb21-8">│&nbsp;&nbsp;         ├── CellStatsDir</span>
+<span id="cb21-9">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── &lt;slide&gt;_C902_P02_To_P01_RegStats.csv</span>
+<span id="cb21-10">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── CellComposite</span>
+<span id="cb21-11">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── CellOverlay</span>
+<span id="cb21-12">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── FOV001</span>
+<span id="cb21-13">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellBoundaries_F001.csv</span>
+<span id="cb21-14">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellBoundaries_F001_935.fz</span>
+<span id="cb21-15">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
+<span id="cb21-16">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CompartmentLabels_F001.tif</span>
+<span id="cb21-17">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── Run_86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Cell_Stats_F001.csv</span>
+<span id="cb21-18">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; └── Run_86906312-688f-4f31-9fc5-48b04db5f958_FOV001__complete_code_cell_target_call_coord.cs</span>
+<span id="cb21-19">│&nbsp;&nbsp;         │&nbsp;&nbsp; ...</span>
+<span id="cb21-20">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── FOV064</span>
+<span id="cb21-21">│&nbsp;&nbsp;         │&nbsp;&nbsp; └── Morphology2D</span>
+<span id="cb21-22">│&nbsp;&nbsp;         └── RunSummary</span>
+<span id="cb21-23">│&nbsp;&nbsp;             ├── 75d021be-b81e-4d7d-ad28-d390a13da7ad.mkit</span>
+<span id="cb21-24">│&nbsp;&nbsp;             ├── Beta15_Affine_Transform_20221118.csv</span>
+<span id="cb21-25">│&nbsp;&nbsp;             ├── Distortion</span>
+<span id="cb21-26">│&nbsp;&nbsp;             ├── FovTracking</span>
+<span id="cb21-27">│&nbsp;&nbsp;             ├── Morphology_ChannelID_Dictionary.txt</span>
+<span id="cb21-28">│&nbsp;&nbsp;             ├── Run86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Beta15_RNA_SpatialBC_Metrics4D.csv</span>
+<span id="cb21-29">│&nbsp;&nbsp;             ├── Run_86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Beta15_ExptConfig.txt</span>
+<span id="cb21-30">│&nbsp;&nbsp;             ├── SampleSlide_PlaneFit_&lt;slide&gt;_History.csv</span>
+<span id="cb21-31">│&nbsp;&nbsp;             ├── Shading</span>
+<span id="cb21-32">│&nbsp;&nbsp;             ├── c902.fovs.csv</span>
+<span id="cb21-33">│&nbsp;&nbsp;             ├── latest.af.fovs.csv</span>
+<span id="cb21-34">│&nbsp;&nbsp;             └── latest.fovs.csv</span>
+<span id="cb21-35">├── flatFiles</span>
+<span id="cb21-36">│&nbsp;&nbsp; └── &lt;flow cell&gt;</span>
+<span id="cb21-37">│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_exprMat_file.csv.gz</span>
+<span id="cb21-38">│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_fov_positions_file.csv.gz</span>
+<span id="cb21-39">│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_metadata_file.csv.gz</span>
+<span id="cb21-40">│&nbsp;&nbsp;     └── fov_positions_formatted.csv</span></code></pre></div>
+</div>
+</div>
+<p>So in order to read in image data into squidpy, we must first rearrange our folders. We can do this manually by moving, copying, or linking files to match the expected format. Normally I am a big fan of symbolic links for just this situation. However, I have noticed that <code>read.nanostring</code> can have an error when using symbolic links for some of the files (error not shown). So for simplicity I will make a copy of the data and place them into a new folder <code>sample_dir_formatted</code>.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb22-1"># Note that this code works for a single slide. If exporting</span>
+<span id="cb22-2"># multiple slides, some modification might be necessary.</span>
+<span id="cb22-3"></span>
+<span id="cb22-4"># cd to parent directory</span>
+<span id="cb22-5"></span>
+<span id="cb22-6"># create a directory adjacent to RawData and flatFiles</span>
+<span id="cb22-7">mkdir -p sample_dir_formatted &amp;&amp; cd $_</span>
+<span id="cb22-8"></span>
+<span id="cb22-9"># Add flat files</span>
+<span id="cb22-10">for file in $(ls ../flatFiles/*/*csv*); do cp $file ./; done</span>
+<span id="cb22-11"></span>
+<span id="cb22-12"># Add folders</span>
+<span id="cb22-13">cp -r ../RawFiles/*/*/CellStatsDir/CellComposite ./</span>
+<span id="cb22-14">cp -r ../RawFiles/*/*/CellStatsDir/CellOverlay ./</span>
+<span id="cb22-15"></span>
+<span id="cb22-16">mkdir -p CellLabels</span>
+<span id="cb22-17">for file in $(ls ../RawFiles/*/*/CellStatsDir/FOV*/CellLabels*); do cp $file ./CellLabels/ ; done</span>
+<span id="cb22-18">rm ./CellLabels/._Cell*</span>
+<span id="cb22-19">  </span>
+<span id="cb22-20">mkdir -p CompartmentLabels</span>
+<span id="cb22-21">for file in $(ls ../RawFiles/*/*/CellStatsDir/FOV*/CompartmentLabels*); do cp $file ./CompartmentLabels/ ; done</span></code></pre></div>
+</div>
+</div>
+<p>The file structure of <code>sample_dir_formatted</code> now looks like this:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb23-1">tree -L 2</span>
+<span id="cb23-2"></span>
+<span id="cb23-3">.</span>
+<span id="cb23-4">├── &lt;flow cell&gt;_exprMat_file.csv.gz</span>
+<span id="cb23-5">├── &lt;flow cell&gt;_fov_positions_file.csv.gz</span>
+<span id="cb23-6">├── &lt;flow cell&gt;_metadata_file.csv.gz</span>
+<span id="cb23-7">├── CellComposite</span>
+<span id="cb23-8">│&nbsp;&nbsp; ├── CellComposite_F001.jpg</span>
+<span id="cb23-9">|   ├── ...</span>
+<span id="cb23-10">│&nbsp;&nbsp; └── CellComposite_F064.jpg</span>
+<span id="cb23-11">├── CellLabels</span>
+<span id="cb23-12">│&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
+<span id="cb23-13">|   ├── ...</span>
+<span id="cb23-14">│&nbsp;&nbsp; └── CellLabels_F064.tif</span>
+<span id="cb23-15">├── CellOverlay</span>
+<span id="cb23-16">│&nbsp;&nbsp; ├── CellOverlay_F001.jpg</span>
+<span id="cb23-17">|   ├── ...</span>
+<span id="cb23-18">│&nbsp;&nbsp; └── CellOverlay_F064.jpg</span>
+<span id="cb23-19">└── CompartmentLabels</span>
+<span id="cb23-20">    ├── CompartmentLabels_F001.tif</span>
+<span id="cb23-21">    ...</span>
+<span id="cb23-22">    └── CompartmentLabels_F064.tif</span></code></pre></div>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If your flow cell was created prior to AtoMx v1.3.2, the CellComposite jpg files may not show the composites but instead just blank images. They will still load into squidpy but will not show the expected tissue structure. This issue was patched for samples created in v1.3.2+. If you have blank images and would like to replace them with composite images, check out <a href="../../posts/composite-images/making-composite-images.html" target="_blank">this post</a>.</p>
+</div>
+</div>
+</section>
+<section id="read-expression-and-image-data-into-squidpy" class="level2" data-number="5.2">
+<h2 data-number="5.2" class="anchored" data-anchor-id="read-expression-and-image-data-into-squidpy"><span class="header-section-number">5.2</span> Read expression and image data into squidpy</h2>
+<p>The block of code below reads the flat files <em>and images</em> now that the image data are in the specified format. The location of the data in the example code below is <code>sample_dir</code> and is provided as the argument for the <code>path</code> parameter of <code>read.nanostring</code>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+from pathlib import Path
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scanpy as sc
+import squidpy as sq
+
+sample_dir = 'path/to/breast_cancer_example/sample_dir_formatted'
+meta_file = [item for item in os.listdir(sample_dir) if 'metadata_file' in item][0]
+counts_file = [item for item in os.listdir(sample_dir) if 'exprMat_file' in item][0]
+fov_file = [item for item in os.listdir(sample_dir) if 'fov_positions_file' in item][0]
+ 
+fov_df = pd.read_csv(os.path.join(sample_dir, fov_file))
+if 'FOV' in fov_df.columns:
+  print("Refactoring file to older format.")
+  # Rename 'FOV' column to 'fov'
+  fov_df.rename(columns={'FOV': 'fov'}, inplace=True)
+  # have fov_file reference the new, formatted file and write it
+  fov_file = os.path.join(sample_dir,'fov_positions_formatted.csv')
+  fov_df.to_csv(fov_file, index=False)
+
+adata2 = sq.read.nanostring(
+    path=sample_dir,
+    counts_file=counts_file,
+    meta_file=meta_file,
+    fov_file=fov_file
+)
+
+# This part of the analyis is similar to above
+adata2.var["Negative"] = adata2.var_names.str.startswith("Negative")
+adata2.var["SystemControl"] = adata2.var_names.str.startswith("SystemControl")
+sc.pp.calculate_qc_metrics(adata2, qc_vars=["Negative", "SystemControl"], inplace=True)
+sc.pp.filter_cells(adata2, min_counts=250)
+sc.pp.filter_genes(adata2, min_cells=1000)
+adata2.layers["counts"] = adata2.X.copy()
+sc.pp.normalize_total(adata2, inplace=True, exclude_highly_expressed=True)
+sc.pp.log1p(adata2)
+sc.pp.pca(adata2, n_comps=50)
+sc.pp.neighbors(adata2)
+sc.tl.umap(adata2, min_dist=0.2, spread=1)
+sc.tl.leiden(adata2)
+</code></pre>
+</div>
+</section>
+<section id="spatial-analysis" class="level2" data-number="5.3">
+<h2 data-number="5.3" class="anchored" data-anchor-id="spatial-analysis"><span class="header-section-number">5.3</span> Spatial Analysis</h2>
+<p>In addition to the analysis code we’ve already covered, we can view and analyze our CosMx results with image data. For a full list of features, please see <a href="https://squidpy.readthedocs.io/en/stable/api.html" target="_blank">squidpy’s documentation</a>. For some of the examples below, I’ll use a subset of the data – a single FOV – to speed up computation and to make plotting easier.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>adata_subset = adata2[adata2.obs.fov == "35"].copy()</code></pre>
+</div>
+<section id="viewing-results-in-space" class="level3" data-number="5.3.1">
+<h3 data-number="5.3.1" class="anchored" data-anchor-id="viewing-results-in-space"><span class="header-section-number">5.3.1</span> Viewing results in space</h3>
+<p>Figure&nbsp;7 shows a single FOV image data with cells drawn as contours that are colored based on their Leiden cluster.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>sq.pl.spatial_segment(
+    adata2,
+    color="leiden",
+    seg_contourpx=20,
+    seg_cell_id="cell_ID",
+    library_key="fov",
+    library_id="35",
+    img=True,
+    size=60,
+    figsize = (4, 4),
+    dpi = 200,
+    save = "fig-image1.png"
+)
+
+</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-image1" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-image1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-image1.png" class="img-fluid figure-img" width="412">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-image1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Leiden clusters in space for a single FOV of breast cancer tissue. Clusters are displayed as cell contours overlaid on morphology image (green = PanCK, magenta = DAPI).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="autocorrelation-with-morans-i" class="level3" data-number="5.3.2">
+<h3 data-number="5.3.2" class="anchored" data-anchor-id="autocorrelation-with-morans-i"><span class="header-section-number">5.3.2</span> Autocorrelation with Moran’s <em>I</em></h3>
+<p>Moran’s <em>I</em> is a useful spatial statistic for measuring the extent that a gene’s expression is clustered in space (verus random or dispersed). Taking a look at the single-FOV subset, we see genes with positive Moran’s <em>I</em>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sq.gr.spatial_neighbors(adata_subset, coord_type="generic", delaunay=True)
+sq.gr.spatial_autocorr(
+    adata_subset,
+    mode="moran",
+    n_perms=100,
+    n_jobs=1,
+)
+adata_subset.uns["moranI"].head(10)</code></pre>
+</div>
+<pre><code>                I  pval_norm  var_norm  pval_z_sim  pval_sim   var_sim  pval_norm_fdr_bh  pval_z_sim_fdr_bh  pval_sim_fdr_bh
+CRIP1    0.634842        0.0  0.000279         0.0  0.009901  0.000460               0.0                0.0         0.044936
+COX6C    0.624853        0.0  0.000279         0.0  0.009901  0.000496               0.0                0.0         0.044936
+COL1A1   0.616015        0.0  0.000279         0.0  0.009901  0.000476               0.0                0.0         0.044936
+SCGB2A2  0.587074        0.0  0.000279         0.0  0.009901  0.000419               0.0                0.0         0.044936
+COL1A2   0.572189        0.0  0.000279         0.0  0.009901  0.000487               0.0                0.0         0.044936
+COL3A1   0.559603        0.0  0.000279         0.0  0.009901  0.000449               0.0                0.0         0.044936
+SPARC    0.547069        0.0  0.000279         0.0  0.009901  0.000394               0.0                0.0         0.044936
+KRT8     0.516281        0.0  0.000279         0.0  0.009901  0.000427               0.0                0.0         0.044936
+ERBB2    0.509171        0.0  0.000279         0.0  0.009901  0.000458               0.0                0.0         0.044936
+KRT19    0.502475        0.0  0.000279         0.0  0.009901  0.000529               0.0                0.0         0.044936
+</code></pre>
+<p>When we plot the expression of some of these genes (Figure&nbsp;8), we indeed see some how they are aggregated. For example, <em>COX6C</em> expression, which may have clinical significance with breast cancer <span class="citation" data-cites="Tian2021">(Tian et al. 2021)</span>, is autocorrelated and co-occurs with cells high in <em>KRT19</em>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sq.pl.spatial_segment(
+    adata_subset,
+    library_id="35",
+    seg_cell_id="cell_ID",
+    library_key="fov",
+    color=["COX6C", "COL1A1", "KRT19"],
+    size=60,
+    img=False,
+    figsize=(4, 4),
+    dpi = 200,
+    save = "fig-nhood-Morans-I.png"
+)</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-morans" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-morans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-nhood-Morans-I.png" class="img-fluid figure-img" width="1142">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-morans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;8: Expression for select genes showing relatively high Moran’s <em>I</em>.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="spatial-co-occurence" class="level3" data-number="5.3.3">
+<h3 data-number="5.3.3" class="anchored" data-anchor-id="spatial-co-occurence"><span class="header-section-number">5.3.3</span> Spatial co-occurence</h3>
+<p>While Moran’s <em>I</em> quantifies autocorrelation of genes, spatial co-occurence with <code>gr.co_occurence</code> quantifies cell-level co-occurences. In example below, co-occurence of Leiden clusters was used (Figure&nbsp;9).</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sq.gr.co_occurrence(
+    adata_subset,
+    cluster_key="leiden",
+)
+
+sq.pl.co_occurrence(
+    adata_subset,
+    cluster_key="leiden",
+    clusters="1",
+    save = "fig-co-occurence1.png"
+)
+sq.pl.spatial_segment(
+    adata_subset,
+    shape="hex",
+    color="leiden",
+    library_id="35",
+    library_key="fov",
+    seg_cell_id="cell_ID",
+    img=False,
+    size=60,
+    ax = ax[1],
+    save = "fig-co-occurence2.png"
+)</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: Package `magick` is required to draw images. Image not drawn.
+
+Warning: Package `magick` is required to draw images. Image not drawn.</code></pre>
+</div>
+<div class="cell-output-display">
+<div id="fig-co-occurence" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-co-occurence-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/squidpy-essentials_files/figure-html/fig-co-occurence-1.png" class="img-fluid figure-img" width="768">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-co-occurence-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;9: Co-occurence of Leiden clusters. Left: Leiden clusters in space for a single FOV of breast cancer tissue. Right: co-occurence probability ratio (Y) for each cluster relative to Leiden cluster 1 (orange cells in left plot) with increasing radius (X).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="neighborhood-enrichment" class="level3" data-number="5.3.4">
+<h3 data-number="5.3.4" class="anchored" data-anchor-id="neighborhood-enrichment"><span class="header-section-number">5.3.4</span> Neighborhood enrichment</h3>
+<p>We can take a look at neighborhood enrichment scores using <code>gr.nhood_enrichment</code> and <code>pl.nhood_enrichment</code>(Figure&nbsp;10).</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Python</strong></pre>
+</div>
+<pre data-filename="Python"><code>
+sq.gr.nhood_enrichment(adata2, cluster_key="leiden")
+sq.pl.nhood_enrichment(
+    adata2,
+    cluster_key="leiden",
+    figsize=(5, 5),
+    dpi = 200,
+    title="Neighborhood enrichment",
+    save = "fig-nhood-enrichment.png"
+)
+</code></pre>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-neighbors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-neighbors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-nhood-enrichment.png" class="img-fluid figure-img" width="613">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-neighbors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;10: Neighborhood enrichment across all FOVs for each pairwise combination of Leiden clusters.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<!-- # Saving annData -->
+<!-- ```{filename="Python"} -->
+<!-- adata2.write("./adata2.h5ad") -->
+<!-- ``` -->
+</section>
+</section>
+</section>
+<section id="conclusion" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Conclusion</h1>
+<p>In this post I showed how to pivot CosMx SMI data that were exported from AtoMx SIP into a format that can be read with the open-sourced python package squidpy. A full analysis of SMI data in squidpy was beyond the scope of this post but look for additional blog post that utilize squidpy’s functions.</p>
+</section>
+<section id="appendix" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Appendix</h1>
+<section id="sec-venv" class="level2" data-number="7.1">
+<h2 data-number="7.1" class="anchored" data-anchor-id="sec-venv"><span class="header-section-number">7.1</span> Create a virtual environment for squidpy</h2>
+<p>I recommend creating a separate virtual environment to run squidpy and to keep packages isolated from the rest of your system. This can be operating system and architecture specific so my (M1 Mac) specific example code below may not work with your configuration.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Troubleshooting or assistance with squidpy installation is beyond the scope of this post. Please see <a href="https://squidpy.readthedocs.io/en/stable/api.html" target="_blank">squidpy’s documentation</a>.</p>
+</div>
+</div>
+<p>In general, there are two main package management systems: the default one that ships with python and conda. I’ll use the former for this post. For more information, please see the <a href="https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#create-and-use-virtual-environments" target="_blank">Python Packaging User Guide</a> for examples on Windows and Mac/Linux.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb33-1">python3.10 -m venv .venv</span>
+<span id="cb33-2">source .venv/bin/activate</span>
+<span id="cb33-3">python --version</span></code></pre></div>
+</div>
+</div>
+<blockquote class="blockquote">
+<p>Python 3.10.6</p>
+</blockquote>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb34-1">pip install squidpy</span></code></pre></div>
+</div>
+</div>
+<p>Here are the packages that I used for this post:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Terminal</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb35-1">pip freeze &gt; requirements.txt</span></code></pre></div>
+</div>
+</div>
+<div class="cell">
+<details class="code-fold">
+<summary>Click to show contents of requirements.txt</summary>
+<div class="sourceCode cell-code" id="cb36" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb36-1">aiobotocore==2.5.4</span>
+<span id="cb36-2">aiohttp==3.9.5</span>
+<span id="cb36-3">aioitertools==0.11.0</span>
+<span id="cb36-4">aiosignal==1.3.1</span>
+<span id="cb36-5">anndata==0.10.8</span>
+<span id="cb36-6">array_api_compat==1.7.1</span>
+<span id="cb36-7">asciitree==0.3.3</span>
+<span id="cb36-8">async-timeout==4.0.3</span>
+<span id="cb36-9">attrs==23.2.0</span>
+<span id="cb36-10">botocore==1.31.17</span>
+<span id="cb36-11">certifi==2024.6.2</span>
+<span id="cb36-12">charset-normalizer==3.3.2</span>
+<span id="cb36-13">click==8.1.7</span>
+<span id="cb36-14">click-plugins==1.1.1</span>
+<span id="cb36-15">cligj==0.7.2</span>
+<span id="cb36-16">cloudpickle==3.0.0</span>
+<span id="cb36-17">colorcet==3.1.0</span>
+<span id="cb36-18">contourpy==1.2.1</span>
+<span id="cb36-19">cycler==0.12.1</span>
+<span id="cb36-20">dask==2024.6.1</span>
+<span id="cb36-21">dask-expr==1.1.4</span>
+<span id="cb36-22">dask-image==2024.5.3</span>
+<span id="cb36-23">datashader==0.16.2</span>
+<span id="cb36-24">distributed==2024.6.1</span>
+<span id="cb36-25">docrep==0.3.2</span>
+<span id="cb36-26">exceptiongroup==1.2.1</span>
+<span id="cb36-27">fasteners==0.19</span>
+<span id="cb36-28">fiona==1.9.6</span>
+<span id="cb36-29">fonttools==4.53.0</span>
+<span id="cb36-30">frozenlist==1.4.1</span>
+<span id="cb36-31">fsspec==2023.6.0</span>
+<span id="cb36-32">geopandas==0.14.4</span>
+<span id="cb36-33">h5py==3.11.0</span>
+<span id="cb36-34">idna==3.7</span>
+<span id="cb36-35">igraph==0.11.5</span>
+<span id="cb36-36">imageio==2.34.1</span>
+<span id="cb36-37">importlib_metadata==7.2.0</span>
+<span id="cb36-38">inflect==7.2.1</span>
+<span id="cb36-39">Jinja2==3.1.4</span>
+<span id="cb36-40">jmespath==1.0.1</span>
+<span id="cb36-41">joblib==1.4.2</span>
+<span id="cb36-42">kiwisolver==1.4.5</span>
+<span id="cb36-43">lazy_loader==0.4</span>
+<span id="cb36-44">legacy-api-wrap==1.4</span>
+<span id="cb36-45">leidenalg==0.10.2</span>
+<span id="cb36-46">llvmlite==0.43.0</span>
+<span id="cb36-47">locket==1.0.0</span>
+<span id="cb36-48">markdown-it-py==3.0.0</span>
+<span id="cb36-49">MarkupSafe==2.1.5</span>
+<span id="cb36-50">matplotlib==3.9.0</span>
+<span id="cb36-51">matplotlib-scalebar==0.8.1</span>
+<span id="cb36-52">mdurl==0.1.2</span>
+<span id="cb36-53">more-itertools==10.3.0</span>
+<span id="cb36-54">msgpack==1.0.8</span>
+<span id="cb36-55">multidict==6.0.5</span>
+<span id="cb36-56">multipledispatch==1.0.0</span>
+<span id="cb36-57">multiscale_spatial_image==0.11.2</span>
+<span id="cb36-58">natsort==8.4.0</span>
+<span id="cb36-59">networkx==3.3</span>
+<span id="cb36-60">numba==0.60.0</span>
+<span id="cb36-61">numcodecs==0.12.1</span>
+<span id="cb36-62">numpy==1.26.4</span>
+<span id="cb36-63">ome-zarr==0.9.0</span>
+<span id="cb36-64">omnipath==1.0.8</span>
+<span id="cb36-65">packaging==24.1</span>
+<span id="cb36-66">pandas==2.2.2</span>
+<span id="cb36-67">param==2.1.0</span>
+<span id="cb36-68">partd==1.4.2</span>
+<span id="cb36-69">patsy==0.5.6</span>
+<span id="cb36-70">pillow==10.3.0</span>
+<span id="cb36-71">PIMS==0.7</span>
+<span id="cb36-72">psutil==6.0.0</span>
+<span id="cb36-73">pyarrow==16.1.0</span>
+<span id="cb36-74">pyct==0.5.0</span>
+<span id="cb36-75">pygeos==0.14</span>
+<span id="cb36-76">Pygments==2.18.0</span>
+<span id="cb36-77">pynndescent==0.5.13</span>
+<span id="cb36-78">pyparsing==3.1.2</span>
+<span id="cb36-79">pyproj==3.6.1</span>
+<span id="cb36-80">python-dateutil==2.9.0.post0</span>
+<span id="cb36-81">pytz==2024.1</span>
+<span id="cb36-82">PyYAML==6.0.1</span>
+<span id="cb36-83">requests==2.32.3</span>
+<span id="cb36-84">rich==13.7.1</span>
+<span id="cb36-85">s3fs==2023.6.0</span>
+<span id="cb36-86">scanpy==1.10.1</span>
+<span id="cb36-87">scikit-image==0.24.0</span>
+<span id="cb36-88">scikit-learn==1.5.0</span>
+<span id="cb36-89">scipy==1.13.1</span>
+<span id="cb36-90">seaborn==0.13.2</span>
+<span id="cb36-91">session-info==1.0.0</span>
+<span id="cb36-92">shapely==2.0.4</span>
+<span id="cb36-93">six==1.16.0</span>
+<span id="cb36-94">slicerator==1.1.0</span>
+<span id="cb36-95">sortedcontainers==2.4.0</span>
+<span id="cb36-96">spatial_image==0.3.0</span>
+<span id="cb36-97">spatialdata==0.0.15</span>
+<span id="cb36-98">squidpy==1.5.0</span>
+<span id="cb36-99">statsmodels==0.14.2</span>
+<span id="cb36-100">stdlib-list==0.10.0</span>
+<span id="cb36-101">tblib==3.0.0</span>
+<span id="cb36-102">texttable==1.7.0</span>
+<span id="cb36-103">threadpoolctl==3.5.0</span>
+<span id="cb36-104">tifffile==2024.6.18</span>
+<span id="cb36-105">toolz==0.12.1</span>
+<span id="cb36-106">tornado==6.4.1</span>
+<span id="cb36-107">tqdm==4.66.4</span>
+<span id="cb36-108">typeguard==4.3.0</span>
+<span id="cb36-109">typing_extensions==4.12.2</span>
+<span id="cb36-110">tzdata==2024.1</span>
+<span id="cb36-111">umap-learn==0.5.6</span>
+<span id="cb36-112">urllib3==1.26.19</span>
+<span id="cb36-113">validators==0.28.3</span>
+<span id="cb36-114">wrapt==1.16.0</span>
+<span id="cb36-115">xarray==2024.6.0</span>
+<span id="cb36-116">xarray-dataclasses==1.8.0</span>
+<span id="cb36-117">xarray-datatree==0.0.14</span>
+<span id="cb36-118">xarray-schema==0.0.3</span>
+<span id="cb36-119">xarray-spatial==0.4.0</span>
+<span id="cb36-120">yarl==1.9.4</span>
+<span id="cb36-121">zarr==2.18.2</span>
+<span id="cb36-122">zict==3.0.0</span>
+<span id="cb36-123">zipp==3.19.2</span></code></pre></div>
+</details>
+</div>
+
+
+
+</section>
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-Dries2021" class="csl-entry">
+Dries, Ruben, Qian Zhu, Rui Dong, Chee-Huat Linus Eng, Huipeng Li, Kan Liu, Yuntian Fu, et al. 2021. <span>“Giotto: A Toolbox for Integrative Analysis and Visualization of Spatial Expression Data.”</span> <em>Genome Biology</em> 22 (December): 78. <a href="https://doi.org/10.1186/s13059-021-02286-2">https://doi.org/10.1186/s13059-021-02286-2</a>.
+</div>
+<div id="ref-Hao2024" class="csl-entry">
+Hao, Yuhan, Tim Stuart, Madeline H. Kowalski, Saket Choudhary, Paul Hoffman, Austin Hartman, Avi Srivastava, et al. 2024. <span>“Dictionary Learning for Integrative, Multimodal and Scalable Single-Cell Analysis.”</span> <em>Nature Biotechnology</em> 42 (February): 293–304. <a href="https://doi.org/10.1038/s41587-023-01767-y">https://doi.org/10.1038/s41587-023-01767-y</a>.
+</div>
+<div id="ref-He2022" class="csl-entry">
+He, Shanshan, Ruchir Bhatt, Carl Brown, Emily A Brown, Derek L Buhr, Kan Chantranuvatana, Patrick Danaher, et al. 2022. <span>“High-Plex Imaging of RNA and Proteins at Subcellular Resolution in Fixed Tissue by Spatial Molecular Imaging.”</span> <em>Nature Biotechnology</em> 40 (December): 1794–1806. <a href="https://doi.org/10.1038/s41587-022-01483-z">https://doi.org/10.1038/s41587-022-01483-z</a>.
+</div>
+<div id="ref-Palla2022" class="csl-entry">
+Palla, Giovanni, Hannah Spitzer, Michal Klein, David Fischer, Anna Christina Schaar, Louis Benedikt Kuemmerle, Sergei Rybakov, et al. 2022. <span>“Squidpy: A Scalable Framework for Spatial Omics Analysis.”</span> <em>Nature Methods</em> 19 (February): 171–78. <a href="https://doi.org/10.1038/s41592-021-01358-2">https://doi.org/10.1038/s41592-021-01358-2</a>.
+</div>
+<div id="ref-Tian2021" class="csl-entry">
+Tian, Bi-Xia, Wei Sun, Shu-Hong Wang, Pei-Jun Liu, and Yao-Chun Wang. 2021. <span>“<a href="https://www.ncbi.nlm.nih.gov/pubmed/33527004">Differential Expression and Clinical Significance of COX6C in Human Diseases.</a>”</span> <em>American Journal of Translational Research</em> 13: 1–10.
+</div>
+<div id="ref-Wolf2018" class="csl-entry">
+Wolf, F Alexander, Philipp Angerer, and Fabian J Theis. 2018. <span>“SCANPY: Large-Scale Single-Cell Gene Expression Data Analysis.”</span> <em>Genome Biology</em> 19: 15. <a href="https://doi.org/10.1186/s13059-017-1382-0">https://doi.org/10.1186/s13059-017-1382-0</a>.
+</div>
+</div></section></div> ]]></description>
+  <category>squidpy</category>
+  <category>python</category>
+  <category>visualization</category>
+  <category>anndata</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/squidpy-essentials.html</guid>
+  <pubDate>Wed, 03 Jul 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-image1.png" medium="image" type="image/png" height="125" width="144"/>
+</item>
 <item>
   <title>Applications for visualization and cell typing using ‘smoothed’ marker genes</title>
   <dc:creator>Dan McGuire</dc:creator>
@@ -10857,75 +12994,6 @@ font-style: inherit;">"/"</span>)</span></code></pre></div>
   <category>segmentation</category>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/</guid>
   <pubDate>Wed, 24 Jan 2024 00:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Inferring cell polygons from transcript locations</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/deriving-cell-polygons-from-transcript-locations/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="deriving-cell-polygons-for-plotting" class="level2">
-<h2 class="anchored" data-anchor-id="deriving-cell-polygons-for-plotting">Deriving cell polygons for plotting</h2>
-<p>A complete CosMx dataset will contain polygonal boundaries for each cell for use in plotting. In practice, especially with earlier datasets or with datasets passed between collaborators, this data can be missing. We’ve created a toolkit for deriving these polygons from cells’ transcript locations. (Note: we are <em>not</em> performing cell segmentation here, just drawing boundaries around transcripts already assigned to cells.)</p>
-<p>You can find the package <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cellPoly" target="_blank">here</a>.</p>
-<p>Plotting cells as polygons looks better in zoomed-in views, and it allows for plotting of individual transcripts as in the below: <img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/deriving-cell-polygons-from-transcript-locations/figures/fig1.png" class="img-fluid"></p>
-
-
-</section>
-
- ]]></description>
-  <category>visualization</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/deriving-cell-polygons-from-transcript-locations/</guid>
-  <pubDate>Fri, 05 Jan 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/deriving-cell-polygons-from-transcript-locations/figures/fig1.png" medium="image" type="image/png" height="100" width="144"/>
-</item>
-<item>
-  <title>What is high-plex spatial transcriptomics for?</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="what-is-high-plex-spatial-transcriptomics-for" class="level1">
-<h1>What is high-plex spatial transcriptomics for?</h1>
-<p>High-plex single cell spatial transcriptomics data is a little awe-inspiring: even a perfunctory analysis of a single run produces a terabyte of data, gorgeous images, and spatial relationships from the scale of centimeters to micrometers that you could spend weeks exploring.</p>
-<p>But ultimately, you don’t need amazing images, you need answers to biological questions. Here I’ll lay out questions typically asked with spatial transcriptomics, and I’ll suggest a more expansive approach that reveals spatial single-cell data to be perhaps the most productive question-posing machine in molecular biology.</p>
-<p>Data analysis begins with two fundamental pieces: a matrix of all cells’ gene expression, and their spatial locations: <img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/figures/fig1.png" class="img-fluid"></p>
-<p>As with any single cell dataset, we begin by using the gene expression matrix to call cell types. Then, simply coloring our spatial map by cell type, we obtain an intricate picture of tissue structure.</p>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/figures/fig2.png" class="img-fluid"></p>
-<p>Even this simplistic analysis is valuable: most experts examining these plots come away with new insights and new questions.</p>
-<p>Questions answered with cell type + location:</p>
-<ul>
-<li>How is each immune cell type spread through this tumor? Where are the inflammatory vs.&nbsp;the suppressive macrophages trafficking?</li>
-<li>Do we see more memory T-cell invasion in post-treatment samples?</li>
-<li>What immune cell types tend to physically interact with each other?</li>
-</ul>
-<p>Most early analyses of spatial transcriptomic data stop here. They wrap questions like the above in formal statistics (“spatial clustering” / “niche analysis”, “cell proximity analysis”), and publish what is usually already a compelling story. But if we take this analysis just a little farther, we can begin to ask a staggering number of questions. The power of this data isn’t its ability to get single cell expression profiles, nor its ability to describe spatial variation: it’s the ability to do both of these at the same time. By simultaneously measuring single cells’ phenotypes (gene expression) and environments (the phenotypes of surrounding cells), we can interrogate how phenotype responds to environment. What can we say about a cell’s environment? Consider the below closeup of a PDAC tumor. “T-cell 1” is in a lymphoid structure, surrounded by B-cells and endothelial cells. These cells are expressing certain levels of ligands that bind receptors on T-cells. In contrast, “T-cell 2” has invaded into the tumor bed and is mainly surrounded by tumor cells, plus a few macrophages, and these cells are signaling the T-cell with a different set of genes.</p>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/figures/fig3.png" class="img-fluid"></p>
-<p>In short, we can trivially derive over 1000 variables describing each cell’s environment. And now, for every cell type, we can measure how every gene responds to every environmental variable. This amounts to roughly 20 * 1000 * 1000 = 20 million questions. Or, in a study across multiple tissues, we might ask these 20 million questions separately for each tissue. (Note that in a lower-plex technology, where a panel of ~300 genes might be devoted almost entirely to cell typing, the number of interesting questions to be asked drops precipitously.)</p>
-<p>In short, a standard analysis can lead to millions of hypothesis tests. Single-cell data without spatial information, and spatial data at larger-than-single-cell resolution, can’t come close to this.</p>
-<p>Questions on how phenotype responds to environment:</p>
-<ul>
-<li>How do tumor cells modulate gene expression in the face of T-cell attack?</li>
-<li>How do macrophages in the stroma differ from macrophages in the tumor interior?</li>
-<li>What genes do T-cells express when exposed to inflammatory cytokines?</li>
-</ul>
-
-
-</section>
-
- ]]></description>
-  <category>overview</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/</guid>
-  <pubDate>Fri, 05 Jan 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/high-plex-spatial/figures/fig3.png" medium="image" type="image/png" height="55" width="144"/>
 </item>
 </channel>
 </rss>
