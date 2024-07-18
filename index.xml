@@ -9,7 +9,7 @@
 <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/</link>
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
-<generator>quarto-1.5.54</generator>
+<generator>quarto-1.5.55</generator>
 <lastBuildDate>Wed, 03 Jul 2024 00:00:00 GMT</lastBuildDate>
 <item>
   <title>Comparing AtoMx™ SIP flat files with the legacy format</title>
@@ -2138,7 +2138,7 @@ Wolf, F Alexander, Philipp Angerer, and Fabian J Theis. 2018. <span>“SCANPY: L
   <category>Squidpy</category>
   <category>python</category>
   <category>visualization</category>
-  <category>anndata</category>
+  <category>AnnData</category>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/squidpy-essentials.html</guid>
   <pubDate>Wed, 03 Jul 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-image1.png" medium="image" type="image/png" height="125" width="144"/>
@@ -6757,6 +6757,213 @@ Figure&nbsp;15: Same extent as Figure&nbsp;7 highlighting three cell types only.
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-duality.png" medium="image" type="image/png" height="144" width="144"/>
 </item>
 <item>
+  <title>Making composite images from layered morphology 2D images</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <dc:creator>Vikram Kohli</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/making-composite-images.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-composite" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-composite-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig1.png" class="img-fluid figure-img" width="468">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-composite-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: A composite image created using the make_composite.py script. This image represents all channels of a single field of view in the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">publicly available</a> mouse coronal hemisphere FFPE dataset.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<section id="description" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Description</h1>
+<p>Composite images of CosMx™ Spatial Molecular Imager (SMI) fields of view (FOVs) can be useful when using open-sourced software such as <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank">squidpy</a> and <a href="https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html#create-a-giotto-object-for-each-fov" target="_blank">giotto</a>. In this post, we describe the make_composite.py script, a developmental python script that creates such composite images from layered morphology 2D images that can be exported from the AtoMx™ Spatial Informatics Portal (SIP). Layered images are extracted from the 2D morphology TIF files and written in a file format selected by the user. The extracted images are converted to 8bit, and composite images are written from these 8bit images.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>make_composite.py is a development version. Use at your own risk.</p>
+</div>
+</div>
+</section>
+<section id="where-to-find-the-script" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Where to find the script?</h1>
+<p>The script and license can be found in the <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/make-composite" target="_blank"><code>assets/make-composite</code></a> folder of the repository.</p>
+</section>
+<section id="required-libraries" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Required libraries</h1>
+<p>The script requires the following libraries to be installed:</p>
+<ul>
+<li>Pillow (<em>e.g.</em>, <code>pip install pillow</code>)</li>
+<li>Numpy (<em>e.g.</em>, <code>pip install numpy</code>)</li>
+</ul>
+</section>
+<section id="user-inputs-required" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> User inputs (required)</h1>
+<ul>
+<li><p><code>clipping</code> (int or float) - Histogram clipping percentage. This value is the percentage of the histogram to clip on the left and right side. The effect changes the contrast of the image. A higher percentage produces more contrast. The user needs to determine the appropriate percentage by testing on a subset of images. The same clipping value is applied to all images. Generally, setting the value between 1 and 3 is a good starting point. Specifying a clipping value of 0 will not alter the histogram. A value is required, there is no default. <code>clipping</code> is a required input.</p></li>
+<li><p><code>user_format</code> (str) - File format to be written. Options are jpg, png, and tif. All output files will be written in the format specified by the user. <code>user_format</code> is a required input.</p></li>
+</ul>
+</section>
+<section id="additional-inputs-changed-within-the-script" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Additional inputs (changed within the script)</h1>
+<ul>
+<li><p>Variable: <code>colors</code> = [‘cyan’, ‘red’, ‘yellow’, ‘blue’, ‘magenta’]. The variable is the composite color scheme (not a user input; changeable within the script). The colors are listed in order of channel number (channel 0 to channel 4). Example: Channel 0 is colored ‘cyan’,</p></li>
+<li><p>Variable: <code>compress_value</code> (set to 3). Lossless file compression value. Higher values produce smaller files at the expense of increased script execution time. The set value is a compromise between file size and execution time.</p></li>
+</ul>
+</section>
+<section id="output" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Output</h1>
+<ul>
+<li><p><code>raw</code> – The extracted tif files from the morphology 2D images will be saved in this folder. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_raw.&lt;user_format&gt;. &lt;fov_num&gt; is the fov number,<code>ch&lt;#&gt;</code> is the channel number (from 0 to 4), and &lt;user_format&gt; is the specified file type format (see User inputs). Note: If the specified <code>user_format</code> is jpg, the raw files will be 8bit jpg files.</p>
+<p>Example</p>
+<pre><code>F001_ch0_raw.jpg (for user_format = jpg)</code></pre></li>
+<li><p><code>8bit</code> - The images in the raw_folder are converted to 8bit and saved in this folder. Note: If the specified <code>user_format</code> is jpg, the 8bit files are identical to the raw files. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_8bit.&lt;user_format&gt; except when <code>user_format</code> = jpg</p>
+<p>Example</p>
+<pre><code>F001_ch0_8bit.tif (for user_format = tif)
+F001_ch0_raw.jpg (for user_format = jpg)</code></pre></li>
+<li><p><code>8bit_autocontrast</code> – Images in the 8bit folder are autocontrasted based on the user supplied clipping value. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_8bit_autocontrast.&lt;user_format&gt;</p>
+<p>Example</p>
+<pre><code>F001_ch0_8bit_autocontrast.png (for user_format = png)</code></pre></li>
+<li><p><code>composite</code> - Composite images created from the images in the <code>8bit</code> folder. The composite type is a screen composite. The file format will follow &lt;fov_num&gt;_composite.&lt;user_format&gt;</p>
+<p>Example</p>
+<pre><code>F001_composite.jpg (for user_format = jpg)</code></pre></li>
+<li><p><code>composite_autocontrast</code> - Images in the composite_folder are autocontrasted based on the user specified clipping value. The file format will follow &lt;fov_num&gt;_composite_autocontrast.&lt;user_format&gt;</p>
+<p>Example</p>
+<pre><code>F001_composite_autocontrast.png (for user_format = png)</code></pre></li>
+</ul>
+</section>
+<section id="usage" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Usage</h1>
+<pre><code>cd to/your/Morphology2D folder
+python /path/to/your/make_composite.py # and follow the on-screen prompts</code></pre>
+<p>Regex pattern matching on 2D morphology file name format is implemented, however, only NanoString 2D morphology files should be present in the folder containing the make_composite script.</p>
+</section>
+<section id="example" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Example</h1>
+<p>The example dataset that we used was the mouse coronal hemisphere FFPE dataset that is available to download from NanoString’s website <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">here</a>.</p>
+<p>The Morphology2D folder is found within the CellStatsDir folder and has TIF files for each of the 130 FOVs.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># In Terminal</span></span>
+<span id="cb7-2">cd <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>path<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>to<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>slide<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>CellStatsDir<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>Morphology2D</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># In Terminal</span></span>
+<span id="cb8-2">tree <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>L <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span></code></pre></div>
+</div>
+<pre><code>├── 20230406_205644_S1_C902_P99_N99_F001.TIF
+├── 20230406_205644_S1_C902_P99_N99_F002.TIF
+...
+├── 20230406_205644_S1_C902_P99_N99_F129.TIF
+└── 20230406_205644_S1_C902_P99_N99_F130.TIF
+</code></pre>
+<p>Once in the Morphology2D folder, simply run the script and follow the on-screen prompts (Figure&nbsp;2).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># In Terminal</span></span>
+<span id="cb10-2">python <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>path<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>to<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>CosMx<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>Analysis<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>Scratch<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>Space<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>assets<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>make<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>composite<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>make_composite.py</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-run" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-run-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig-out.png" class="img-fluid figure-img" width="675">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-run-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Screenshot of standard output from terminal following script execution. In this example, I set the clipping percentage to 3 and the output to <code>png</code>. On a Macbook Pro M1, this took about 25 minutes to process 130 FOVs.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>When complete, the structure of the Morphology2D folder should resemble this:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># In Terminal</span></span>
+<span id="cb11-2">tree <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>L <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span></code></pre></div>
+</div>
+<pre><code>├── 20230406_205644_S1_C902_P99_N99_F001.TIF
+├── 20230406_205644_S1_C902_P99_N99_F002.TIF
+...
+├── 20230406_205644_S1_C902_P99_N99_F129.TIF
+├── 20230406_205644_S1_C902_P99_N99_F130.TIF
+├── 8bit
+├── 8bit_autocontrast
+├── composite
+├── composite_autocontrast
+└── raw</code></pre>
+<p>These composite images can now be imported into open-sourced software or explored further.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>Squidpy</category>
+  <category>Giotto</category>
+  <category>pre-processing</category>
+  <category>python</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/making-composite-images.html</guid>
+  <pubDate>Wed, 12 Jun 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig1.png" medium="image" type="image/png" height="144" width="144"/>
+</item>
+<item>
   <title>GeoMx® mask generation for marker-based single-cell application</title>
   <dc:creator>Lidan Wu</dc:creator>
   <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/GeoMx-scMask-generation/</link>
@@ -6969,212 +7176,6 @@ export masks into file only when there are cells selected in either case; Defaul
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/GeoMx-scMask-generation/</guid>
   <pubDate>Wed, 12 Jun 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/GeoMx-scMask-generation/figures/workflow_GeoMx_scMask_given_query.png" medium="image" type="image/png" height="85" width="144"/>
-</item>
-<item>
-  <title>Making composite images from layered morphology 2D images</title>
-  <dc:creator>Evelyn Metzger</dc:creator>
-  <dc:creator>Vikram Kohli</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/making-composite-images.html</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-composite" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-composite-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig1.png" class="img-fluid figure-img" width="468">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-composite-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: A composite image created using the make_composite.py script. This image represents all channels of a single field of view in the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">publicly available</a> mouse coronal hemisphere FFPE dataset.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<section id="description" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Description</h1>
-<p>Composite images of CosMx™ Spatial Molecular Imager (SMI) fields of view (FOVs) can be useful when using open-sourced software such as <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank">squidpy</a> and <a href="https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html#create-a-giotto-object-for-each-fov" target="_blank">giotto</a>. In this post, we describe the make_composite.py script, a developmental python script that creates such composite images from layered morphology 2D images that can be exported from the AtoMx™ Spatial Informatics Portal (SIP). Layered images are extracted from the 2D morphology TIF files and written in a file format selected by the user. The extracted images are converted to 8bit, and composite images are written from these 8bit images.</p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>make_composite.py is a development version. Use at your own risk.</p>
-</div>
-</div>
-</section>
-<section id="where-to-find-the-script" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Where to find the script?</h1>
-<p>The script and license can be found in the <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/make-composite" target="_blank"><code>assets/make-composite</code></a> folder of the repository.</p>
-</section>
-<section id="required-libraries" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Required libraries</h1>
-<p>The script requires the following libraries to be installed:</p>
-<ul>
-<li>Pillow (<em>e.g.</em>, <code>pip install pillow</code>)</li>
-<li>Numpy (<em>e.g.</em>, <code>pip install numpy</code>)</li>
-</ul>
-</section>
-<section id="user-inputs-required" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> User inputs (required)</h1>
-<ul>
-<li><p><code>clipping</code> (int or float) - Histogram clipping percentage. This value is the percentage of the histogram to clip on the left and right side. The effect changes the contrast of the image. A higher percentage produces more contrast. The user needs to determine the appropriate percentage by testing on a subset of images. The same clipping value is applied to all images. Generally, setting the value between 1 and 3 is a good starting point. Specifying a clipping value of 0 will not alter the histogram. A value is required, there is no default. <code>clipping</code> is a required input.</p></li>
-<li><p><code>user_format</code> (str) - File format to be written. Options are jpg, png, and tif. All output files will be written in the format specified by the user. <code>user_format</code> is a required input.</p></li>
-</ul>
-</section>
-<section id="additional-inputs-changed-within-the-script" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Additional inputs (changed within the script)</h1>
-<ul>
-<li><p>Variable: <code>colors</code> = [‘cyan’, ‘red’, ‘yellow’, ‘blue’, ‘magenta’]. The variable is the composite color scheme (not a user input; changeable within the script). The colors are listed in order of channel number (channel 0 to channel 4). Example: Channel 0 is colored ‘cyan’,</p></li>
-<li><p>Variable: <code>compress_value</code> (set to 3). Lossless file compression value. Higher values produce smaller files at the expense of increased script execution time. The set value is a compromise between file size and execution time.</p></li>
-</ul>
-</section>
-<section id="output" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> Output</h1>
-<ul>
-<li><p><code>raw</code> – The extracted tif files from the morphology 2D images will be saved in this folder. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_raw.&lt;user_format&gt;. &lt;fov_num&gt; is the fov number,<code>ch&lt;#&gt;</code> is the channel number (from 0 to 4), and &lt;user_format&gt; is the specified file type format (see User inputs). Note: If the specified <code>user_format</code> is jpg, the raw files will be 8bit jpg files.</p>
-<p>Example</p>
-<pre><code>F001_ch0_raw.jpg (for user_format = jpg)</code></pre></li>
-<li><p><code>8bit</code> - The images in the raw_folder are converted to 8bit and saved in this folder. Note: If the specified <code>user_format</code> is jpg, the 8bit files are identical to the raw files. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_8bit.&lt;user_format&gt; except when <code>user_format</code> = jpg</p>
-<p>Example</p>
-<pre><code>F001_ch0_8bit.tif (for user_format = tif)
-F001_ch0_raw.jpg (for user_format = jpg)</code></pre></li>
-<li><p><code>8bit_autocontrast</code> – Images in the 8bit folder are autocontrasted based on the user supplied clipping value. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_8bit_autocontrast.&lt;user_format&gt;</p>
-<p>Example</p>
-<pre><code>F001_ch0_8bit_autocontrast.png (for user_format = png)</code></pre></li>
-<li><p><code>composite</code> - Composite images created from the images in the <code>8bit</code> folder. The composite type is a screen composite. The file format will follow &lt;fov_num&gt;_composite.&lt;user_format&gt;</p>
-<p>Example</p>
-<pre><code>F001_composite.jpg (for user_format = jpg)</code></pre></li>
-<li><p><code>composite_autocontrast</code> - Images in the composite_folder are autocontrasted based on the user specified clipping value. The file format will follow &lt;fov_num&gt;_composite_autocontrast.&lt;user_format&gt;</p>
-<p>Example</p>
-<pre><code>F001_composite_autocontrast.png (for user_format = png)</code></pre></li>
-</ul>
-</section>
-<section id="usage" class="level1" data-number="7">
-<h1 data-number="7"><span class="header-section-number">7</span> Usage</h1>
-<pre><code>cd to/your/Morphology2D folder
-python /path/to/your/make_composite.py # and follow the on-screen prompts</code></pre>
-<p>Regex pattern matching on 2D morphology file name format is implemented, however, only NanoString 2D morphology files should be present in the folder containing the make_composite script.</p>
-</section>
-<section id="example" class="level1" data-number="8">
-<h1 data-number="8"><span class="header-section-number">8</span> Example</h1>
-<p>The example dataset that we used was the mouse coronal hemisphere FFPE dataset that is available to download from NanoString’s website <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">here</a>.</p>
-<p>The Morphology2D folder is found within the CellStatsDir folder and has TIF files for each of the 130 FOVs.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># In Terminal</span></span>
-<span id="cb7-2">cd <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>path<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>to<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>slide<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>CellStatsDir<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>Morphology2D</span></code></pre></div>
-</div>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># In Terminal</span></span>
-<span id="cb8-2">tree <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>L <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span></code></pre></div>
-</div>
-<pre><code>├── 20230406_205644_S1_C902_P99_N99_F001.TIF
-├── 20230406_205644_S1_C902_P99_N99_F002.TIF
-...
-├── 20230406_205644_S1_C902_P99_N99_F129.TIF
-└── 20230406_205644_S1_C902_P99_N99_F130.TIF
-</code></pre>
-<p>Once in the Morphology2D folder, simply run the script and follow the on-screen prompts (Figure&nbsp;2).</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># In Terminal</span></span>
-<span id="cb10-2">python <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>path<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>to<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>CosMx<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>Analysis<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>Scratch<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>Space<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>assets<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>make<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>composite<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>make_composite.py</span></code></pre></div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-run" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-run-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig-out.png" class="img-fluid figure-img" width="675">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-run-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Screenshot of standard output from terminal following script execution. In this example, I set the clipping percentage to 3 and the output to <code>png</code>. On a Macbook Pro M1, this took about 25 minutes to process 130 FOVs.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>When complete, the structure of the Morphology2D folder should resemble this:</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># In Terminal</span></span>
-<span id="cb11-2">tree <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>L <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span></code></pre></div>
-</div>
-<pre><code>├── 20230406_205644_S1_C902_P99_N99_F001.TIF
-├── 20230406_205644_S1_C902_P99_N99_F002.TIF
-...
-├── 20230406_205644_S1_C902_P99_N99_F129.TIF
-├── 20230406_205644_S1_C902_P99_N99_F130.TIF
-├── 8bit
-├── 8bit_autocontrast
-├── composite
-├── composite_autocontrast
-└── raw</code></pre>
-<p>These composite images can now be imported into open-sourced software or explored further.</p>
-
-
-</section>
-
- ]]></description>
-  <category>Squidpy</category>
-  <category>Giotto</category>
-  <category>pre-processing</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/making-composite-images.html</guid>
-  <pubDate>Wed, 12 Jun 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig1.png" medium="image" type="image/png" height="144" width="144"/>
 </item>
 <item>
   <title>Creating an anndata object from AtoMx™ exported results for interactive viewer and python-based analysis</title>
@@ -8823,7 +8824,7 @@ font-style: inherit;">3</span>],</span>
   <category>visualization</category>
   <category>Seurat</category>
   <category>AnnData</category>
-  <category>Python</category>
+  <category>python</category>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/</guid>
   <pubDate>Wed, 05 Jun 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-mBrain-S1-cirroViewer-screenshot.png" medium="image" type="image/png" height="94" width="144"/>
@@ -12329,6 +12330,7 @@ Figure&nbsp;17: When metadata are available in the _metadata.csv file, it’s po
  ]]></description>
   <category>visualization</category>
   <category>napari</category>
+  <category>python</category>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/</guid>
   <pubDate>Wed, 01 May 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/using-napari-for-cosmx-data/figures/prostate.gif" medium="image" type="image/gif"/>
@@ -12568,6 +12570,36 @@ font-style: inherit;">which</span>(use))</span></code></pre></div>
   <pubDate>Wed, 20 Mar 2024 00:00:00 GMT</pubDate>
 </item>
 <item>
+  <title>On the use of marker genes</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="on-cell-typing-with-marker-genes" class="level1">
+<h1>On cell typing with marker genes</h1>
+<p>Our basic recommendation is this: relying on a few marker genes alone will not produce successful cell typing.</p>
+<p>Spatial transcriptomics data has two features that make marker genes challenging to use.</p>
+<ol type="1">
+<li><p>Background: cells’ expression profiles can include two kinds of false counts: these platforms sometimes see transcripts that aren’t present (false detections), and errors in cell segmentation lead transcripts from one cell to be assigned to its neighbor. Both these phenomena lead to marker genes being counted in cells where they aren’t truly present.</p></li>
+<li><p>Variable signal strength / false negative detection: tissues and cells vary widely in how efficiently existing RNA molecules are read. Thus genes with low expression are easily missed in many cells.</p></li>
+</ol>
+<p>Applying the above phenomena to FOXP3, the canonical marker for Treg cells, we can envision non-Treg cells with spurious FOXP3 coming from false detections or contamination from a neighboring Treg (error mode 1 above), and we can imagine Treg cells where FOXP3 isn’t detected (error mode 2 above). A cell typing regime that applied an expression threshold to FOXP3 would be unacceptably error-prone.</p>
+<p>Instead of using marker genes, we recommend cell typing using most or all of cells’ expression profiles. The data for a single gene in a single cell is noisy, but the evidence from a complete expression profile is much more stable. Given clusters derived from all or most of your panel, marker genes are useful for annotating clusters. E.g., if a cluster is enriched in FOXP3, you can safely label it Tregs.</p>
+<p>As an advanced approach, we have had success cell typing using <em>smoothed</em> expression of marker genes. We replace each cell’s observed profile with the average profile of the 20+ cells that have the most similar expression profiles to it. This essentially performs a variance-bias tradeoff: we bias a cell to look like its neighbors in expression space, but we greatly cut down the noise in the expression level. Cell typing based on marker genes in this smoothed data can be successful.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>cell typing</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/</guid>
+  <pubDate>Tue, 12 Mar 2024 00:00:00 GMT</pubDate>
+</item>
+<item>
   <title>Cell typing: what we’ve found to work</title>
   <dc:creator>Patrick Danaher</dc:creator>
   <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/</link>
@@ -12621,36 +12653,6 @@ font-style: inherit;">which</span>(use))</span></code></pre></div>
  ]]></description>
   <category>cell typing</category>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/</guid>
-  <pubDate>Tue, 12 Mar 2024 00:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>On the use of marker genes</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="on-cell-typing-with-marker-genes" class="level1">
-<h1>On cell typing with marker genes</h1>
-<p>Our basic recommendation is this: relying on a few marker genes alone will not produce successful cell typing.</p>
-<p>Spatial transcriptomics data has two features that make marker genes challenging to use.</p>
-<ol type="1">
-<li><p>Background: cells’ expression profiles can include two kinds of false counts: these platforms sometimes see transcripts that aren’t present (false detections), and errors in cell segmentation lead transcripts from one cell to be assigned to its neighbor. Both these phenomena lead to marker genes being counted in cells where they aren’t truly present.</p></li>
-<li><p>Variable signal strength / false negative detection: tissues and cells vary widely in how efficiently existing RNA molecules are read. Thus genes with low expression are easily missed in many cells.</p></li>
-</ol>
-<p>Applying the above phenomena to FOXP3, the canonical marker for Treg cells, we can envision non-Treg cells with spurious FOXP3 coming from false detections or contamination from a neighboring Treg (error mode 1 above), and we can imagine Treg cells where FOXP3 isn’t detected (error mode 2 above). A cell typing regime that applied an expression threshold to FOXP3 would be unacceptably error-prone.</p>
-<p>Instead of using marker genes, we recommend cell typing using most or all of cells’ expression profiles. The data for a single gene in a single cell is noisy, but the evidence from a complete expression profile is much more stable. Given clusters derived from all or most of your panel, marker genes are useful for annotating clusters. E.g., if a cluster is enriched in FOXP3, you can safely label it Tregs.</p>
-<p>As an advanced approach, we have had success cell typing using <em>smoothed</em> expression of marker genes. We replace each cell’s observed profile with the average profile of the 20+ cells that have the most similar expression profiles to it. This essentially performs a variance-bias tradeoff: we bias a cell to look like its neighbors in expression space, but we greatly cut down the noise in the expression level. Cell typing based on marker genes in this smoothed data can be successful.</p>
-
-
-</section>
-
- ]]></description>
-  <category>cell typing</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/</guid>
   <pubDate>Tue, 12 Mar 2024 00:00:00 GMT</pubDate>
 </item>
 <item>
