@@ -1,0 +1,174 @@
+---
+title: "GeoMx&#174; mask generation for marker-based single-cell application"
+author:
+  - name: Lidan Wu
+    orcid: 0000-0003-3150-6170
+    affiliations:
+      - ref: nstg
+      - ref: lidanwu
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+number-sections: true
+number-depth: 4
+date: "2024-06-12"
+date-modified: last-modified
+categories: [GeoMx, how-tos, image processing, Python]
+image: figures/workflow_GeoMx_scMask_given_query.png
+description: "This post introduces a pipeline for automatic generating GeoMx&#174; Digital Spatial Profiler (DSP)-ready binary masks in batch for marker-based single-cell application. Given the query marker protein of interest, the pipeline would take morphology images and generate binary masks for negative-stained cells and cells connecting to positive-stained regions, respectively. The pipeline runs as a command line and this post would serve as a guide to how it works and how to use it."
+draft: false
+execute:
+  engine: knitr
+---
+
+# Introduction
+
+The ability to separate cells based on their relationship to nearby marker protein staining is a desired feature in many biological studies. One such use case would be to study the difference between neurons immediately next to neurofibrillary tangles and neurons that are a little further away. Another example would be to study the immune cells that are at different stages of engulfing microbes. This post introduces a pipeline for automatically generating [GeoMx&#174; Digital Spatial Profiler (DSP)](https://nanostring.com/products/geomx-digital-spatial-profiler/geomx-dsp-overview/){target="_blank"}-ready binary masks in batch for marker-based single-cell application.
+
+Like other items in our [Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
+the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
+
+
+
+# Workflow Description
+
+The pipeline is a python script `Generate_scMask_given_query.py` that runs as a command line and you can downloaded from `_code/GeoMx-scMask-generation` [folder](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/GeoMx-scMask-generation){target="_blank"} in this repository. By passing the file path to image folder to the script, the pipeline would take GeoMx&#174; morphology images and generate binary masks for negative-stained cells and cells connecting to positive-stained regions, respectively. 
+
+
+![**Workflow schematic**. In neuropathology study, it's sometimes desired to separate between neurons (stained in red channel) touching the neurofibrillary tangles (stained in green channel) and those that are a little further away. The pipeline described here fullfills the need of separating cells based on additional morphology marker of interest (aka "query channel") and could also be applied to other single-cell applications like separating immune cells based on their contact with nearby pathogen.](figures/workflow_GeoMx_scMask_given_query.png){#fig-workflow}
+
+1. The process starts with color-channel reordering of morphology images that user downloads from [GeoMx&#174; DSP](https://nanostring.com/products/geomx-digital-spatial-profiler/geomx-dsp-overview/){target="_blank"} instrument for the region of interest (ROI). The pipeline script would take those images and rearrange the channel order to have cytoplasm stain as 1st channel, query marker stain as 2nd channel, and optionally nuclear stain as 3rd channel. 
+    + The rearranged images would be saved in `2chan_res` (or `3chan_res` if including nuclear stain as 3rd channel) sub folder of the user-designated output root folder. 
+
+2. After rearrangement, the pipeline script would perform cell segmentation using cytoplasm stain and optionally nuclear stain as well. 
+    + The resulting cell label images with pixel value indicates cell ID would be saved under `cellLabels` sub folder within the step (1) result folder.
+
+3. The pipeline script also takes the query marker stain of each image and performs auto-threshold to identify individual objects with positive stain and **bigger** than user-defined size cutoff, `min_positive_area`.
+    + You can adjust the size cutoff based on your particular application to get a cleaner isolation of objects of interest. For example, if you are only interested in mature tangles, you can use higher size cutoff to select only the query-positive objects of big size.  
+
+4. With label images from both cell segmentation and query-stained object segmentation, the pipeline script would then perform connectivity analysis between the 2 sets of label images and output 2 sets of binary masks in separate folders under user-designated output root folder. 
+    i) `negative_cell_masks`: binary masks for cells that do **NOT** have valid overlapping with any of positive-stained object. 
+         +  A valid overlapping is defined by whether the intersected area between cell and positive-stained object is **bigger** than user-defined size cutoff, `min_intersect_area`. 
+         +  The ability to define valid overlapping based on area cutoff could help to separate between barely touching events and more significant overlapping events. This could be useful if you want to separate between immune cells just contacting a microbe stained in query channel and immune cells that have engulfed an invading microbe. 
+    ii) `positive_ROI_masks`: binary masks for cells with valid overlapping event **AND** their connected positive-stained objects. 
+
+Once complete, user can upload these binary masks back to GeoMx&#174; DSP instrument for the corresponding ROI selection and initiate the sample collection. 
+
+::: {.callout-tip title="Use manually modified cell label images"}
+You can use [ImageJ](https://imagej.net/){target="_blank"} or similar viewer to inspect and modify the outcomes of both cell segmentation and binary mask generation. We recommend `cellpose` [GUI](https://cellpose.readthedocs.io/en/latest/gui.html){target="_blank"} for visualization and modification on cell segmentation outcomes. 
+
+To use the modified cell label images which must be under **same** names and folder structure as original outputs, simply **rerunning** the pipeline script with same configuration would skip the step (1) and (2) above but instead perform identification of positive-stained objects and binary mask generation using the modified cell label images.
+:::
+
+# Setup Environment
+
+The pipeline script uses [cellpose](https://cellpose.readthedocs.io/en/latest/index.html){target="_blank"} python package for cell segmentation. Please refer to `cellpose` guide on [installation instruction](https://github.com/MouseLand/cellpose/tree/main?tab=readme-ov-file#installation){target="_blank"} for best usage, especially if you want to enable GPU for faster processing. 
+
+In addition, you would also need the following python packages in your environment. Below shows how to install them in terminal via `pip`. 
+
+```{default filename="Terminal"}
+#| eval: false
+pip install numpy scipy opencv-python scikit-image
+```
+
+# Command Line Usage
+
+The pipeline script in use, `Generate_scMask_given_query.py`, assumes you have multi-channel single-slice images in one folder. Those images should be downloaded for the ROIs you choose in GeoMx&#174; study. The required inputs for the pipeline include: 
+
+* `in_dir`: the **absolute** path to your GeoMx&#174; DSP morphology image folder.
+* `cyto_chan`, `query_chan`, `nuc_chan`: channel index for cytoplasm, query marker and nucleus stain, respectively. 
+    + The channel index should start from 1, so if your cytoplasm stain is at 4th channel, you use `--cyto_chan 4` with the script. 
+    + By default, `nuc_chan` is set to `0` such that it would not be included in cell segmentation downstream. But if you would like to use stains for both cytoplasm and nucleus for cell segmentation, you can pass the corresponding channel index of nucleus stain to the script. 
+* `cell_diameter`: median cell diameter in pixel unit within your images, default to `30`. For best cell segmentation results, it's recommended to set this parameter based on your sample. 
+
+To use the pipeline, run `python Generate_scMask_given_query.py` and specify parameters as desired. 
+
+For instance to run on a folder with images where the 4th and 3rd channels of each image are cytoplasm and query marker stain, respectively while defining positive-stained objects (in query marker channel) to have at least 500 squared pixel area (using default values for all other parameters):
+
+```{default filename="Command Line Interface (CLI) example to run in Terminal"}
+#| eval: false
+python Generate_scMask_given_query.py --in_dir imageFolder --cyto_chan 4 --query_chan 3 --out_dir outputFolder --min_positive_area 500
+```
+
+The resulting output folder structure looks like this:
+
+```
+outputFolder 
+├── 20240612_pipeline_run_log.txt
+│
+├── 2chan_res 
+│  ├── 001.tiff 
+│  ├── 002.tiff 
+│  └──cellLabels
+│     ├── 001_cp_masks.tif 
+│     └── 002_cp_masks.tif 
+│
+├── negative_cell_masks 
+│     ├── 001_neg_2.tif
+│     └── 002_neg_2.tif 
+│
+└── positive_ROI_masks 
+      ├── 001_pos_1.tif
+      └── 002_pos_1.tif
+```
+
+
+There are other additional arguments providing fine control of different steps of the pipeline. Please use `-h` argument to see a full list of options allowed by the pipeline script. 
+
+```{default filename="Command Line Parameters"}
+#| eval: false
+usage: Generate_scMask_given_query.py [-h] [--in_dir IN_DIR] [--out_dir OUT_DIR] [--cyto_chan CYTO_CHAN]
+                                      [--query_chan QUERY_CHAN] [--nuc_chan NUC_CHAN]
+                                      [--cell_seg_model CELL_SEG_MODEL] [--cell_diameter CELL_DIAMETER]
+                                      [--min_cell_area MIN_CELL_AREA] [--thresh_method THRESH_METHOD]
+                                      [--fill_holes] [--min_positive_area MIN_POSITIVE_AREA]
+                                      [--min_intersect_area MIN_INTERSECT_AREA] [--clean_export]
+```
+
+## Input Image Arguments:
+
+in_dir    
+: absolute path to folder containing multi-channel images to evaluate
+
+out_dir
+: output parent folder for intermediate results and final masks. (default to use input image folder)
+
+cyto_chan
+: input channel index for cytoplasm or membrane stain of cells (starting from 1); Default: 1
+
+query_chan
+: input channel index for the stain in query to define positive vs. negative staining (starting from 1); Default: 2
+
+nuc_chan
+: input channel index for nuclear stain of cells (starting from 1);  default to 0 to exclude nuclear stain from cell segmentation; Default: 0
+
+## Cell Segmentation Model Arguments:
+
+cell_seg_model
+: cell segmentation model in use, ok to pass a file path of custom model; Default: `cyto3`
+                        
+cell_diameter
+: median cell diameter of input images, in pixel unit; Default: 30
+                        
+min_cell_area
+: minimal area of a valid cell, in squared pixel unit; can turn off with -1; Default: 15
+
+## Positive-stained cell Arguments:
+
+thresh_method
+:  auto-threshold method to define positive-stained object in query channel, use either `triangle` or `otsu`; Default: `triangle`
+                        
+fill_holes
+: fill holes in positive-stained object before area filtering; if `True`, use 0.1x of input cell diameter as kernel size and output roundish borders; Default: `False`
+                        
+min_positive_area
+: minimal area of a positive-stained object in query channel, in squared pixel unit; recommend to be 0.5x of expected cell area; Default: 50
+                        
+min_intersect_area
+: minimal intersection area between a positive-stained cell with nearest positive-stained object in query channel, in squared pixel unit; recommend to be 0.1x of expected cell area; Default: 500
+                        
+clean_export
+: export masks into file only when there are cells selected in either case; Default: `False`
+

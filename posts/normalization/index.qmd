@@ -7,7 +7,7 @@ author:
       - ref: nstg
       - ref: patrickjdanaher
 date: "2024-01-29"
-date-modified: "2024-04-17"
+date-modified: "2024-06-19"
 categories: [quality control, normalization, pre-processing]
 draft: false
 image: figures/puzzle.png
@@ -30,8 +30,13 @@ image: figures/puzzle.png
 # QC and normalization of CosMx RNA data
 We've tried a lot of options here, and we've settled on very simple procedures for most cases. 
 
+We discuss them here. To see them implemented in an R-based analysis workflow, see
+the [QC and normalization page](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/assets/2.-QC-and-normalization.html) of our [basic analysis vignette](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/)
+
 <img src="figures/puzzle.png" class="center">
 <!-- ![](figures/puzzle.png =250x) -->
+
+
 
 
 ## QC
@@ -48,7 +53,8 @@ QC in CosMx is motivated by known error modes. Here's a list of major things tha
 
 **QC logic would then proceed as follows:**
 
-1. Remove cells with too few counts. For our 1000plex assay, we use a pretty generous threshold of 20 counts. A higher threshold would be reasonable. 
+1. Remove cells with too few counts. We use fairly generous thresholds of 20 counts for our 1000plex assay
+and 50 counts for the 6000plex assay. Higher / more stringent thresholds would also be reasonable. 
 
 ```{r}
 #| echo: true
@@ -65,8 +71,7 @@ or you can draw a histogram of cell areas and choose a cutoff on your own.
 
 4. Flag FOVs with distorted expression profiles. AtoMx now flags FOVs where z-stack registration is highly unstable, but 
  older runs won't benefit from this update, and other effects, namely background fluorescence, can still distort FOV expression profiles. 
- Unfortunately, there's no easy automated way to flag outlier FOVs (yet). Fortunately, they do tend to stand out in spatial analyses. 
- If you e.g. plot cell typing results in space, or plot spatial clustering results in space, outlier FOVs stand out strongly. They can then be manually flagged and removed. 
+ To implement steps 3 and 4, you can find our FOV QC tool [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/). 
  
 ## Normalization
  
@@ -82,20 +87,33 @@ We make the reasonable assumption that a cell's detection efficiency is well-est
 totalcounts <- Matrix::rowSums(counts)  
 norm <- sweep(counts, 1, pmax(totalcounts, 20), "/")
 ```
-...note the ```pmax(totalcounts, 20)``` term in the above. This puts a floor on how much we'll up-scale a cell. This prevents us 
-from taking cells with very few counts and drastically scaling them up, which gives them undeserved highly-distinct expression profiles.
+Note the ```pmax(totalcounts, 20)``` term in the above. This puts a floor on how much we'll up-scale a cell.
+This prevents us from taking cells with very few counts and drastically scaling them up, which gives them misleadingly distinct expression profiles.
 
-(Note: some authors have pointed out that there's information to be had in a cell's total counts. For example, cancer cells
-tend to have high overall RNA expression. When we normalize, we lose this information. But we've usually found that a small price to 
-pay to control the variability in total counts that arises from unwanted technical sources.)
+(Note: some authors have pointed out that there's information to be had in a cell's total counts. 
+For example, cancer cells tend to have high overall RNA expression. 
+When we normalize, we lose this information. 
+But we've usually found that a small price to pay to control the variability in total 
+counts that arises from unwanted technical sources. 
+Discerning between highly distinct cell types like cancer vs. immune cells is generally easy,
+while uncovering trends within a cell type is a harder task where controlling technical variability 
+can be enabling.)
 
 ## Other transformations
 
-We generally do not perform non-linear transformations on our data. 
+For most cases, we recommend keeping data on the linear scale, i.e. normalizing without further transformation.
+This approach keeps the data on an easily-interpretable scale and tends to perform well in analyses. 
 
-Exception: UMAPs often look better when drawn from log- and sqrt-transformed data or from Pearson residuals. 
-Pearson residuals are problematic for big datasets, however, since they convert your data from a sparse matrix to a dense matrix. 
+For some purposes, further transformations can make sense.
+Transformations like square root or "log1p" (log(1 + x)) inflate the variability of low counts
+and shrink the variability of high counts. 
+In some datasets, this can make UMAPs and distance-based clustering methods like Leiden and Louvain perform better.
+Seurat and AtoMx both offer a log1p transformation.
 
- 
+AtoMx also offers a "Pearson residuals" transformation. 
+This transformation can produce great UMAPs, but is only viable in small studies:
+because it creates a dense (not sparse) expression matrix, it produces an expression 
+matrix with a huge memory footprint, potentially crashing your analysis environment.
 
-
+If you do perform a non-linear transformation to run UMAP or Leiden clustering,
+consider using linear-scale data elsewhere in your analysis. 
