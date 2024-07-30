@@ -1,5 +1,5 @@
 ---
-title: "FOV QC from single-cell gene expression in spatial dataset"
+title: "Interpreting Registation Quality Scores for individual FOVs"
 author:
   - name: Mithra Korukonda
     affiliations:
@@ -10,37 +10,70 @@ toc-title: Contents
 toc-depth: 3
 toc-expand: 2
 toc-location: left
-date: "2024-05-20"
-date-modified: "2024-05-20"
+date: "2024-06-30"
+date-modified: "2024-06-30"
 categories: [primary processing, quality control, registration]
 draft: false
-#image: figures/fov_qc_thumbnail.png
-description: "Draft: Primary Registraton Quality Check" 
+description: "Primary Registraton Quality Check" 
+format: 
+  html:
+    theme: 
+      light: custom.scss
+      dark: darkly
+  pdf:
+    number-sections: true
+  docx:
+    toc: true
+    number-sections: true
+    highlight-style: github
+format-links: [docx]
 ---
 
-```{css}
-#| echo: false
-#| eval: true
-.center {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  width: 50%;
-}
-
-```
-
-
-# FOV QC
+# FOV Registration Quality Check
 
 ## Background
 
-In most experiments, all FOVs will perform comparably, and data analyses need not consider FOV as a relevant variable.
-However, FOVs can suffer a variety of technical effects, sometimes causing obvious bias in the 
-data (e.g. all the cells in an FOV will be clustered as the same cell type), and sometimes more subtle. 
-We recommend that FOV QC be performed early in analyses. Should misbehaving FOVs be detected,
-we almost always recommend they be excluded. 
+3D Registration is a critical component of the CosMx primary analysis pipeline. Registration is achieved using immutable fiducial beads that are visible in all imaged channels. Most experiments achieve 100% successful registration for all fields of view (FOVs). However, occasionally, some FOVs might depart from the norm due to a variety of reasons:  poor tissue quality, sparse fiducial count and distribution, high tissue auto-fluorescence, reporter hyper expression, water column loss or focus failures. Poor registration adversely impacts gene signal and counts.
 
-Here we'll describe known FOV-level artifacts, and we'll show use of R code for detecting 
-impacted FOVs.
+In CosMx, we use normalized cross-correlation (NCC) to align a reporter image with a fixed reference. The NCC is a measure of similarity between the reference image and subsequent reporter images and its value is influenced by the fiducials, which add to the similarity score, and the reporter signal, which detracts from the score. Below is an example of how the interplay between fiducial counts and reporter expression can influence registration across different reporter cycles. The stronger and tighter the NCC peak, the higher the precision of the calculated registration values. The top row in the figure below are representative images for low, moderate and highly expressed reporter signal. The low expressor allows one to note the sparsity of the fiducials (bright, large spots) in this FOV. While the fiducials are still visible in image with the moderate expressors, the high expressor creates near white out conditions, completely masking out the fiducials.  The bottom row represents a one dimensional profile of the cross-correlation peak between the selected images and the reference. As the expression level increase, the integrity of the correlation profile deteriorates resulting in failed registration for the high expressor image. 
+
+![Example of Potential Registration Errors](figures\Registration_Failure_Example.png)
+
+## Standalone QC Tool
+This tool, in the form of a standalone executable, provides users a quantitative approach to evaluate FOV registration quality. The executable file (SMIRunQC.exe) along with the required supporting files and license can be found in [assets/fov_registration_qc](
+https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/fov_registration_qc){target="_blank"}. Once the SMIRunQC executable is launched, you will be required to select a folder, typically the original RunSummary folder, that should contain the ExptConfig.txt and SpatialBC_Metrics4D.csv files. 
+
+
+The SMIRunQC tool will create a new sub-folder, 'QCDir', to store an assortment of output files describing registration quality, spot counts and channel intensities per FOV. In addition, these metrics can be further visualized as spatial heat maps saved in the QC_Plots folder.
+
+![Screenshot of the RUN QC outputs](figures\QCDir_Outputs_Screenshot.png)
+
+For the purpose of identifying FOVs with potential registration tools,  we will concentrate only on two files, namely the 
+RNA_Potential_QC_Issues.txt and RNA_Quality_perFOV.csv files. The Potential_QC_Issues.txt file lists the FOVs flagged for potential poor quality.An example of a such an output is shown below. The file records that 89.77% of the total FOvs passed our registration quality check. Of the remaining FOVs,  eight FOVs demonstrated extremely poor scores and are strongly recommended for removal from analysis. A single FOV is flagged for a middling score and recommended 
+
+![Flagging potential low quality FOVs](figures\Potential_QC_Issues.png)
+
+If no FOVs were flagged, i.e. a 100% success rate, the Potential_QC_Issues file will simply report that "No problematic FOVs flagged for this run.". 
+
+For more details on how this list was generated, you can refer to the Quality_perFOV.csv file. This file lists various registration metrics, such as variances in the calculated x, y and z-shifts ("X-StDev", "Y-StdDev", "Z_StdDev") that are used to generate a final registration quality score reported in the "Score" column. These metrics used to generate a final quality score per FOV. Any value between 0.75 and 1.0 indicate FOVs with good registration quality. Scores ranging from 0.5 to 0.75 indicate middling registration quality, while an FOV with a score of less than 0.5 should be considered for removal from the study. 
+
+![Per FOV QC File](figures/Quality_perFOV_File_Score_Std.png){width=60%}
+
+This file further characterizes the registration score across reporters and cycles. This form of delineation provides insight into the mode of failure - for instance, reporter specific failures could be observed if the expression levels in that reporter overwhelm the fiducial signal. Cycle specific failures would be indicative of fluidic or water columns issues. In the example below, FOV 1 has lost registration in specific reporters (N07, N15, N17) for the last 3 cycles. This is indicative of possible hyper-expression in the registration channel. As the fiducials bleach with increasing cumulative exposure, this Consequently, the FOV is assigned a middling score of 0.62. Meanwhile, FOV 30 displays a loss of registration across all reporters. Looking at the corresponding data per cycle, it is obvious that this particular FOV suffered from complete loss of registration from cycle 5 onward. This FOV must therefore be removed from downstream analysis. 
+
+![Per FOV QC File](figures/Quality_perFOV_File_Score_PerReporterCycle.png)
+
+## Plots description
+These same metrics can be visualized in the form of scatter plots presented in FOV_RegistrationStats.pdf. The example before displays the spatial locations of the FOVs in the experiment with the color indicating the quality score per FOV. The top row displays the standard deviation in the x, y and z-shifts across the run. While the final score and cross correlation statistics are plotted in the bottom row. In the example below, we observe certain FOVs have higher than average variation in the x-y shift or in the z-direction (FOVs represented by the green-yellow hues). The resultant quality scores are displayed in the bottom left, which passing FOVs represented in green, while failed FOVs are towards the red spectrum. 
+
+![Per FOV QC File](figures/Registration_Stats_HeatMap.png)
+
+
+
+Note: these plots will not be automatically generated if you do not have python installed or is not path of your PATH environment variables. You can generate plots using the python script Plot_Current_RunQC_Metrics.py. 
+
+
+
+
+
 
