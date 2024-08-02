@@ -26,14 +26,14 @@ draft: false
 One of the most exciting aspects of CosMx&#8482; Spatial Molecular Imager (SMI) data is the ability to directly observe gene expression in its spatial context at the single cell level. This is a great technological leap from previous single cell transcriptomics methods that lost spatial context while retrieving cells. For analysts looking to perform spatial data analysis, the [Seurat R package](https://satijalab.org/seurat/){target="_blank"} has continually added features to support CosMx data. Readers are encouraged to take a look at previous vignettes by the Seurat group ([Spatial Vignette](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2.html#human-lung-nanostring-cosmx-spatial-molecular-imager){target="_blank"} and
 [Clustering Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial){target="_blank"}) as well as blog posts we've provided previously ([scratch space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"}). The blog post herein supplements these and provides you with some of the plotting configurations we find most helpful as you explore your CosMx data. This vignette does not cover analysis of data in Seurat but rather tries to address frequently asked questions we've received from customers on getting started with their data in Seurat. 
 
-For this vignette, we use a Seurat object made from the mouse brain public data set and assembled in the structure used by the Technology Access Program ([TAP](https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/)); similar outputs are available from the AtoMx&#8482; Spatial Informatics Portal (SIP). To download raw data for this dataset, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="_blank"}. 
+For this vignette, we use a Seurat object made from the mouse brain public data set. To download raw data for this dataset, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="_blank"}. Two options to generate your own Seurat object from the from the AtoMx&#8482; Spatial Informatics Portal (SIP) are described below. 
 
 Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
 the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
 This post will show you how to:
 
-- @sec-loading Load needed libraries and example dataset
-- @sec-data-structure Find important data in Seurat object
+- @sec-loading Load data into a Seurat object
+- @sec-data-structure Find important data in a Seurat object
 - @sec-spatial-plotting Plot CosMx data in space
 - @sec-dim-reduction-plots Visualize dimension reduction data 
 - @sec-conclusions Concluding thoughts
@@ -42,10 +42,9 @@ This post will show you how to:
 
 
 # Data Loading {#sec-loading}
-Here we start from a Seurat object containing CosMx data and analysis stored in an rds file. To start from raw data instead, see the Seurat Spatial Vignette above.
 
 ::: {.callout-note}
-Many of the below functions require that you are working with [Seurat v5](https://satijalab.org/seurat/){target="_blank"} and may not work in earlier versions. Additionally, if you are exporting a Seurat object from AtoMx (v1.3+), be sure to export the Seurat object with polygon coordinates and transcripts included to access all of the functionality below.
+Many of the below functions require that you are working with [Seurat v5](https://satijalab.org/seurat/){target="_blank"} and may not work in earlier versions. 
 :::
 
 First, load needed libraries:
@@ -59,10 +58,89 @@ Adjust globals option to avoid an error exceeding max allowed size. We've found 
 options(future.globals.maxSize = 8000 * 1024^2)
 ```
 
-Load in the Seurat object, available on Box.com [here](https://nanostring.box.com/s/y7ielc54qw1g1f5x98hxczdo8tezobbg){target="_blank"}.
-```{r load_seuratObject, message=FALSE, eval = FALSE}
-seu.obj <- readRDS("seurat_object.Rds")
+There are two approaches to export CosMx SMI data from AtoMx SIP and load them into a Seurat object. Data can be exported from AtoMx SIP directly into a Seurat object. Alternatively, raw data can be exported as flat files and then loaded into a Seurat object. Both approaches are demonstrated below.
+
+::: {.panel-tabset}
+
+## Export Seurat object
+
+To export CosMx data from AtoMx SIP directly into a Seurat object, select "Export a Seurat Object" from the export module as shown in @fig-seurat-export-option. Be sure to export the Seurat object with transcript coordinates and polygon coordinates included to access all of the functionality below.
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-seurat-export-option"
+#| fig-cap: "Screenshot showing selection of Seurat object for export from AtoMx SIP."
+
+knitr::include_graphics("./figures/AtoMx_seuratExport_image.png")
 ```
+
+Once export is complete, download the file
+using your SFTP application (_e.g._, cyberduck, FileZilla, WinSCP).
+
+You can then load the Seurat object into R as follows. The Seurat object used for the demonstration here is available on Box.com [here](https://nanostring.box.com/s/y7ielc54qw1g1f5x98hxczdo8tezobbg){target="_blank"}.
+```{r load_seuratObject, message=FALSE, eval = FALSE}
+seu.obj <- readRDS("/path/to/file/seurat_object.Rds")
+```
+
+
+## Export flat files
+
+To export CosMx data from AtoMx SIP into flat files, select all five flat files from the export module as shown in @fig-flat-file-export-option. For more information about the flat file formats, please see [this post](../flat-file-exports/flat-files-compare.qmd).
+
+```{r}
+#| eval: true
+#| echo: false
+#| label: "fig-flat-file-export-option"
+#| fig-cap: "Screenshot showing selection of flat files for export from AtoMx SIP."
+
+knitr::include_graphics("./figures/AtoMx_flatFileExport_image.png")
+```
+
+Once export is complete, download the files
+using your SFTP application (_e.g._, cyberduck, FileZilla, WinSCP).
+
+Load the flat files into a Seurat object using the `LoadNanostring` function from the Seurat package. Within the Seurat object, each slide is stored as a separate 'image' or 'fov'. This is an unfortunate naming convention difference between CosMx nomenclature and the Seurat package. What Seurat refers to as an ‘fov’ is what NanoString refers to as a slide. When you load flat files into a Seurat object, you need to name the Seurat fov / CosMx slide with the argument `fov = `. This name must be a character, not a numeric. Here we use "slide1", but more descriptive names are also possible.
+
+```{r}
+#| eval: false
+#| echo: true
+#| label: "load_from_flat_files"
+
+seu.obj <- LoadNanostring("/path/to/flatFileDirectory/", fov = "slide1")
+```
+
+For convenience, you may want to save this Seurat object for future use.
+```{r}
+#| eval: false
+#| echo: true
+#| label: "save_seurat"
+
+saveRDS(seu.obj, file = "seurat_object.Rds")
+```
+
+If you have data from multiple CosMx slides, you can join them all into a single Seurat object with multiple images.
+```{r}
+#| eval: false
+#| echo: true
+#| label: "merge_seurat"
+
+# Make a list of multiple Seurat objects
+all_seurat_objects <- list(
+  "slide1" = seu.obj_1,
+  "slide2" = seu.obj_2,
+  "slide3" = seu.obj_3
+)
+
+# Merge objects together, appending a slide identifier to each cell ID
+joined_seu.obj <- merge(all_seurat_objects[[1]], 
+                        y = all_seurat_objects[2:length(all_seurat_objects)], 
+                        add.cell.ids = names(all_seurat_objects), 
+                        project = "CosMx")
+```
+
+:::
+
 
 # Data Structure {#sec-data-structure}
 Here we'll show where various key data are stored in the Seurat object.
@@ -118,7 +196,7 @@ results_obj$cell.centroids
 ```
 
 # Plot data in space {#sec-spatial-plotting}
-Within the Seurat object, each slide is stored as a separate 'image' or 'fov'. This is an unfortunate naming convention difference between CosMx nomenclature and the Seurat package. What Seurat refers to as an ‘fov’ is what NanoString refers to as a slide. When plotting cells in space, you need to specify the Seurat 'fov' to plot, and this is equivalent to choosing which CosMx slide to plot.
+As noted above, within the Seurat object, each slide is stored as a separate 'image' or 'fov'. This is an unfortunate naming convention difference between CosMx nomenclature and the Seurat package. What Seurat refers to as an ‘fov’ is what NanoString refers to as a slide. When plotting cells in space, you need to specify the Seurat 'fov' to plot, and this is equivalent to choosing which CosMx slide to plot.
 
 Plot all cells on one slide in space, coloring by cell type.
 ```{r plot_allCellsInSpace, eval = FALSE, fig.dim = c(12, 8)}
