@@ -1,5 +1,5 @@
 ---
-title: "Introduction to visualizing CosMx data in Seurat"
+title: "Introduction to visualizing CosMx SMI data in Seurat"
 author:
   - name: Claire Williams
     orcid: 0000-0001-5467-149X
@@ -23,10 +23,10 @@ draft: false
 
 # Introduction 
 
-One of the most exciting aspects of CosMx&#8482; Spatial Molecular Imager (SMI) data is the ability to directly observe gene expression in its spatial context at the single cell level. This is a great technological leap from previous single cell transcriptomics methods that lost spatial context while retrieving cells. For analysts looking to perform spatial data analysis, the [Seurat R package](https://satijalab.org/seurat/){target="_blank"} has continually added features to support CosMx data. Readers are encouraged to take a look at previous vignettes by the Seurat group ([Spatial Vignette](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2.html#human-lung-nanostring-cosmx-spatial-molecular-imager){target="_blank"} and
-[Clustering Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial){target="_blank"}) as well as blog posts we've provided previously ([scratch space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"}). The blog post herein supplements these and provides you with some of the plotting configurations we find most helpful as you explore your CosMx data. This vignette does not cover analysis of data in Seurat but rather tries to address frequently asked questions we've received from customers on getting started with their data in Seurat. 
+One of the most exciting aspects of CosMx&#8482; Spatial Molecular Imager (SMI) data is the ability to directly observe gene expression in its spatial context at the single cell level. This is a great technological leap from previous single cell transcriptomics methods that lost spatial context while retrieving cells. For analysts looking to perform spatial data analysis, the [Seurat R package](https://satijalab.org/seurat/){target="_blank"} has continually added features to support CosMx SMI data. Readers are encouraged to take a look at previous vignettes by the Seurat group ([Spatial Vignette](https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2.html#human-lung-nanostring-cosmx-spatial-molecular-imager){target="_blank"} and
+[Clustering Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial){target="_blank"}) as well as blog posts we've provided previously ([scratch space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"}). The blog post herein supplements these and provides you with some of the plotting configurations we find most helpful as you explore your CosMx SMI data. This vignette does not cover analysis of data in Seurat but rather tries to address frequently asked questions we've received from customers on getting started with their data in Seurat. 
 
-For this vignette, we use a Seurat object made from the mouse brain public data set. To download raw data for this dataset, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="_blank"}. Two options to generate your own Seurat object from the from the AtoMx&#8482; Spatial Informatics Portal (SIP) are described below. 
+For this vignette, we use a Seurat object made from a mouse brain public data set. To download raw data for this dataset, go [here](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/){target="_blank"}. Two options to generate your own Seurat object from the AtoMx&#8482; Spatial Informatics Portal (SIP) are described below. 
 
 Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
 the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
@@ -34,7 +34,7 @@ This post will show you how to:
 
 - @sec-loading Load data into a Seurat object
 - @sec-data-structure Find important data in a Seurat object
-- @sec-spatial-plotting Plot CosMx data in space
+- @sec-spatial-plotting Plot CosMx SMI data in space
 - @sec-dim-reduction-plots Visualize dimension reduction data 
 - @sec-conclusions Concluding thoughts
 
@@ -53,7 +53,7 @@ library(Seurat)
 library(ggplot2)
 ```
 
-Adjust globals option to avoid an error exceeding max allowed size. We've found this is necessary even with relatively small CosMx datasets (30 - 40 FOVs).
+Adjust globals option to avoid an error exceeding max allowed size. We've found this is necessary even with relatively small CosMx SMI datasets (30 - 40 FOVs).
 ```{r set_globals, message = FALSE, eval = FALSE}
 options(future.globals.maxSize = 8000 * 1024^2)
 ```
@@ -64,7 +64,7 @@ There are two approaches to export CosMx SMI data from AtoMx SIP and load them i
 
 ## Export Seurat object
 
-To export CosMx data from AtoMx SIP directly into a Seurat object, select "Export a Seurat Object" from the export module as shown in @fig-seurat-export-option. Be sure to export the Seurat object with transcript coordinates and polygon coordinates included to access all of the functionality below.
+To export CosMx SMI data from AtoMx SIP directly into a Seurat object, select "Export a Seurat Object" from the export module as shown in @fig-seurat-export-option. Be sure to export the Seurat object with transcript coordinates and polygon coordinates included to access all of the functionality below.
 
 ```{r}
 #| eval: true
@@ -86,7 +86,7 @@ seu.obj <- readRDS("/path/to/file/seurat_object.Rds")
 
 ## Export flat files
 
-To export CosMx data from AtoMx SIP into flat files, select all five flat files from the export module as shown in @fig-flat-file-export-option. For more information about the flat file formats, please see [this post](../flat-file-exports/flat-files-compare.qmd). When taking this approach, some tertiary analyses run in AtoMx SIP may not be included. For example, any PCA or UMAP dimension reductions performed in AtoMx SIP do not get exported in the flat files and so will not be present in the Seurat object when generated from flat files.
+To export CosMx SMI data from AtoMx SIP into flat files, select all five flat files from the export module as shown in @fig-flat-file-export-option. For more information about the flat file formats, please see [this post](../flat-file-exports/flat-files-compare.qmd). When taking this approach, some tertiary analyses run in AtoMx SIP may not be included. For example, any PCA or UMAP dimension reductions performed in AtoMx SIP do not get exported in the flat files and so will not be present in the Seurat object when generated from flat files.
 
 ```{r}
 #| eval: true
@@ -100,7 +100,7 @@ knitr::include_graphics("./figures/AtoMx_flatFileExport_image.png")
 Once export is complete, download the files
 using your SFTP application (_e.g._, cyberduck, FileZilla, WinSCP).
 
-Load the flat files into a Seurat object using the `LoadNanostring` function from the Seurat package. Within the Seurat object, each slide is stored as a separate 'image' or 'fov'. This is an unfortunate naming convention difference between CosMx nomenclature and the Seurat package. What Seurat refers to as an ‘fov’ is what NanoString refers to as a slide. When you load flat files into a Seurat object, you need to name the Seurat fov / CosMx slide with the argument `fov = `. This name must be a character, not a numeric. Here we use "slide1", but more descriptive names are also possible.
+Load the flat files into a Seurat object using the `LoadNanostring` function from the Seurat package. Within the Seurat object, each slide is stored as a separate 'image' or 'fov'. This is an unfortunate naming convention difference between CosMx SMI nomenclature and the Seurat package. What Seurat refers to as an ‘fov’ is what NanoString refers to as a slide. When you load flat files into a Seurat object, you need to name the Seurat fov / CosMx SMI slide with the argument `fov = `. This name must be a character, not a numeric. Here we use "slide1", but more descriptive names are also possible. For an example of how to plot a single CosMx SMI FOV, see @sec-spatial-plotting.
 
 ```{r}
 #| eval: false
@@ -119,7 +119,7 @@ For convenience, you may want to save this Seurat object for future use.
 saveRDS(seu.obj, file = "seurat_object.Rds")
 ```
 
-If you have data from multiple CosMx slides, you can join them all into a single Seurat object with multiple images.
+If you have data from multiple CosMx SMI slides, you can join them all into a single Seurat object with multiple images.
 ```{r}
 #| eval: false
 #| echo: true
@@ -196,7 +196,7 @@ results_obj$cell.centroids
 ```
 
 # Plot data in space {#sec-spatial-plotting}
-As noted above, within the Seurat object, each slide is stored as a separate 'image' or 'fov'. This is an unfortunate naming convention difference between CosMx nomenclature and the Seurat package. What Seurat refers to as an ‘fov’ is what NanoString refers to as a slide. When plotting cells in space, you need to specify the Seurat 'fov' to plot, and this is equivalent to choosing which CosMx slide to plot.
+As noted above, within the Seurat object, each slide is stored as a separate 'image' or 'fov'. This is an unfortunate naming convention difference between CosMx SMI nomenclature and the Seurat package. What Seurat refers to as an ‘fov’ is what NanoString refers to as a slide. When plotting cells in space, you need to specify the Seurat 'fov' to plot, and this is equivalent to choosing which CosMx SMI slide to plot.
 
 Plot all cells on one slide in space, coloring by cell type.
 ```{r plot_allCellsInSpace, eval = FALSE, fig.dim = c(12, 8)}
@@ -235,7 +235,7 @@ knitr::include_graphics("./figures/plot_genesOnImage-1.png")
 ```
 
 
-Plot one CosMx FOV. To do this, we set the cells we'd like to plot to be all those in our target FOV. A similar strategy could be used to plot a subset of FOVs or a subset of cells of interest.
+Plot one CosMx SMI FOV. To do this, we set the cells we'd like to plot to be all those in our target FOV. A similar strategy could be used to plot a subset of FOVs or a subset of cells of interest.
 ```{r plot_oneCosMxFOV, fig.dim = c(12,8), eval = FALSE}
 ImageDimPlot(seu.obj,
              fov = Images(seu.obj)[1],
@@ -328,7 +328,7 @@ knitr::include_graphics("./figures/plot_centroids-1.png")
 ```
 
 # Dimension reduction plots {#sec-dim-reduction-plots}
-The CosMx Seurat object contains coordinates for each cell for UMAP dimensional reduction.
+The CosMx SMI Seurat object contains coordinates for each cell for UMAP dimensional reduction.
 
 Here, we color cells by cell type and overlay cell type labels.
 ```{r plot_umapCellTypes, eval = FALSE}
@@ -361,6 +361,6 @@ knitr::include_graphics("./figures/plot_umapTranscriptExpression-1.png")
 
 # Conclusions {#sec-conclusions}
 
-This vignette serves as an introduction to exploring CosMx data in Seurat, with a primary focus on visualization. Mix and match the functions and options from above to generate new customized visualizations with your data. Once you're comfortable visualizing your spatial data, you may want to proceed to [refining your cell typing](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/index.html){target="_blank"}, [performing differential expression](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/index.html){target="_blank"}, [finding spatially correlated genes](https://github.com/Nanostring-Biostats/InSituCor){target="_blank"}, or countless other analysis paths. 
+This vignette serves as an introduction to exploring CosMx SMI data in Seurat, with a primary focus on visualization. Mix and match the functions and options from above to generate new customized visualizations with your data. Once you're comfortable visualizing your spatial data, you may want to proceed to [refining your cell typing](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/index.html){target="_blank"}, [performing differential expression](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/index.html){target="_blank"}, [finding spatially correlated genes](https://github.com/Nanostring-Biostats/InSituCor){target="_blank"}, or countless other analysis paths. 
 
 
