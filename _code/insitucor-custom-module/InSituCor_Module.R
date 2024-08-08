@@ -16,19 +16,12 @@ message("Custom Script Version: 0.1")
 # celltype      - Metadata column giving cell type. options: Leiden, Insitutype
 
 
-# (probably delete the below)
-# studyName     - Output Folder Name
-# outPath       - Destination S3 file path
-# access_key    - Destination AWS access key
-# secret_key    - Destination AWS secret key
-# s3Region      - Destination AWS region
-# session_token - Destination AWS session token, if needed
-
-
 #### advanced arguments not exposed to UI: --------------------------------------
 return_all <- TRUE    # whether to return the full results of insitucor()
 plot_res <- 600        # resolution for .png plots
-# (it's also reasonable to edit the arguments to the insitucor() call further below)
+verbose <- FALSE      # for debugging; prints progress if toggled
+# For finer-grained control of insitucor(), the arguments can be changed in the function call.
+# Just Control-F for "insitucor(" to find the relevant code. Run ?insitucor for guidance on the arguments. 
 
 library(nanopipeline)
 library(InSituCor)
@@ -45,10 +38,12 @@ if (!dir.exists(outDir)) {
   dir.create(outDir)
 }
 
-print("reached1")
+if (verbose) {
+  print("reached1")
+  print(celltype)
+  print(str(celltype))
+}
 
-print(celltype)
-print(str(celltype))
 
 #### Test User Variables ---------------------------------------------------
 variableTest <- function(varName, varType, msg, required = TRUE){
@@ -97,69 +92,37 @@ variableTest <- function(varName, varType, msg, required = TRUE){
 
 variableMsg <- NULL
 variableMsg <- variableTest(varName = "celltype", varType = "character", msg = variableMsg)
-#variableMsg <- variableTest(varName = "studyName", varType = "character", msg = variableMsg)
-#variableMsg <- variableTest(varName = "outPath", varType = "character", msg = variableMsg)
-#variableMsg <- variableTest(varName = "access_key", varType = "character", msg = variableMsg)
-#variableMsg <- variableTest(varName = "secret_key", varType = "character", msg = variableMsg)
-#variableMsg <- variableTest(varName = "s3Region", varType = "character", msg = variableMsg)
-#variableMsg <- variableTest(varName = "session_token", varType = "character", required = FALSE, msg = variableMsg)
-#variableMsg <- variableTest(varName = "rawFiles", varType = "logical", msg = variableMsg)  # <---- @MG: I assume I can delete all rows here that aren't in my user-defined variables at line 15?
-#variableMsg <- variableTest(varName = "SeuratObject", varType = "logical", msg = variableMsg)  
-#variableMsg <- variableTest(varName = "FullSeuratObject", varType = "logical", msg = variableMsg) 
-#variableMsg <- variableTest(varName = "transcripts", varType = "logical", msg = variableMsg)
-#variableMsg <- variableTest(varName = "tiledbArray", varType = "logical", msg = variableMsg)
-#variableMsg <- variableTest(varName = "spotFiles", varType = "logical", msg = variableMsg)
-#variableMsg <- variableTest(varName = "exportFOVImages", varType = "logical", msg = variableMsg)
-#variableMsg <- variableTest(varName = "return_all", varType = "logical", msg = variableMsg)
-#variableMsg <- variableTest(varName = "plot_res", varType = "numeric", msg = variableMsg)
-
-print("reached2")
 
 # stop on variable errors if applicable
 if(!is.null(variableMsg)){
   stop(variableMsg)
 }
 
+if (verbose) {
+  print("reached2")
+}
 
 #### extract basic data ---------------------------------------
 
-#print(study$somas)
-if (FALSE) {
-  print("reached2.0")
-  all_files <- system2(command = "aws",arg = c("s3","ls", paste0(studyDirectory, "/configs/")), stdout = TRUE)
-  normalizeConfig <- all_files[grep("config_normalize.txt", all_files)]
-  normalizeConfig <- strsplit(normalizeConfig, " ")[[1]]
-  normalizeConfig <- normalizeConfig[length(normalizeConfig)]
-  
-  bucket <- strsplit(normalizeConfig,"/")[[1]][3]
-  file_key <- strsplit(normalizeConfig, paste0(bucket,"/"))[[1]][2]
-  system2(command = "aws", arg = c("s3api", "get-object","--bucket",bucket,"--key", file_key,paste0("/tmp/tmp.csv")), stdout = TRUE)
-  normalizeConfig <- read.delim("/tmp/tmp.csv", header = TRUE, sep = ",") #probably need a different read fucntion for the config
-  file.remove("/tmp/tmp.csv")
-  rm(bucket)
-  rm(file_key)
-  #normname <- ____________
-  #norm <- study$somas[[normname]]$X$members$data$to_matrix()
-  #norm <- Matrix::t(norm)
-  #print("reached2.2")
-}
-
-print("reached2.1")
-
-# see column names: my_pipeline$tiledbsc_dataset$somas$RNA$obs$attrnames()
+# how to see column names: my_pipeline$tiledbsc_dataset$somas$RNA$obs$attrnames()
 
 counts <- study$somas$RNA$X$members$counts$to_matrix()
 print(str(counts))
 counts <- Matrix::t(counts)
 norm <- sweep(counts, 1, pmax(Matrix::rowSums(counts), 20), "/") * 500
 rm(counts)
-print("reached2.4")
+
+if (verbose) {
+  print("reached2.4")
+}
+
 # align norm to metadata:
 annotcellIDs <- study$somas$RNA$obs$to_dataframe("cell_ID")
 annotcellIDs <- annotcellIDs$cell_ID
 
 m <- match(annotcellIDs, rownames(norm))
 norm <- norm[m, ]
+
 # using slide ID as a stand-in for tissue, which won't generally be available
 tissuevec <- study$somas$RNA$obs$to_dataframe("slide_ID_numeric")  
 tissuevec <- tissuevec$slide_ID_numeric
@@ -170,9 +133,13 @@ print(head(tissuevec))
 # get xy:
 xy <- as.matrix(cbind(study$somas$RNA$obs$to_dataframe("x_slide_mm"),
                       study$somas$RNA$obs$to_dataframe("y_slide_mm")))
-#annot <- study$somas$RNA$obs$to_dataframe()
-print(head(xy))
-print("reached3")
+
+if (verbose) {
+  print("reached3")
+  print(head(xy))
+}
+
+
 
 #### get cell type: ---------------------------------
 
@@ -191,25 +158,21 @@ if (celltype == "Leiden") {
 if(celltypecolumn < 0) {
   stop(paste0("couldn't find the cell type column for ", celltype))
 }
-
-print(celltypecolumn)
-
 celltypevec <- study$somas$RNA$obs$to_dataframe()[[celltypecolumn]]
-print(head(celltypevec))
-print(str(celltypevec))
 
-print(head(study$somas$RNA$obs$to_dataframe()))
-print(str(study$somas$RNA$obs$to_dataframe()))
-
-print("reached4")
-
-# review data:
-print(head(annotcellIDs))
-print(head(tissuevec))
-print(head(celltypevec))
-print(head(xy))
-print(norm[1:4,1:4])
-
+if (verbose) {
+  print("reached4")
+  print(celltypecolumn)
+  print(head(celltypevec))
+  print(str(celltypevec))
+  print(head(study$somas$RNA$obs$to_dataframe()))
+  print(str(study$somas$RNA$obs$to_dataframe()))
+  print(head(annotcellIDs))
+  print(head(tissuevec))
+  print(head(celltypevec))
+  print(head(xy))
+  print(norm[1:4,1:4])
+}
 
 
 # subset to complete data:
@@ -223,15 +186,18 @@ print(table(iscomplete))
 print(dim(norm))
 print(length(celltypevec))
 
-print("reached5")
-
+if (verbose) {
+  print("reached5")
+}
 
 #### run InSituCor ---------------------------------------
 # prep conditionon:
 conditionon <-  data.frame(celltype = celltypevec)
 rownames(conditionon) <- rownames(norm)
 
-print("reached6")
+if (verbose) {
+  print("reached6")
+}
 
 # remove genes with no information:
 propnonzero <- colMeans(norm > 0)
@@ -263,28 +229,25 @@ if (length(res) == 0) {
 }
 
 
-print("reached7")
-
+if (verbose) {
+  print("reached7")
+}
 
 #### save results ---------------------------------------
 
 # return insitucor results list:
-if (FALSE) {
-  #saveRDS(res, file = paste0(studyName, "/", tiledbName, "_InSituCor_results.RDS"))   # <---- @MG: is this a good way to save complex output? Where will users find these results?
-  saveRDS(res, file = paste0(outDir, "/InSituCor_results.RDS"))   # <---- @MG: is this a good way to save complex output? Where will users find these results?
-} 
 if (return_all) {
   # save smaller, diversely formatted results to download
   saveRDS(res$modules, file = paste0(outDir, "/InSituCor_modules.RDS"))
   saveRDS(res$condcor, file = paste0(outDir, "/InSituCor_conditional_correlation_matrix.RDS"))   
   saveRDS(res$attributionmats, file = paste0(outDir, "/InSituCor_celltype_involvement_per_module.RDS"))   
   saveRDS(res$celltypeinvolvement, file = paste0(outDir, "/InSituCor_celltype_involvement_all_modules.RDS"))   
-  # write scores to tileDB:
-  
 } 
 
 
-print("reached8")
+if (verbose) {
+  print("reached8")
+}
 
 #### before plotting, arrange the tissues: -----------------------------
 
@@ -359,10 +322,11 @@ condenseTissues <- function(xy, tissue, tissueorder = NULL, buffer = 0.2, widthh
   return(xy)  
 }
 
-print("reached9.1")
-
-print(sum(is.na(xy)))
-print(sum(is.na(tissuevec)))
+if (verbose) {
+  print("reached9.1")
+  print(sum(is.na(xy)))
+  print(sum(is.na(tissuevec)))
+}
 
 # first condense the xy space:
 xy <- condenseTissues(xy = xy, 
@@ -371,8 +335,9 @@ xy <- condenseTissues(xy = xy,
                       buffer = 1, 
                       widthheightratio = 4/3) 
 
-print("reached9.2")
-
+if (verbose) {
+  print("reached9.2")
+}
 
 #### plotting ----------------------------------------------
 
@@ -388,8 +353,6 @@ plotdims <- c(xy2inches(diff(range(xy[, 1]))),
 # plot module neighborhood scores:
 sapply(colnames(res$scores_env), function(name) {
   modulegenes <- res$modules$gene[res$modules$module == name]
-  # @MG: see below for my plotting. Same question: where will they find their results? Am I writing to the right place?
-  #png(paste0(studyName, "/", tiledbName, "_InSituCor_module_", make.names(name), ".png"), width = plotdims[1], height = plotdims[2], res = res, units = "in")
   png(paste0(outDir, "/InSituCor_module_", make.names(name), ".png"), width = plotdims[1], height = plotdims[2], res = plot_res, units = "in")
   par(mar = c(0,0,0,0))
   plot(xy, pch = 16, cex = 0.15, asp = 1,
@@ -407,11 +370,12 @@ sapply(colnames(res$scores_env), function(name) {
   dev.off()
 })
 
-print("reached10")
+if (verbose) {
+  print("reached10")
+}
 
 ## plot attribution analysis results:
 # modules x celltypes
-#pdf(paste0(studyName, "/", tiledbName, "_InSituCor_attribution_moduleXcelltype.pdf"))
 pdf(paste0(outDir, "/InSituCor_attribution_moduleXcelltype.pdf"),
     width = pmin(2 + 0.2 * ncol(res$celltypeinvolvement), 12),
     height = pmin(2 + 0.2 * nrow(res$celltypeinvolvement), 20))
@@ -420,7 +384,6 @@ pheatmap(res$celltypeinvolvement,
          main = "", fontsize_row = 8, fontsize_col = 8)
 dev.off()
 
-#pdf(paste0(studyName, "/", tiledbName, "_InSituCor_attribution_permodulegeneXcelltype.pdf"))
 pdf(paste0(outDir, "/InSituCor_attribution_permodule_geneXcelltype.pdf"))
 for (name in names(res$attributionmats)) {
   pheatmap(res$attributionmats[[name]], 
@@ -430,9 +393,6 @@ for (name in names(res$attributionmats)) {
 dev.off()
 
 
-print("reached11")
-
-
-
-
-
+if (verbose) {
+  print("reached11")
+}
