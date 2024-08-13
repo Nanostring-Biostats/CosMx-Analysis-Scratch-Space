@@ -8,6 +8,8 @@
 - Only one argument to specify: "celltype", display name = "celltype", range = 1-50, Default value = "Insitutype" (unless you want to use Leiden clustering), argument type = "String", and check "required"
 - Put it in the pipeline after either leiden clustering or Insitutype
 
+![image](https://github.com/user-attachments/assets/a8311d34-e0a4-416a-ba30-ecd224546ed8)
+
 ## Interpreting results
 
 See the [Insitucor preprint](https://www.biorxiv.org/content/10.1101/2023.09.19.558514v1) 
