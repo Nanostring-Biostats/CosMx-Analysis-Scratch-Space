@@ -107,7 +107,6 @@ if (verbose) {
 # how to see column names: my_pipeline$tiledbsc_dataset$somas$RNA$obs$attrnames()
 
 counts <- study$somas$RNA$X$members$counts$to_matrix()
-print(str(counts))
 counts <- Matrix::t(counts)
 norm <- sweep(counts, 1, pmax(Matrix::rowSums(counts), 20), "/") * 500
 rm(counts)
@@ -127,15 +126,14 @@ norm <- norm[m, ]
 tissuevec <- study$somas$RNA$obs$to_dataframe("slide_ID_numeric")  
 tissuevec <- tissuevec$slide_ID_numeric
 
-print(table(tissuevec))
-print(head(tissuevec))
-
 # get xy:
 xy <- as.matrix(cbind(study$somas$RNA$obs$to_dataframe("x_slide_mm"),
                       study$somas$RNA$obs$to_dataframe("y_slide_mm")))
 
 if (verbose) {
   print("reached3")
+  print(table(tissuevec))
+  print(head(tissuevec))
   print(head(xy))
 }
 
@@ -182,12 +180,12 @@ celltypevec <- celltypevec[iscomplete]
 tissuevec <- tissuevec[iscomplete]
 xy <- xy[iscomplete, ]
 
-print(table(iscomplete))
-print(dim(norm))
-print(length(celltypevec))
 
 if (verbose) {
   print("reached5")
+  print(table(iscomplete))
+  print(dim(norm))
+  print(length(celltypevec))
 }
 
 #### run InSituCor ---------------------------------------
@@ -311,7 +309,6 @@ condenseTissues <- function(xy, tissue, tissueorder = NULL, buffer = 0.2, widthh
         tempshelfwidth <- 0
       }
     }
-    print(tissdf)
   }
   # now update xy:
   for (tiss in unique(tissue)) {
