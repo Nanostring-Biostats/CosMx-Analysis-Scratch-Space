@@ -28,3 +28,24 @@ Finally, to more thoroughly understand what a module is doing, use the AtoMx vie
 
  ### Attribution heatmap:
 ![image](https://github.com/user-attachments/assets/0fa10221-7bc6-4eca-98bb-72423a7aa203)
+
+
+### Advanced users
+
+For greater control over InSituCor, you can modify the below lines of the plugin .R script.
+Run ?insitucor to see details of how to use these arguments. 
+
+```
+  k = 50,
+  radius = NULL,
+  tissue = tissuevec,
+  min_module_size = 3,
+  max_module_size = 30,
+  resolution = 0.02,
+  corthresh = 0.1,
+  min_module_cor = 0.1,
+  gene_weighting_rule = "inverse_sqrt",
+  roundcortozero = 0.01,
+  max_cells = 5000,
+  attribution_subset_size = 5000
+```
