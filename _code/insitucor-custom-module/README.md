@@ -25,4 +25,4 @@ Finally, to more thoroughly understand what a module is doing, use the AtoMx vie
  its genes in space. For a good starting view, show individual transcripts from module genes, and color cells by cell type. 
 
  ### Attribution heatmap:
- ![image](https://github.com/Nanostring-Biostats/InSituCor-custom-module/assets/4357938/e96fd676-1edd-4851-8446-cb40b57b9433)
+![image](https://github.com/user-attachments/assets/0fa10221-7bc6-4eca-98bb-72423a7aa203)
