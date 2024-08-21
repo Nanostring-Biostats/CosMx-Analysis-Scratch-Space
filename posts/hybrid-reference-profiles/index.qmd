@@ -10,5 +10,61 @@ date: "2024-08-21"
 date-modified: "2024-08-21"
 categories: [cell typing]
 draft: false
-image: figures/insitucor-tile.png
+image: figures/heatmap_tile.png
 ---
+
+
+## Background
+
+The InSituType cell typing algorithm relies on a "reference matrix" to perform supervised or semi-supervised cell typing.
+A reference matrix gives the expected gene expression profile of each cell type in a tissue;
+these are usually derived from previous scRNA-seq or spatial transcriptomics experiments. 
+
+Fairly often, it's convenient to create a hybrid reference matrix from two studies. 
+In a typical example, you may want to cell type a solid tissue with autoimmune disease. 
+There is likely a good scRNA-seq dataset available for the healthy cell types in your tissue, 
+but this dataset probably has poor coverage of immune cells, as immune cells are rare in 
+non-inflamed tissues, and most single cell datasets only sample some tens of thousands of cells.
+
+
+
+## Example
+
+Here's an example workflow for merging the HCA liver cell profiles with the 
+InSituType immune cell profiles. The key steps are:
+
+- Aligning by shared genes
+- Rescaling (InSituType doesn't care about the scaling of the columns in a reference matrix,
+but it's convenient for descriptive analyses if they're all comparably scales)
+- Removing redundant cell types
+
+```{r, echo=TRUE, eval=FALSE}
+# get immune cell profiles included in the InSituType library:
+library(InSituType)
+data("ioprofiles")
+head(ioprofiles)
+
+# load HCA profiles for liver:
+load(url("https://github.com/Nanostring-Biostats/CellProfileLibrary/raw/master/Human/Adult/Colon_HCA.RData"))
+liverprofiles <- as.matrix(profile_matrix)
+
+# align genes:
+sharedgenes <- intersect(rownames(ioprofiles), rownames(liverprofiles))
+ioprofiles <- ioprofiles[sharedgenes, ]
+liverprofiles <- liverprofiles[sharedgenes, ]
+
+# put on appproximately the same scale:
+ioprofiles <- ioprofiles / quantile(ioprofiles, 0.99) * 1000
+liverprofiles <- liverprofiles / quantile(liverprofiles, 0.99) * 1000
+
+# omit immune cells from liver profiles:
+colnames(ioprofiles)
+colnames(liverprofiles)
+omit_from_liver <- c("plasma.cell")
+omit_from_io <- c("fibroblast", "endothelial")
+
+# merge:
+ref <- cbind(ioprofiles[, setdiff(colnames(ioprofiles), omit_from_io)], 
+             liverprofiles[, setdiff(colnames(liverprofiles), omit_from_liver)])
+head(ref)
+```
