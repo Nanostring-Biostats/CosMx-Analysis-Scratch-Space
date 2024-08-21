@@ -3,6 +3,7 @@
 # expression threshold for calling positivity
 
 library(ggplot2)
+rm(list = ls())
 
 # range of expected expression levels:
 mu = seq(0.02, 3, by = 0.01)
@@ -23,52 +24,6 @@ df$setting = gsub("1 counts", "1 count", df$setting)
 df$sens <- 1 - ppois(df$thresh - 1, df$mu)
 df$spec <- ppois(df$thresh - 1, df$b)
 df$tpr <- (df$sens * df$rate) / ((df$sens * df$rate) + ((1 - df$spec) * (1 - df$rate)))
-
-
-
-#ggplot(df[(df$thresh == 1) & (df$rate == 0.5), ], aes(x = mu, y = sens, col = b)) + geom_point()
-
-# stratify by bg
-par(mfrow = c(2,4))
-for (bval in b) {
-  use = (df$b == bval)
-  # sens:
-  plot(df$mu[use], df$sens[use], col = c("blue", "orange")[1 + (df$thresh[use] == thresh[2])])
-  # spec:
-  #plot(df$mu[use], df$spec[use], col = c("blue", "orange")[1 + (df$thresh[use] == thresh[2])], ylim = c(0.9, 1))
-  # tpr:
-  for (r in rate) {
-    use.r = use & (df$rate == r)
-    plot(df$mu[use.r], df$tpr[use.r], col = c("blue", "orange")[1 + (df$thresh[use.r] == thresh[2])],
-         ylim = c(0, 1)) # pch = c(1 + (df$rate[use.r] == rate[2]) + 2*(df$rate[use] == rate[3])),
-  }
-  
-  ## sens vs. tpr:
-  #plot(df$sens[use], df$tpr[use], col = c("blue", "orange")[1 + (df$thresh[use] == thresh[2])],
-  #     pch = c(1 + (df$rate[use] == rate[2]) + 2*(df$rate[use] == rate[3])))
-  
-}
- 
-# stratify by thresh
-par(mfrow = c(2,4))
-for (threshval in thresh) {
-  use = (df$thresh == threshval)
-  # sens:
-  plot(df$mu[use], df$sens[use], col = c("blue", "orange")[1 + (df$b[use] == b[2])])
-  # spec:
-  #plot(df$mu[use], df$spec[use], col = c("blue", "orange")[1 + (df$thresh[use] == thresh[2])], ylim = c(0.9, 1))
-  # tpr:
-  for (r in rate) {
-    use.r = use & (df$rate == r)
-    plot(df$mu[use.r], df$tpr[use.r], col = c("blue", "orange")[1 + (df$b[use.r] == b[2])],
-         ylim = c(0, 1)) # pch = c(1 + (df$rate[use.r] == rate[2]) + 2*(df$rate[use] == rate[3])),
-  }
-  
-  ## sens vs. tpr:
-  #plot(df$sens[use], df$tpr[use], col = c("blue", "orange")[1 + (df$thresh[use] == thresh[2])],
-  #     pch = c(1 + (df$rate[use] == rate[2]) + 2*(df$rate[use] == rate[3])))
-  
-}
 
 # unstratified:
 png("marker detection performance.png", units = "in", width = 8, height = 8, res = 400)

@@ -1,8 +1,4 @@
-if (FALSE) {
-  # install colby package
-  devtools::install_github("https://github.com/patrickjdanaher/colby")
-}
-library(colby) 
+library(Matrix)
 
 rm(list = ls())
 load("CRC excerpt.RData")
@@ -17,19 +13,17 @@ totcounts = totcounts[sub]
 clust = clust[sub]
 
 
-# simulate a gene with almost no background: 
+# simulate a gene with almost no background by down-sampling a high expresser: 
 # the mean counts of COL1A1 were 6.34; mean gene had 0.15 mean counts.
 # so downsample its counts to the level of an average gene:
 set.seed(0)
-#nobg <- sapply(counts[, "COL1A1"], function(x){rpois(1, x * 0.15 / 6.34)})
 nobg <- sapply(counts[, "COL1A1"], function(x){rpois(1, x * 0.075 / 6.34)})
 
-# now simulate background atop it, with each cell's expected background based on its mean negprobe value
-#bg <- sapply(neg, function(x){rpois(1, x)})
-c(mean(bg), mean(neg)) # bg is representative of the negprobes at large, in fact a bit higher background
+# now simulate background atop it, using a negative control gene
 bg <- counts[, "negprobe"]
+c(mean(bg), mean(neg)) # the negative control gene we use for "background" is representative of the negprobes at large, in fact a bit higher background
+# proportion of background counts:
 sum(bg) / sum(bg + nobg)
-
 
 hicols <- colorRampPalette(c("grey80", "darkblue"))(87)
 locols <- colorRampPalette(c("grey80", "darkblue"))(4)
@@ -41,25 +35,21 @@ plot(xy, pch = 16, cex = 0.1 + 0.1 * (counts[, "COL1A1"] > 0),
      main = "COL1A1 counts\n(a high expresser)",
      asp = 1, xaxt = "n", yaxt = "n", xlab = "", ylab = "",
      col = hicols[1 + pmin(length(hicols) - 1, counts[, "COL1A1"])],
-     #col = colby(counts[, "COL1A1"], type = "nonnegative")$col,
      ylim =c(-0.4,4.5), cex.main = 0.9)
 plot(xy, pch = 16, cex = 0.1 + 0.1 * (nobg > 0), 
      main = "COL1A1 downsampled, simulating\na low expresser with near-zero background",
      asp = 1, xaxt = "n", yaxt = "n", xlab = "", ylab = "",
      col = locols[1 + pmin(length(locols) - 1, nobg)],
-     #col = colby(nobg, type = "nonnegative")$col,
      ylim =c(-0.4,4.5), cex.main = 0.9)
 plot(xy, pch = 16, cex = 0.1 + 0.1 * (bg > 0), 
      main = "Background",
      asp = 1, xaxt = "n", yaxt = "n", xlab = "", ylab = "",
      col = locols[1 + pmin(length(locols) - 1, bg)],
-     #col = colorRampPalette(c("grey80", "darkblue"))(4)[1 + pmin(bg, 3)],
      ylim = c(-0.4,4.5), cex.main = 0.9)
 plot(xy, pch = 16, cex = 0.1  + 0.1 * (nobg + bg > 0), 
      main = "COL1A1 downsampled,\nplus background",
      asp = 1, xaxt = "n", yaxt = "n", xlab = "", ylab = "",
      col = locols[1 + pmin(length(locols) - 1, nobg + bg)],
-     #col = colby(nobg + bg, type = "nonnegative")$col,
      ylim =c(-0.4,4.5), cex.main = 0.9)
 dev.off() 
 
@@ -78,7 +68,7 @@ for (i in 1:length(xpositions) ) {
 
 
 png("COL1A1 with downsampling and background - plus traces.png", width = 8.5, height = 4.5, units = "in", res = 400)
-layout(t(matrix(1:8, 4)), heights = rep(c(4,.5,4)))#heights = c(rep(3.75,4), rep(1,4)))
+layout(t(matrix(1:8, 4)), heights = rep(c(4,.5,4)))
 par(mar = c(0.1,0.1,3,0.1))
 plot(xy, pch = 16, cex = 0.1 + 0.1 * (counts[, "COL1A1"] > 0),
      main = "COL1A1 counts\n(a high expresser)",
