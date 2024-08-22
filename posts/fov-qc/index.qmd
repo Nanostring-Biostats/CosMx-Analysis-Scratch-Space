@@ -39,21 +39,21 @@ Please use thoughtfully while considering biological context.
 ## Introduction
 
 In most CosMx experiments, FOVs perform comparably and data analyses do not require consideration of FOV as a relevant variable.
-FOVs can, however, experience technical effects, which in some cases requires quality control considerations (ex: cells in an FOV clustering as the same cell type). 
-We recommend that FOV QC be performed early in analyses. Should lower quality FOVs be detected, we recommend they be excluded. 
+FOVs can, however, experience technical effects, which in some cases require quality control considerations (ex: cells in an FOV clustering as the same cell type). 
+We recommend that FOV QC be performed early in data analysis. Should lower quality FOVs be detected, we recommend they are excluded. 
 
-Here we will describe known FOV-level quality considerations, and we will show use of R code for detecting impacted FOVs.
+Here we will describe known FOV-level quality considerations and will show use of R code for detecting impacted FOVs.
 
 ::: {.callout-caution title="Important note"}
-This approach, which looks only at gene expression data, complements
-a tool we've developed for detecting FOVs with registration failures. 
+This approach, which looks only at gene expression data and complements
+a tool under development for detecting FOVs with lower quality. 
 This other tool will appear on the [CosMx Analysis Scratch Space](/about.qmd){target="_blank"} in 2024.
 :::
 
 ## FOV quality
 
 Lower quality FOVs generally result in reduced overall gene expression or reduced signal from select genes. 
-An example of such a phenomena is shown below where genes with impacted signal are muted in specific FOVs (top left); other genes behave consistently.
+An example of such a phenomena is shown below where a gene with impacted signal is muted in specific FOVs (top left); other genes behave consistently.
 
 ```{r}
 #| eval: true
@@ -62,9 +62,7 @@ An example of such a phenomena is shown below where genes with impacted signal a
 knitr::include_graphics("./figures/example1.png")
 #![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/3e3dbed6-5469-4bab-885e-ad1534dba420)
 ```
-
-Potential reasons for lower FOV quality (lower relative signal all/select genes) include tissue quality/peeling, autofluorescence, inadequate fiducials.
-
+Potential causes for lower FOV quality (e.g. lower relative signal for all/select genes for a given FOV compared to majority of FOVs) include tissue/section quality, high autofluorescence, and inadequate fiducials.
 
 ## Approach to FOV QC
 
@@ -116,7 +114,7 @@ In contrast, the low expression in FOV 16 is shown to be similar - sometimes hig
 than biologically similar regions elsewhere in the tissue. 
 FOV 22 now stands out as having perhaps increased expression of the bit, but the high
 log2(fold-changes) (red squares) appear to follow spatially smooth biology and not the 
-sharp FOV borders, suggesting we needn't worry about technical artifacts in this FOV. 
+sharp FOV borders, suggesting we need not worry about technical quality issues in this FOV. 
 
 Our tool summarize our output across FOVs x reporter bits with plots like the below:
 
@@ -131,8 +129,8 @@ knitr::include_graphics("./figures/exampleheatmap.png")
 
 
 In this example, 2 reporter bits from reporter cycle 12 were flagged, as was one bit from reporter cycle 18. 
-Because all known artifacts impact *reporter cycles*, not the individual colors within them, we only flag FOVs
-in which at least two bits/colors from a single reporter cycle appear anomalous. This rule helps avoid flagging
+Because low quality impacts *reporter cycles*, not the individual colors within them, we only flag FOVs
+in which at least two reporters/colors from a single reporter cycle appear anomalous. This rule helps avoid flagging
 FOVs due to biological variability. 
 So in this example, FOV 19 would be flagged since it had 2 bits flagged in reporter cycle 12,
 whereas FOV 18 would not be flagged since it had only one bit flagged in reporter cycle 18.
