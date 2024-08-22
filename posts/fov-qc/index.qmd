@@ -29,34 +29,31 @@ image: figures/fov_qc_thumbnail.png
 }
 
 ```
-
+::: {.callout-note}
+This experimental approach is new as of April 2024 and is lightly tested. 
+Please use thoughtfully while considering biological context. 
+:::
 
 # FOV QC
 
-## Background
+## Introduction
 
-In most experiments, all FOVs will perform comparably, and data analyses need not consider FOV as a relevant variable.
-However, FOVs can suffer a variety of technical effects, sometimes causing obvious bias in the 
-data (e.g. all the cells in an FOV will be clustered as the same cell type), and sometimes more subtle. 
-We recommend that FOV QC be performed early in analyses. Should misbehaving FOVs be detected,
-we almost always recommend they be excluded. 
+In most CosMx experiments, FOVs perform comparably and data analyses do not require consideration of FOV as a relevant variable.
+FOVs can, however, experience technical effects, which in some cases require quality control considerations (ex: cells in an FOV clustering as the same cell type). 
+We recommend that FOV QC be performed early in data analysis. Should lower quality FOVs be detected, we recommend they are excluded. 
 
-Here we'll describe known FOV-level artifacts, and we'll show use of R code for detecting 
-impacted FOVs.
+Here we will describe known FOV-level quality considerations and will show use of R code for detecting impacted FOVs.
 
 ::: {.callout-caution title="Important note"}
-This approach, which looks only at gene expression data, compliments
-a tool we've developed for detecting FOVs with registration failures. 
-This other tool will appear on the [CosMx Analysis Scratch Space](/about.qmd){target="_blank"} in June 2024.
+This approach, which looks only at gene expression data and complements
+a tool under development for detecting FOVs with lower quality. 
+This other tool will appear on the [CosMx Analysis Scratch Space](/about.qmd){target="_blank"} in 2024.
 :::
 
-## FOV artifacts
+## FOV quality
 
-All known FOV artifacts act by modulating our ability to detect reporter probes. In CosMx SMI, the reporter probes contain a barcode that is read out across reporter cycles. At each reporter cycle, a given probe will either contain one of four colors or an empty slot.
-Among FOV artifacts, most commonly we see a single reporter cycle in which all 4 colors of probes lose efficiency;
-that is, 4 "bits" of our color barcode are impacted, and in turn, so are all the genes sharing those barcode bits. 
-
-Thus we see phenomena like the below, where genes with impacted bits are muted in specific FOVs (top left), while other genes behave normally:
+Lower quality FOVs generally result in reduced overall gene expression or reduced signal from select genes. 
+An example of such a phenomena is shown below where a gene with impacted signal is muted in specific FOVs (top left); other genes behave consistently.
 
 ```{r}
 #| eval: true
@@ -65,58 +62,34 @@ Thus we see phenomena like the below, where genes with impacted bits are muted i
 knitr::include_graphics("./figures/example1.png")
 #![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/3e3dbed6-5469-4bab-885e-ad1534dba420)
 ```
-
-
-
-We have observed the below root causes of FOV artifacts:
-
-#### Registration failure: 
-The images from each reporter cycle must be "registered", i.e.
-aligned to the images from the other cycles, in both horizontal and vertical position. 
-This process can go wrong in various ways, but all with the same impact: the barcode bits 
-from that reporter cycle are assigned to the wrong positions, and they can no longer be used
-to identify the RNA transcript they came from. This phenomenon drives down expression
-for all genes with a barcode bit in the impacted reporter cycle. 
-The CosMx instrument performs 8 "cycles" (as opposed to "reporter cycles") of data acquisition for every reporter cycle and therefore barcode position;
-registration failure can impact a reporter cycle across one or all of these cycles, causing
-either a slight decrease or a total loss of signal for the impacted genes. 
-
-#### Autofluorescence: 
-If the tissue in an FOV is autofluorescent, it can make fluorescent 
-signal from CosMx reporter probes harder to detect. When this happens, all genes with barcode
-bits in the impacted color will be harder to detect. At the same time, they will
-suffer higher rates of FalseCode style background events - i.e., their barcode will 
-more often be spuriously observed in the absense of hyb probes for the gene. 
-
-#### Loss of signal:
-An FOV with unusually low signal is an indicator of something having gone wrong with data collection. 
-To be cautious, we recommend removing FOVs with any substantial loss of signal.
+Potential causes for lower FOV quality (e.g. lower relative signal for all/select genes for a given FOV compared to majority of FOVs) include tissue/section quality, high autofluorescence, and inadequate fiducials.
 
 ## Approach to FOV QC
 
-First, we'll apply a permissive look at FOV's signal strength, throwing out FOVs with >60% 
-loss of signal across most of their spatial span. 
+First, we will apply a permissive look at FOV signal strength, filtering out FOVs with >60% loss of signal across most of their spatial span. 
 
-Then we'll look for FOVs with biased gene expression profiles.
-Because all known artifacts impact *reporter cycles* (each containing 4 "bits", i.e. reporter cycle/color pairs), 
-we will look for artifacts at the level of bits, not genes. 
-Specifically, for each barcode bit, we'll look for FOVs where genes using the bit are
+Then we will look for FOVs with potentially biased gene expression profiles.
+Because FOV quality issues can be linked to fluorescent reporters (multiple reporters encode a gene)  
+we will look at the level of reporters, not genes. 
+
+
+Specifically, for each reporter, we'll look for FOVs where genes using the reporter are
 underexpressed compared to comparable regions elsewhere. 
-And we'll fail reporter cycles where multiple bits look bad.
+And we'll fail reporter cycles with low quality for multiple reporters.
 
 #### Technical details: 
 
 We place a 7x7 grid across each FOV. For each grid square, we find the 10 most similar squares
-in other FOVs, with "similar" being based on the square's expression profile. (We also only accept one 
-neighbor per other FOV.)
+in other FOVs, with "similar" being based on the square's expression profile (we also only accept one 
+neighbor per other FOV).
 
 Then we score FOVs for signal loss. For each square, we compare its total counts to its comparator squares. 
-For each barcode bit, this gives us 49 contrasts. 
+For each reporter bit, this gives us 49 contrasts. 
 If most (75%) of an FOV's squares have low total counts compared to comparators, we flag the FOV.
 
 
 To score FOVs for bias, we use a similar approach. 
-For each barcode bit, we take the genes using the bit, and we contrast their 
+For each reporter, we take the genes using the bit, and we contrast their 
 expression in the square vs. in the average of the 10 most similar squares elsewhere. 
 When an FOV's grid squares consistently underexpress the relevant gene set, we flag the FOV.
 
@@ -131,20 +104,20 @@ knitr::include_graphics("./figures/example2.png")
 #![image](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/assets/4357938/76c95e5d-9bef-4bea-9571-84b37cf9b988)
 ```
 
-On the left, we plot expression of a single barcode bit (c12B = reporter cycle 12, color Blue) impacted by FOV effects. 
-FOV 19 has almost entirely lost expression of the genes from this barcode bit,
+On the left, we plot expression of a single reporter bit (c12B = reporter cycle 12, color Blue) impacted by FOV effects. 
+FOV 19 has almost entirely lost expression of the genes from this reporter,
 and FOV 16 looks as though it could be losing some expression. 
 
 On the right, we show the results of our FOV QC approach: for a 7x7 grid within 
-each FOV, we see estimated change in barcode bit expression compared to similar 
-grid squares in other FOVs. FOV 19 still stands out as an obvious failure. 
+each FOV, we see estimated change in reporter bit expression compared to similar 
+grid squares in other FOVs. FOV 19 still stands out as an obvious quality control flag. 
 In contrast, the low expression in FOV 16 is shown to be similar - sometimes higher, sometimes lower - 
 than biologically similar regions elsewhere in the tissue. 
 FOV 22 now stands out as having perhaps increased expression of the bit, but the high
 log2(fold-changes) (red squares) appear to follow spatially smooth biology and not the 
-sharp FOV borders, suggesting we needn't worry about technical artifacts in this FOV. 
+sharp FOV borders, suggesting we need not worry about technical quality issues in this FOV. 
 
-Our tool summarize our output across FOVs x barcode bits with plots like the below:
+Our tool summarize our output across FOVs x reporter bits with plots like the below:
 
 
 ```{r}
@@ -156,9 +129,9 @@ knitr::include_graphics("./figures/exampleheatmap.png")
 ```
 
 
-In this example, 2 barcode bits from reporter cycle 12 were flagged, as was one bit from reporter cycle 18. 
-Because all known artifacts impact *reporter cycles*, not the individual colors within them, we only flag FOVs
-in which at least two bits/colors from a single reporter cycle appear anomalous. This rule helps avoid flagging
+In this example, 2 reporter bits from reporter cycle 12 were flagged, as was one bit from reporter cycle 18. 
+Because low quality impacts *reporter cycles*, not the individual colors within them, we only flag FOVs
+in which at least two reporters/colors from a single reporter cycle appear anomalous. This rule helps avoid flagging
 FOVs due to biological variability. 
 So in this example, FOV 19 would be flagged since it had 2 bits flagged in reporter cycle 12,
 whereas FOV 18 would not be flagged since it had only one bit flagged in reporter cycle 18.
@@ -172,8 +145,7 @@ The gene-to-barcode mappings needed by this approach are saved in the same
 We advise this approach be applied separately to each slide or tissue in a study. 
 
 ::: {.callout-note}
-This approach is new as of April 2024, and as-yet lightly tested. 
-Use thoughtfully. 
+This experimental approach is new as of April 2024 and is lightly tested. 
+Please use thoughtfully while considering biological context. 
 :::
-
 
