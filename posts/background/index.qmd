@@ -16,13 +16,14 @@ image: figures/background_tile.png
 ## Introduction
 
 CosMx data includes off-target “background” counts from off-target probe binding, appearing randomly at a low frequency across the dataset. In this article, we’ll discuss how background impacts data analysis. Many details follow, but our main findings are simple:
+
 1.	For analyses where statistics are calculated across many cells, for example differential expression or spatial correlation analysis, the impact of background approaches zero. 
 2.	For analyses of single cell profiles, for example cell typing or UMAP projections, background contributes a small amount of noise/error. But by far the major driver of noise in single cell profiles is sensitivity / readout sparsity, not background. 
-3.	Analyses of single genes in single cells, for example calling cells as +/- for a marker gene, perform poorly regardless of background levels, except for perhaps the top ~10%  high-expressing genes. We recommend [a smoothing / imputation approach](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/) {target="_blank"} to make this kind of analysis reliable. 
+3.	Analyses of single genes in single cells, for example calling cells as +/- for a marker gene, perform poorly regardless of background levels, except for perhaps the top ~10%  high-expressing genes. We recommend [a smoothing / imputation approach](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/){target="_blank"} to make this kind of analysis reliable. 
 
-Note: For details of the origins of background counts, see [Appendix 1.](#appendix1)
+Note: For details of the origins of background counts, see @appendix1.
 
-Note: This document focuses on background. But always worth bearing in mind is that segmentation errors have a far more deleterious impact on data quality. See [Appendix 2](#appendix2) for a brief discussion.
+Note: This document focuses on background. But always worth bearing in mind is that segmentation errors have a far more deleterious impact on data quality. See @appendix2 for a brief discussion.
 
 
 ## How much background is there?
@@ -39,13 +40,20 @@ knitr::include_graphics("./figures/signal vs. bg 2.png")
 ___Figure 1: signal and background across 6k datasets of widely varying data quality.___
 ___a.___ _Datasets’ mean background (mean counts per negprobe per cell) plotted against mean signal (mean RNA counts per cell)._ ___b.___ _Datasets’ proportion of background counts plotted against mean signal. Proportion of background counts is estimated with: (mean counts per negprobe per cell)(plex)/(mean RNA counts per cell)._
 
-From Figure 1, we see that datasets with more signal tend to also have more background, but that background does not rise as quickly as signal. For a nuanced discussion of how background behaves within a dataset, see [Appendix 3.](#appendix2)
+From Figure 1, we see that datasets with more signal (raw counts) tend to also have more background, but that background does not rise as quickly as signal. For a nuanced discussion of how background behaves within a dataset, see @appendix3.
 
 ## Case 1: Impact of background when calculating summary statistics over many cells
 
-CosMx datasets tend to be large, containing hundreds of thousands of cells in total, and at least thousands of cells from most individual cell types. When we’re calculating summary statistics, for example performing differential expression or computing spatial correlations, this sample size is enabling. The law of large numbers assures us that as N increases, the noise in our data averages out, leaving us with precise estimates. Thus background does not obscure trends that occur over large numbers of cells. 
+CosMx datasets tend to be large, containing hundreds of thousands of cells in total, and at least thousands of cells from most individual cell types. 
+This high sample size gives us high statistical power and precision whenever we calculate summary statistics over cells,
+for example when performing differential expression or computing spatial correlations. 
+The law of large numbers assures us that as N increases, the noise in our data averages out, leaving us with precise estimates. 
+Thus background, which mainly acts to add random noise to the data, does not obscure trends that occur over large numbers of cells. 
 
-To demonstrate what statistical theory assures us, we’ll simulate CosMx data for which we can attribute each count to real RNA or background. Our simulation is simple: using a CosMx dataset, we’ll a gene for which only a very small percentage of counts are background, i.e. one of our highest expressers. Then we’ll down-sample it until it has half as many counts as the average gene. This down-sampled data will behave like a low-expression gene with near-zero background. Finally, we’ll take background counts from a negative control gene and use them as simulated background atop the down-sampled values, producing data akin to a low-expressing gene with typical background, for which 22.3% of counts are background. 
+To demonstrate what statistical theory assures us, we’ll simulate CosMx data for which we can attribute each count to real RNA or background. 
+Our simulation is simple: using a CosMx dataset, we’ll take a gene for which only a very small percentage of counts are background, i.e. one of our highest expressers. 
+Then we’ll down-sample it until it has half as many counts as the average gene. This down-sampled data will behave like a low-expression gene with near-zero background. 
+Finally, we’ll take background counts from a negative control gene and use them as simulated background atop the down-sampled values, producing data akin to a low-expressing gene with typical background, for which 22.3% of counts are background. 
 
 First, let’s get a visceral feel for what background looks like by plotting our simulated counts across space:
 
@@ -77,9 +85,10 @@ ___Figure 3: spatial plots of two low expressers.___
 Now let’s see how background impacts hard statistics. Using the same simulation, we’ll perform a differential expression analysis of how fibroblast cells modulate COL1A1 across the span of the tissue. For simplicity, we’ll just contrast fibroblasts in the top vs. bottom halves of the tissue, and we’ll run a simple t-test on normalized expression. We run this analysis on the downsampled / “negligible background” data, and on the data with simulated background added back in. 
 When we analyze all 18871 fibroblasts, we find that adding background leaves our point estimate and confidence interval essentially intact:
 
- 	Estimate	Lower 95% conf interval	Upper 95% conf interval	p-value
-Downsampled to simulate near-zero background	0.000107	7.35e-05	0.000140	3.4e-10
-With simulated background	0.000108	7.4e-05	0.000143	6.91e-10
+|	|	Estimate | Lower 95% conf interval	| Upper 95% conf interval	| p-value | 
+|---------:|-----|------|------|
+| Downsampled to simulate near-zero background	| 0.000107	| 7.35e-05	| 0.000140	| 3.4e-10 | 
+| With simulated background	| 0.000108	| 7.4e-05	| 0.000143	| 6.91e-10 | 
 
 ___Table 1: Differential expression results from 18871 fibroblasts.___ _A linear model comparing expression in the upper vs. lower half of the tissue was run for two expression vectors._ 
 ___Top row:___ _COL1A1 counts were down-sampled 85-fold to create a simulated gene of low expression level and negligible background._ 
@@ -87,9 +96,10 @@ ___Bottom row:___ _Background was added to the down-sampled data to simulate a g
 
 To simulate a rare cell type where our sample size is less overpowering, we can re-run our analysis on a random subset of merely 1000 fibroblasts. When we do so, the fundamental finding remains: adding background to the data barely budges our estimates, confidence intervals and p-values. Remember, this is a gene for which 22.3% of counts are background.
 
- 	Estimate	Lower 95% conf interval	Upper 95% conf interval	p-value
-Downsampled to simulate near-zero background	0.000165	8.14e-06	0.000321	0.0392
-With simulated background	0.000175	1.64e-05	0.000334	0.0307
+|	|	Estimate | Lower 95% conf interval	| Upper 95% conf interval	| p-value | 
+|---------:|-----|------|------|
+| Downsampled to simulate near-zero background	| 	0.000165	| 8.14e-06	| 0.000321	| 0.0392 | 
+| With simulated background	| 0.000175	| 1.64e-05	| 0.000334	| 0.0307 | 
 
 ___Table 2: Differential expression results from 1000 fibroblasts, simulating a rare cell type.___
 _For a random subset of 1000 fibroblasts, a linear model comparing expression in the upper vs. lower half of the tissue was run for two expression vectors._ 
@@ -170,8 +180,7 @@ There is a powerful countermeasure to this limitation, described [here](https://
 
 In summary, regardless of background level, analyses of single genes in single cells (e.g. of marker genes) have low sensitivity except for high expressing genes. Background increases the false positive rate of marker gene detection, mainly in rare cell types. To overcome inaccuracy resulting from both low expression and background, use imputed marker gene expression. 
 
-<a id="appendix1"></a>
-## Appendix 1: Origins of background in spatial transcriptomics
+## Appendix 1: Origins of background in spatial transcriptomics {#appendix1}
 
 Background counts are simply instances where the instrument calls an RNA transcript that isn’t there. In CosMx data, background happens through two mechanisms. 
 
@@ -180,18 +189,15 @@ which are barcodes with no corresponding probes in hybridization reaction.
 
 Second, in “NegProbe” style background, a hybridization probe binds to the wrong target, then is correctly detected through reporter probes. This is the dominant form of background, occurring at 0.01-0.04 counts per plex per cell in most datasets. Our “NegProbe” controls, which are standard hybridization probes targeting sequences not found in any known genome, measure both this kind of background and FalseCode style background. Because they capture both sources of background, our analyses only need consider NegProbes levels. 
 
-<a id="appendix2"></a>
-## Appendix 2: contrasting the harm of background vs. of segmentation errors 
+## Appendix 2: contrasting the harm of background vs. of segmentation errors  {#appendix2}
 
 Background arises at random, and so impacts the data as noise. Segmentation errors, on the other hand, are not random: cells in different spatial contexts will be contaminated by different genes. This causes bias in the data. And while noise averages out at high sample sizes, bias does not. Thus segmentation errors are a far more pernicious influence on data quality than background and sparsity. For further discussion, see [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/){target="_blank"}.
 
-<a id="appendix3"></a>
-## Appendix 3: How is background distributed? 
+## Appendix 3: How is background distributed?  {#appendix3}
 
 As a first-order approximation, negprobe-style background happens with equal probability to all genes. (Beyond the first-order view, we have observed small subsets of negprobes with elevated background, usually not dramatically above the other negprobes.) We usually see cells’ background rising in proportion to their total expression: a tumor cell with twice the counts of another tumor cell is probably experiencing twice the background. Areas of necrosis will generate higher background, likely due to a more charged and thus more sticky surface for nucleic acid probes. Negprobes also seem to appear more densely outside of cells. 
 
-<a id="appendix4"></a>
-## Appendix 4: Measuring cells’ background
+## Appendix 4: Measuring cells’ background {#appendix4}
 
 Because background is so low, averaging around 0.01-0.04 counts per cell in the 6000plex panel across all the 20 NegProbes, a single cell’s negprobe signal is too unstable to give a precise estimate of its background rate. (Most cells have 0 NegProbe counts, while their true background rate is surely greater than zero.) When we need to estimate single cells’ background levels, we estimate this from their total counts: we calculate the mean background counts per total counts across the dataset, then apply this ratio to each individual cell’s total counts. 
 
