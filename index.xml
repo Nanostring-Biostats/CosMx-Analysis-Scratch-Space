@@ -10,7 +10,223 @@
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
 <generator>quarto-1.5.56</generator>
-<lastBuildDate>Thu, 18 Jul 2024 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Wed, 21 Aug 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>How does background impact CosMx data, and when does it matter?</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>CosMx data includes off-target “background” counts from off-target probe binding, appearing randomly at a low frequency across the dataset. In this article, we’ll discuss how background impacts data analysis. Many details follow, but our main findings are simple:</p>
+<ol type="1">
+<li>For analyses where statistics are calculated across many cells, for example differential expression or spatial correlation analysis, the impact of background approaches zero.</li>
+<li>For analyses of single cell profiles, for example cell typing or UMAP projections, background contributes a small amount of noise/error. But by far the major driver of noise in single cell profiles is sensitivity / readout sparsity, not background.</li>
+<li>Analyses of single genes in single cells, for example calling cells as +/- for a marker gene, perform poorly regardless of background levels, except for perhaps the top ~10% high-expressing genes. We recommend <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/" target="_blank">a smoothing / imputation approach</a> to make this kind of analysis reliable.</li>
+</ol>
+<p>Note: For details of the origins of background counts, see <span class="citation" data-cites="appendix1">(<strong>appendix1?</strong>)</span>.</p>
+<p>Note: This document focuses on background. But always worth bearing in mind is that segmentation errors have a far more deleterious impact on data quality. See <span class="citation" data-cites="appendix2">(<strong>appendix2?</strong>)</span> for a brief discussion.</p>
+</section>
+<section id="how-much-background-is-there" class="level2">
+<h2 class="anchored" data-anchor-id="how-much-background-is-there">How much background is there?</h2>
+<p>In most 6000-plex datasets, background is somewhere between 0.01 and 0.05 counts per plex per cell. To get a fuller sense of the range of background, see below for results from a set of 6k datasets of varying quality.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/signal vs. bg 2.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong><em>Figure 1: signal and background across 6k datasets of widely varying data quality.</em></strong> <strong><em>a.</em></strong> <em>Datasets’ mean background (mean counts per negprobe per cell) plotted against mean signal (mean RNA counts per cell).</em> <strong><em>b.</em></strong> <em>Datasets’ proportion of background counts plotted against mean signal. Proportion of background counts is estimated with: (mean counts per negprobe per cell)(plex)/(mean RNA counts per cell).</em></p>
+<p>From Figure 1, we see that datasets with more signal (raw counts) tend to also have more background, but that background does not rise as quickly as signal. For a nuanced discussion of how background behaves within a dataset, see <span class="citation" data-cites="appendix3">(<strong>appendix3?</strong>)</span>.</p>
+</section>
+<section id="case-1-impact-of-background-when-calculating-summary-statistics-over-many-cells" class="level2">
+<h2 class="anchored" data-anchor-id="case-1-impact-of-background-when-calculating-summary-statistics-over-many-cells">Case 1: Impact of background when calculating summary statistics over many cells</h2>
+<p>CosMx datasets tend to be large, containing hundreds of thousands of cells in total, and at least thousands of cells from most individual cell types. This high sample size gives us high statistical power and precision whenever we calculate summary statistics over cells, for example when performing differential expression or computing spatial correlations. The law of large numbers assures us that as N increases, the noise in our data averages out, leaving us with precise estimates. Thus background, which mainly acts to add random noise to the data, does not obscure trends that occur over large numbers of cells.</p>
+<p>To demonstrate what statistical theory assures us, we’ll simulate CosMx data for which we can attribute each count to real RNA or background. Our simulation is simple: using a CosMx dataset, we’ll take a gene for which only a very small percentage of counts are background, i.e.&nbsp;one of our highest expressers. Then we’ll down-sample it until it has half as many counts as the average gene. This down-sampled data will behave like a low-expression gene with near-zero background. Finally, we’ll take background counts from a negative control gene and use them as simulated background atop the down-sampled values, producing data akin to a low-expressing gene with typical background, for which 22.3% of counts are background.</p>
+<p>First, let’s get a visceral feel for what background looks like by plotting our simulated counts across space:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/COL1A1 with downsampling and background - plus traces.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong><em>Figure 2: spatial plots of simulated real and background counts from a typical gene in a typical 6k dataset.</em></strong> <strong><em>Top row:</em></strong> <em>single cell expression in space. The right three plots are on the same color scale.</em> <strong><em>Bottom row:</em></strong> <em>total expression in a sliding window along the highlighted regions in the spatial plots. The right three plots are on the same vertical scale.</em> <strong><em>Left:</em></strong> <em>COL1A1 is a high expresser in this dataset.</em> <strong><em>Center left:</em></strong> <em>COL1A1 counts were down-sampled 42-fold to create a simulated gene of average expression level and negligible background.</em> <strong><em>Center right:</em></strong> <em>background counts (from a negative control gene).</em> <strong><em>Right:</em></strong> <em>Background added to the down-sampled data to simulate a gene of average expression and average background, for which 22.4% of counts are background.</em></p>
+<p>The spatial pattern of this gene’s expression is equally clear with and without background. This example serves to demonstrate a general principle: since background occurs randomly, it does little to obscure spatial trends in gene expression. We can also demonstrate this without use of simulation. Figure 3 below shows two low expressers displaying clear spatial patterns.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/low expressers.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong><em>Figure 3: spatial plots of two low expressers.</em></strong></p>
+<p>Now let’s see how background impacts hard statistics. Using the same simulation, we’ll perform a differential expression analysis. Mimicking (somewhat simplisticly) a typical use case, in which we study how a single cell type modules gene expression across spatial context, we’ll measure how gene expression in fibroblasts changes between the top vs.&nbsp;bottom halves of the tissue. To do this, we’ll run a simple t-test on normalized expression. We run this toy analysis on the downsampled / “negligible background” data, and on the data with simulated background added back in. When we analyze all 18871 fibroblasts, we find that adding background leaves our point estimate and confidence interval essentially intact:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 37%">
+<col style="width: 18%">
+<col style="width: 22%">
+<col style="width: 22%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;"></th>
+<th>Estimate</th>
+<th>Lower 95% conf interval</th>
+<th>Upper 95% conf interval</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">Downsampled to simulate near-zero background</td>
+<td>0.000107</td>
+<td>7.35e-05</td>
+<td>0.000140</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">With simulated background</td>
+<td>0.000108</td>
+<td>7.4e-05</td>
+<td>0.000143</td>
+</tr>
+</tbody>
+</table>
+<p><strong><em>Table 1: Differential expression results from 18871 fibroblasts.</em></strong> <em>A linear model comparing expression in the upper vs.&nbsp;lower half of the tissue was run for two expression vectors.</em> <strong><em>Top row:</em></strong> <em>COL1A1 counts were down-sampled 85-fold to create a simulated gene of low expression level and negligible background.</em> <strong><em>Bottom row:</em></strong> <em>Background was added to the down-sampled data to simulate a gene of low expression and average background.</em></p>
+<p>To simulate a rare cell type where our sample size is less overpowering, we can re-run our analysis on a random subset of merely 1000 fibroblasts. When we do so, the fundamental finding remains: adding background to the data barely budges our estimates, confidence intervals and p-values. Remember, this is a gene for which 22.3% of counts are background.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 37%">
+<col style="width: 18%">
+<col style="width: 22%">
+<col style="width: 22%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;"></th>
+<th>Estimate</th>
+<th>Lower 95% conf interval</th>
+<th>Upper 95% conf interval</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">Downsampled to simulate near-zero background</td>
+<td>0.000165</td>
+<td>8.14e-06</td>
+<td>0.000321</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">With simulated background</td>
+<td>0.000175</td>
+<td>1.64e-05</td>
+<td>0.000334</td>
+</tr>
+</tbody>
+</table>
+<p><strong><em>Table 2: Differential expression results from 1000 fibroblasts, simulating a rare cell type.</em></strong> <em>For a random subset of 1000 fibroblasts, a linear model comparing expression in the upper vs.&nbsp;lower half of the tissue was run for two expression vectors.</em> <strong><em>Top row:</em></strong> <em>COL1A1 counts were down-sampled 85-fold to create a simulated gene of average expression level and negligible background.</em> <strong><em>Bottom row:</em></strong> <em>Background was added to the down-sampled data to simulate a gene of average expression and average background.</em></p>
+<p>Code for the above simulation can be found <a href="../../_code/background_simulations/CRC_sims.R" target="_blank">here</a>.</p>
+</section>
+<section id="case-2-impact-of-background-when-analyzing-single-cell-expression-profiles" class="level2">
+<h2 class="anchored" data-anchor-id="case-2-impact-of-background-when-analyzing-single-cell-expression-profiles">Case 2: Impact of background when analyzing single-cell expression profiles</h2>
+<p>Now, instead of analyzing one gene over many cells, we’ll see what happens when we analyze all the genes in a single cell. For this, we’ll need a new simulation. We first define a “true” expression profile as the average expression of macrophages in a scRNA-seq study (taken from the “ioprofiles” data from the InSituType R package). Then, we use this “true” profile to simulate a single cell’s non-background counts. Specifically, we sample from a multinomial distribution, with N equal to 590 (the average per-cell non-background count level in a typical 6k dataset), and with probabilities proportional to the expression levels of the 6k panel in our “true” profile. Finally, we simulate background atop the single cell profile, using a Poisson distribution with rate = 0.017.</p>
+<p>These simulation settings mimic a middle-of-the-road 6k dataset selected from the datasets in Figure 1, with an expected 698 counts per cell, of which 15.5% are background. Simulating a single cell under this setting, we obtained 676 counts, of which 12.9% were background. This represents a typical cell from a typical 6k dataset (Figure 4).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/1cell_barplot.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong><em>Figure 4: simulated real and background counts for a typical cell in 6k data.</em></strong> <em>Bars show the counts from all genes in the 6k panel. Red vs.&nbsp;blue portions of bars denote background vs.&nbsp;real counts.</em></p>
+<p>For the definitive parts of the profile, i.e.&nbsp;the highly-expressed genes, background does not distort our impression. Rather, it primarily contributes single-count values across a random selection of truly 0-count genes.</p>
+<p>Figure 3 gives us a gestalt for what a single cell profile with background looks like. But we truly care about is how well that observed profile reflects the cell’s true expression profile. A perfect assay would of course count every one of the ~300,000 mRNA molecules in a cell. In real-world settings where we measure closer to 1,000 molecules, we can measure a single cell profile’s accuracy by comparing its N observed counts to the expected counts obtained by sampling N mRNA molecules at random from the cell. With that in mind, let’s see how background impacts the fidelity of our measured gene expression profiles to the ground truth. First, we plot our simulated expression profile, with and without background, against the expected counts:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/1cell_scatterplots.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong><em>Figure 5. Simulated single-cell profile for a cell with 589 real counts, with and without an additional 87 background counts, in linear (top row) and log-scale (bottom row). (For log-scale plots, zeroes have been rounded up to 0.5.)</em></strong></p>
+<p>The simulated “observed” profiles with and without background have almost the same correlation to the ground truth. In other words, background contributes little to the error.</p>
+<p>Notice that even the profile without background is not terribly close to the truth. This divergence can’t be caused by background; rather, it’s caused by sampling error: because the counts are so sparse, they are noisy.</p>
+<p>(A brief digression into theory: because we’re sampling such a low percentage of the cell’s RNA molecules, each gene’s counts are effectively Poisson-distributed. The CV (sd / mean) of a Poisson distribution with mean µ is 1/sqrt(µ). In English: Poisson data with low means is noisy.)</p>
+<p>To see how sparsity drives error, we can re-run our simulation for a cell with 20,000 RNA counts:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/1cell_scatterplots_highcount.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong><em>Figure 6. Simulated single-cell profile for a cell with 20,000 real counts and 2971 background counts (12.9% of the total), in linear and log-scale.</em></strong></p>
+<p>The observed profile now correlates closely with the ground truth. We can conclude that sparsity more than background leads our observed counts to diverge from cells’ true profiles. Code for the above simulation can be found <a href="../../_code/background_simulations/single_cell_profile_sims.R" target="_blank">here</a>.</p>
+</section>
+<section id="case-3-impact-of-background-on-analyses-of-single-genes-in-single-cells." class="level2">
+<h2 class="anchored" data-anchor-id="case-3-impact-of-background-on-analyses-of-single-genes-in-single-cells.">Case 3: Impact of background on analyses of single genes in single cells.</h2>
+<p>In analyses of this sort, e.g.&nbsp;trying to declare a cell as +/- for a marker gene, background does act as a headwind. If we see only 1 count of a gene in a cell, the existence of background means we cannot be confident that the gene is truly expressed in the cell. We can calculate the impact of background in this setting directly, without simulation. (We assume that both real and background counts arise from Poisson distributions with different rates.) Figure 7 below shows how our ability to call gene presence/absence varies based on expression level, background, and the count threshold at which we call presence.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/marker detection performance.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong><em>Figure 7. performance metrics for calling cells as +/- for a gene.</em></strong> <strong><em>(top left):</em></strong> <em>sensitivity to call a cell as positive for a gene vs.&nbsp;the gene’s expected expression level per cell. This relationship is shown for thresholds of 1 count (cells with &gt;=1 counts are called positive) and 2 counts.</em> <strong><em>(other panels)</em></strong> <em>The true positive rate for cells called positive for a gene vs.&nbsp;the gene’s expected expression level per cell. Curves are shown for two count thresholds and for typical background (0.02 counts/plex/cell) and 40-fold lower background (0.005 counts/plex/cell). Vertical position indicates the percent of cells that are called positive are truly positive. The three panels correspond to (b) common cell types (50% of cells are positive), (c) somewhat rare cell types (10%) and (d) rare cell types (1%). Code for this simulation is available <a href="../../_code/background_simulations/marker_positivity_sims.R" target="_blank">here</a></em>.</p>
+<p>From Figure 7, we get a broad picture of the performance of calling marker gene positivity. Panel (a) conveys a few important if unsurprising lessons. First, sensitivity rises with expression level; second, it drops when we require more counts to make a cell. Third, sensitivity to detect a gene is quite poor until expected counts rise to ~3 per cell. In high-plex spatial transcriptomics in 2024, genes at this level are uncommon and would be considered high expressers. Put another way: sensitivity to detect gene positivity within a single cell is generally poor, regardless of background level. In panel (b), we see that for common cell types, background causes a low but acceptable rate of false positive calls. For cell types with 10% prevalence (panel c), background results in a 20% false detection rate using a threshold of 1 count, forcing a tradeoff between loss in sensitivity or the admission of some false positive cells to our positive calls. For cell types with 1% prevalence (panel d), a threshold of 1 count produces unacceptable levels of false positives, forcing a threshold of 2 counts and therefore a lower sensitivity.</p>
+<p>Note: keep in mind that prevalence can be contextual: a tiny proportion of all cells may be FOXP3+, but looking within T-cells, FOXP3 positivity could reach 10%. Thus by looking for gene positivity within a sensible subset of cells we can improve our detection performance.</p>
+<p>There is a powerful countermeasure to this limitation, described <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/" target="_blank">here</a>. To summarize briefly, we can derive smoothed/imputed gene expression values for crucial marker genes by borrowing information from similar cells. For a given cell, we identify the 50 cells most closely resembling its expression profile, and we replace the cell’s observed expression profile with the average expression profile of those 50 most similar cells. This negotiates a favorable variance/bias tradeoff: we bias the cell to look like its neighbors in expression space, but we squash noise due to sparsity and background. (In particular, a cell may contain a background count of a marker gene, but it’s vanishingly unlikely that very many of its expression space neighbors will have background in that same gene.) This approach works for any gene that correlates with other aspects of a cell’s expression state. For example, Treg cells aren’t just CD4 T cells with some FOXP3; FOXP3+ and FOXP3- T-cells have more extensive expression differences that allow this smoothing approach to attribute FOXP3 expression to Tregs and not to other CD4 T cells.</p>
+<p>In summary, regardless of background level, analyses of single genes in single cells (e.g.&nbsp;of marker genes) have low sensitivity except for high expressing genes. Background increases the false positive rate of marker gene detection, mainly in rare cell types. To overcome inaccuracy resulting from both low expression and background, use imputed marker gene expression.</p>
+</section>
+<section id="appendix1" class="level2">
+<h2 class="anchored" data-anchor-id="appendix1">Appendix 1: Origins of background in spatial transcriptomics</h2>
+<p>Background counts are simply instances where the instrument calls an RNA transcript that isn’t there. In CosMx data, background happens through two mechanisms.</p>
+<p>First, in “FalseCode” style background, reporter probes can colocalize with each other in space by random chance and then be misconstrued as a gene’s barcode. This kind of background is very rare, on the order of 0.005 counts per plex per cell. It can arise from false spot detection, from off-target binding of reporter probes, or from reporter codes from two closely adjacent transcripts combining to form the barcode of a third gene. This kind of background can be measured with our FalseCode negative controls, which are barcodes with no corresponding probes in hybridization reaction.</p>
+<p>Second, in “NegProbe” style background, a hybridization probe binds to the wrong target, then is correctly detected through reporter probes. This is the dominant form of background, occurring at 0.01-0.04 counts per plex per cell in most datasets. Our “NegProbe” controls, which are standard hybridization probes targeting sequences not found in any known genome, measure both this kind of background and FalseCode style background. Because they capture both sources of background, our analyses only need consider NegProbes levels.</p>
+</section>
+<section id="appendix2" class="level2">
+<h2 class="anchored" data-anchor-id="appendix2">Appendix 2: contrasting the harm of background vs.&nbsp;of segmentation errors</h2>
+<p>Background arises at random, and so impacts the data as noise. Segmentation errors, on the other hand, are not random: cells in different spatial contexts will be contaminated by different genes. This causes bias in the data. And while noise averages out at high sample sizes, bias does not. Thus segmentation errors are a far more pernicious influence on data quality than background and sparsity. For further discussion, see <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/" target="_blank">here</a>.</p>
+</section>
+<section id="appendix3" class="level2">
+<h2 class="anchored" data-anchor-id="appendix3">Appendix 3: How is background distributed?</h2>
+<p>As a first-order approximation, negprobe-style background happens with equal probability to all genes. (Beyond the first-order view, we have observed small subsets of negprobes with elevated background, usually not dramatically above the other negprobes.) We usually see cells’ background rising in proportion to their total expression: a tumor cell with twice the counts of another tumor cell is probably experiencing twice the background. Areas of necrosis will generate higher background, likely due to a more charged and thus more sticky surface for nucleic acid probes. Negprobes also seem to appear more densely outside of cells.</p>
+</section>
+<section id="appendix4" class="level2">
+<h2 class="anchored" data-anchor-id="appendix4">Appendix 4: Measuring cells’ background</h2>
+<p>Because background is so low, averaging around 0.01-0.04 counts per cell in the 6000plex panel across all the 20 NegProbes, a single cell’s negprobe signal is too unstable to give a precise estimate of its background rate. (Most cells have 0 NegProbe counts, while their true background rate is surely greater than zero.) When we need to estimate single cells’ background levels, we estimate this from their total counts: we calculate the mean background counts per total counts across the dataset, then apply this ratio to each individual cell’s total counts.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>quality control</category>
+  <category>overview</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/</guid>
+  <pubDate>Wed, 21 Aug 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/background_tile.png" medium="image" type="image/png" height="146" width="144"/>
+</item>
 <item>
   <title>InSituCor: an open-source package and AtoMx custom module for exploratory data analysis</title>
   <dc:creator>Patrick Danaher</dc:creator>
@@ -13049,71 +13265,6 @@ font-style: inherit;">"/"</span>)</span></code></pre></div>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/</guid>
   <pubDate>Fri, 26 Jan 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/figures/fig2.png" medium="image" type="image/png" height="88" width="144"/>
-</item>
-<item>
-  <title>Visualize cellular neighborhood in gallery mode</title>
-  <dc:creator>Lidan Wu</dc:creator>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="visualize-cellular-neighborhood-in-gallery-mode" class="level2">
-<h2 class="anchored" data-anchor-id="visualize-cellular-neighborhood-in-gallery-mode">Visualize cellular neighborhood in gallery mode</h2>
-<p>A complete CosMx dataset will contain cell metadata, morphology/protein images and cell label results of cell segmentation. We’ve created a toolkit for visualizing the neighborhood of query cells in terms of protein staining, cell segmentation border, numeric and categorical metadata. (Note: we are <em>not</em> performing cell typing or cell segmetnation here, just drawing boundaries from the existing cell label/segmetnation results.)</p>
-<p>You can find the package <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/NeighVizGallery" target="_blank">here</a>. See the corresponding <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/NeighVizGallery/vignettes/tutorial.R" target="_blank">tutorial</a> inside the package for more details.</p>
-<p>The inputs required:</p>
-<ul>
-<li><p>cell metadata with unique cell_ID in format of <code>c_[slide]_[fov]_[CellId]</code>.</p></li>
-<li><p>Either file path to <code>CellStatsDir</code> that contains per FOV level of cell label images, morphology C902 images and optional <code>ProteinDir</code> that contains per FOV level of protein images.</p></li>
-<li><p>Or file path to <code>napari-cosmx</code> dataset which contains stitched images for cell label, morphology and optional protein images of entire slide.</p></li>
-</ul>
-<p>This code expects the file format output generated by CosMx Single Molecular Imager (SMI) and <code>napari-cosMx</code> plugin. Here are the example data/folder structure of the required input files.</p>
-<ul>
-<li>Example cell metadata:</li>
-</ul>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig1.png" class="img-fluid"></p>
-<ul>
-<li><p>Example <code>CellStatsDir</code> and <code>ProteinDir</code> under raw data folder of given slide.</p>
-<ol type="1">
-<li>Each FOV subfolder under <code>CellStatsDir</code> contains cell label images of given FOV.</li>
-</ol></li>
-</ul>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig2.png" class="img-fluid"></p>
-<ol start="2" type="1">
-<li><code>Morphology2D</code> subfolder under <code>CellStatsDir</code> contains multi-channel morphology images of each FOV.</li>
-</ol>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig3.png" class="img-fluid"></p>
-<ol start="3" type="1">
-<li>Each FOV subfolder under <code>ProteinDir</code> contains a folder called <code>ProteinImages</code>, which has single-channel images for all the protein profiled for the given FOV.</li>
-</ol>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig4.png" class="img-fluid"></p>
-<ul>
-<li>Example <code>napari-cosmx</code> dataset with stitched images: <code>labels</code> for cell labels, <code>protein/[proteinName]</code> for single-channel protein images, other folders (e.g.&nbsp;<code>DNA</code>) for single-channel morphology images.</li>
-</ul>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig5.png" class="img-fluid"></p>
-<p>Below are the example outputs of plotting query cells’ neighborhood:</p>
-<ul>
-<li>Plotting morphology images and cell borers of query cells’s neighborhood</li>
-</ul>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig6.png" class="img-fluid"></p>
-<ul>
-<li>Plotting numeric and categorical metadata of query cells’ neighborhood</li>
-</ul>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig7.png" class="img-fluid"></p>
-
-
-</section>
-
- ]]></description>
-  <category>visualization</category>
-  <category>napari</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/</guid>
-  <pubDate>Wed, 24 Jan 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visualize-cellular-neighborhood-in-gallery-mode/figures/fig6.png" medium="image" type="image/png" height="188" width="144"/>
 </item>
 </channel>
 </rss>
