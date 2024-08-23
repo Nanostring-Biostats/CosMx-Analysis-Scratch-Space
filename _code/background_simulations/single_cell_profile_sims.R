@@ -92,16 +92,16 @@ expectedprofilehigh <- ioprofiles[, "macrophage"] / sum(ioprofiles[, "macrophage
 
 png("1cell_scatterplots_highcount.png", width = 8, height = 4, units = "in", res = 500)
 par(mfrow = c(1,2))
-par(mar = c(5,5,0.1,0.1))
+par(mar = c(5.5,5,0.1,0.1))
 # no background, linear-scale:
 plot(expectedprofilehigh, jitter(sim.highcount, amount = 0.3),
      col = scales::alpha("darkblue", 0.5), pch = 16, cex.lab = 1.2,
-     xlab = "Expected counts", ylab = "Simulated high-count cell")
+     xlab = "Expected counts", ylab = "Simulated high-count cell\n(with background)")
 legend("topleft", legend = paste0("cor = ", round(cor(ioprofiles[, "macrophage"], sim.highcount), 2)))
 # no background, log-scale:
 plot(pmax(expectedprofilehigh, 1e-3), jitter(pmax(sim.highcount, 0.5), amount = 0.1), log = "xy",
      col = scales::alpha("darkblue", 0.5), pch = 16, cex.lab = 1.2,
-     xlab = "Expected counts", ylab = "Simulated high-count cell", yaxt = "n", xaxt = "n")
+     xlab = "Expected counts", ylab = "Simulated high-count cell\n(with background)", yaxt = "n", xaxt = "n")
 legend("topleft", legend = paste0("cor = ", round(cor(
   log2(pmax(ioprofiles[, "macrophage"], 0.5)), 
   log2(pmax(sim.highcount, 0.5)))

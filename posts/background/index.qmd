@@ -82,7 +82,11 @@ knitr::include_graphics("./figures/low expressers.png")
 ```
 ___Figure 3: spatial plots of two low expressers.___
 
-Now let’s see how background impacts hard statistics. Using the same simulation, we’ll perform a differential expression analysis of how fibroblast cells modulate COL1A1 across the span of the tissue. For simplicity, we’ll just contrast fibroblasts in the top vs. bottom halves of the tissue, and we’ll run a simple t-test on normalized expression. We run this analysis on the downsampled / “negligible background” data, and on the data with simulated background added back in. 
+Now let’s see how background impacts hard statistics. Using the same simulation, we’ll perform a differential expression analysis.
+Mimicking (somewhat simplisticly) a typical use case, in which we study how a single cell type modules gene expression across spatial context,
+we'll measure how gene expression in fibroblasts changes between the top vs. bottom halves of the tissue. 
+To do this, we’ll run a simple t-test on normalized expression. 
+We run this toy analysis on the downsampled / “negligible background” data, and on the data with simulated background added back in. 
 When we analyze all 18871 fibroblasts, we find that adding background leaves our point estimate and confidence interval essentially intact:
 
 |	|	Estimate | Lower 95% conf interval	| Upper 95% conf interval	| p-value | 
@@ -110,7 +114,10 @@ Code for the above simulation can be found [here](/_code/background_simulations/
 
 ## Case 2: Impact of background when analyzing single-cell expression profiles
 
-Now, instead of analyzing one gene over many cells, we’ll see what happens when we analyze all the genes in a single cell. For this, we’ll need a new simulation. We first define a “true” expression profile as the average expression of macrophages in a scRNA-seq study (taken from the “ioprofiles” data from the InSituType R package). Then, we use this “true” profile to simulate a single cell’s non-background counts. (Specifically, we sample from a multinomial distribution with probabilities proportional to the 6k panel genes’ values in our “true” profile and N equal to 590, the average per-cell non-background count level in a typical 6k dataset.) Finally, we simulate background atop the single cell profile, using a Poisson distribution with rate = 0.017.
+Now, instead of analyzing one gene over many cells, we’ll see what happens when we analyze all the genes in a single cell. For this, we’ll need a new simulation. We first define a “true” expression profile as the average expression of macrophages in a scRNA-seq study (taken from the “ioprofiles” data from the InSituType R package). Then, we use this “true” profile to simulate a single cell’s non-background counts. 
+Specifically, we sample from a multinomial distribution, with N equal to 590 (the average per-cell non-background count level in a typical 6k dataset),
+and with probabilities proportional to the expression levels of the 6k panel in our “true” profile.
+Finally, we simulate background atop the single cell profile, using a Poisson distribution with rate = 0.017.
 
 These simulation settings mimic a middle-of-the-road 6k dataset selected from the datasets in Figure 1, with an expected 698 counts per cell, of which 15.5% are background. Simulating a single cell under this setting, we obtained 676 counts, of which 12.9% were background. This represents a typical cell from a typical 6k dataset (Figure 4). 
  
@@ -134,9 +141,9 @@ Figure 3 gives us a gestalt for what a single cell profile with background looks
 
 knitr::include_graphics("./figures/1cell_scatterplots.png")
 ```
-___Figure 5. Simulated single-cell profile for a cell with 589 real counts, with and without an additional 87 background counts, in linear and log-scale. (For log-scale plots, zeroes have been rounded up to 0.5.)___
+___Figure 5. Simulated single-cell profile for a cell with 589 real counts, with and without an additional 87 background counts, in linear (top row) and log-scale (bottom row). (For log-scale plots, zeroes have been rounded up to 0.5.)___
 
-The simulated “observed” profiles with and without background are comparably faithful to the ground truth. In other words, background contributes little to the error. 
+The simulated “observed” profiles with and without background have almost the same correlation to the ground truth. In other words, background contributes little to the error. 
 
 Notice that even the profile without background is not terribly close to the truth. This divergence can’t be caused by background; rather, it’s caused by sampling error: because the counts are so sparse, they are noisy. 
 
@@ -158,7 +165,7 @@ Code for the above simulation can be found [here](/_code/background_simulations/
 
 ## Case 3: Impact of background on analyses of single genes in single cells. 
 
-In analyses of this sort, e.g. trying to declare a cell as +/- for a marker gene, background does act as a headwind. If we see 1 count of a gene in a cell, the existence of background means we cannot be confident that the gene is truly present. 
+In analyses of this sort, e.g. trying to declare a cell as +/- for a marker gene, background does act as a headwind. If we see only 1 count of a gene in a cell, the existence of background means we cannot be confident that the gene is truly expressed in the cell. 
 We can calculate the impact of background in this setting directly, without simulation. (We assume that both real and background counts arise from Poisson distributions with different rates.) Figure 7 below shows how our ability to call gene presence/absence varies based on expression level, background, and the count threshold at which we call presence. 
  
 ```{r, out.width="100%", out.height="100%"}
@@ -168,13 +175,14 @@ We can calculate the impact of background in this setting directly, without simu
 knitr::include_graphics("./figures/marker detection performance.png")
 ```
 ___Figure 7. performance metrics for calling cells as +/- for a gene.___
-___a:___ _sensitivity to call a cell as positive for a gene vs. the gene’s expected expression level. This relationship is shown for thresholds of 1 count (cells with >=1 counts are called positive) and 2 counts._
-___b-d:___ _The true positive rate for cells called positive for a gene vs. expected expression level. Curves are shown for two count thresholds and for typical background (0.02 counts/plex/cell) and 40-fold lower background (0.005 counts/plex/cell). Vertical position indicates the percent of cells that are called positive are truly positive. The three panels correspond to (b) common cell types (50% of cells are positive), (c) somewhat rare cell types (10%) and (d) rare cell types (1%). Code for this simulation is available [here](/_code/background_simulations/marker_positivity_sims.R){target="_blank"}_.
+___(top left):___ _sensitivity to call a cell as positive for a gene vs. the gene’s expected expression level per cell. This relationship is shown for thresholds of 1 count (cells with >=1 counts are called positive) and 2 counts._
+___(other panels)___ _The true positive rate for cells called positive for a gene vs. the gene's expected expression level per cell. Curves are shown for two count thresholds and for typical background (0.02 counts/plex/cell) and 40-fold lower background (0.005 counts/plex/cell). Vertical position indicates the percent of cells that are called positive are truly positive. The three panels correspond to (b) common cell types (50% of cells are positive), (c) somewhat rare cell types (10%) and (d) rare cell types (1%). Code for this simulation is available [here](/_code/background_simulations/marker_positivity_sims.R){target="_blank"}_.
 
-From Figure 7, we get a broad picture of the performance of calling marker gene positivity. Panel (a) conveys a few important if unsurprising lessons. First, sensitivity rises with expression level; second, it drops when we require more counts to make a cell. Third, sensitivity to detect a gene is quite poor until expected counts rise to ~3 per cell. In high-plex spatial transcriptomics circa 2024, genes at this level are uncommon and would be considered high expressers. Put another way: sensitivity to detect gene positivity within a single cell is generally poor, regardless of background level.
+From Figure 7, we get a broad picture of the performance of calling marker gene positivity. Panel (a) conveys a few important if unsurprising lessons. First, sensitivity rises with expression level; second, it drops when we require more counts to make a cell. Third, sensitivity to detect a gene is quite poor until expected counts rise to ~3 per cell. In high-plex spatial transcriptomics in 2024, genes at this level are uncommon and would be considered high expressers. Put another way: sensitivity to detect gene positivity within a single cell is generally poor, regardless of background level.
 In panel (b), we see that for common cell types, background causes a low but acceptable rate of false positive calls. For cell types with 10% prevalence (panel c), background results in a 20% false detection rate using a threshold of 1 count, forcing a tradeoff between loss in sensitivity or the admission of some false positive cells to our positive calls. For cell types with 1% prevalence (panel d), a threshold of 1 count produces unacceptable levels of false positives, forcing a threshold of 2 counts and therefore a lower sensitivity.
 
-Note: keep in mind that prevalence can be contextual: a tiny proportion of all cells may be FOXP3+, but looking within T-cells, FOXP3 positivity could reach 10%. Thus by looking for gene positivity within a sensible subset of cells we can improve our detection performance. 
+Note: keep in mind that prevalence can be contextual: a tiny proportion of all cells may be FOXP3+, but looking within T-cells, FOXP3 positivity could reach 10%. 
+Thus by looking for gene positivity within a sensible subset of cells we can improve our detection performance. 
 
 There is a powerful countermeasure to this limitation, described [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/){target="_blank"}. To summarize briefly, we can derive smoothed/imputed gene expression values for crucial marker genes by borrowing information from similar cells. For a given cell, we identify the 50 cells most closely resembling its expression profile, and we replace the cell’s observed expression profile with the average expression profile of those 50 most similar cells. This negotiates a favorable variance/bias tradeoff: we bias the cell to look like its neighbors in expression space, but we squash noise due to sparsity and background. (In particular, a cell may contain a background count of a marker gene, but it’s vanishingly unlikely that very many of its expression space neighbors will have background in that same gene.) This approach works for any gene that correlates with other aspects of a cell’s expression state. For example, Treg cells aren’t just CD4 T cells with some FOXP3; FOXP3+ and FOXP3- T-cells have more extensive expression differences that allow this smoothing approach to attribute FOXP3 expression to Tregs and not to other CD4 T cells.
 
