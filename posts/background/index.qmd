@@ -17,8 +17,8 @@ image: figures/background_tile.png
 
 CosMx data includes off-target “background” counts appearing randomly at a low frequency across the dataset. In this article, we’ll discuss how background impacts data analysis. Many details follow, but our main findings are simple:
 1.	For analyses where statistics are calculated across many cells, for example differential expression or spatial correlation analysis, the impact of background approaches zero. 
-2.	For analyses of single cell profiles, for example cell typing or UMAP projections, background contributes a small amount of noise/error. But by far the major driver of noise in single cell profiles is sensitivity/sparsity, not background. 
-3.	Analyses of single genes in single cells, for example calling cells as +/- for a marker gene, perform poorly regardless of background levels, save for perhaps the top ~10% expressing genes. We recommend [a smoothing / imputation approach](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/) {target="_blank"} to make this kind of analysis reliable. 
+2.	For analyses of single cell profiles, for example cell typing or UMAP projections, background contributes a small amount of noise/error. But by far the major driver of noise in single cell profiles is sensitivity / readout sparsity, not background. 
+3.	Analyses of single genes in single cells, for example calling cells as +/- for a marker gene, perform poorly regardless of background levels, except for perhaps the top ~10%  high-expressing genes. We recommend [a smoothing / imputation approach](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/) {target="_blank"} to make this kind of analysis reliable. 
 
 Note: For details of the origins of background counts, see Appendix 1. 
 
@@ -33,7 +33,7 @@ In most 6000-plex datasets, background is somewhere between 0.01 and 0.05 counts
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/exampleheatmap.png")
+knitr::include_graphics("./figures/signal vs. bg 2.png")
 ```
 
 ___Figure 1: signal and background across 6k datasets of widely varying data quality.___
@@ -166,17 +166,18 @@ In panel (b), we see that for common cell types, background causes a low but acc
 
 Note: keep in mind that prevalence can be contextual: a tiny proportion of all cells may be FOXP3+, but looking within T-cells, FOXP3 positivity could reach 10%. Thus by looking for gene positivity within a sensible subset of cells we can improve our detection performance. 
 
-There is a powerful countermeasure to this limitation, described [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/){target="_blank"}. To summarize briefly, we can derive smoothed/imputed gene expression values for crucial marker genes by borrowing information from similar cells. For a given cell, we identify the 50 cells most closely resembling its expression profile, and we replace the cell’s observed expression profile with the average expression profile of those 50 most similar cells. This negotiates a favorable variance/bias tradeoff: we bias the cell to look like its neighbors, but we squash noise due to sparsity and background. (In particular, a cell may contain a background count of a marker gene, but it’s vanishingly unlikely that very many of its neighbors will have background in that same gene.) This approach works for any gene that correlates with other aspects of a cell’s expression state. For example, Treg cells aren’t just CD4 T cells with some FOXP3; FOXP3+ and FOXP3- T-cells have more extensive expression differences that allow this smoothing approach to attribute FOXP3 expression to Tregs and not to other CD4 T cells.
+There is a powerful countermeasure to this limitation, described [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/){target="_blank"}. To summarize briefly, we can derive smoothed/imputed gene expression values for crucial marker genes by borrowing information from similar cells. For a given cell, we identify the 50 cells most closely resembling its expression profile, and we replace the cell’s observed expression profile with the average expression profile of those 50 most similar cells. This negotiates a favorable variance/bias tradeoff: we bias the cell to look like its neighbors in expression space, but we squash noise due to sparsity and background. (In particular, a cell may contain a background count of a marker gene, but it’s vanishingly unlikely that very many of its expression space neighbors will have background in that same gene.) This approach works for any gene that correlates with other aspects of a cell’s expression state. For example, Treg cells aren’t just CD4 T cells with some FOXP3; FOXP3+ and FOXP3- T-cells have more extensive expression differences that allow this smoothing approach to attribute FOXP3 expression to Tregs and not to other CD4 T cells.
 
-In summary, regardless of background level, analyses of single genes in single cells (e.g. of marker genes) have low sensitivity save for high expressing genes. Background increases the false positive rate of marker gene detection, mainly in rare cell types. To overcome inaccuracy resulting from both low expression and background, use imputed marker gene expression. 
+In summary, regardless of background level, analyses of single genes in single cells (e.g. of marker genes) have low sensitivity except for high expressing genes. Background increases the false positive rate of marker gene detection, mainly in rare cell types. To overcome inaccuracy resulting from both low expression and background, use imputed marker gene expression. 
 
 ## Appendix 1: Origins of background in spatial transcriptomics
 
 Background counts are simply instances where the instrument calls an RNA transcript that isn’t there. In CosMx data, background happens through two mechanisms. 
 
-First, in “FalseCode” style background, fluorescent spots from reporter probes can be misconstrued as a gene’s barcode. This kind of background is very rare, on the order of 0.005 counts per plex per cell. It can arise from false spot detection, from off-target binding of reporter probes, or from reporter codes from two closely adjacent transcripts combining to form the barcode of a third gene. This kind of background can be measured with our FalseCode negative controls. 
+First, in “FalseCode” style background, reporter probes can colocalize with each other in space by random chance and then be misconstrued as a gene’s barcode. This kind of background is very rare, on the order of 0.005 counts per plex per cell. It can arise from false spot detection, from off-target binding of reporter probes, or from reporter codes from two closely adjacent transcripts combining to form the barcode of a third gene. This kind of background can be measured with our FalseCode negative controls,
+which are barcodes with no corresponding probes in hybridization reaction. 
 
-Second, in “NegProbe” style background, a hybridization probe binds to the wrong target, then is correctly detected through reporter probes. This is the dominant form of background, occurring at 0.01-0.04 counts per plex per cell in most datasets. Our “NegProbe” negative controls, which are standard hybridization probes targeting sequences not found in any known genome, measure both this kind of background and FalseCode style background. Because they capture both sources of background, our analyses only need consider NegProbes levels. 
+Second, in “NegProbe” style background, a hybridization probe binds to the wrong target, then is correctly detected through reporter probes. This is the dominant form of background, occurring at 0.01-0.04 counts per plex per cell in most datasets. Our “NegProbe” controls, which are standard hybridization probes targeting sequences not found in any known genome, measure both this kind of background and FalseCode style background. Because they capture both sources of background, our analyses only need consider NegProbes levels. 
 
 ## Appendix 2: contrasting the harm of background vs. of segmentation errors 
 
@@ -184,7 +185,7 @@ Background arises at random, and so impacts the data as noise. Segmentation erro
 
 ## Appendix 3: How is background distributed? 
 
-As a first-order approximation, negprobe-style background happens with equal probability to all genes. (Beyond the first-order view, we have observed small subsets of negprobes with elevated background, usually not dramatically above the other negprobes.) We usually see cells’ background rising in proportion to their total expression: a tumor cell with twice the counts of another tumor cell is probably experiencing twice the background. Areas of necrosis will generate higher background. Negprobes also seem to appear more densely outside of cells. 
+As a first-order approximation, negprobe-style background happens with equal probability to all genes. (Beyond the first-order view, we have observed small subsets of negprobes with elevated background, usually not dramatically above the other negprobes.) We usually see cells’ background rising in proportion to their total expression: a tumor cell with twice the counts of another tumor cell is probably experiencing twice the background. Areas of necrosis will generate higher background, likely due to a more charged and thus more sticky surface for nucleic acid probes. Negprobes also seem to appear more densely outside of cells. 
 
 ## Appendix 4: Measuring cells’ background
 
