@@ -25,11 +25,11 @@ Note: For details of the origins of background counts, see Appendix 1.
 Note: This document focuses on background. But always worth bearing in mind is that segmentation errors have a far more deleterious impact on data quality. See Appendix 2 for a brief discussion.
 
 
-##How much background is there?
+## How much background is there?
 
 In most 6000-plex datasets, background is somewhere between 0.01 and 0.05 counts per plex per cell. To get a fuller sense of the range of background, see below for results from a set of 6k datasets of varying quality. 
 
-```{r, out.width="20%", out.height="20%"}
+```{r, out.width="100%", out.height="100%"}
 #| eval: true
 #| echo: false
 
@@ -41,7 +41,7 @@ ___a.___ _Datasets’ mean background (mean counts per negprobe per cell) plotte
 
 From Figure 1, we see that datasets with more signal tend to also have more background, but that background does not rise as quickly as signal. For a nuanced discussion of how background behaves within a dataset, see Appendix 3.
 
-##Case 1: Impact of background when calculating summary statistics over many cells
+## Case 1: Impact of background when calculating summary statistics over many cells
 
 CosMx datasets tend to be large, containing hundreds of thousands of cells in total, and at least thousands of cells from most individual cell types. When we’re calculating summary statistics, for example performing differential expression or computing spatial correlations, this sample size is enabling. The law of large numbers assures us that as N increases, the noise in our data averages out, leaving us with precise estimates. Thus background does not obscure trends that occur over large numbers of cells. 
 
@@ -49,7 +49,7 @@ To demonstrate what statistical theory assures us, we’ll simulate CosMx data f
 
 First, let’s get a visceral feel for what background looks like by plotting our simulated counts across space:
 
-```{r, out.width="20%", out.height="20%"}
+```{r, out.width="100%", out.height="100%"}
 #| eval: true
 #| echo: false
 
@@ -66,7 +66,7 @@ ___Right:___ _Background added to the down-sampled data to simulate a gene of av
 The spatial pattern of this gene’s expression is equally clear with and without background. This example serves to demonstrate a general principle: since background occurs randomly, it does little to obscure spatial trends in gene expression. We can also demonstrate this without use of simulation. Figure 3 below shows two low expressers displaying clear spatial patterns.
 
  
-```{r, out.width="20%", out.height="20%"}
+```{r, out.width="100%", out.height="100%"}
 #| eval: true
 #| echo: false
 
@@ -98,13 +98,13 @@ ___Bottom row:___ _Background was added to the down-sampled data to simulate a g
 
 Code for the above simulation can be found [here](/_code/background_simulations/CRC_sims.R){target="_blank"}.
 
-##Case 2: Impact of background when analyzing single-cell expression profiles
+## Case 2: Impact of background when analyzing single-cell expression profiles
 
 Now, instead of analyzing one gene over many cells, we’ll see what happens when we analyze all the genes in a single cell. For this, we’ll need a new simulation. We first define a “true” expression profile as the average expression of macrophages in a scRNA-seq study (taken from the “ioprofiles” data from the InSituType R package). Then, we use this “true” profile to simulate a single cell’s non-background counts. (Specifically, we sample from a multinomial distribution with probabilities proportional to the 6k panel genes’ values in our “true” profile and N equal to 590, the average per-cell non-background count level in a typical 6k dataset.) Finally, we simulate background atop the single cell profile, using a Poisson distribution with rate = 0.017.
 
 These simulation settings mimic a middle-of-the-road 6k dataset selected from the datasets in Figure 1, with an expected 698 counts per cell, of which 15.5% are background. Simulating a single cell under this setting, we obtained 676 counts, of which 12.9% were background. This represents a typical cell from a typical 6k dataset (Figure 4). 
  
-```{r, out.width="20%", out.height="20%"}
+```{r, out.width="100%", out.height="100%"}
 #| eval: true
 #| echo: false
 
@@ -118,7 +118,7 @@ For the definitive parts of the profile, i.e. the highly-expressed genes, backgr
 Figure 3 gives us a gestalt for what a single cell profile with background looks like. But we truly care about is how well that observed profile reflects the cell’s true expression profile. A perfect assay would of course count every one of the ~300,000 mRNA molecules in a cell. In real-world settings where we measure closer to 1,000 molecules, we can measure a single cell profile’s accuracy by comparing its N observed counts to the expected counts obtained by sampling N mRNA molecules at random from the cell. With that in mind, let’s see how background impacts the fidelity of our measured gene expression profiles to the ground truth. First, we plot our simulated expression profile, with and without background, against the expected counts: 
  
  
-```{r, out.width="20%", out.height="20%"}
+```{r, out.width="100%", out.height="100%"}
 #| eval: true
 #| echo: false
 
@@ -135,7 +135,7 @@ Notice that even the profile without background is not terribly close to the tru
 To see how sparsity drives error, we can re-run our simulation for a cell with 20,000 RNA counts: 
 
  
-```{r, out.width="20%", out.height="20%"}
+```{r, out.width="100%", out.height="100%"}
 #| eval: true
 #| echo: false
 
@@ -146,12 +146,12 @@ ___Figure 6. Simulated single-cell profile for a cell with 20,000 real counts an
 The observed profile now correlates closely with the ground truth. We can conclude that sparsity more than background leads our observed counts to diverge from cells’ true profiles.
 Code for the above simulation can be found [here](/_code/background_simulations/single_cell_profile_sims.R){target="_blank"}.
 
-##Case 3: Impact of background on analyses of single genes in single cells. 
+## Case 3: Impact of background on analyses of single genes in single cells. 
 
 In analyses of this sort, e.g. trying to declare a cell as +/- for a marker gene, background does act as a headwind. If we see 1 count of a gene in a cell, the existence of background means we cannot be confident that the gene is truly present. 
 We can calculate the impact of background in this setting directly, without simulation. (We assume that both real and background counts arise from Poisson distributions with different rates.) Figure 7 below shows how our ability to call gene presence/absence varies based on expression level, background, and the count threshold at which we call presence. 
  
-```{r, out.width="20%", out.height="20%"}
+```{r, out.width="100%", out.height="100%"}
 #| eval: true
 #| echo: false
 
@@ -186,7 +186,7 @@ Background arises at random, and so impacts the data as noise. Segmentation erro
 
 As a first-order approximation, negprobe-style background happens with equal probability to all genes. (Beyond the first-order view, we have observed small subsets of negprobes with elevated background, usually not dramatically above the other negprobes.) We usually see cells’ background rising in proportion to their total expression: a tumor cell with twice the counts of another tumor cell is probably experiencing twice the background. Areas of necrosis will generate higher background. Negprobes also seem to appear more densely outside of cells. 
 
-##Appendix 4: Measuring cells’ background
+## Appendix 4: Measuring cells’ background
 
 Because background is so low, averaging around 0.01-0.04 counts per cell in the 6000plex panel across all the 20 NegProbes, a single cell’s negprobe signal is too unstable to give a precise estimate of its background rate. (Most cells have 0 NegProbe counts, while their true background rate is surely greater than zero.) When we need to estimate single cells’ background levels, we estimate this from their total counts: we calculate the mean background counts per total counts across the dataset, then apply this ratio to each individual cell’s total counts. 
 
