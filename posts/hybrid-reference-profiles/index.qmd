@@ -1,5 +1,5 @@
 ---
-title: "Creating hybrid reference profiles for InSituType"
+title: "Creating reference profiles for InSituType"
 author:
   - name: Patrick Danaher
     orcid: 0000-0002-2844-5883
@@ -11,14 +11,28 @@ date-modified: "2024-08-21"
 categories: [cell typing]
 draft: false
 image: figures/heatmap_tile.png
+description: "A short guide to creating reference profiles, and to merging profiles from different sources."
 ---
 
 
 ## Background
 
-The InSituType cell typing algorithm relies on a "reference matrix" to perform supervised or semi-supervised cell typing.
+The [InSituType cell typing algorithm](https://github.com/Nanostring-Biostats/InSituType){target="_blank"} relies on a "reference matrix" to perform supervised or semi-supervised cell typing.
 A reference matrix gives the expected gene expression profile of each cell type in a tissue;
 these are usually derived from previous scRNA-seq or spatial transcriptomics experiments. 
+
+## Deriving reference profiles:
+
+To create reference profiles from a previous dataset, you can use `InSituType::getRNAprofiles`.
+When using this function, keep the following in mind:
+
+1. Ensure that your dataset is linear-scale (no log-transformations)
+2. Raw data is preferred, though normalized will work just fine
+3. If you input data is scRNA-seq, which has essentially no background, 
+ just enter the negative control argument as `neg = rep(0, length(clust))` (where `clust` is the vector you pass to the clust argument).
+
+
+## Creating hybrid reference profiles:
 
 Fairly often, it's convenient to create a hybrid reference matrix from two studies. 
 In a typical example, you may want to cell type a solid tissue with autoimmune disease. 
@@ -26,16 +40,14 @@ There is likely a good scRNA-seq dataset available for the healthy cell types in
 but this dataset probably has poor coverage of immune cells, as immune cells are rare in 
 non-inflamed tissues, and most single cell datasets only sample some tens of thousands of cells.
 
+### Example 
 
-
-## Example
-
-Here's an example workflow for merging the HCA liver cell profiles with the 
+Here's an example workflow for merging the HCA colon cell profiles (Kinchen et al 2018, original data [here](https://data.humancellatlas.org/explore/projects/f8aa201c-4ff1-45a4-890e-840d63459ca2 https://www.sciencedirect.com/science/article/pii/S0092867418311681?via%3Dihub){target="_blank"}) with the 
 InSituType immune cell profiles. The key steps are:
 
 - Aligning by shared genes
 - Rescaling (InSituType doesn't care about the scaling of the columns in a reference matrix,
-but it's convenient for descriptive analyses if they're all comparably scales)
+but it's convenient for descriptive analyses if they're all comparably scaled.)
 - Removing redundant cell types
 
 ```{r, echo=TRUE, eval=FALSE}
@@ -44,27 +56,32 @@ library(InSituType)
 data("ioprofiles")
 head(ioprofiles)
 
-# load HCA profiles for liver:
+# load HCA profiles for colon:
 load(url("https://github.com/Nanostring-Biostats/CellProfileLibrary/raw/master/Human/Adult/Colon_HCA.RData"))
-liverprofiles <- as.matrix(profile_matrix)
+colonprofiles <- as.matrix(profile_matrix)
+head(colonprofiles)
 
 # align genes:
-sharedgenes <- intersect(rownames(ioprofiles), rownames(liverprofiles))
+sharedgenes <- intersect(rownames(ioprofiles), rownames(colonprofiles))
 ioprofiles <- ioprofiles[sharedgenes, ]
-liverprofiles <- liverprofiles[sharedgenes, ]
+colonprofiles <- colonprofiles[sharedgenes, ]
 
 # put on appproximately the same scale:
 ioprofiles <- ioprofiles / quantile(ioprofiles, 0.99) * 1000
-liverprofiles <- liverprofiles / quantile(liverprofiles, 0.99) * 1000
+colonprofiles <- colonprofiles / quantile(colonprofiles, 0.99) * 1000
 
-# omit immune cells from liver profiles:
+# omit immune cells from colon profiles:
 colnames(ioprofiles)
-colnames(liverprofiles)
-omit_from_liver <- c("plasma.cell")
+colnames(colonprofiles)
+omit_from_colon <- c("plasma.cell")
 omit_from_io <- c("fibroblast", "endothelial")
 
 # merge:
 ref <- cbind(ioprofiles[, setdiff(colnames(ioprofiles), omit_from_io)], 
-             liverprofiles[, setdiff(colnames(liverprofiles), omit_from_liver)])
+             colonprofiles[, setdiff(colnames(colonprofiles), omit_from_colon)])
 head(ref)
 ```
+
+Once you obtain this merged reference profile, you can use it for cell typing with InSituType as you would any other reference matrix.
+
+For deep-dives on other cell typing topics, see the [InSituType FAQS](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md){target="_blank"}.
