@@ -9,8 +9,186 @@
 <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/</link>
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
-<generator>quarto-1.5.56</generator>
+<generator>quarto-1.5.57</generator>
 <lastBuildDate>Wed, 21 Aug 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Creating reference profiles for InSituType</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="background" class="level2">
+<h2 class="anchored" data-anchor-id="background">Background</h2>
+<p>The <a href="https://github.com/Nanostring-Biostats/InSituType" target="_blank">InSituType cell typing algorithm</a> relies on a “reference matrix” to perform supervised or semi-supervised cell typing. A reference matrix gives the expected gene expression profile of each cell type in a tissue; these are usually derived from previous scRNA-seq or spatial transcriptomics experiments.</p>
+</section>
+<section id="deriving-reference-profiles" class="level2">
+<h2 class="anchored" data-anchor-id="deriving-reference-profiles">Deriving reference profiles:</h2>
+<p>To create reference profiles from a previous dataset, you can use <code>InSituType::getRNAprofiles</code>. When using this function, keep the following in mind:</p>
+<ol type="1">
+<li>Ensure that your dataset is linear-scale (no log-transformations)</li>
+<li>Raw data is preferred, though normalized will work just fine</li>
+<li>If you input data is scRNA-seq, which has essentially no background, just enter the negative control argument as <code>neg = rep(0, length(clust))</code> (where <code>clust</code> is the vector you pass to the clust argument).</li>
+</ol>
+</section>
+<section id="creating-hybrid-reference-profiles" class="level2">
+<h2 class="anchored" data-anchor-id="creating-hybrid-reference-profiles">Creating hybrid reference profiles:</h2>
+<p>Fairly often, it’s convenient to create a hybrid reference matrix from two studies. In a typical example, you may want to cell type a solid tissue with autoimmune disease. There is likely a good scRNA-seq dataset available for the healthy cell types in your tissue, but this dataset probably has poor coverage of immune cells, as immune cells are rare in non-inflamed tissues, and most single cell datasets only sample some tens of thousands of cells.</p>
+<section id="example" class="level3">
+<h3 class="anchored" data-anchor-id="example">Example</h3>
+<p>Here’s an example workflow for merging the HCA colon cell profiles (Kinchen et al 2018, original data <a href="https://data.humancellatlas.org/explore/projects/f8aa201c-4ff1-45a4-890e-840d63459ca2%20https://www.sciencedirect.com/science/article/pii/S0092867418311681?via%3Dihub" target="_blank">here</a>) with the InSituType immune cell profiles. The key steps are:</p>
+<ul>
+<li>Aligning by shared genes</li>
+<li>Rescaling (InSituType doesn’t care about the scaling of the columns in a reference matrix, but it’s convenient for descriptive analyses if they’re all comparably scaled.)</li>
+<li>Removing redundant cell types</li>
+</ul>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># get immune cell profiles included in the InSituType library:</span></span>
+<span id="cb1-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(InSituType)</span>
+<span id="cb1-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ioprofiles"</span>)</span>
+<span id="cb1-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">head</span>(ioprofiles)</span>
+<span id="cb1-5"></span>
+<span id="cb1-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># load HCA profiles for colon:</span></span>
+<span id="cb1-7"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">load</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">url</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://github.com/Nanostring-Biostats/CellProfileLibrary/raw/master/Human/Adult/Colon_HCA.RData"</span>))</span>
+<span id="cb1-8">colonprofiles <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.matrix</span>(profile_matrix)</span>
+<span id="cb1-9"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">head</span>(colonprofiles)</span>
+<span id="cb1-10"></span>
+<span id="cb1-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># align genes:</span></span>
+<span id="cb1-12">sharedgenes <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">intersect</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(ioprofiles), <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(colonprofiles))</span>
+<span id="cb1-13">ioprofiles <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> ioprofiles[sharedgenes, ]</span>
+<span id="cb1-14">colonprofiles <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> colonprofiles[sharedgenes, ]</span>
+<span id="cb1-15"></span>
+<span id="cb1-16"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># put on appproximately the same scale:</span></span>
+<span id="cb1-17">ioprofiles <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> ioprofiles <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">quantile</span>(ioprofiles, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.99</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span></span>
+<span id="cb1-18">colonprofiles <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> colonprofiles <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">quantile</span>(colonprofiles, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.99</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span></span>
+<span id="cb1-19"></span>
+<span id="cb1-20"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># omit immune cells from colon profiles:</span></span>
+<span id="cb1-21"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(ioprofiles)</span>
+<span id="cb1-22"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(colonprofiles)</span>
+<span id="cb1-23">omit_from_colon <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"plasma.cell"</span>)</span>
+<span id="cb1-24">omit_from_io <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"fibroblast"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"endothelial"</span>)</span>
+<span id="cb1-25"></span>
+<span id="cb1-26"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># merge:</span></span>
+<span id="cb1-27">ref <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">cbind</span>(ioprofiles[, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">setdiff</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(ioprofiles), omit_from_io)], </span>
+<span id="cb1-28">             colonprofiles[, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">setdiff</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(colonprofiles), omit_from_colon)])</span>
+<span id="cb1-29"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">head</span>(ref)</span></code></pre></div>
+</div>
+<p>Once you obtain this merged reference profile, you can use it for cell typing with InSituType as you would any other reference matrix.</p>
+<p>For deep-dives on other cell typing topics, see the <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">InSituType FAQS</a>.</p>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>cell typing</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/</guid>
+  <pubDate>Wed, 21 Aug 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/figures/heatmap_tile.png" medium="image" type="image/png" height="126" width="144"/>
+</item>
 <item>
   <title>How does background impact CosMx data, and when does it matter?</title>
   <dc:creator>Patrick Danaher</dc:creator>
@@ -13242,37 +13420,6 @@ font-style: inherit;">"/"</span>)</span></code></pre></div>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/normalization/</guid>
   <pubDate>Mon, 29 Jan 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/normalization/figures/puzzle.png" medium="image" type="image/png" height="145" width="144"/>
-</item>
-<item>
-  <title>Functions for condensing FOVs and tissues to minimize whitespace</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="condensing-cells-in-xy-space-for-better-plotting" class="level2">
-<h2 class="anchored" data-anchor-id="condensing-cells-in-xy-space-for-better-plotting">Condensing cells in xy space for better plotting</h2>
-<p>Minimizing whitespace while plotting cells in xy space is a constant challenge. A single tissue will often have discontinuous FOVs, and aligning multiple tissues in a sensible way can be onerous.</p>
-<p>Here, for example, are FOVs collected from core needle biopsies, where the cells can barely be seen against the vast expanse of white space.</p>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/figures/fig1.png" class="img-fluid"></p>
-<p>As a partial solution, see the function consenseXY(), provided <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/condensing%20xy%20space/CondenseXY.R" target="_blank">here</a>.</p>
-<p>The main wrapper function contains an algorithm for pulling together FOVs from the same tissue, and an algorithm for tiling tissues across a plot.</p>
-<p>Here’s a toy example of FOV groups from two tissues before and after the algorithm (color denotes tissue ID):</p>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/figures/fig2.png" class="img-fluid"></p>
-<p>It’s not perfect, but it’s an improvement on the original spacing with no thought or manual labor.</p>
-<p>Warning: the FOV condensing code is inefficiently written and takes longer than it should, though it’s still faster than working by hand.</p>
-
-
-</section>
-
- ]]></description>
-  <category>visualization</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/</guid>
-  <pubDate>Fri, 26 Jan 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/figures/fig2.png" medium="image" type="image/png" height="88" width="144"/>
 </item>
 </channel>
 </rss>
