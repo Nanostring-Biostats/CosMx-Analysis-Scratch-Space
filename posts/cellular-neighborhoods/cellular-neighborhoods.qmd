@@ -2,7 +2,7 @@
 title: "Cellular neighborhoods: a useful and straightforward analysis framework"
 author:
   - name: Patrick Danaher
-    orcid: 0000-0002-4074-9003
+    orcid: 0000-0002-2844-5883
     affiliations: 
       - ref: Bruker Spatial Biology
       - ref: patrickjdanaher
@@ -45,14 +45,20 @@ they make analyses easier to understand, both for analysts and for their eventua
 In this spirit, we recommend "cellular neighborhoods" as an framework for diverse analyses. 
 This approach is easy to implement, straightforward to riff on, and computationally cheap. 
 
-# What are cellular neighborhoods?
-
-There are two steps to define cellular neighborhood data:
+Cellular neighborhood analysis begins with two steps:
 
 1. First, we define each cell's neighboring cells. 
 2. Second, we define each cell's "spatial context", creating a new data matrix. 
 To do this, we compute summaries of each cell's neighbors, reporting for example
  their average expression profile or the abundance of different cell types within them.
+
+
+```{r}
+#| eval: true
+#| echo: false
+#| fig-cap: "Left: example of a cellular neighborhood defined as a cell's 50 nearest neighbors. Right: the mean expression profile of those neighbors is used to define the cell's spatial context. This 'mean neighborhood expression', calculated separately for all cells in the dataset, defines a new data matrix." 
+knitr::include_graphics("./figures/cartoon.png")
+```
 
 Once we've obtained a matrix of spatial context data, myriad analyses become possible. 
 We can:
@@ -67,12 +73,30 @@ Many of these analyses are achieved by simply applying techniques from single ce
 for example clustering the rows (cells) or columns (genes) of the matrix. 
 
 
-```{r}
-#| eval: true
-#| echo: false
-#| fig-cap: "Left: example of a cellular neighborhood defined as a cell's 50 nearest neighbors. Right: the mean expression profile of those neighbors is used to define the cell's spatial context. This 'mean neighborhood expression', calculated separately for all cells in the dataset, defines a new data matrix." 
-knitr::include_graphics("./figures/cartoon.png")
+# Tools for analyzing cellular neighborhoods:
+
+A small R package implementing the building blocks of cellular neighborhood analysis is 
+[here](/_code/cellular-neighborhoods){target="_blank"}. 
+
+To install it:
+
+```{r, echo = TRUE, eval = FALSE}
+devtools::install_github("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cellular-neighborhoods")
 ```
+
+To set up our examples, let's load the package and open its data:
+
+```{r, echo = TRUE, eval = TRUE}
+library(CellularNeighborhoods)
+data(cosmx_kidney)
+annot <- cosmx_kidney$annot
+rownames(annot) <- annot$cell_ID
+counts <- cosmx_kidney$counts
+celltype <- as.factor(cosmx_kidney$annot$celltype)
+xy <- cosmx_kidney$xy
+```
+
+Now we can demonstrate the basics:
 
 ## Defining a cell's neighbors
  
@@ -86,6 +110,43 @@ The size of a neighborhood is up to the analyst's discretion. Try to choose a ne
 size that reflects your understanding of biology (how far away is a cell ) and that makes sense for your biological question. There is a goldilocks zone though: very small neighborhoods produce sparse and noisy data, 
 and very large neighborhoods become inaccurate representations of a cell's 3D surroundings. 
 (Why: the area of your neighborhood increases with the square of the radius, but the volume increases with the cube of the radius. This means that the larger the radius, the less of your 3D neighborhood falls in the narrow tissue slide you've assayed, and the more it consists of unseen cells increasingly far away in the Z-dimension.)
+
+Here's code for defining cellular neighborhoods:
+```{r}
+#| eval: true
+#| echo: false
+
+# define neighbors using a K-nearest approach:
+neighbors.nearest50 <- nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50)
+
+# define using a radius-based approach:
+neighbors.radiusbased <- radiusBasedGraph(x = xy[, 1], y = xy[, 2], R = 0.05)
+
+# the output is a sparse matrix of cells * cells:
+str(neighbors.nearest50)
+
+# compare the number of neighbors found by each approach:
+summary(Matrix::rowSums(neighbors.nearest50))
+summary(Matrix::rowSums(neighbors.radiusbased))
+```
+
+### Subsampling neighbors to minimize spatial auto-correlation
+
+An occasionally important detail: 
+
+In "Mitigating autocorrelation during spatially resolved transcriptomics data analysis" (bioRvix), Maher et al. describe an inconvenient tendency of spatial context matrices: because neighboring cells have largely the same neighbors, their entries in the spatial context matrix are correlated. 
+This correlation between neighbors proves a substantial barrier to distance-based analyses like UMAP or Leiden clustering, producing UMAPs where all points fall in a highly-connected blob and generally poor Leiden performance. 
+(However, for most analyses, correlation between neighboring cells' spatial context vectors doesn't seem to have much impact.)
+They propose that by defining each cell's neighborhood as a random subset of its nearest neighbors, they can
+largely break this correlation between neighbors. They released a python toolkit for this, [SPIN](https://github.com/wanglab-broad/spin){target="_blank"}.
+
+For R coders, here's how you would get a neighborhood matrix with random subsetting:
+
+```{r}
+subsetted_neighbors <- subsampleNeighborsByRow(neighbors = neighbors.nearest50, p = 0.5)
+summary(Matrix::rowSums(subsetted_neighbors))
+```
+
 
 ## Summarizing a cell's neighbors to define its spatial context
 
@@ -106,16 +167,79 @@ The main takeaway here is that once you've defined cellular neighborhoods, it's 
 simply to extract all manner of variables from them, giving you great flexibility in how 
 you pose biological questions. 
 
+You can implement the basic formats of spatial context matrices as follows:
+
+```{r}
+# mean neighborhood expression:
+spatialcontext_expression <- get_neighborhood_expression(counts = counts, neighbors = neighbors)
+# mean cell type abundances:
+spatialcontext_celltypes <- neighbor_tabulate(annot$celltype, neighbors)
+
+# spatial context matrices are dense:
+str(spatialcontext_expression)
+str(spatialcontext_celltypes)
+```
+
+
 # Analyzing the spatial context matrix:
 
-## Spatial clustering / niche analysis
+Now that we've got a spatial context matrix, we can play all our usual matrix analysis games with it. 
+Brief descriptions follow:
+
+### Visualization
+
+Plotting genes' values in the spatial context matrix, rather than their single cell expression values,
+often produces smoother, cleaner representations of their spatial patterns. 
+
+### Spatial clustering / niche analysis
+
+This is an exercise in clustering the rows (cells) of the spatial context matrix. 
+The Mclust library works well here. 
+If you use subsetted neighbors (via the \code{subsampleNeighborsByRow} function), then Louvain and Leiden clustering will also work. 
+
+### UMAPs:
+
+Two approaches lead to informative UMAP projections of spatial context matrices:
+
+1. Use \code{subsampleNeighborsByRow} to squash autocorrelation. 
+2. Simply plot a UMAP of a random subset of cells. 
+
+### Clustering genes:
+
+To find sets of genes that are correlated with each other in space, we recommend the [InSituCor library](https://github.com/Nanostring-Biostats/InSituCor){target="_blank"},
+ which applies many of the functions shown here and implements other insights to get more informative results. 
+
+### Evaluating single genes for spatial autocorrelation:
+
+Lots of well-considered packages are available for this task, though cellular neighborhoods can also be used. 
+Simply take the correlation between a gene's (normalized) single cell expression and its mean expression across cellular neighborhoods, i.e. its column in the spatial context matrix. 
 
 
+### Differential expression
+
+Spatial context variables, for example abundance of a cell type of interest or expression of a gene of interest,
+are well-suited for use as predictors in differential expression analysis. 
+For example, you might model how tumor cell gene expression changes in response to the number of neighboring T-cells,
+or to neighborhood expression of interferon gamma. 
+
+### Ligand-receptor analysis:
+
+The cellular neighborhood framework lets us examine ligand-receptor interactions in a variety of ways:
+
+- We can score cellular neighborhoods for concurrent expression of a LR pair
+- We can study whether a LR pair tends to be expressed in the same neighborhoods. (Again, InSituCor is well-crafted for this task.)
+- You might reasonably just look at a ligand's neighborhood expression levels as indicative of the LR signaling cells are subject to. (You might do this if the single cell expression of the Receptor gene is problematically noisy, or if you're willing to assume that all the cells you're analyzing have at least *some* receptor, and the biologically interesting question is how much ligand they're exposed to.)
+
+# Recommendation: spatial clustering / niche analysis
+
+"Niche analysis" is the task of classifying cellular neighborhoods, usually via cluster analysis. 
+Anecdotally, scientists seem to be making very effective use of this technique. 
+Spatial transcriptomics data is complex, and it's a convenient simplification to say things like,
+"We found a T-cell-enriched niche", or, "This niche is more common in higher-grade disease".
+This technique is particularly useful in large studies, where much of analysis focuses on tissue-level attributes. In this setting, it's very convenient to summarize tissues with their relative abundances of different niches.
 
 
-# Finer points
-
-## Computational considerations
+# Computational considerations
 
 Single cell expression data is sparse, and so can be stored in sparse matrix format for huge memory savings. 
 But a spatial context matrix reporting average neighborhood expression is dense, and for 
@@ -131,95 +255,13 @@ Here's how you would get a spatial context for a subset:
 #| eval: true
 #| echo: false
 
-!!!!!!!
-
+sub <- sample(1:nrow(counts), 1000)
+subsampled_spatialcontext <- get_neighborhood_expression(
+  counts = counts,
+  neighbors = neighbors[sub, ])
 ```
 
 2. On-the-fly calculations: it's computationally quick to compute things like mean neighborhood 
 expression or mean neighborhood cell type abundance. Rather than storing these matrices,
 calculate them anew every time you need them. 
-
-## Minimizing spatial auto-correlation
-
-In "Mitigating autocorrelation during spatially resolved transcriptomics data analysis" (bioRvix), Maher et al. describe an inconvenient tendency of spatial context matrices: because neighboring cells have largely the same neighbors, their entries in the spatial context matrix are correlated. 
-This correlation between neighbors proves a substantial barrier to distance-based analyses like UMAP or Leiden clustering, producing UMAPs where all points fall in a highly-connected blob and generally poor Leiden performance. 
-They propose that by defining each cell's neighborhood as a random subset of its nearest neighbors, they can
-largely break this correlation between neighbors. They released a python toolkit for this, [SPIN](https://github.com/wanglab-broad/spin){target="_blank"}.
-
-For R coders, here's how you would get a neighborhood matrix with random subsetting.
-This process produces only pseudo-random subsampling, but it's very fast and more than good enough. 
-
-```{r}
-#| eval: true
-#| echo: false
-
-#' Subsample each row of a nearest neighbors matrix by 50%, 
-#'  assuming each row has exactly the same number of non-zero entries
-#' @param neighbors sparse matrix of neighbor relationships
-#' @param p Subsampling rate
-#' @return The same neighbors matrix, with p proportion of the entries in each row set to 0. 
-fastSubsampleByRow <- function(neighbors, p = 0.5) {
-  # checks:
-  if (length(unique(Matrix::rowSums(neighbors != 0))) > 1) {
-    stop("This function requires that every row of neighbors has the same number of non-zero entries.")
-  }
-  
-  # random vector of which neighbors to keep vs. reset to 0:
-  K <- sum(neighbors[1, ] != 0)
-  temp <- rep(seq_len(nrow(neighbors)), each = K) + rnorm(K * nrow(neighbors), mean = 0, sd = 1e-5)
-  o <- order(temp) %% K + 1
-  keep <- o <= round(K * p)
-
-  # reset non-kept entries to 0
-  neighbors <- t(neighbors)
-  neighbors@x <- neighbors@x * keep
-  neighbors <- t(neighbors)
-  
-  return(neighbors)
-}
-
-# derive cellular neighbors:
-neighbors <- InSituCor:::nearestNeighborGraph(x = cosmx_kidney$xy[, 1],
-                                              y = cosmx_kidney$xy[, 2],
-                                              N = 80)
-# subsample:
-subsetted_neighbors <- fastSubsampleByRow(neighbors, p = 0.5)
-```
-
-# Appendix: code for neighborhood analyses
-
-Here we'll rely on code and data from the InSituCor package, which implements many 
-of the basic operations of cellular neighborhood analysis. 
-So let's start by loading the package and extracting its example data:
-
-```{r insitucor}
-#| eval: true
-#| echo: true
-
-# install InSituCor if needed:
-devtools::install_github("https://github.com/Nanostring-Biostats/InSituCor")
-library(InSituCor)
-
-# get example CosMx data:
-data("cosmx_kidney")
-str(cosmx_kidney)
-```
-
-Now let's summarize the cells in those neighborhood to create data matrices of "spatial context":
-
-```{r basics}
-#| eval: true
-#| echo: true
-
-# define cellular neighborhoods using the K-nearest approach:
-
-# define cellular neighborhoods using a radius-based approach:
-
-# Get the mean expression profile of cellular neighborhoods:
-
-# Get the cell type abundances of cellular neighborhoods:
-
-
-```
-
 
