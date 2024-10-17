@@ -141,10 +141,13 @@ calculate them anew every time you need them.
 
 ## Minimizing spatial auto-correlation
 
-!!!!!
+In "Mitigating autocorrelation during spatially resolved transcriptomics data analysis" (bioRvix), Maher et al. describe an inconvenient tendency of spatial context matrices: because neighboring cells have largely the same neighbors, their entries in the spatial context matrix are correlated. 
+This correlation between neighbors proves a substantial barrier to distance-based analyses like UMAP or Leiden clustering, producing UMAPs where all points fall in a highly-connected blob and generally poor Leiden performance. 
+They propose that by defining each cell's neighborhood as a random subset of its nearest neighbors, they can
+largely break this correlation between neighbors. They released a python toolkit for this, [SPIN](https://github.com/wanglab-broad/spin){target="_blank"}.
 
-
-Here's how you would get a neighborhood matrix with random subsetting:
+For R coders, here's how you would get a neighborhood matrix with random subsetting.
+This process produces only pseudo-random subsampling, but it's very fast and more than good enough. 
 
 ```{r}
 #| eval: true
@@ -160,15 +163,18 @@ fastSubsampleByRow <- function(neighbors, p = 0.5) {
   if (length(unique(Matrix::rowSums(neighbors != 0))) > 1) {
     stop("This function requires that every row of neighbors has the same number of non-zero entries.")
   }
-  # pseudo-random vector of which neighbors to reset to 0:
+  
+  # random vector of which neighbors to keep vs. reset to 0:
   K <- sum(neighbors[1, ] != 0)
-  keepofK <- rep(0, K)
-  keepofK[sample(1:K, round(K * p))] <- 1
-  keep <- rep(keepofK, nrow(neighbors))
-  # update elements of neighbors matrix:
+  temp <- rep(seq_len(nrow(neighbors)), each = K) + rnorm(K * nrow(neighbors), mean = 0, sd = 1e-5)
+  o <- order(temp) %% K + 1
+  keep <- o <= round(K * p)
+
+  # reset non-kept entries to 0
   neighbors <- t(neighbors)
   neighbors@x <- neighbors@x * keep
   neighbors <- t(neighbors)
+  
   return(neighbors)
 }
 
