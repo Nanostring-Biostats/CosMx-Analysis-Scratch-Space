@@ -1,12 +1,14 @@
 ---
-title: "Cellular neighborhoods: a useful and straightforward analysis framework"
+title: "Cellular neighborhoods: a useful, simple and flexible analysis framework"
 author:
   - name: Patrick Danaher
     orcid: 0000-0002-2844-5883
     affiliations: 
-      - ref: Bruker Spatial Biology
+      - ref: nstg
       - ref: patrickjdanaher
 toc: true
+execute: 
+  eval: true
 toc-title: Contents
 toc-depth: 3
 toc-expand: 2
@@ -38,22 +40,22 @@ format-links: [pdf, docx]
 # Introduction
 
 The literature is becoming crowded with analysis tools employing
-increasingly elaborate techniques (graphical neural networks, Fourier transforms, hidden Markov random fields...)
+ elaborate techniques (graphical neural networks, Fourier transforms, hidden Markov random fields)
 to solve straightforward problems (e.g. spatial clustering or seeking spatially auto-correlated genes).
 While these methods promise more optimal performance, simpler techniques have a different virtue:
 they make analyses easier to understand, both for analysts and for their eventual audiences. 
 In this spirit, we recommend "cellular neighborhoods" as an framework for diverse analyses. 
-This approach is easy to implement, straightforward to riff on, and computationally cheap. 
+This approach is easy to implement, straightforward to riff on, and computationally efficient 
 
 Cellular neighborhood analysis begins with two steps:
 
-1. First, we define each cell's neighboring cells. 
-2. Second, we define each cell's "spatial context", creating a new data matrix. 
+1. Define each cell's neighboring cells. 
+2. Create a new matrix encoding cells' "spatial contexts". 
 To do this, we compute summaries of each cell's neighbors, reporting for example
  their average expression profile or the abundance of different cell types within them.
 
 
-```{r}
+```{r, out.width="120%"}
 #| eval: true
 #| echo: false
 #| fig-cap: "Left: example of a cellular neighborhood defined as a cell's 50 nearest neighbors. Right: the mean expression profile of those neighbors is used to define the cell's spatial context. This 'mean neighborhood expression', calculated separately for all cells in the dataset, defines a new data matrix." 
@@ -96,25 +98,24 @@ celltype <- as.factor(cosmx_kidney$annot$celltype)
 xy <- cosmx_kidney$xy
 ```
 
-Now we can demonstrate the basics:
+Now we're ready to demonstrate the basics:
 
 ## Defining a cell's neighbors
  
 Convenient approaches to define a cell's neighbors include the "K-nearest" approach
 (we usually use the nearest 50 neighbors) and a radius-based approach. 
-Code for both these methods appears in the Appendix. 
 We prefer the K-nearest neighbors approach, mainly because radius-based neighborhoods
  tend to vary widely in the number of cells they contain, and neighborhoods of very few cells are statistically unstable.
 
 The size of a neighborhood is up to the analyst's discretion. Try to choose a neighborhood 
-size that reflects your understanding of biology (how far away is a cell ) and that makes sense for your biological question. There is a goldilocks zone though: very small neighborhoods produce sparse and noisy data, 
+size that reflects your understanding of biology and that makes sense for your biological question. There is a Goldilocks zone, however: very small neighborhoods produce sparse and noisy data, 
 and very large neighborhoods become inaccurate representations of a cell's 3D surroundings. 
-(Why: the area of your neighborhood increases with the square of the radius, but the volume increases with the cube of the radius. This means that the larger the radius, the less of your 3D neighborhood falls in the narrow tissue slide you've assayed, and the more it consists of unseen cells increasingly far away in the Z-dimension.)
+(The problem with large neighborhoods: the area of your circular neighborhood increases with the square of the radius, but the volume of the corresponding (unobserved) 3D tissue region increases with the cube of the radius. This means that the larger the radius, the less of your 3D neighborhood falls in the narrow tissue slide you've assayed, and the more it consists of unseen cells increasingly far away in the Z-dimension.)
 
 Here's code for defining cellular neighborhoods:
 ```{r}
 #| eval: true
-#| echo: false
+#| echo: true
 
 # define neighbors using a K-nearest approach:
 neighbors.nearest50 <- nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50)
@@ -171,9 +172,9 @@ You can implement the basic formats of spatial context matrices as follows:
 
 ```{r}
 # mean neighborhood expression:
-spatialcontext_expression <- get_neighborhood_expression(counts = counts, neighbors = neighbors)
+spatialcontext_expression <- get_neighborhood_expression(counts, neighbors.nearest50)
 # mean cell type abundances:
-spatialcontext_celltypes <- neighbor_tabulate(annot$celltype, neighbors)
+spatialcontext_celltypes <- neighbor_tabulate(annot$celltype, neighbors.nearest50)
 
 # spatial context matrices are dense:
 str(spatialcontext_expression)
@@ -253,12 +254,12 @@ Here's how you would get a spatial context for a subset:
 
 ```{r}
 #| eval: true
-#| echo: false
+#| echo: true
 
 sub <- sample(1:nrow(counts), 1000)
 subsampled_spatialcontext <- get_neighborhood_expression(
   counts = counts,
-  neighbors = neighbors[sub, ])
+  neighbors = neighbors.nearest50[sub, ])
 ```
 
 2. On-the-fly calculations: it's computationally quick to compute things like mean neighborhood 
