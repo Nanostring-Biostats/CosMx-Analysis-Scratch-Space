@@ -12,6 +12,33 @@
 <generator>quarto-1.5.57</generator>
 <lastBuildDate>Thu, 17 Oct 2024 00:00:00 GMT</lastBuildDate>
 <item>
+  <title>New Features of AtoMx™ SIP v1.3.2</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/nanoU/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<p>Cross posting for our colleagues at <a href="https://university.nanostring.com/">NanoU</a>.</p>
+<p>Course links to AtoMx™ SIP v.1.3.2 release notes and a video discussing and demoing new features covering:</p>
+<ul>
+<li>Image Viewer and Data Plotting Improvements</li>
+<li>Data Pipeline Orchestrator Improvements</li>
+<li>Protein Cell Segmentation</li>
+</ul>
+<p>can be found here: <a href="https://university.nanostring.com/new-features-of-atomxtm-v132">https://university.nanostring.com/new-features-of-atomxtm-v132</a>.</p>
+
+
+
+ ]]></description>
+  <category>nanoU</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/nanoU/</guid>
+  <pubDate>Thu, 17 Oct 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://cc.sj-cdn.net/instructor/j3v0702q7qcg-nanostring-university/courses/3ppjfhs3ah3wf/promo-image.1728930731.png" medium="image" type="image/png"/>
+</item>
+<item>
   <title>Stay up-to-date with our blog using your favorite RSS reader</title>
   <dc:creator>Evelyn Metzger</dc:creator>
   <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/</link>
@@ -13264,88 +13291,6 @@ font-style: inherit;">which</span>(use))</span></code></pre></div>
   <category>cell typing</category>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/</guid>
   <pubDate>Tue, 12 Mar 2024 00:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Big datasets: strategies for memory-efficient analysis</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/big-data/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="strategies-for-big-datasets" class="level1">
-<h1>Strategies for big datasets</h1>
-<p>CosMx data can be truly huge, containing millions of cells and thousands of genes. This prevents many typical analysis strategies, including many toolkits designed for scRNA-seq data. Here we’ll discuss ways to work with big datasets.</p>
-<section id="strategy-1-be-intentional-about-what-data-you-bring-into-memory" class="level2">
-<h2 class="anchored" data-anchor-id="strategy-1-be-intentional-about-what-data-you-bring-into-memory">Strategy 1: be intentional about what data you bring into memory</h2>
-<p>No analysis method uses all your data at once. So for any given analysis, pull in only what you need. See below for a discussion of data types and how to handle them.</p>
-<section id="data-types" class="level3">
-<h3 class="anchored" data-anchor-id="data-types">Data types:</h3>
-<p>CosMx data comes several varieties:</p>
-<section id="large-sparse-matrices" class="level4">
-<h4 class="anchored" data-anchor-id="large-sparse-matrices">Large sparse matrices:</h4>
-<p>These are matrices of cells * genes or cells * cells, populated mainly by 0 values. Sparse matrix formats allow us to only store information for non-zero values, greatly reducing memory demands. When working with sparse matrices, try to use methods that can act on this data type.</p>
-<p>Examples of sparse matrices:</p>
-<ul>
-<li>raw counts (sparse matrix, integers)</li>
-<li>norm counts (sparse, but now decimals. can round to 3 or 4 decimal places to control size a bit)</li>
-<li>cells’ neighbor relationships (e.g.&nbsp;50 entries per cell for 50 nearest neighbors)</li>
-</ul>
-</section>
-<section id="large-dense-datasets" class="level4">
-<h4 class="anchored" data-anchor-id="large-dense-datasets">Large dense datasets:</h4>
-<p>Some data is inevitably dense. Ideally, only pull this data into memory when you need it.</p>
-<p>Examples of dense data:</p>
-<ul>
-<li>Cell metadata. Storing as a data table is most efficient. Since this usually has dozens of variables that are unnecessary for most analyses, you can also keep in memory only the columns you need for a given analysis.</li>
-<li>Principal components. Unavoidably large. To save memory, store only the top 20-50 PCs, throwing out the information-light remaining PCs.</li>
-</ul>
-</section>
-<section id="data-small-enough-to-not-be-a-problem" class="level4">
-<h4 class="anchored" data-anchor-id="data-small-enough-to-not-be-a-problem">Data small enough to not be a problem:</h4>
-<ul>
-<li>umap</li>
-<li>xy locations</li>
-</ul>
-</section>
-<section id="other-data" class="level4">
-<h4 class="anchored" data-anchor-id="other-data">Other data:</h4>
-<ul>
-<li>Transcript locations. This comes in an enormous data table. In most studies you’ll want to handle this in chunks, e.g.&nbsp;one FOV / region at a time, or one gene.</li>
-<li>Cell polygons. Another very large file. Since you can’t resolve polygon shapes for tens of thousands of cells at once, this data is only useful for very zoomed-in plots, allowing you to only keep say thousands of cell polygons in memory at once.</li>
-</ul>
-</section>
-</section>
-</section>
-<section id="strategy-2-process-each-tissue-slide-separately" class="level2">
-<h2 class="anchored" data-anchor-id="strategy-2-process-each-tissue-slide-separately">Strategy 2: process each tissue / slide separately</h2>
-<p>It doesn’t take too many slides before you can no longer fit the raw count matrix into R. At this point, you’re forced to work in batches. One good approach is to run fundamental analyses - e.g.&nbsp;QC, normalization, dimension reduction and cell typing - one sample at a time, saving your results to disk. Then for study-wide analyzes you can load in only the data you need, e.g.&nbsp;xy positions and cell types, or normalized expression values from a single gene.</p>
-</section>
-<section id="strategy-3-use-data-objects-that-handle-moving-data-between-disk-and-memory" class="level2">
-<h2 class="anchored" data-anchor-id="strategy-3-use-data-objects-that-handle-moving-data-between-disk-and-memory">Strategy 3: use data objects that handle moving data between disk and memory</h2>
-<p>Data formats do exist for this purpose, and they’re developing rapidly. Consider:</p>
-<ul>
-<li>TileDB / TileDBSOMA TileDBsc</li>
-<li>SeuratDisk</li>
-<li>Seurat v5 has some functionality for switching between disk and memory, but not yet enough to support a full spatial analysis.</li>
-</ul>
-</section>
-<section id="strategy-4-efficient-computing" class="level2">
-<h2 class="anchored" data-anchor-id="strategy-4-efficient-computing">Strategy 4: efficient computing</h2>
-<p>Large datasets take time to analyze, there is no way around that, but some simple computation choices can make a big impact.</p>
-<p>Ensure your data stays in sparse matrix format; watch out for dense coercions. The Matrix package is great to ensure sparsity.</p>
-<p>Parallelization is your friend but be sure to understand how much data you are reading into memory in each core. While as fast as possible is always nice, hardware does have its limitations.</p>
-
-
-</section>
-</section>
-
- ]]></description>
-  <category>big data</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/big-data/</guid>
-  <pubDate>Mon, 04 Mar 2024 00:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
