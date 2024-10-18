@@ -31,7 +31,7 @@ google-scholar: true
 ---
 
 This is the third how-to post in our [`napari series`](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/#category=napari) for CosMx<sup>&#174;</sup> SMI data analysis.  In the [first
-post](../napari-cosmx-intro/index.qmd), I introduced the napari-cosmx plugin, which allows you to view and analyze CosMx SMI data exported from AtoMx&#8482; SIP. This plugin features a user-friendly GUI widget for stitching raw data, making it ideal for those without scripting experience.  The [second post](../napari-cosmx-intro/index.qmd) highlighted some tips and tricks for using the plugin effectively. This post will explore programmatic stitching using Python, offering a more flexible and powerful approach for advanced users.
+post](../napari-cosmx-intro/index.qmd), I introduced the napari-cosmx plugin, which allows you to view and analyze CosMx SMI data exported from AtoMx&#8482; SIP. This plugin features a user-friendly GUI widget for stitching raw data, making it ideal for those without scripting experience.  The [second post](../napari-cosmx-basics/using-napari-cosmx.qmd) highlighted some tips and tricks for using the plugin effectively. This post will explore programmatic stitching using Python, offering a more flexible and powerful approach for advanced users.
 
 Stitching CosMx SMI datasets can be challenging due to their large size and the
 high RAM requirements of the stitching process. This is often compounded by 
@@ -66,9 +66,8 @@ typically executed back-to-back.
 # Installation {#sec-installation}
 
 Before we begin stitching, we need to install both napari and the
-`napari-cosmx` plugin. I've found that the success of installation
-depends on the particular package versions and the version of python. 
-I recommend using a version and virtual environment management like [pyenv](https://github.com/pyenv/pyenv) but python's built in
+`napari-cosmx` plugin.
+I recommend using a version and virtual environment management like [pyenv](https://github.com/pyenv/pyenv) to keep specific versions of packages but python's built in
 [venv](https://docs.python.org/3/library/venv.html) works well too. 
 
 I've tested the instructions below on MacOS (v12.5.1) and an EC2 instance running Amazon Linux 2. 
@@ -109,11 +108,11 @@ pip freeze | grep "napari_CosMx"
 When `napari-cosmx` is installed, we get a few package scripts that can be called directly. These
 are:
 
-- `stitch-images`, which builds the zarr structuere
+- `stitch-images`, which builds the zarr structure
 - `read-targets`, which creates the targets.hdf5 file
 
 Assuming these are in your path, you can
-see their help documentation by running `stitch-image --help` or
+see their help documentation by running `stitch-images --help` or
 `read-targets --help`.
 
 
@@ -226,7 +225,8 @@ cmd_read_targets = 'read-targets "' + AnalysisDir + '"' + ' -o ' + SlideOutputDi
 
 And your output should look something like this:
 
-> Writing DNA multiscale output to zarr.
+```
+Writing DNA multiscale output to zarr.
 Writing level 1 of 7, shape: (34043, 34043), chunksize: (8192, 8192)
 Writing level 2 of 7, shape: (17021, 17021), chunksize: (4096, 4096)
 Writing level 3 of 7, shape: (8510, 8510), chunksize: (2048, 2048)
@@ -239,10 +239,11 @@ Writing omero metadata...
 {'min': 136, 'max': 33272, 'start': 432, 'end': 28260}
 Reading targets from ...
 Writing targets to ...
+```
 
 ## Viewing the results {#sec-launching-napari-cosmx-from-python}
 
-As mentioned in the [second napari series post](../napari-cosmx-intro/index.qmd), 
+As mentioned in the [second napari series post](../napari-cosmx-basics/using-napari-cosmx.qmd), 
 one can use python directly to view CosMx SMI data. We can also launch napari from
 python directly. In the code below, I
 instantiated a `Gemini` class object, turned off the segmentation and
@@ -284,7 +285,7 @@ widget section that the `Color Cells` widget is blank. That's because we
 didn't create metadata for this slide (*i.e.*, it was not present in the
 raw data). For an example of adding metadata, see the [Adding and
 viewing
-metadata](../napari-cosmx-index/index.qmd#sec-adding-metadata)
+metadata](../napari-cosmx-intro/index.qmd#sec-adding-metadata)
 section from the first post.
 :::
 
