@@ -1,0 +1,234 @@
+---
+title: "Using InSituDiff"
+author: "Patrick Danaher"
+date: "2024-09-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction to InSituDiff
+
+InSituDiff is an algorithm for exploratory analysis of single cell spatial transcriptomics 
+data, e.g. CosMx. It is designed for experiments where diseased tissues/regions are compared to controls. 
+
+InSituDiff seeks to measure how cellular neighborhoods in diseased tissues are 
+perturbed from control neighborhoods. 
+For every cell in disease tissues, InSituDiff finds the cell in a control
+tissue with the most similar cellular neighborhood. 
+It then contrasts the expression profile in the target cell's neighborhood with
+ the expression profile in the matching control neighborhood. 
+The resulting differences, or perturbations, are a powerful view for exploratory data analysis.
+
+InSituDiff provides tools for:
+
+1. Identifying highly perturbed genes
+2. Finding clusters of genes whose perturbations have similar spatial patterns
+3. Spatial clustering, i.e. splitting tissues into spatial domains with distinct perturbation patters. 
+
+## Design
+
+Neighborhood perturbations are properly encoded as a dense matrix over all cells x genes.
+But in moderately large datasets, this dense matrix can overwhelm the memory of 
+even well-provisioned compute instances.
+
+With the above in mind, InSituDiff is designed to work quickly and with minimal demands on memory. Importantly, it avoids ever calculating the whole matrix of perturbations over all cells x genes. Instead, it derives the data needed to compute perturbations, then for further analysis calculates only the necessary perturbations on the fly. 
+
+## Usage
+
+Start by loading the package and necessary data, a handful of FOVs from kidneys,
+ one with childhood lupus and two controls:
+
+```{r prep}
+library(InSituDiff)
+library(pheatmap)
+# load demo data from lupus nephritis:
+data(minisle)
+# normalize the counts matrix (InSituDiff is best run on normalized data):
+normconstants <- pmax(Matrix::rowSums(minisle$counts), 20) 
+norm_factors <- Matrix::Diagonal(x = 1 / normconstants)
+minisle$norm <- norm_factors %*% minisle$counts * mean(normconstants)
+rownames(minisle$norm) <- rownames(minisle$counts)
+```
+
+## Setting up InSituDiff
+
+Now we set ourselves up for calculating perturbation scores by running ```initializeISD```.
+This function defines two mappings needed for perturbation scoring: 
+
+1. The cells making up each cell's neighborhood
+2. For each cell, the identify of the control well with the most-similar neighborhood
+
+```{r initialize}
+obj <- initializeISD(
+  mat = minisle$norm, # matrix of normalized expression
+  xy = minisle$xy, # matrix of xy coordinates
+  tissue = minisle$annot$tissue, # vector of cells' tissue IDs
+  iscontrol = grepl("control", minisle$annot$tissue), 
+  k = 50) # define cellular neighborhoods as a cell's 50 nearest neighbors
+str(obj)
+```
+
+And that's all we need to start analysis.  
+
+## Calculating neighborhood perturbations
+
+Below we'll show three useful analyses of perturbations we can perform. 
+But first, at any time you like, you can easily compute a matrix of perturbation scores
+ for any cells and genes you like. 
+To get perturbations for all cells and genes, just enter ```cells = NULL, genes = NULL```.
+*Warning*: for larger datasets, attempting to compute this matrix for all cells and all genes risks overwhelming your R session's memory.
+
+```{r getdata}
+selectedperturbations <- getPerturbations(
+  x = minisle$norm, 
+  obj = obj, 
+  cells = rownames(minisle$counts)[minisle$annot$tissue == "SP19_1139"], # only look at one tissue
+  genes = c("IGHA1", "FGFR3", "HIF1A", "ACE2", "SAT1"),  # only look at a few genes of interest
+  residtype = "log2ratio",  # look at perturbations on the scale of log fold-changes
+  eps = 1)
+# the result is just dense matrix of perturbation scores over cells x genes:
+selectedperturbations[1:5,1:5]
+```
+
+## Identifying highly perturbed genes
+
+We summarize genes' degree of perturbation in two ways: how broadly perturbed they are, 
+ and how intensely perturbed they are.
+We calculate "breadth" of perturbation by comparing a gene's medium perturbation score in disease vs. control. 
+We calculate "intensity" of perturbation by comparing a gene's 99th percentile perturbation score in disease vs. control. 
+
+Plotting these scores against each other gives a good sense of how genes are perturbed:
+
+```{r genepertlevels}
+genescores <- summarizeGenePerturbation(
+  x = minisle$norm, obj = obj, 
+  residtype = "log2ratio", plotresults = TRUE, eps = 0.1, subsetsize = 1e5) 
+```
+
+To get a feel for what these statistics mean, let's look at a broadly perturbed 
+and an intensely perturbed gene:
+
+```{r examplegenes}
+twogenesperturbations <- getPerturbations(
+  x = minisle$norm, 
+  obj = obj, 
+  cells = NULL, # only look at one tissue
+  genes = c("HLA-C", "CYTOR"),  # only look at a few genes of interest
+  residtype = "log2ratio",  # look at perturbations on the scale of log fold-changes
+  eps = 0.2)
+gene = "HLA-C"
+plot(minisle$xy, pch = 16, cex = 0.1, asp = 1, main = paste0("Perturbation of ", gene),
+     col = colorZeroCentered(twogenesperturbations[, gene], maxquant = 0.999))
+text(c(-12, -10, -8), rep(-10.05, 3), c("control1", "control2", "disease"), cex = 1)
+
+gene = "CYTOR"
+plot(minisle$xy, pch = 16, cex = 0.1, asp = 1, main = paste0("Perturbation of ", gene),
+     col = colorZeroCentered(twogenesperturbations[, gene], maxquant = 0.999))
+text(c(-12, -10, -8), rep(-10.05, 3), c("control1", "control2", "disease"), cex = 1)
+
+```
+
+We might wish to define our own list of highly perturbed genes for downstream analysis. 
+A simple approach to this problem is this:
+
+```{r hpg}
+# identify highly perturbed genes:
+hist(genescores[,1], breaks = 10)
+thresh = 3
+abline(v = thresh, col = 2, lty = 2)
+hpgs <- rownames(genescores)[genescores[, "broadness"] > thresh]
+print(paste0("Highly perturbed genes: ", paste0(hpgs, collapse = ", ")))
+```
+
+
+## Identifying modules of genes with spatially correlated perturbations
+
+We can quickly find clusters of genes whose perturbations have similar spatial distributions
+ as follows:
+ 
+```{r modules}
+modules <- buildGeneModules(
+  x = minisle$norm, obj = obj, 
+  genes = NULL,  # subset of genes to use; enter NULL to use all, or "highlyperturbed" to take just the most perturbed genes ("highlyperturbed" is our default and our recommendation for full studies; here we use NULL because our mini dataset has only 30 genes.)
+  resolution = 0.02, # control leiden clustering
+  corthresh = 0.3, # control the adjacency network used by leiden clustering
+  min_module_cor = 0.25, # throw out modules with average cor below this
+  subsetsize = 1e5, 
+  eps = 0.5, 
+  residtype = "log2ratio") 
+modules
+```
+
+We can explore module perturbations using the same code as for gene perturbations, 
+entering our list of modules in the "genes" argument:
+
+```{r moduleperturbations}
+moduleperturbations <- getPerturbations(
+  x = minisle$norm, 
+  obj = obj, 
+  cells = NULL, # only look at one tissue
+  genes = modules[1:2], # arbitrarily plotting the first and third modules
+  residtype = "log2ratio",  # look at perturbations on the scale of log fold-changes
+  eps = 0.2)
+
+plot(minisle$xy, pch = 16, cex = 0.1, asp = 1, 
+     main = paste0("Perturbation of module ", colnames(moduleperturbations)[1]),
+     col = colorZeroCentered(moduleperturbations[, 1], maxquant = 0.999))
+text(c(-12, -10, -8), rep(-10.05, 3), c("control1", "control2", "disease"), cex = 1)
+
+```
+
+## Using perturbation to define spatial domains 
+
+Spatial clustering is a large field. 
+We propose that spatial clustering using perturbation scores can be more informative than
+clustering using simple gene expression. 
+A perturbation matrix derived with ```getPerturbations``` can be entered into all manner
+ of spatial clustering algorithms. 
+For convenience, InSituDiff provides the below function to perform spatial clustering of perturbation scores. It is designed to be fast and simple. 
+
+```{r spatdomains}
+res <- clusterPerturbations(x = minisle$norm, obj = obj, 
+                            cells = NULL, 
+                            genes = hpgs, # using the highly perturbed genes we defined earlier 
+                            residtype = "log2ratio", 
+                            nclust = 6)
+plot(minisle$xy, pch = 16, cex = 0.1, 
+     col = c("grey", "cornflowerblue", "darkviolet", "orange", "red", "forestgreen")[
+       as.numeric(as.factor(res$clust))])  
+text(c(-12, -10, -8), rep(-10.05, 3), c("control1", "control2", "disease"), cex = 1)
+```
+
+To understand our results, we might then look at average perturbation of genes within clusters:
+
+```{r exploreclusts}
+pheatmap(res$means, 
+         breaks = seq(-3,3,length.out = 101), 
+         col = colorRampPalette(c("darkblue", "white", "darkred"))(100))
+```
+
+We can see that two domains are minimally perturbed, while two others have high perturbations for a handful of genes.
+
+## UMAP of perturbed cellular neighborhoods
+
+To make this UMAP, it's important we only show a subset of cells - using all cells will 1. take a lot of memory, and 2. include cells' immediate neighbors, whose highly correlated data forces the umap into a useless blob. 
+
+```{r umap}
+set.seed(0)
+sub <- sample(1:nrow(minisle$norm), 1500) # sampling to ~15% of all cells
+tempperturbations <- getPerturbations(
+  x = minisle$norm, 
+  obj = obj, 
+  cells = sub, # only look at one tissue
+  genes = hpgs,  # only calculate over the highly perturbed genes defined earlier
+  residtype = "log2ratio")  # look at perturbations on the scale of log fold-changes
+
+um <- uwot::umap(tempperturbations)
+
+# plot the umap, colored by the spatial clusters derived above:
+plot(um, pch = 16, 
+     col = c("grey", "cornflowerblue", "darkviolet", "orange", "red", "forestgreen")[as.numeric(as.factor(res$clust[sub]))])  
+```
