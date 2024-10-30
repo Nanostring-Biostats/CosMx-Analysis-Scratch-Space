@@ -6,12 +6,11 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Evelyn Metzger">
-<meta name="author" content="Vikram Kohli">
-<meta name="dcterms.date" content="2024-06-12">
-<meta name="description" content="In this post, we describe a developmental python script that creates composite images from layered morphology 2D images.">
+<meta name="author" content="Patrick Danaher">
+<meta name="dcterms.date" content="2024-10-30">
+<meta name="description" content="An introduction to “cellular neighborhoods” and their many uses in analysis.">
 
-<title>Making composite images from layered morphology 2D images – Blog</title>
+<title>Cellular neighborhoods: a useful, simple and flexible analysis framework – Blog</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -58,7 +57,27 @@ div.sourceCode
 @media screen {
 pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
-</style>
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
 
 
 <script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
@@ -205,45 +224,31 @@ cookieconsent.run({
 <header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">Making composite images from layered morphology 2D images</h1>
+      <h1 class="title">Cellular neighborhoods: a useful, simple and flexible analysis framework</h1>
                   <div>
         <div class="description">
-          In this post, we describe a developmental python script that creates composite images from layered morphology 2D images.
+          An introduction to “cellular neighborhoods” and their many uses in analysis.
         </div>
       </div>
                           <div class="quarto-categories">
-                <div class="quarto-category">Squidpy</div>
-                <div class="quarto-category">Giotto</div>
-                <div class="quarto-category">pre-processing</div>
-                <div class="quarto-category">python</div>
+                <div class="quarto-category">overview</div>
               </div>
                   </div>
   </div>
     
   <div class="quarto-title-meta-author">
-    <div class="quarto-title-meta-heading">Authors</div>
+    <div class="quarto-title-meta-heading">Author</div>
     <div class="quarto-title-meta-heading">Affiliations</div>
     
       <div class="quarto-title-meta-contents">
-      <p class="author">Evelyn Metzger <a href="https://orcid.org/0000-0002-4074-9003" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+      <p class="author">Patrick Danaher <a href="https://orcid.org/0000-0002-2844-5883" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
     </div>
     <div class="quarto-title-meta-contents">
           <p class="affiliation">
               Bruker Spatial Biology
             </p>
           <p class="affiliation">
-              Github: <a href="https://github.com/eveilyeverafter" target="_blank">eveilyeverafter</a>
-            </p>
-        </div>
-      <div class="quarto-title-meta-contents">
-      <p class="author">Vikram Kohli </p>
-    </div>
-    <div class="quarto-title-meta-contents">
-          <p class="affiliation">
-              Bruker Spatial Biology
-            </p>
-          <p class="affiliation">
-              Github: <a href="https://github.com/mrvikramkohli" target="_blank">mrvikramkohli</a>
+              Github: <a href="https://github.com/patrickjdanaher" target="_blank">patrickjdanaher</a>
             </p>
         </div>
     </div>
@@ -254,7 +259,7 @@ cookieconsent.run({
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">June 12, 2024</p>
+        <p class="date">October 30, 2024</p>
       </div>
     </div>
     
@@ -269,16 +274,29 @@ cookieconsent.run({
     <h2 id="toc-title">Contents</h2>
    
   <ul>
-  <li><a href="#description" id="toc-description" class="nav-link active" data-scroll-target="#description"><span class="header-section-number">1</span> Description</a></li>
-  <li><a href="#where-to-find-the-script" id="toc-where-to-find-the-script" class="nav-link" data-scroll-target="#where-to-find-the-script"><span class="header-section-number">2</span> Where to find the script?</a></li>
-  <li><a href="#required-libraries" id="toc-required-libraries" class="nav-link" data-scroll-target="#required-libraries"><span class="header-section-number">3</span> Required libraries</a></li>
-  <li><a href="#user-inputs-required" id="toc-user-inputs-required" class="nav-link" data-scroll-target="#user-inputs-required"><span class="header-section-number">4</span> User inputs (required)</a></li>
-  <li><a href="#additional-inputs-changed-within-the-script" id="toc-additional-inputs-changed-within-the-script" class="nav-link" data-scroll-target="#additional-inputs-changed-within-the-script"><span class="header-section-number">5</span> Additional inputs (changed within the script)</a></li>
-  <li><a href="#output" id="toc-output" class="nav-link" data-scroll-target="#output"><span class="header-section-number">6</span> Output</a></li>
-  <li><a href="#usage" id="toc-usage" class="nav-link" data-scroll-target="#usage"><span class="header-section-number">7</span> Usage</a></li>
-  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example"><span class="header-section-number">8</span> Example</a></li>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
+  <li><a href="#tools-for-analyzing-cellular-neighborhoods" id="toc-tools-for-analyzing-cellular-neighborhoods" class="nav-link" data-scroll-target="#tools-for-analyzing-cellular-neighborhoods"><span class="header-section-number">2</span> Tools for analyzing cellular neighborhoods</a>
+  <ul class="collapse">
+  <li><a href="#defining-a-cells-neighbors" id="toc-defining-a-cells-neighbors" class="nav-link" data-scroll-target="#defining-a-cells-neighbors"><span class="header-section-number">2.1</span> Defining a cell’s neighbors</a>
+  <ul class="collapse">
+  <li><a href="#subsampling-neighbors-to-minimize-spatial-auto-correlation" id="toc-subsampling-neighbors-to-minimize-spatial-auto-correlation" class="nav-link" data-scroll-target="#subsampling-neighbors-to-minimize-spatial-auto-correlation"><span class="header-section-number">2.1.1</span> Subsampling neighbors to minimize spatial auto-correlation</a></li>
+  </ul></li>
+  <li><a href="#summarizing-a-cells-neighbors-to-define-its-spatial-context" id="toc-summarizing-a-cells-neighbors-to-define-its-spatial-context" class="nav-link" data-scroll-target="#summarizing-a-cells-neighbors-to-define-its-spatial-context"><span class="header-section-number">2.2</span> Summarizing a cell’s neighbors to define its spatial context</a></li>
+  </ul></li>
+  <li><a href="#analyzing-the-spatial-context-matrix" id="toc-analyzing-the-spatial-context-matrix" class="nav-link" data-scroll-target="#analyzing-the-spatial-context-matrix"><span class="header-section-number">3</span> Analyzing the spatial context matrix</a>
+  <ul class="collapse">
+  <li><a href="#visualization" id="toc-visualization" class="nav-link" data-scroll-target="#visualization"><span class="header-section-number">3.0.1</span> Visualization</a></li>
+  <li><a href="#spatial-clustering-niche-analysis" id="toc-spatial-clustering-niche-analysis" class="nav-link" data-scroll-target="#spatial-clustering-niche-analysis"><span class="header-section-number">3.0.2</span> Spatial clustering / niche analysis</a></li>
+  <li><a href="#umaps" id="toc-umaps" class="nav-link" data-scroll-target="#umaps"><span class="header-section-number">3.0.3</span> UMAPs</a></li>
+  <li><a href="#clustering-genes" id="toc-clustering-genes" class="nav-link" data-scroll-target="#clustering-genes"><span class="header-section-number">3.0.4</span> Clustering genes</a></li>
+  <li><a href="#evaluating-single-genes-for-spatial-autocorrelation" id="toc-evaluating-single-genes-for-spatial-autocorrelation" class="nav-link" data-scroll-target="#evaluating-single-genes-for-spatial-autocorrelation"><span class="header-section-number">3.0.5</span> Evaluating single genes for spatial autocorrelation</a></li>
+  <li><a href="#differential-expression" id="toc-differential-expression" class="nav-link" data-scroll-target="#differential-expression"><span class="header-section-number">3.0.6</span> Differential expression</a></li>
+  <li><a href="#ligand-receptor-analysis" id="toc-ligand-receptor-analysis" class="nav-link" data-scroll-target="#ligand-receptor-analysis"><span class="header-section-number">3.0.7</span> Ligand-receptor analysis</a></li>
+  </ul></li>
+  <li><a href="#recommendation-spatial-clustering-niche-analysis" id="toc-recommendation-spatial-clustering-niche-analysis" class="nav-link" data-scroll-target="#recommendation-spatial-clustering-niche-analysis"><span class="header-section-number">4</span> Recommendation: spatial clustering / niche analysis</a></li>
+  <li><a href="#computational-considerations" id="toc-computational-considerations" class="nav-link" data-scroll-target="#computational-considerations"><span class="header-section-number">5</span> Computational considerations</a></li>
   </ul>
-<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="making-composite-images.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li><li><a href="making-composite-images.docx"><i class="bi bi-file-word"></i>MS Word</a></li></ul></div></nav>
+</nav>
 </nav>
 <div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
@@ -291,23 +309,56 @@ cookieconsent.run({
 
 
 
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>The field of spatial analysis offers a growing array of sophisticated tools, including graphical neural networks, Fourier transforms, hidden Markov random fields. While these methods offer potential advantages in performance, simpler techniques have their own merit: they make analyses easier to understand, both for analysts and for their eventual audiences. In this spirit, we recommend “cellular neighborhoods” as an framework for diverse analyses. This framework offers a balance of flexibility, computational efficiency, and ease of use, making it a valuable tool for researchers.</p>
+<p>Cellular neighborhood analysis begins with two steps:</p>
+<ol type="1">
+<li>Define each cell’s neighboring cells.</li>
+<li>Create a new matrix encoding cells’ “spatial contexts”. To do this, we compute summaries of each cell’s neighbors, reporting for example their average expression profile or the abundance of different cell types within them.</li>
+</ol>
 <div class="cell">
 <div class="cell-output-display">
-<div id="fig-composite" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-composite-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="./figures/fig1.png" class="img-fluid figure-img">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-composite-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: A composite image created using the make_composite.py script. This image represents all channels of a single field of view in the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">publicly available</a> mouse coronal hemisphere FFPE dataset.
-</figcaption>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/cartoon.png" class="img-fluid figure-img" style="width:120.0%"></p>
+<figcaption>Left: example of a cellular neighborhood defined as a cell’s 50 nearest neighbors. Right: the mean expression profile of those neighbors is used to define the cell’s spatial context. This ‘mean neighborhood expression’, calculated separately for all cells in the dataset, defines a new data matrix.</figcaption>
 </figure>
 </div>
 </div>
 </div>
-<section id="description" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Description</h1>
-<p>Composite images of CosMx™ Spatial Molecular Imager (SMI) fields of view (FOVs) can be useful when using open-sourced software such as <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank">squidpy</a> and <a href="https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html#create-a-giotto-object-for-each-fov" target="_blank">giotto</a>. In this post, we describe the make_composite.py script, a developmental python script that creates such composite images from layered morphology 2D images that can be exported from the AtoMx™ Spatial Informatics Portal (SIP). Layered images are extracted from the 2D morphology TIF files and written in a file format selected by the user. The extracted images are converted to 8bit, and composite images are written from these 8bit images.</p>
+<p>Once we’ve obtained a matrix of spatial context data, myriad analyses become possible. We can:</p>
+<ul>
+<li>Plot spatially smoothed expression to make spatial expression patterns for visually clear</li>
+<li>Derive spatial clusters / niches</li>
+<li>Find spatially auto-correlated genes / sets of genes</li>
+<li>Set up interesting differential expression problems, asking how cells modulate expression in response to their spatial context</li>
+<li>Explore ligand-receptor interactions</li>
+</ul>
+<p>Many of these analyses are achieved by simply applying techniques from single cell analyses, for example clustering the rows (cells) or columns (genes) of the matrix.</p>
+</section>
+<section id="tools-for-analyzing-cellular-neighborhoods" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Tools for analyzing cellular neighborhoods</h1>
+<p>A small R package implementing the building blocks of cellular neighborhood analysis is <a href="../../_code/cellular-neighborhoods" target="_blank">here</a>.</p>
+<p>To install it:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>devtools<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">"Nanostring-Biostats/CosMx-Analysis-Scratch-Space@Main"</span>, <span class="at">subdir =</span> <span class="st">"_code/cellular-neighborhoods"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>To set up our examples, let’s load the package and open its data:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(CellularNeighborhoods)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">data</span>(cosmx_kidney)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>annot <span class="ot">&lt;-</span> cosmx_kidney<span class="sc">$</span>annot</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(annot) <span class="ot">&lt;-</span> annot<span class="sc">$</span>cell_ID</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> cosmx_kidney<span class="sc">$</span>counts</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>celltype <span class="ot">&lt;-</span> <span class="fu">as.factor</span>(cosmx_kidney<span class="sc">$</span>annot<span class="sc">$</span>celltype)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>xy <span class="ot">&lt;-</span> cosmx_kidney<span class="sc">$</span>xy</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now we’re ready to demonstrate the basics.</p>
+<section id="defining-a-cells-neighbors" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="defining-a-cells-neighbors"><span class="header-section-number">2.1</span> Defining a cell’s neighbors</h2>
+<p>Convenient approaches to define a cell’s neighbors include the “K-nearest” approach (we usually use the nearest 50 neighbors) and a radius-based approach. We prefer the K-nearest neighbors approach, mainly because radius-based neighborhoods tend to vary widely in the number of cells they contain, and neighborhoods of very few cells are statistically unstable.</p>
+<p>The size of a neighborhood is up to the analyst’s discretion. Try to choose a neighborhood size that reflects your understanding of biology and that makes sense for your biological question. There is a Goldilocks zone, however: very small neighborhoods produce sparse and noisy data, and very large neighborhoods become inaccurate representations of a cell’s 3D surroundings.</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -318,121 +369,187 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>make_composite.py is a development version. Use at your own risk.</p>
+<p>The problem with large neighborhoods: the area of your circular neighborhood increases with the square of the radius, but the volume of the corresponding (unobserved) 3D tissue region increases with the cube of the radius. This means that the larger the radius, the less of your 3D neighborhood falls in the narrow tissue slide you’ve assayed, and the more it consists of unseen cells increasingly far away in the Z-dimension.</p>
 </div>
 </div>
-</section>
-<section id="where-to-find-the-script" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Where to find the script?</h1>
-<p>The script and license can be found in the <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/make-composite" target="_blank"><code>assets/make-composite</code></a> folder of the repository.</p>
-</section>
-<section id="required-libraries" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Required libraries</h1>
-<p>The script requires the following libraries to be installed:</p>
-<ul>
-<li>Pillow (<em>e.g.</em>, <code>pip install pillow</code>)</li>
-<li>Numpy (<em>e.g.</em>, <code>pip install numpy</code>)</li>
-</ul>
-</section>
-<section id="user-inputs-required" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> User inputs (required)</h1>
-<ul>
-<li><p><code>clipping</code> (int or float) - Histogram clipping percentage. This value is the percentage of the histogram to clip on the left and right side. The effect changes the contrast of the image. A higher percentage produces more contrast. The user needs to determine the appropriate percentage by testing on a subset of images. The same clipping value is applied to all images. Generally, setting the value between 1 and 3 is a good starting point. Specifying a clipping value of 0 will not alter the histogram. A value is required, there is no default. <code>clipping</code> is a required input.</p></li>
-<li><p><code>user_format</code> (str) - File format to be written. Options are jpg, png, and tif. All output files will be written in the format specified by the user. <code>user_format</code> is a required input.</p></li>
-</ul>
-</section>
-<section id="additional-inputs-changed-within-the-script" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Additional inputs (changed within the script)</h1>
-<ul>
-<li><p>Variable: <code>colors</code> = [‘cyan’, ‘red’, ‘yellow’, ‘blue’, ‘magenta’]. The variable is the composite color scheme (not a user input; changeable within the script). The colors are listed in order of channel number (channel 0 to channel 4). Example: Channel 0 is colored ‘cyan’,</p></li>
-<li><p>Variable: <code>compress_value</code> (set to 3). Lossless file compression value. Higher values produce smaller files at the expense of increased script execution time. The set value is a compromise between file size and execution time.</p></li>
-</ul>
-</section>
-<section id="output" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> Output</h1>
-<ul>
-<li><p><code>raw</code> – The extracted tif files from the morphology 2D images will be saved in this folder. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_raw.&lt;user_format&gt;. &lt;fov_num&gt; is the fov number,<code>ch&lt;#&gt;</code> is the channel number (from 0 to 4), and &lt;user_format&gt; is the specified file type format (see User inputs). Note: If the specified <code>user_format</code> is jpg, the raw files will be 8bit jpg files.</p>
-<p>Example</p>
-<pre><code>F001_ch0_raw.jpg (for user_format = jpg)</code></pre></li>
-<li><p><code>8bit</code> - The images in the raw_folder are converted to 8bit and saved in this folder. Note: If the specified <code>user_format</code> is jpg, the 8bit files are identical to the raw files. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_8bit.&lt;user_format&gt; except when <code>user_format</code> = jpg</p>
-<p>Example</p>
-<pre><code>F001_ch0_8bit.tif (for user_format = tif)
-F001_ch0_raw.jpg (for user_format = jpg)</code></pre></li>
-<li><p><code>8bit_autocontrast</code> – Images in the 8bit folder are autocontrasted based on the user supplied clipping value. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_8bit_autocontrast.&lt;user_format&gt;</p>
-<p>Example</p>
-<pre><code>F001_ch0_8bit_autocontrast.png (for user_format = png)</code></pre></li>
-<li><p><code>composite</code> - Composite images created from the images in the <code>8bit</code> folder. The composite type is a screen composite. The file format will follow &lt;fov_num&gt;_composite.&lt;user_format&gt;</p>
-<p>Example</p>
-<pre><code>F001_composite.jpg (for user_format = jpg)</code></pre></li>
-<li><p><code>composite_autocontrast</code> - Images in the composite_folder are autocontrasted based on the user specified clipping value. The file format will follow &lt;fov_num&gt;_composite_autocontrast.&lt;user_format&gt;</p>
-<p>Example</p>
-<pre><code>F001_composite_autocontrast.png (for user_format = png)</code></pre></li>
-</ul>
-</section>
-<section id="usage" class="level1" data-number="7">
-<h1 data-number="7"><span class="header-section-number">7</span> Usage</h1>
-<pre><code>cd to/your/Morphology2D folder
-python /path/to/your/make_composite.py # and follow the on-screen prompts</code></pre>
-<p>Regex pattern matching on 2D morphology file name format is implemented, however, only NanoString 2D morphology files should be present in the folder containing the make_composite script.</p>
-</section>
-<section id="example" class="level1" data-number="8">
-<h1 data-number="8"><span class="header-section-number">8</span> Example</h1>
-<p>The example dataset that we used was the mouse coronal hemisphere FFPE dataset that is available to download from NanoString’s website <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">here</a>.</p>
-<p>The Morphology2D folder is found within the CellStatsDir folder and has TIF files for each of the 130 FOVs.</p>
+<p>Here’s code for defining cellular neighborhoods:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># In Terminal</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>cd <span class="sc">/</span>path<span class="sc">/</span>to<span class="sc">/</span>slide<span class="sc">/</span>CellStatsDir<span class="sc">/</span>Morphology2D</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># define neighbors using a K-nearest approach:</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>neighbors.nearest50 <span class="ot">&lt;-</span> <span class="fu">nearestNeighborGraph</span>(<span class="at">x =</span> xy[, <span class="dv">1</span>], <span class="at">y =</span> xy[, <span class="dv">2</span>], <span class="at">N =</span> <span class="dv">50</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># define using a radius-based approach:</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>neighbors.radiusbased <span class="ot">&lt;-</span> <span class="fu">radiusBasedGraph</span>(<span class="at">x =</span> xy[, <span class="dv">1</span>], <span class="at">y =</span> xy[, <span class="dv">2</span>], <span class="at">R =</span> <span class="fl">0.05</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co"># the output is a sparse matrix of cells * cells:</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(neighbors.nearest50)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Formal class 'dgCMatrix' [package "Matrix"] with 6 slots
+  ..@ i       : int [1:327750] 1 22 30 40 54 59 62 63 73 78 ...
+  ..@ p       : int [1:6556] 0 29 60 89 114 141 181 207 239 276 ...
+  ..@ Dim     : int [1:2] 6555 6555
+  ..@ Dimnames:List of 2
+  .. ..$ : NULL
+  .. ..$ : NULL
+  ..@ x       : num [1:327750] 0.0603 0.0405 0.0135 0.0379 0.0179 ...
+  ..@ factors : list()</code></pre>
 </div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># compare the number of neighbors found by each approach:</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(Matrix<span class="sc">::</span><span class="fu">rowSums</span>(neighbors.nearest50))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  1.230   1.595   1.742   1.784   1.927   5.360 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(Matrix<span class="sc">::</span><span class="fu">rowSums</span>(neighbors.radiusbased))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  0.000   1.234   1.514   1.512   1.781   2.772 </code></pre>
+</div>
+</div>
+<section id="subsampling-neighbors-to-minimize-spatial-auto-correlation" class="level3" data-number="2.1.1">
+<h3 data-number="2.1.1" class="anchored" data-anchor-id="subsampling-neighbors-to-minimize-spatial-auto-correlation"><span class="header-section-number">2.1.1</span> Subsampling neighbors to minimize spatial auto-correlation</h3>
+<p>An occasionally important detail:</p>
+<p>In “Mitigating autocorrelation during spatially resolved transcriptomics data analysis”, <span class="citation" data-cites="Maher2023">Maher et al. (<a href="#ref-Maher2023" role="doc-biblioref">2023</a>)</span> describe an inconvenient tendency of spatial context matrices: because neighboring cells have largely the same neighbors, their entries in the spatial context matrix are correlated. This correlation between neighbors proves a substantial barrier to distance-based analyses like UMAP or Leiden clustering, producing UMAPs where all points fall in a highly-connected blob and generally poor Leiden performance. (However, for most analyses, correlation between neighboring cells’ spatial context vectors doesn’t seem to have much impact.) They propose that by defining each cell’s neighborhood as a random subset of its nearest neighbors, they can largely break this correlation between neighbors. They released a python toolkit for this, <a href="https://github.com/wanglab-broad/spin" target="_blank">SPIN</a>.</p>
+<p>For R coders, here’s how you would get a neighborhood matrix with random subsetting:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># In Terminal</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>tree <span class="sc">-</span>L <span class="dv">1</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>subsetted_neighbors <span class="ot">&lt;-</span> <span class="fu">subsampleNeighborsByRow</span>(<span class="at">neighbors =</span> neighbors.nearest50, <span class="at">p =</span> <span class="fl">0.5</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(Matrix<span class="sc">::</span><span class="fu">rowSums</span>(subsetted_neighbors))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+ 0.5635  0.7936  0.8712  0.8922  0.9668  2.7334 </code></pre>
 </div>
-<pre><code>├── 20230406_205644_S1_C902_P99_N99_F001.TIF
-├── 20230406_205644_S1_C902_P99_N99_F002.TIF
-...
-├── 20230406_205644_S1_C902_P99_N99_F129.TIF
-└── 20230406_205644_S1_C902_P99_N99_F130.TIF
-</code></pre>
-<p>Once in the Morphology2D folder, simply run the script and follow the on-screen prompts (<a href="#fig-run" class="quarto-xref">Figure&nbsp;2</a>).</p>
+</div>
+</section>
+</section>
+<section id="summarizing-a-cells-neighbors-to-define-its-spatial-context" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="summarizing-a-cells-neighbors-to-define-its-spatial-context"><span class="header-section-number">2.2</span> Summarizing a cell’s neighbors to define its spatial context</h2>
+<p>Usually, you’ll employ one of two approaches:</p>
+<ol type="1">
+<li>Report the average expression of neighborhood cells</li>
+<li>Report the cell type abundances within the neighborhood cells</li>
+</ol>
+<p>But more bespoke options are possible. For example, you could:</p>
+<ul>
+<li>Only record expression of known ligands, under the theory that they’re mainly responsible for cell-cell communication.</li>
+<li>Only record genes from a pathway of interest</li>
+<li>Record QC metrics like the rate of flagged cells, or total counts per cell, or total negprobe counts per cell.</li>
+<li>Create a hybrid matrix including both cell type abundances and expression of selected genes.</li>
+<li>Instead of computing means, look at SD or covariance of gene expression within a neighborhood.</li>
+</ul>
+<p>The main takeaway here is that once you’ve defined cellular neighborhoods, it’s incredibly simply to extract all manner of variables from them, giving you great flexibility in how you pose biological questions.</p>
+<p>You can implement the basic formats of spatial context matrices as follows:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># In Terminal</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>python <span class="sc">/</span>path<span class="sc">/</span>to<span class="sc">/</span>CosMx<span class="sc">-</span>Analysis<span class="sc">-</span>Scratch<span class="sc">-</span>Space<span class="sc">/</span>assets<span class="sc">/</span>make<span class="sc">-</span>composite<span class="sc">/</span>make_composite.py</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># mean neighborhood expression:</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>spatialcontext_expression <span class="ot">&lt;-</span> <span class="fu">get_neighborhood_expression</span>(counts, neighbors.nearest50)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># mean cell type abundances:</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>spatialcontext_celltypes <span class="ot">&lt;-</span> <span class="fu">neighbor_tabulate</span>(annot<span class="sc">$</span>celltype, neighbors.nearest50)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="co"># spatial context matrices are dense:</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(spatialcontext_expression)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> num [1:6555, 1:11] 0.16 0.24 0.4 0.28 0.22 0.4 0.32 0.38 0.28 0.34 ...
+ - attr(*, "dimnames")=List of 2
+  ..$ : NULL
+  ..$ : chr [1:11] "ITGAV" "ITGA3" "SPOCK2" "SPP1" ...</code></pre>
 </div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(spatialcontext_celltypes)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> num [1:6555, 1:26] 24 34 17 36 29 11 36 35 19 39 ...
+ - attr(*, "dimnames")=List of 2
+  ..$ : NULL
+  ..$ : chr [1:26] "PCT" "Parietal.epithelium" "Connecting.tubule" "Type.B.intercalated.cell" ...</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="analyzing-the-spatial-context-matrix" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Analyzing the spatial context matrix</h1>
+<p>Now that we’ve got a spatial context matrix, we can play all our usual matrix analysis games with it. Brief descriptions follow:</p>
+<section id="visualization" class="level3" data-number="3.0.1">
+<h3 data-number="3.0.1" class="anchored" data-anchor-id="visualization"><span class="header-section-number">3.0.1</span> Visualization</h3>
+<p>Plotting genes’ values in the spatial context matrix, rather than their single cell expression values, often produces smoother, cleaner representations of their spatial patterns.</p>
 <div class="cell">
 <div class="cell-output-display">
-<div id="fig-run" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-run-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="./figures/fig-out.png" class="img-fluid figure-img">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-run-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Screenshot of standard output from terminal following script execution. In this example, I set the clipping percentage to 3 and the output to <code>png</code>. On a Macbook Pro M1, this took about 25 minutes to process 130 FOVs.
-</figcaption>
+<div>
+<figure class="figure">
+<p><img src="./figures/smoothexample.png" class="img-fluid figure-img" width="388"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>When complete, the structure of the Morphology2D folder should resemble this:</p>
+</section>
+<section id="spatial-clustering-niche-analysis" class="level3" data-number="3.0.2">
+<h3 data-number="3.0.2" class="anchored" data-anchor-id="spatial-clustering-niche-analysis"><span class="header-section-number">3.0.2</span> Spatial clustering / niche analysis</h3>
+<p>This is an exercise in clustering the rows (cells) of the spatial context matrix. The Mclust library works well here. If you use subsetted neighbors (via the function), then Louvain and Leiden clustering will also work.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># In Terminal</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>tree <span class="sc">-</span>L <span class="dv">1</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="./figures/nicheexample.png" class="img-fluid figure-img" width="299"></p>
+</figure>
 </div>
-<pre><code>├── 20230406_205644_S1_C902_P99_N99_F001.TIF
-├── 20230406_205644_S1_C902_P99_N99_F002.TIF
-...
-├── 20230406_205644_S1_C902_P99_N99_F129.TIF
-├── 20230406_205644_S1_C902_P99_N99_F130.TIF
-├── 8bit
-├── 8bit_autocontrast
-├── composite
-├── composite_autocontrast
-└── raw</code></pre>
-<p>These composite images can now be imported into open-sourced software or explored further.</p>
+</div>
+</div>
+</section>
+<section id="umaps" class="level3" data-number="3.0.3">
+<h3 data-number="3.0.3" class="anchored" data-anchor-id="umaps"><span class="header-section-number">3.0.3</span> UMAPs</h3>
+<p>Two approaches lead to informative UMAP projections of spatial context matrices:</p>
+<ol type="1">
+<li>Use to squash autocorrelation.</li>
+<li>Simply plot a UMAP of a random subset of cells.</li>
+</ol>
+</section>
+<section id="clustering-genes" class="level3" data-number="3.0.4">
+<h3 data-number="3.0.4" class="anchored" data-anchor-id="clustering-genes"><span class="header-section-number">3.0.4</span> Clustering genes</h3>
+<p>To find sets of genes that are correlated with each other in space, we recommend the <a href="https://github.com/Nanostring-Biostats/InSituCor" target="_blank">InSituCor library</a>, which applies many of the functions shown here and implements other insights to get more informative results.</p>
+</section>
+<section id="evaluating-single-genes-for-spatial-autocorrelation" class="level3" data-number="3.0.5">
+<h3 data-number="3.0.5" class="anchored" data-anchor-id="evaluating-single-genes-for-spatial-autocorrelation"><span class="header-section-number">3.0.5</span> Evaluating single genes for spatial autocorrelation</h3>
+<p>Lots of well-considered packages are available for this task, though cellular neighborhoods can also be used. Simply take the correlation between a gene’s (normalized) single cell expression and its mean expression across cellular neighborhoods, i.e.&nbsp;its column in the spatial context matrix.</p>
+</section>
+<section id="differential-expression" class="level3" data-number="3.0.6">
+<h3 data-number="3.0.6" class="anchored" data-anchor-id="differential-expression"><span class="header-section-number">3.0.6</span> Differential expression</h3>
+<p>Spatial context variables, for example abundance of a cell type of interest or expression of a gene of interest, are well-suited for use as predictors in differential expression analysis. For example, you might model how tumor cell gene expression changes in response to the number of neighboring T-cells, or to neighborhood expression of interferon gamma.</p>
+</section>
+<section id="ligand-receptor-analysis" class="level3" data-number="3.0.7">
+<h3 data-number="3.0.7" class="anchored" data-anchor-id="ligand-receptor-analysis"><span class="header-section-number">3.0.7</span> Ligand-receptor analysis</h3>
+<p>The cellular neighborhood framework lets us examine ligand-receptor interactions in a variety of ways:</p>
+<ul>
+<li>We can score cellular neighborhoods for concurrent expression of a LR pair</li>
+<li>We can study whether a LR pair tends to be expressed in the same neighborhoods. (Again, InSituCor is well-crafted for this task.)</li>
+<li>You might reasonably just look at a ligand’s neighborhood expression levels as indicative of the LR signaling cells are subject to. (You might do this if the single cell expression of the Receptor gene is problematically noisy, or if you’re willing to assume that all the cells you’re analyzing have at least <em>some</em> receptor, and the biologically interesting question is how much ligand they’re exposed to.)</li>
+</ul>
+</section>
+</section>
+<section id="recommendation-spatial-clustering-niche-analysis" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Recommendation: spatial clustering / niche analysis</h1>
+<p>“Niche analysis” is the task of classifying cellular neighborhoods, usually via cluster analysis. Anecdotally, scientists seem to be making very effective use of this technique. Spatial transcriptomics data is complex, and it’s a convenient simplification to say things like, “We found a T-cell-enriched niche”, or, “This niche is more common in higher-grade disease”. This technique is particularly useful in large studies, where much of analysis focuses on tissue-level attributes. In this setting, it’s very convenient to summarize tissues with their relative abundances of different niches.</p>
+</section>
+<section id="computational-considerations" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Computational considerations</h1>
+<p>Single cell expression data is sparse, and so can be stored in sparse matrix format for huge memory savings. But a spatial context matrix reporting average neighborhood expression is dense, and for larger datasets can overwhelm even generously-allotted memory. We recommend two countermeasures:</p>
+<ol type="1">
+<li>Subsetting: many analyses don’t need to use every cell in a dataset: taking results from just thousands or tens of thousands of cells produces sufficiently stable summary statistics. InSituCor, for example, defaults to calculating spatial context matrix for just a subset of 5000 cells.</li>
+</ol>
+<p>Here’s how you would get a spatial context for a subset:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>sub <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(counts), <span class="dv">1000</span>)</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>subsampled_spatialcontext <span class="ot">&lt;-</span> <span class="fu">get_neighborhood_expression</span>(</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">counts =</span> counts,</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">neighbors =</span> neighbors.nearest50[sub, ])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<ol start="2" type="1">
+<li>On-the-fly calculations: it’s computationally quick to compute things like mean neighborhood expression or mean neighborhood cell type abundance. Rather than storing these matrices, calculate them anew every time you need them.</li>
+</ol>
+
 
 
 </section>
 
-</main> <!-- /main -->
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-Maher2023" class="csl-entry" role="listitem">
+Maher, Kamal, Morgan Wu, Yiming Zhou, Jiahao Huang, Qiangge Zhang, and Xiao Wang. 2023. <span>“Mitigating Autocorrelation During Spatially Resolved Transcriptomics Data Analysis.”</span> <em>bioRxiv</em>. <a href="https://doi.org/10.1101/2023.06.30.547258">https://doi.org/10.1101/2023.06.30.547258</a>.
+</div>
+</div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {

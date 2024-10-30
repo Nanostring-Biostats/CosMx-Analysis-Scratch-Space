@@ -10,7 +10,413 @@
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
 <generator>quarto-1.5.57</generator>
-<lastBuildDate>Fri, 18 Oct 2024 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Wed, 30 Oct 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Cellular neighborhoods: a useful, simple and flexible analysis framework</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cellular-neighborhoods/cellular-neighborhoods.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>The field of spatial analysis offers a growing array of sophisticated tools, including graphical neural networks, Fourier transforms, hidden Markov random fields. While these methods offer potential advantages in performance, simpler techniques have their own merit: they make analyses easier to understand, both for analysts and for their eventual audiences. In this spirit, we recommend “cellular neighborhoods” as an framework for diverse analyses. This framework offers a balance of flexibility, computational efficiency, and ease of use, making it a valuable tool for researchers.</p>
+<p>Cellular neighborhood analysis begins with two steps:</p>
+<ol type="1">
+<li>Define each cell’s neighboring cells.</li>
+<li>Create a new matrix encoding cells’ “spatial contexts”. To do this, we compute summaries of each cell’s neighbors, reporting for example their average expression profile or the abundance of different cell types within them.</li>
+</ol>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cellular-neighborhoods/figures/cartoon.png" class="img-fluid figure-img" style="width:120.0%"></p>
+<figcaption>Left: example of a cellular neighborhood defined as a cell’s 50 nearest neighbors. Right: the mean expression profile of those neighbors is used to define the cell’s spatial context. This ‘mean neighborhood expression’, calculated separately for all cells in the dataset, defines a new data matrix.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Once we’ve obtained a matrix of spatial context data, myriad analyses become possible. We can:</p>
+<ul>
+<li>Plot spatially smoothed expression to make spatial expression patterns for visually clear</li>
+<li>Derive spatial clusters / niches</li>
+<li>Find spatially auto-correlated genes / sets of genes</li>
+<li>Set up interesting differential expression problems, asking how cells modulate expression in response to their spatial context</li>
+<li>Explore ligand-receptor interactions</li>
+</ul>
+<p>Many of these analyses are achieved by simply applying techniques from single cell analyses, for example clustering the rows (cells) or columns (genes) of the matrix.</p>
+</section>
+<section id="tools-for-analyzing-cellular-neighborhoods" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Tools for analyzing cellular neighborhoods</h1>
+<p>A small R package implementing the building blocks of cellular neighborhood analysis is <a href="../../_code/cellular-neighborhoods" target="_blank">here</a>.</p>
+<p>To install it:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1">devtools<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">install_github</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Nanostring-Biostats/CosMx-Analysis-Scratch-Space@Main"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">subdir =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"_code/cellular-neighborhoods"</span>)</span></code></pre></div>
+</div>
+<p>To set up our examples, let’s load the package and open its data:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(CellularNeighborhoods)</span>
+<span id="cb2-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data</span>(cosmx_kidney)</span>
+<span id="cb2-3">annot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cosmx_kidney<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>annot</span>
+<span id="cb2-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(annot) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> annot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>cell_ID</span>
+<span id="cb2-5">counts <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cosmx_kidney<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>counts</span>
+<span id="cb2-6">celltype <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.factor</span>(cosmx_kidney<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>annot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>celltype)</span>
+<span id="cb2-7">xy <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cosmx_kidney<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>xy</span></code></pre></div>
+</div>
+<p>Now we’re ready to demonstrate the basics.</p>
+<section id="defining-a-cells-neighbors" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="defining-a-cells-neighbors"><span class="header-section-number">2.1</span> Defining a cell’s neighbors</h2>
+<p>Convenient approaches to define a cell’s neighbors include the “K-nearest” approach (we usually use the nearest 50 neighbors) and a radius-based approach. We prefer the K-nearest neighbors approach, mainly because radius-based neighborhoods tend to vary widely in the number of cells they contain, and neighborhoods of very few cells are statistically unstable.</p>
+<p>The size of a neighborhood is up to the analyst’s discretion. Try to choose a neighborhood size that reflects your understanding of biology and that makes sense for your biological question. There is a Goldilocks zone, however: very small neighborhoods produce sparse and noisy data, and very large neighborhoods become inaccurate representations of a cell’s 3D surroundings.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The problem with large neighborhoods: the area of your circular neighborhood increases with the square of the radius, but the volume of the corresponding (unobserved) 3D tissue region increases with the cube of the radius. This means that the larger the radius, the less of your 3D neighborhood falls in the narrow tissue slide you’ve assayed, and the more it consists of unseen cells increasingly far away in the Z-dimension.</p>
+</div>
+</div>
+<p>Here’s code for defining cellular neighborhoods:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># define neighbors using a K-nearest approach:</span></span>
+<span id="cb3-2">neighbors.nearest50 <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">nearestNeighborGraph</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">N =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span>
+<span id="cb3-3"></span>
+<span id="cb3-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># define using a radius-based approach:</span></span>
+<span id="cb3-5">neighbors.radiusbased <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">radiusBasedGraph</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> xy[, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">R =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.05</span>)</span>
+<span id="cb3-6"></span>
+<span id="cb3-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># the output is a sparse matrix of cells * cells:</span></span>
+<span id="cb3-8"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str</span>(neighbors.nearest50)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Formal class 'dgCMatrix' [package "Matrix"] with 6 slots
+  ..@ i       : int [1:327750] 1 22 30 40 54 59 62 63 73 78 ...
+  ..@ p       : int [1:6556] 0 29 60 89 114 141 181 207 239 276 ...
+  ..@ Dim     : int [1:2] 6555 6555
+  ..@ Dimnames:List of 2
+  .. ..$ : NULL
+  .. ..$ : NULL
+  ..@ x       : num [1:327750] 0.0603 0.0405 0.0135 0.0379 0.0179 ...
+  ..@ factors : list()</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># compare the number of neighbors found by each approach:</span></span>
+<span id="cb5-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">summary</span>(Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rowSums</span>(neighbors.nearest50))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  1.230   1.595   1.742   1.784   1.927   5.360 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">summary</span>(Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rowSums</span>(neighbors.radiusbased))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  0.000   1.234   1.514   1.512   1.781   2.772 </code></pre>
+</div>
+</div>
+<section id="subsampling-neighbors-to-minimize-spatial-auto-correlation" class="level3" data-number="2.1.1">
+<h3 data-number="2.1.1" class="anchored" data-anchor-id="subsampling-neighbors-to-minimize-spatial-auto-correlation"><span class="header-section-number">2.1.1</span> Subsampling neighbors to minimize spatial auto-correlation</h3>
+<p>An occasionally important detail:</p>
+<p>In “Mitigating autocorrelation during spatially resolved transcriptomics data analysis”, <span class="citation" data-cites="Maher2023">Maher et al. (2023)</span> describe an inconvenient tendency of spatial context matrices: because neighboring cells have largely the same neighbors, their entries in the spatial context matrix are correlated. This correlation between neighbors proves a substantial barrier to distance-based analyses like UMAP or Leiden clustering, producing UMAPs where all points fall in a highly-connected blob and generally poor Leiden performance. (However, for most analyses, correlation between neighboring cells’ spatial context vectors doesn’t seem to have much impact.) They propose that by defining each cell’s neighborhood as a random subset of its nearest neighbors, they can largely break this correlation between neighbors. They released a python toolkit for this, <a href="https://github.com/wanglab-broad/spin" target="_blank">SPIN</a>.</p>
+<p>For R coders, here’s how you would get a neighborhood matrix with random subsetting:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1">subsetted_neighbors <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">subsampleNeighborsByRow</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">neighbors =</span> neighbors.nearest50, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">p =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>)</span>
+<span id="cb9-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">summary</span>(Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rowSums</span>(subsetted_neighbors))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+ 0.5635  0.7936  0.8712  0.8922  0.9668  2.7334 </code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="summarizing-a-cells-neighbors-to-define-its-spatial-context" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="summarizing-a-cells-neighbors-to-define-its-spatial-context"><span class="header-section-number">2.2</span> Summarizing a cell’s neighbors to define its spatial context</h2>
+<p>Usually, you’ll employ one of two approaches:</p>
+<ol type="1">
+<li>Report the average expression of neighborhood cells</li>
+<li>Report the cell type abundances within the neighborhood cells</li>
+</ol>
+<p>But more bespoke options are possible. For example, you could:</p>
+<ul>
+<li>Only record expression of known ligands, under the theory that they’re mainly responsible for cell-cell communication.</li>
+<li>Only record genes from a pathway of interest</li>
+<li>Record QC metrics like the rate of flagged cells, or total counts per cell, or total negprobe counts per cell.</li>
+<li>Create a hybrid matrix including both cell type abundances and expression of selected genes.</li>
+<li>Instead of computing means, look at SD or covariance of gene expression within a neighborhood.</li>
+</ul>
+<p>The main takeaway here is that once you’ve defined cellular neighborhoods, it’s incredibly simply to extract all manner of variables from them, giving you great flexibility in how you pose biological questions.</p>
+<p>You can implement the basic formats of spatial context matrices as follows:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># mean neighborhood expression:</span></span>
+<span id="cb11-2">spatialcontext_expression <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">get_neighborhood_expression</span>(counts, neighbors.nearest50)</span>
+<span id="cb11-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># mean cell type abundances:</span></span>
+<span id="cb11-4">spatialcontext_celltypes <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">neighbor_tabulate</span>(annot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>celltype, neighbors.nearest50)</span>
+<span id="cb11-5"></span>
+<span id="cb11-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># spatial context matrices are dense:</span></span>
+<span id="cb11-7"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str</span>(spatialcontext_expression)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> num [1:6555, 1:11] 0.16 0.24 0.4 0.28 0.22 0.4 0.32 0.38 0.28 0.34 ...
+ - attr(*, "dimnames")=List of 2
+  ..$ : NULL
+  ..$ : chr [1:11] "ITGAV" "ITGA3" "SPOCK2" "SPP1" ...</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str</span>(spatialcontext_celltypes)</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> num [1:6555, 1:26] 24 34 17 36 29 11 36 35 19 39 ...
+ - attr(*, "dimnames")=List of 2
+  ..$ : NULL
+  ..$ : chr [1:26] "PCT" "Parietal.epithelium" "Connecting.tubule" "Type.B.intercalated.cell" ...</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="analyzing-the-spatial-context-matrix" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Analyzing the spatial context matrix</h1>
+<p>Now that we’ve got a spatial context matrix, we can play all our usual matrix analysis games with it. Brief descriptions follow:</p>
+<section id="visualization" class="level3" data-number="3.0.1">
+<h3 data-number="3.0.1" class="anchored" data-anchor-id="visualization"><span class="header-section-number">3.0.1</span> Visualization</h3>
+<p>Plotting genes’ values in the spatial context matrix, rather than their single cell expression values, often produces smoother, cleaner representations of their spatial patterns.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cellular-neighborhoods/figures/smoothexample.png" class="img-fluid figure-img" width="388"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="spatial-clustering-niche-analysis" class="level3" data-number="3.0.2">
+<h3 data-number="3.0.2" class="anchored" data-anchor-id="spatial-clustering-niche-analysis"><span class="header-section-number">3.0.2</span> Spatial clustering / niche analysis</h3>
+<p>This is an exercise in clustering the rows (cells) of the spatial context matrix. The Mclust library works well here. If you use subsetted neighbors (via the function), then Louvain and Leiden clustering will also work.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cellular-neighborhoods/figures/nicheexample.png" class="img-fluid figure-img" width="299"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="umaps" class="level3" data-number="3.0.3">
+<h3 data-number="3.0.3" class="anchored" data-anchor-id="umaps"><span class="header-section-number">3.0.3</span> UMAPs</h3>
+<p>Two approaches lead to informative UMAP projections of spatial context matrices:</p>
+<ol type="1">
+<li>Use to squash autocorrelation.</li>
+<li>Simply plot a UMAP of a random subset of cells.</li>
+</ol>
+</section>
+<section id="clustering-genes" class="level3" data-number="3.0.4">
+<h3 data-number="3.0.4" class="anchored" data-anchor-id="clustering-genes"><span class="header-section-number">3.0.4</span> Clustering genes</h3>
+<p>To find sets of genes that are correlated with each other in space, we recommend the <a href="https://github.com/Nanostring-Biostats/InSituCor" target="_blank">InSituCor library</a>, which applies many of the functions shown here and implements other insights to get more informative results.</p>
+</section>
+<section id="evaluating-single-genes-for-spatial-autocorrelation" class="level3" data-number="3.0.5">
+<h3 data-number="3.0.5" class="anchored" data-anchor-id="evaluating-single-genes-for-spatial-autocorrelation"><span class="header-section-number">3.0.5</span> Evaluating single genes for spatial autocorrelation</h3>
+<p>Lots of well-considered packages are available for this task, though cellular neighborhoods can also be used. Simply take the correlation between a gene’s (normalized) single cell expression and its mean expression across cellular neighborhoods, i.e.&nbsp;its column in the spatial context matrix.</p>
+</section>
+<section id="differential-expression" class="level3" data-number="3.0.6">
+<h3 data-number="3.0.6" class="anchored" data-anchor-id="differential-expression"><span class="header-section-number">3.0.6</span> Differential expression</h3>
+<p>Spatial context variables, for example abundance of a cell type of interest or expression of a gene of interest, are well-suited for use as predictors in differential expression analysis. For example, you might model how tumor cell gene expression changes in response to the number of neighboring T-cells, or to neighborhood expression of interferon gamma.</p>
+</section>
+<section id="ligand-receptor-analysis" class="level3" data-number="3.0.7">
+<h3 data-number="3.0.7" class="anchored" data-anchor-id="ligand-receptor-analysis"><span class="header-section-number">3.0.7</span> Ligand-receptor analysis</h3>
+<p>The cellular neighborhood framework lets us examine ligand-receptor interactions in a variety of ways:</p>
+<ul>
+<li>We can score cellular neighborhoods for concurrent expression of a LR pair</li>
+<li>We can study whether a LR pair tends to be expressed in the same neighborhoods. (Again, InSituCor is well-crafted for this task.)</li>
+<li>You might reasonably just look at a ligand’s neighborhood expression levels as indicative of the LR signaling cells are subject to. (You might do this if the single cell expression of the Receptor gene is problematically noisy, or if you’re willing to assume that all the cells you’re analyzing have at least <em>some</em> receptor, and the biologically interesting question is how much ligand they’re exposed to.)</li>
+</ul>
+</section>
+</section>
+<section id="recommendation-spatial-clustering-niche-analysis" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Recommendation: spatial clustering / niche analysis</h1>
+<p>“Niche analysis” is the task of classifying cellular neighborhoods, usually via cluster analysis. Anecdotally, scientists seem to be making very effective use of this technique. Spatial transcriptomics data is complex, and it’s a convenient simplification to say things like, “We found a T-cell-enriched niche”, or, “This niche is more common in higher-grade disease”. This technique is particularly useful in large studies, where much of analysis focuses on tissue-level attributes. In this setting, it’s very convenient to summarize tissues with their relative abundances of different niches.</p>
+</section>
+<section id="computational-considerations" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Computational considerations</h1>
+<p>Single cell expression data is sparse, and so can be stored in sparse matrix format for huge memory savings. But a spatial context matrix reporting average neighborhood expression is dense, and for larger datasets can overwhelm even generously-allotted memory. We recommend two countermeasures:</p>
+<ol type="1">
+<li>Subsetting: many analyses don’t need to use every cell in a dataset: taking results from just thousands or tens of thousands of cells produces sufficiently stable summary statistics. InSituCor, for example, defaults to calculating spatial context matrix for just a subset of 5000 cells.</li>
+</ol>
+<p>Here’s how you would get a spatial context for a subset:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1">sub <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sample</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">nrow</span>(counts), <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>)</span>
+<span id="cb15-2">subsampled_spatialcontext <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">get_neighborhood_expression</span>(</span>
+<span id="cb15-3">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">counts =</span> counts,</span>
+<span id="cb15-4">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">neighbors =</span> neighbors.nearest50[sub, ])</span></code></pre></div>
+</div>
+<ol start="2" type="1">
+<li>On-the-fly calculations: it’s computationally quick to compute things like mean neighborhood expression or mean neighborhood cell type abundance. Rather than storing these matrices, calculate them anew every time you need them.</li>
+</ol>
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-Maher2023" class="csl-entry">
+Maher, Kamal, Morgan Wu, Yiming Zhou, Jiahao Huang, Qiangge Zhang, and Xiao Wang. 2023. <span>“Mitigating Autocorrelation During Spatially Resolved Transcriptomics Data Analysis.”</span> <em>bioRxiv</em>. <a href="https://doi.org/10.1101/2023.06.30.547258">https://doi.org/10.1101/2023.06.30.547258</a>.
+</div>
+</div></section></div> ]]></description>
+  <category>overview</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cellular-neighborhoods/cellular-neighborhoods.html</guid>
+  <pubDate>Wed, 30 Oct 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cellular-neighborhoods/figures/neighborhood-tile.png" medium="image" type="image/png" height="144" width="144"/>
+</item>
 <item>
   <title>Programmatic stitching with napari-cosmx</title>
   <dc:creator>Evelyn Metzger</dc:creator>
@@ -344,90 +750,96 @@ Writing targets to ...</code></pre>
 <section id="sec-launching-napari-cosmx-from-python" class="level2" data-number="2.1">
 <h2 data-number="2.1" class="anchored" data-anchor-id="sec-launching-napari-cosmx-from-python"><span class="header-section-number">2.1</span> Viewing the results</h2>
 <p>As mentioned in the <a href="../../posts/napari-cosmx-basics/using-napari-cosmx.html">second napari series post</a>, one can use python directly to view CosMx SMI data. We can also launch napari from python directly. In the code below, I instantiated a <code>Gemini</code> class object, turned off the segmentation and FOV labels layers, added the PanCK and DNA channels and manually adjusted the contrast of PanCK. Finally, I launched the widget for further exploration.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="im" style="color: #00769E;
+<div class="sourceCode" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| label: view one slide</span></span>
+<span id="cb11-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| eval: false</span></span>
+<span id="cb11-3"></span>
+<span id="cb11-4"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">from</span> importlib.metadata <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> metadata</span>
-<span id="cb11-2"><span class="im" style="color: #00769E;
+<span id="cb11-5"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> numpy</span>
-<span id="cb11-3"><span class="im" style="color: #00769E;
+<span id="cb11-6"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> pandas <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> pd</span>
-<span id="cb11-4"><span class="im" style="color: #00769E;
+<span id="cb11-7"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> os</span>
-<span id="cb11-5"><span class="im" style="color: #00769E;
+<span id="cb11-8"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">from</span> napari_cosmx.gemini <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> Gemini</span>
-<span id="cb11-6"><span class="im" style="color: #00769E;
+<span id="cb11-9"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> imageio</span>
-<span id="cb11-7"></span>
-<span id="cb11-8">napari_files_path <span class="op" style="color: #5E5E5E;
+<span id="cb11-10"></span>
+<span id="cb11-11">napari_files_path <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> SlideOutputDir <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># i.e., 'your/SlideOutputDir/from/above'</span></span>
-<span id="cb11-9">gem <span class="op" style="color: #5E5E5E;
+<span id="cb11-12">gem <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> Gemini(napari_files_path)</span>
-<span id="cb11-10">gem.viewer.layers[<span class="st" style="color: #20794D;
+<span id="cb11-13">gem.viewer.layers[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'Segmentation'</span>].visible <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span></span>
-<span id="cb11-11">gem.viewer.layers[<span class="st" style="color: #20794D;
+<span id="cb11-14">gem.viewer.layers[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'FOV labels'</span>].visible <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span></span>
-<span id="cb11-12">gem.add_channel(<span class="st" style="color: #20794D;
+<span id="cb11-15">gem.add_channel(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'PanCK'</span>, colormap <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'green'</span>)</span>
-<span id="cb11-13">panck <span class="op" style="color: #5E5E5E;
+<span id="cb11-16">panck <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> gem.viewer.layers[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'PanCK'</span>]</span>
-<span id="cb11-14">panck.contrast_limits <span class="op" style="color: #5E5E5E;
+<span id="cb11-17">panck.contrast_limits <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [<span class="fl" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">116.0</span>, <span class="fl" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">5903.646408839779</span>]</span>
-<span id="cb11-15">gem.add_channel(<span class="st" style="color: #20794D;
+<span id="cb11-18">gem.add_channel(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'DNA'</span>, colormap <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'bop blue'</span>)</span>
-<span id="cb11-16">gem.show_widget()</span>
-<span id="cb11-17"></span>
-<span id="cb11-18">fig_path <span class="op" style="color: #5E5E5E;
+<span id="cb11-19">gem.show_widget()</span>
+<span id="cb11-20"></span>
+<span id="cb11-21">fig_path <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> napari_files_path <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">+</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"/fig-stitch-single-slide.png"</span></span>
-<span id="cb11-19"><span class="cf" style="color: #003B4F;
+<span id="cb11-22"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">with</span> imageio.get_writer(fig_path, dpi<span class="op" style="color: #5E5E5E;
@@ -439,15 +851,15 @@ background-color: null;
 font-style: inherit;">800</span>)) <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> writer:</span>
-<span id="cb11-20">        screenshot <span class="op" style="color: #5E5E5E;
+<span id="cb11-23">        screenshot <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> gem.viewer.screenshot(canvas_only<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span>)</span>
-<span id="cb11-21">        writer.append_data(screenshot)</span></code></pre></div>
-</div>
+<span id="cb11-24">        writer.append_data(screenshot)</span>
+<span id="cb11-25">        </span></code></pre></div>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -466,7 +878,7 @@ Note
 <div id="fig-stitch-single-slide" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-stitch-single-slide-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-stitching/figures/fig-stitch-single-slide.png" class="img-fluid figure-img" width="1920">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-stitching/figures/fig-stitch-single-slide.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-single-slide-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: The output from a single slide stitching. This image represent an 8-by-8 FOV grid. PanCK and DNA are shown in green and blue, respectively.
@@ -534,52 +946,58 @@ background-color: null;
 font-style: inherit;">│&nbsp;&nbsp;</span> ├── ./AUG29_6K_BRST_PS_S5/Logs</span></code></pre></div>
 </div>
 <p>In the python script below, we point <code>BatchFolder</code> to the location that contains these slide folders. We also define <code>OutputFolder</code> to store the napari folders (one for each slide). The script then searches through those folders and stitches the slides.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="im" style="color: #00769E;
+<div class="sourceCode" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| label: stitch multiple slides</span></span>
+<span id="cb13-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| eval: false</span></span>
+<span id="cb13-3"></span>
+<span id="cb13-4"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> numpy</span>
-<span id="cb13-2"><span class="im" style="color: #00769E;
+<span id="cb13-5"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> pandas <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> pd</span>
-<span id="cb13-3"><span class="im" style="color: #00769E;
+<span id="cb13-6"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> os</span>
-<span id="cb13-4"><span class="im" style="color: #00769E;
+<span id="cb13-7"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">from</span> os <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> listdir</span>
-<span id="cb13-5"><span class="im" style="color: #00769E;
+<span id="cb13-8"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">from</span> glob <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> iglob</span>
-<span id="cb13-6"></span>
-<span id="cb13-7"><span class="co" style="color: #5E5E5E;
+<span id="cb13-9"></span>
+<span id="cb13-10"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># Directory containing multiple slides</span></span>
-<span id="cb13-8">BatchFolder <span class="op" style="color: #5E5E5E;
+<span id="cb13-11">BatchFolder <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'/directory/containing/multiple/slides'</span></span>
-<span id="cb13-9"></span>
-<span id="cb13-10"><span class="co" style="color: #5E5E5E;
+<span id="cb13-12"></span>
+<span id="cb13-13"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># Output path</span></span>
-<span id="cb13-11">OutputFolder <span class="op" style="color: #5E5E5E;
+<span id="cb13-14">OutputFolder <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'/path/to/output/directory'</span></span>
-<span id="cb13-12"></span>
-<span id="cb13-13"><span class="co" style="color: #5E5E5E;
+<span id="cb13-15"></span>
+<span id="cb13-16"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">### Functions</span></span>
-<span id="cb13-14"></span>
-<span id="cb13-15"><span class="kw" style="color: #003B4F;
+<span id="cb13-17"></span>
+<span id="cb13-18"><span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">def</span> check_folder(path: <span class="bu" style="color: null;
@@ -589,57 +1007,36 @@ background-color: null;
 font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">bool</span>:</span>
-<span id="cb13-16">  <span class="co" style="color: #5E5E5E;
+<span id="cb13-19">  <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">""" Checks if a selected folder is a valid slide.</span></span>
-<span id="cb13-17"></span>
-<span id="cb13-18"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">      Description: </span></span>
-<span id="cb13-19"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">          A folder is a valid slide if it has the following folders:</span></span>
-<span id="cb13-20"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">          CellStatsDir, AnalysisResults/*, and RunSummary</span></span>
+<span id="cb13-20"></span>
 <span id="cb13-21"><span class="co" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">        </span></span>
+font-style: inherit;">      Description: </span></span>
 <span id="cb13-22"><span class="co" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">      Returns:</span></span>
+font-style: inherit;">          A folder is a valid slide if it has the following folders:</span></span>
 <span id="cb13-23"><span class="co" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">          bool: True if valid, False if not valid</span></span>
+font-style: inherit;">          CellStatsDir, AnalysisResults/*, and RunSummary</span></span>
 <span id="cb13-24"><span class="co" style="color: #5E5E5E;
 background-color: null;
+font-style: inherit;">        </span></span>
+<span id="cb13-25"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">      Returns:</span></span>
+<span id="cb13-26"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">          bool: True if valid, False if not valid</span></span>
+<span id="cb13-27"><span class="co" style="color: #5E5E5E;
+background-color: null;
 font-style: inherit;">  """</span></span>
-<span id="cb13-25">  isValid <span class="op" style="color: #5E5E5E;
+<span id="cb13-28">  isValid <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">True</span></span>
-<span id="cb13-26">  <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> os.path.isdir(path <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'/CellStatsDir'</span>):</span>
-<span id="cb13-27">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"No valid CellStatsDir"</span>)</span>
-<span id="cb13-28">    isValid <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span></span>
 <span id="cb13-29">  <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
@@ -650,17 +1047,17 @@ font-style: inherit;">not</span> os.path.isdir(path <span class="op" style="colo
 background-color: null;
 font-style: inherit;">+</span> <span class="st" style="color: #20794D;
 background-color: null;
-font-style: inherit;">'/RunSummary'</span>):</span>
+font-style: inherit;">'/CellStatsDir'</span>):</span>
 <span id="cb13-30">    <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
-font-style: inherit;">"No valid RunSummary"</span>)</span>
+font-style: inherit;">"No valid CellStatsDir"</span>)</span>
 <span id="cb13-31">    isValid <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="va" style="color: #111111;
 background-color: null;
-font-style: inherit;">False</span> </span>
+font-style: inherit;">False</span></span>
 <span id="cb13-32">  <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
@@ -671,25 +1068,46 @@ font-style: inherit;">not</span> os.path.isdir(path <span class="op" style="colo
 background-color: null;
 font-style: inherit;">+</span> <span class="st" style="color: #20794D;
 background-color: null;
-font-style: inherit;">'/AnalysisResults'</span>):</span>
+font-style: inherit;">'/RunSummary'</span>):</span>
 <span id="cb13-33">    <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
-font-style: inherit;">"No valid AnalysisResults Parent folder"</span>)</span>
+font-style: inherit;">"No valid RunSummary"</span>)</span>
 <span id="cb13-34">    isValid <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="va" style="color: #111111;
 background-color: null;
-font-style: inherit;">False</span></span>
+font-style: inherit;">False</span> </span>
 <span id="cb13-35">  <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> os.path.isdir(path <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'/AnalysisResults'</span>):</span>
+<span id="cb13-36">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"No valid AnalysisResults Parent folder"</span>)</span>
+<span id="cb13-37">    isValid <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb13-38">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
 font-style: inherit;">else</span>: </span>
-<span id="cb13-36">      <span class="co" style="color: #5E5E5E;
+<span id="cb13-39">      <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># check if /AnalysisResults/&lt;random_subfolder_name&gt; exists</span></span>
-<span id="cb13-37">      analysis_sub_dir <span class="op" style="color: #5E5E5E;
+<span id="cb13-40">      analysis_sub_dir <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [i <span class="cf" style="color: #003B4F;
 background-color: null;
@@ -710,7 +1128,7 @@ font-weight: bold;
 font-style: inherit;">not</span> i.startswith(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'.'</span>)]</span>
-<span id="cb13-38">      <span class="cf" style="color: #003B4F;
+<span id="cb13-41">      <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">if</span>(<span class="bu" style="color: null;
@@ -720,26 +1138,26 @@ background-color: null;
 font-style: inherit;">!=</span><span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1</span>):</span>
-<span id="cb13-39">        <span class="bu" style="color: null;
+<span id="cb13-42">        <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"No valid AnalysisResults subfolder"</span>)</span>
-<span id="cb13-40">        isValid <span class="op" style="color: #5E5E5E;
+<span id="cb13-43">        isValid <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span></span>
-<span id="cb13-41">  <span class="cf" style="color: #003B4F;
+<span id="cb13-44">  <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">return</span> isValid</span>
-<span id="cb13-42"></span>
-<span id="cb13-43"><span class="co" style="color: #5E5E5E;
+<span id="cb13-45"></span>
+<span id="cb13-46"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">### Processing</span></span>
-<span id="cb13-44"></span>
-<span id="cb13-45"><span class="cf" style="color: #003B4F;
+<span id="cb13-47"></span>
+<span id="cb13-48"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> <span class="bu" style="color: null;
@@ -748,16 +1166,16 @@ font-style: inherit;">dir</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">in</span> listdir(BatchFolder):</span>
-<span id="cb13-46">  ParentFolder <span class="op" style="color: #5E5E5E;
+<span id="cb13-49">  ParentFolder <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> os.path.join(BatchFolder, <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">dir</span>)</span>
-<span id="cb13-47">  <span class="cf" style="color: #003B4F;
+<span id="cb13-50">  <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">if</span> os.path.isfile(ParentFolder):</span>
-<span id="cb13-48">    <span class="bu" style="color: null;
+<span id="cb13-51">    <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
@@ -766,15 +1184,15 @@ background-color: null;
 font-style: inherit;">+</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">dir</span>)</span>
-<span id="cb13-49">    <span class="cf" style="color: #003B4F;
+<span id="cb13-52">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">continue</span></span>
-<span id="cb13-50">  <span class="cf" style="color: #003B4F;
+<span id="cb13-53">  <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">else</span>: </span>
-<span id="cb13-51">    <span class="bu" style="color: null;
+<span id="cb13-54">    <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
@@ -783,77 +1201,77 @@ background-color: null;
 font-style: inherit;">+</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">dir</span>)</span>
-<span id="cb13-52">    <span class="co" style="color: #5E5E5E;
+<span id="cb13-55">    <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># Process slides within the Parent folder</span></span>
-<span id="cb13-53">    <span class="cf" style="color: #003B4F;
+<span id="cb13-56">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> SlideDir <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">in</span> listdir(ParentFolder):</span>
-<span id="cb13-54">        <span class="cf" style="color: #003B4F;
+<span id="cb13-57">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">if</span> os.path.isfile(os.path.join(ParentFolder, SlideDir)):</span>
-<span id="cb13-55">          <span class="bu" style="color: null;
+<span id="cb13-58">          <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Skipping file "</span> <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">+</span> SlideDir)</span>
-<span id="cb13-56">          <span class="cf" style="color: #003B4F;
+<span id="cb13-59">          <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">continue</span></span>
-<span id="cb13-57">        <span class="cf" style="color: #003B4F;
+<span id="cb13-60">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">else</span>:</span>
-<span id="cb13-58">          <span class="co" style="color: #5E5E5E;
+<span id="cb13-61">          <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># check that it is a valid slide</span></span>
-<span id="cb13-59">          <span class="cf" style="color: #003B4F;
+<span id="cb13-62">          <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">not</span> check_folder(os.path.join(ParentFolder, SlideDir)):</span>
-<span id="cb13-60">            <span class="bu" style="color: null;
+<span id="cb13-63">            <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Skipping folder "</span> <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">+</span> SlideDir)</span>
-<span id="cb13-61">          <span class="cf" style="color: #003B4F;
+<span id="cb13-64">          <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">else</span>:</span>
-<span id="cb13-62">            SlideOutputDir <span class="op" style="color: #5E5E5E;
+<span id="cb13-65">            SlideOutputDir <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> os.path.join(OutputFolder, <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">dir</span>)</span>
-<span id="cb13-63">            CellStatsDir <span class="op" style="color: #5E5E5E;
+<span id="cb13-66">            CellStatsDir <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> os.path.join(ParentFolder, SlideDir, <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"CellStatsDir"</span>)</span>
-<span id="cb13-64">            RunSummaryDir <span class="op" style="color: #5E5E5E;
+<span id="cb13-67">            RunSummaryDir <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> os.path.join(ParentFolder, SlideDir, <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"RunSummary"</span>)</span>
-<span id="cb13-65">            AnalysisDirParent <span class="op" style="color: #5E5E5E;
+<span id="cb13-68">            AnalysisDirParent <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> os.path.join(ParentFolder, SlideDir, <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'AnalysisResults'</span>)</span>
-<span id="cb13-66">            AnalysisDirSubBasename <span class="op" style="color: #5E5E5E;
+<span id="cb13-69">            AnalysisDirSubBasename <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [i <span class="cf" style="color: #003B4F;
 background-color: null;
@@ -870,16 +1288,16 @@ font-weight: bold;
 font-style: inherit;">not</span> i.startswith(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'.'</span>)]</span>
-<span id="cb13-67">            AnalysisDir <span class="op" style="color: #5E5E5E;
+<span id="cb13-70">            AnalysisDir <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> os.path.join(AnalysisDirParent, AnalysisDirSubBasename[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">0</span>])</span>
-<span id="cb13-68">            <span class="cf" style="color: #003B4F;
+<span id="cb13-71">            <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">if</span> os.path.exists(SlideOutputDir):</span>
-<span id="cb13-69">              <span class="bu" style="color: null;
+<span id="cb13-72">              <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
@@ -890,16 +1308,16 @@ background-color: null;
 font-style: inherit;">+</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">". Folder exists already"</span>)</span>
-<span id="cb13-70">              <span class="cf" style="color: #003B4F;
+<span id="cb13-73">              <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">continue</span></span>
-<span id="cb13-71">            <span class="cf" style="color: #003B4F;
+<span id="cb13-74">            <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">else</span>:</span>
-<span id="cb13-72">              os.makedirs(SlideOutputDir)</span>
-<span id="cb13-73">              cmd_stitch <span class="op" style="color: #5E5E5E;
+<span id="cb13-75">              os.makedirs(SlideOutputDir)</span>
+<span id="cb13-76">              cmd_stitch <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
@@ -918,13 +1336,13 @@ background-color: null;
 font-style: inherit;">'" -o '</span> <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">+</span> SlideOutputDir</span>
-<span id="cb13-74">              <span class="bu" style="color: null;
+<span id="cb13-77">              <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(cmd_stitch)</span>
-<span id="cb13-75">              <span class="op" style="color: #5E5E5E;
+<span id="cb13-78">              <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">!</span>{cmd_stitch}</span>
-<span id="cb13-76">              cmd_read_targets <span class="op" style="color: #5E5E5E;
+<span id="cb13-79">              cmd_read_targets <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
@@ -941,13 +1359,13 @@ background-color: null;
 font-style: inherit;">' -o '</span> <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">+</span> SlideOutputDir</span>
-<span id="cb13-77">              <span class="bu" style="color: null;
+<span id="cb13-80">              <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(cmd_read_targets)</span>
-<span id="cb13-78">              <span class="op" style="color: #5E5E5E;
+<span id="cb13-81">              <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">!</span>{cmd_read_targets}</span>
-<span id="cb13-79">              <span class="bu" style="color: null;
+<span id="cb13-82">              <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
@@ -955,8 +1373,8 @@ font-style: inherit;">"</span><span class="ch" style="color: #20794D;
 background-color: null;
 font-style: inherit;">\n</span><span class="st" style="color: #20794D;
 background-color: null;
-font-style: inherit;">"</span>)</span></code></pre></div>
-</div>
+font-style: inherit;">"</span>)</span>
+<span id="cb13-83"></span></code></pre></div>
 <section id="conclusion" class="level2" data-number="3.1">
 <h2 data-number="3.1" class="anchored" data-anchor-id="conclusion"><span class="header-section-number">3.1</span> Conclusion</h2>
 <p>In this post, I showed how to prepare napari-cosmx files folders from raw data programmatically. To do this, we used a virtual environment to install our plugin and created a script to install a single slide followed by a script to install multiple slides. I also showed how we can open a slide with <code>napari-cosmx</code> directly from python.</p>
@@ -1016,7 +1434,7 @@ font-style: inherit;">"</span>)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/figures/rss-1.png" class="img-fluid figure-img" width="439"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/figures/rss-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1026,7 +1444,7 @@ font-style: inherit;">"</span>)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/figures/rss-2.png" class="img-fluid figure-img" width="467"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/figures/rss-2.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1457,7 +1875,7 @@ font-style: inherit;">head</span>(ref)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/figures/insitucor-banner.png" class="img-fluid figure-img" width="574"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/figures/insitucor-banner.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -1544,7 +1962,7 @@ Note
 <div id="fig-export" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-export-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-export1.png" class="img-fluid figure-img" width="1320">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-export1.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: Selected flat files and raw data for exporting.
@@ -1570,7 +1988,7 @@ Figure&nbsp;1: Selected flat files and raw data for exporting.
 <div id="fig-export2" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-export2.png" class="img-fluid figure-img" width="446">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-export2.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;2: Folder structure following AtoMx SIP export.
@@ -1835,7 +2253,7 @@ plt.savefig("figures/fig-qc.png", dpi=200)
 <div id="fig-qc" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc.png" class="img-fluid figure-img" width="600">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;3: Unique genes by total counts. Each dot represents a cell. Y-axis: the number of genes with postive counts in a cell. X-axis the sum of counts for a cell.
@@ -1865,7 +2283,7 @@ plt.savefig("figures/fig-qc1.png", dpi=200)
 <div id="fig-qc1" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-qc1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc1.png" class="img-fluid figure-img" width="600">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc1.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;4: The number of negative counts (Y) relative to the total counts (X) per cell.
@@ -1919,7 +2337,7 @@ plt.savefig("figures/fig-qc2.png", dpi=200)
 <div id="fig-qc2" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-qc2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc2.png" class="img-fluid figure-img" width="1500">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc2.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;5: Total counts per cell (left), total unique genes per cell (middle) and total transcripts per FOV (right).
@@ -1976,7 +2394,7 @@ sc.pl.umap(
 <div id="fig-umap" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-umap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-umap.png" class="img-fluid figure-img" width="1441">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-umap.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-umap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;6: UMAP figures with cells colored by natural log Mean PanCK expression (left) and Leiden clusters (right).
@@ -2235,7 +2653,7 @@ sc.tl.leiden(adata2)
 <div id="fig-image1" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-image1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-image1.png" class="img-fluid figure-img" width="412">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-image1.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-image1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;7: Leiden clusters in space for a single FOV of breast cancer tissue. Clusters are displayed as cell contours overlaid on morphology image (green = PanCK, magenta = DAPI).
@@ -2298,7 +2716,7 @@ sq.pl.spatial_segment(
 <div id="fig-morans" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-morans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-nhood-Morans-I.png" class="img-fluid figure-img" width="1142">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-nhood-Morans-I.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-morans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;8: Expression for select genes showing relatively high Moran’s <em>I</em>.
@@ -2345,7 +2763,7 @@ sq.pl.spatial_segment(
 <div id="fig-co-occurence" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-co-occurence-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-co-occurence1and2.png" class="img-fluid figure-img" width="894">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-co-occurence1and2.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-co-occurence-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;9: Co-occurence of Leiden clusters. Left: Leiden clusters in space for a single FOV of breast cancer tissue. Right: co-occurence probability ratio (Y) for each cluster relative to Leiden cluster 1 (orange cells in left plot) with increasing radius (X).
@@ -2379,7 +2797,7 @@ sq.pl.nhood_enrichment(
 <div id="fig-neighbors" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-neighbors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-nhood-enrichment.png" class="img-fluid figure-img" width="613">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-nhood-enrichment.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-neighbors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;10: Neighborhood enrichment across all FOVs for each pairwise combination of Leiden clusters.
@@ -4137,7 +4555,7 @@ font-style: inherit;">cls =</span> ctpal)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/umap_clust_all.png" class="img-fluid figure-img" width="2661"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/umap_clust_all.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -4183,7 +4601,7 @@ font-style: inherit;">7.2</span>))</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/umap_clust_imm.png" class="img-fluid figure-img" width="2214"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/umap_clust_imm.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -4337,7 +4755,7 @@ font-style: inherit;">coord_flip</span>()</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/tcell_calls_barplot.png" class="img-fluid figure-img" width="2298"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/tcell_calls_barplot.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -4724,7 +5142,7 @@ font-style: inherit;">coord_flip</span>()</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/tcell_foxp3_pct_barplot.png" class="img-fluid figure-img" width="2298"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/tcell_foxp3_pct_barplot.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -5065,7 +5483,7 @@ font-style: inherit;">TRUE</span>) </span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/foxp3raw.png" class="img-fluid figure-img" width="1641"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/foxp3raw.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -5560,7 +5978,7 @@ font-style: inherit;">TRUE</span>) </span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/smooth_vs_raw.png" class="img-fluid figure-img" width="2050"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/smooth_vs_raw.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -5733,7 +6151,7 @@ font-style: inherit;">"Proportion of FOXP3+ cells"</span>)</span></code></pre></
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/filter_treg_bar.png" class="img-fluid figure-img" width="2254"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/filter_treg_bar.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -6028,7 +6446,7 @@ font-style: inherit;">print</span>(scatterp1)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/scatterp1.png" class="img-fluid figure-img" width="1838"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/scatterp1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -6038,7 +6456,7 @@ font-style: inherit;">print</span>(scatterp1)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/scatterp2.png" class="img-fluid figure-img" width="2399"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/scatterp2.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -6048,7 +6466,7 @@ font-style: inherit;">print</span>(scatterp1)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/scatterp3.png" class="img-fluid figure-img" width="1838"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/scatterp3.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -6240,7 +6658,7 @@ font-style: inherit;">TRUE</span>) </span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/filter_treg_umaps.png" class="img-fluid figure-img" width="1096"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/filter_treg_umaps.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -6535,7 +6953,7 @@ font-style: inherit;">TRUE</span>) </span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/smoothed_nontcell_markers.png" class="img-fluid figure-img" width="1710"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/smoothed_nontcell_markers.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -6632,7 +7050,7 @@ font-style: inherit;">"kmclust"</span>, sem)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/kmeans_smooth_markers.png" class="img-fluid figure-img" width="1710"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/figures/kmeans_smooth_markers.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -6677,7 +7095,7 @@ Lause, Jan, Philipp Berens, and Dmitry Kobak. 2021. <span>“Analytic Pearson Re
 <div id="fig-duality" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-duality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-duality.png" class="img-fluid figure-img" width="400">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-duality.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-duality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: Drawing that represents the duality of <code>napari-cosmx</code>. On the left side, cell types within a mouse coronal hemisphere are shown in an interactive Graphical User Interface. In addition to creating images interactively, the right side highlights that images can be generated programmatically. Both sides of <code>napari-cosmx</code> are discussed in this post.
@@ -6949,7 +7367,7 @@ font-style: inherit;">FALSE</span>)</span></code></pre></div>
 <div id="fig-initial" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-initial-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-initial.png" class="img-fluid figure-img" width="825">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-initial.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-initial-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;2: The initial view of the tissue shows the location of FOVs and cell boundary layers. Yellow arrow shows location of ipython terminal.
@@ -6965,7 +7383,7 @@ Figure&nbsp;2: The initial view of the tissue shows the location of FOVs and cel
 <div id="fig-cell-types" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-cell-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-cell-types-short.png" class="img-fluid figure-img" width="825">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-cell-types-short.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-cell-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;3: Same extent as Figure&nbsp;2 and displaying the cell type from the ‘RNA_nbclust_clusters’.
@@ -6981,7 +7399,7 @@ Figure&nbsp;3: Same extent as Figure&nbsp;2 and displaying the cell type from th
 <div id="fig-niches" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-niches-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-niches.png" class="img-fluid figure-img" width="825">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-niches.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-niches-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;4: Cells colored by niche
@@ -6997,7 +7415,7 @@ Figure&nbsp;4: Cells colored by niche
 <div id="fig-IF" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-IF-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-IF.png" class="img-fluid figure-img" width="825">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-IF.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-IF-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;5: Hippocampal region of tissue with GFAP (red) and DNA (cyan).
@@ -7013,7 +7431,7 @@ Figure&nbsp;5: Hippocampal region of tissue with GFAP (red) and DNA (cyan).
 <div id="fig-tx" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-transcripts.png" class="img-fluid figure-img" width="825">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-transcripts.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;6: Expression of <em>Calb1</em> (white dots) in cortex layer I.
@@ -7540,7 +7958,7 @@ font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre><
 <div id="fig-contours" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-contours-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-contours.png" class="img-fluid figure-img" width="517">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-contours.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-contours-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;7: Cells types (or other metadata items) can be represented as cell boundaries.
@@ -7689,7 +8107,7 @@ font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre><
 <div id="fig-negatives" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-negatives-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-negatives.png" class="img-fluid figure-img" width="825">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-negatives.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-negatives-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;8: Same extent as Figure&nbsp;7 but with negatives shown in white.
@@ -7831,7 +8249,7 @@ font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre><
 <div id="fig-crowded-tx" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-crowded-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-crowded-tx.png" class="img-fluid figure-img" width="825">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-crowded-tx.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-crowded-tx-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;9: Cortical layer with <em>Npy</em> (magenta) and <em>Calb1</em> (white).
@@ -7886,7 +8304,7 @@ font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre><
 <div id="fig-tx-opacity" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-tx-opacity-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-tx-opacity.png" class="img-fluid figure-img" width="825">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-tx-opacity.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tx-opacity-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;10: Same extent as Figure&nbsp;9 but opacity of <em>Npy</em> reduced from 1 to 0.5.
@@ -7949,7 +8367,7 @@ font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre><
 <div id="fig-center-to-fov" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-center-to-fov-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-center-to-fov.png" class="img-fluid figure-img" width="825">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-center-to-fov.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-center-to-fov-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;11: Centering to a particular FOV (123) using the <code>center_fov</code> method.
@@ -8011,7 +8429,7 @@ font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre><
 <div id="fig-tx-all" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-tx-all-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-tx-all.png" class="img-fluid figure-img" width="825">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-tx-all.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-tx-all-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;12: All targets for FOV 123.
@@ -8064,7 +8482,7 @@ font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre><
 <div id="fig-white" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-white-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-white.png" class="img-fluid figure-img" width="517">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-white.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-white-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;13: Same extent as Figure&nbsp;7 but with a white background.
@@ -8122,7 +8540,7 @@ font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre><
 <div id="fig-scale_bl" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-scale_bl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-scale_bl.png" class="img-fluid figure-img" width="517">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-scale_bl.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-scale_bl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;14: Same extent as Figure&nbsp;7 but with a scale bar moved to the bottom left.
@@ -8205,7 +8623,7 @@ font-style: inherit;">writer.append_data</span>(screenshot)</span></code></pre><
 <div id="fig-color_three" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-color_three-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-color_three.png" class="img-fluid figure-img" width="517">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-color_three.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-color_three-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;15: Same extent as Figure&nbsp;7 highlighting three cell types only. MOL = mature oligodenrocytes = purple; GN = granule neurons = brown; CHO_HB = Cholinergic neurons Habenula = orange; cyan = all other cells.
@@ -8248,7 +8666,7 @@ Figure&nbsp;15: Same extent as Figure&nbsp;7 highlighting three cell types only.
 <div id="fig-composite" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-composite-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig1.png" class="img-fluid figure-img" width="468">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig1.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-composite-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: A composite image created using the make_composite.py script. This image represents all channels of a single field of view in the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">publicly available</a> mouse coronal hemisphere FFPE dataset.
@@ -8395,7 +8813,7 @@ font-style: inherit;">/</span>make_composite.py</span></code></pre></div>
 <div id="fig-run" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-run-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig-out.png" class="img-fluid figure-img" width="675">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig-out.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-run-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;2: Screenshot of standard output from terminal following script execution. In this example, I set the clipping percentage to 3 and the output to <code>png</code>. On a Macbook Pro M1, this took about 25 minutes to process 130 FOVs.
@@ -9682,23 +10100,26 @@ font-style: inherit;">"Pancreas-CosMx-WTx-FlatFiles"</span></span></code></pre><
 </div>
 </div>
 <p>Firstly, we would load the raw expression matrix and assign row names for <code>cell</code> in same naming pattern as the ones in cell meta data file. For demonstration purpose, we would focus on just the <code>RNA</code> probes and remove all the control probes.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="co" style="color: #5E5E5E;
+<div class="sourceCode" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| eval: false</span></span>
+<span id="cb17-2"></span>
+<span id="cb17-3"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># read in cell expression file</span></span>
-<span id="cb17-2">df <span class="op" style="color: #5E5E5E;
+<span id="cb17-4">df <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> pd.read_csv(os.path.join(dataDir, <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'Pancreas_exprMat_file.csv'</span>))</span>
-<span id="cb17-3"></span>
-<span id="cb17-4"><span class="co" style="color: #5E5E5E;
+<span id="cb17-5"></span>
+<span id="cb17-6"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># create row names for "cell" in same format as what's used in cell metadata file</span></span>
-<span id="cb17-5"><span class="co" style="color: #5E5E5E;
+<span id="cb17-7"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># the new cell_ID has pattern as 'c_[slideID]_[cell_ID]', where slideID = 1 in this example dataset</span></span>
-<span id="cb17-6">df[<span class="st" style="color: #20794D;
+<span id="cb17-8">df[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"new_cell_ID"</span>] <span class="op" style="color: #5E5E5E;
 background-color: null;
@@ -9730,18 +10151,18 @@ background-color: null;
 font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1</span>)</span>
-<span id="cb17-7">df.set_index(<span class="st" style="color: #20794D;
+<span id="cb17-9">df.set_index(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"new_cell_ID"</span>, inplace<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">True</span>)</span>
-<span id="cb17-8"></span>
-<span id="cb17-9"><span class="co" style="color: #5E5E5E;
+<span id="cb17-10"></span>
+<span id="cb17-11"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># drop annotation columns</span></span>
-<span id="cb17-10">df.drop(columns<span class="op" style="color: #5E5E5E;
+<span id="cb17-12">df.drop(columns<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
 background-color: null;
@@ -9752,11 +10173,11 @@ background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">True</span>)</span>
-<span id="cb17-11"></span>
-<span id="cb17-12"><span class="co" style="color: #5E5E5E;
+<span id="cb17-13"></span>
+<span id="cb17-14"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># focus on RNA probes while drop control probes</span></span>
-<span id="cb17-13">dummy<span class="op" style="color: #5E5E5E;
+<span id="cb17-15">dummy<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>re.<span class="bu" style="color: null;
 background-color: null;
@@ -9765,7 +10186,7 @@ background-color: null;
 font-style: inherit;">r'Negative|SystemControl'</span>, flags<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>re.IGNORECASE)</span>
-<span id="cb17-14">chosen_probes <span class="op" style="color: #5E5E5E;
+<span id="cb17-16">chosen_probes <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [col <span class="cf" style="color: #003B4F;
 background-color: null;
@@ -9782,51 +10203,53 @@ font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">not</span> dummy.search(col)]</span>
-<span id="cb17-15"></span>
-<span id="cb17-16"><span class="co" style="color: #5E5E5E;
+<span id="cb17-17"></span>
+<span id="cb17-18"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># "cell" names for ordering downstream</span></span>
-<span id="cb17-17">chosen_cells <span class="op" style="color: #5E5E5E;
+<span id="cb17-19">chosen_cells <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> df.index</span>
-<span id="cb17-18"></span>
-<span id="cb17-19"><span class="co" style="color: #5E5E5E;
+<span id="cb17-20"></span>
+<span id="cb17-21"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># convert to a sparse matrix</span></span>
-<span id="cb17-20">raw <span class="op" style="color: #5E5E5E;
+<span id="cb17-22">raw <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> csr_matrix(df[chosen_probes].astype(pd.SparseDtype(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"float64"</span>,<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">0</span>)).sparse.to_coo())</span>
-<span id="cb17-21"></span>
-<span id="cb17-22"><span class="co" style="color: #5E5E5E;
+<span id="cb17-23"></span>
+<span id="cb17-24"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># delete unused variable to free up memory</span></span>
-<span id="cb17-23"><span class="kw" style="color: #003B4F;
+<span id="cb17-25"><span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">del</span> df</span></code></pre></div>
-</div>
 <p>Next, we would read in the cell meta data and extract the spatial coordinates of each cell. Based on the <a href="../../assets/Pancreas-CosMx-ReadMe.html" target="_blank">ReadMe</a> of these data files, we can know this data set has pixel size of 0.12028 µm per pixel. For illustration, we also convert the pixel coordinates to µm here.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><span class="co" style="color: #5E5E5E;
+<div class="sourceCode" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| eval: false</span></span>
+<span id="cb18-2"></span>
+<span id="cb18-3"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># read in cell meta data file</span></span>
-<span id="cb18-2">cell_meta <span class="op" style="color: #5E5E5E;
+<span id="cb18-4">cell_meta <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> pd.read_csv(os.path.join(dataDir, <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'Pancreas_metadata_file.csv'</span>))</span>
-<span id="cb18-3"></span>
-<span id="cb18-4"><span class="co" style="color: #5E5E5E;
+<span id="cb18-5"></span>
+<span id="cb18-6"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># use "cell" column as row names to match with raw expression matrix</span></span>
-<span id="cb18-5"><span class="co" style="color: #5E5E5E;
+<span id="cb18-7"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># for convenience, the "cell" column is kept with the meta data</span></span>
-<span id="cb18-6">cell_meta.set_index(<span class="st" style="color: #20794D;
+<span id="cb18-8">cell_meta.set_index(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"cell"</span>, inplace<span class="op" style="color: #5E5E5E;
 background-color: null;
@@ -9837,22 +10260,22 @@ background-color: null;
 font-style: inherit;">=</span> <span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span>)</span>
-<span id="cb18-7"></span>
-<span id="cb18-8"><span class="co" style="color: #5E5E5E;
+<span id="cb18-9"></span>
+<span id="cb18-10"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># extract spatial coordinates of cells, use the global coordinates</span></span>
-<span id="cb18-9">coords <span class="op" style="color: #5E5E5E;
+<span id="cb18-11">coords <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> cell_meta[[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"CenterX_global_px"</span>,<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"CenterY_global_px"</span>]]</span>
-<span id="cb18-10"></span>
-<span id="cb18-11"><span class="co" style="color: #5E5E5E;
+<span id="cb18-12"></span>
+<span id="cb18-13"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># use "x" and "y" as column names</span></span>
-<span id="cb18-12">coords <span class="op" style="color: #5E5E5E;
+<span id="cb18-14">coords <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> coords.rename(columns<span class="op" style="color: #5E5E5E;
 background-color: null;
@@ -9861,87 +10284,88 @@ background-color: null;
 font-style: inherit;">"CenterX_global_px"</span>:<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"x"</span>, </span>
-<span id="cb18-13">                                <span class="st" style="color: #20794D;
+<span id="cb18-15">                                <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"CenterY_global_px"</span>: <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"y"</span>})</span>
-<span id="cb18-14"></span>
-<span id="cb18-15"><span class="co" style="color: #5E5E5E;
+<span id="cb18-16"></span>
+<span id="cb18-17"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># reorder cells to be in same row order as raw expression matrix</span></span>
-<span id="cb18-16">coords <span class="op" style="color: #5E5E5E;
+<span id="cb18-18">coords <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> coords.reindex(index <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> chosen_cells)</span>
-<span id="cb18-17"></span>
-<span id="cb18-18"><span class="co" style="color: #5E5E5E;
+<span id="cb18-19"></span>
+<span id="cb18-20"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># convert px coordinates to micrometer </span></span>
-<span id="cb18-19">pixel_size <span class="op" style="color: #5E5E5E;
+<span id="cb18-21">pixel_size <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">0.12028</span></span>
-<span id="cb18-20">coords <span class="op" style="color: #5E5E5E;
+<span id="cb18-22">coords <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> coords.mul(pixel_size)</span></code></pre></div>
-</div>
 <p>Now, we are ready to create the <code>anndata</code> object using <code>anndata.AnnData()</code> python function. We would add the spatial coordinates as an annotation array stored in <code>obsm</code> slot.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">adata <span class="op" style="color: #5E5E5E;
+<div class="sourceCode" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| eval: false</span></span>
+<span id="cb19-2"></span>
+<span id="cb19-3">adata <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> ad.AnnData(</span>
-<span id="cb19-2">    X <span class="op" style="color: #5E5E5E;
+<span id="cb19-4">    X <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> raw, </span>
-<span id="cb19-3">    obs <span class="op" style="color: #5E5E5E;
+<span id="cb19-5">    obs <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> cell_meta, </span>
-<span id="cb19-4">    <span class="co" style="color: #5E5E5E;
+<span id="cb19-6">    <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># row names should be the same as gene names</span></span>
-<span id="cb19-5">    var <span class="op" style="color: #5E5E5E;
+<span id="cb19-7">    var <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> pd.DataFrame(</span>
-<span id="cb19-6">        <span class="bu" style="color: null;
+<span id="cb19-8">        <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">list</span>(chosen_probes), </span>
-<span id="cb19-7">        columns <span class="op" style="color: #5E5E5E;
+<span id="cb19-9">        columns <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"gene"</span>],</span>
-<span id="cb19-8">        index <span class="op" style="color: #5E5E5E;
+<span id="cb19-10">        index <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> chosen_probes))</span>
-<span id="cb19-9">                   </span>
-<span id="cb19-10"><span class="co" style="color: #5E5E5E;
+<span id="cb19-11">                   </span>
+<span id="cb19-12"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># add spatial coordinates </span></span>
-<span id="cb19-11">adata.obsm[<span class="st" style="color: #20794D;
+<span id="cb19-13">adata.obsm[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'spatial'</span>] <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> coords.to_numpy()</span>
-<span id="cb19-12"></span>
-<span id="cb19-13"><span class="co" style="color: #5E5E5E;
+<span id="cb19-14"></span>
+<span id="cb19-15"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># you can add name of slide or original file as one of unstructured annotation</span></span>
-<span id="cb19-14">adata.uns[<span class="st" style="color: #20794D;
+<span id="cb19-16">adata.uns[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'name'</span>] <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Pancreas"</span></span>
-<span id="cb19-15"></span>
-<span id="cb19-16"><span class="co" style="color: #5E5E5E;
+<span id="cb19-17"></span>
+<span id="cb19-18"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># convert string columns to categorical data in `obs`</span></span>
-<span id="cb19-17">adata.strings_to_categoricals()</span></code></pre></div>
-</div>
+<span id="cb19-19">adata.strings_to_categoricals()</span></code></pre></div>
 <div class="callout callout-style-default callout-tip callout-titled" title="Add additional embedding">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -9953,8 +10377,11 @@ Add additional embedding
 </div>
 <div class="callout-body-container callout-body">
 <p>You can add additional embedding if exists. The code below assumes you have a new embedding for <code>umap</code> stored in <code>umap.csv</code> file as a data frame with rows in same order as the cell expression file.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">adata.obsm[<span class="st" style="color: #20794D;
+<div class="sourceCode" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| eval: false</span></span>
+<span id="cb20-2"></span>
+<span id="cb20-3">adata.obsm[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'umap'</span>] <span class="op" style="color: #5E5E5E;
 background-color: null;
@@ -9963,46 +10390,50 @@ background-color: null;
 font-style: inherit;">'umap.csv'</span>)).to_numpy()</span></code></pre></div>
 </div>
 </div>
-</div>
 <p>In some case, one may want to convert a meta data column with numeric values (like numeric ID for cell clusters) to categorical data, you can do this as shown below.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><span class="co" style="color: #5E5E5E;
+<div class="sourceCode" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| eval: false</span></span>
+<span id="cb21-2"></span>
+<span id="cb21-3"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># for illustration, we would convert the "fov" column here</span></span>
-<span id="cb21-2">columnName <span class="op" style="color: #5E5E5E;
+<span id="cb21-4">columnName <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"fov"</span></span>
-<span id="cb21-3">adata.obs[columnName] <span class="op" style="color: #5E5E5E;
+<span id="cb21-5">adata.obs[columnName] <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> pd.Categorical(adata.obs[columnName].astype(<span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">str</span>))</span></code></pre></div>
-</div>
 <p>You can also specific color for each categorical value via a dictionary. Most viewers based on <code>anndata</code> data structure would be able to recognize the color information stored under <code>[cell_meta_name]_colors</code> when displaying the corresponding categorical cell meta data.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><span class="co" style="color: #5E5E5E;
+<div class="sourceCode" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| eval: false</span></span>
+<span id="cb22-2"></span>
+<span id="cb22-3"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># use random colors for illustration here</span></span>
-<span id="cb22-2"><span class="im" style="color: #00769E;
+<span id="cb22-4"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> random</span>
-<span id="cb22-3"></span>
-<span id="cb22-4">colors_dict <span class="op" style="color: #5E5E5E;
+<span id="cb22-5"></span>
+<span id="cb22-6">colors_dict <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> {}</span>
-<span id="cb22-5"><span class="cf" style="color: #003B4F;
+<span id="cb22-7"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> catVal <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">in</span> adata.obs[columnName].cat.categories:</span>
-<span id="cb22-6">    <span class="co" style="color: #5E5E5E;
+<span id="cb22-8">    <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># random RGB value</span></span>
-<span id="cb22-7">    [r, g, b] <span class="op" style="color: #5E5E5E;
+<span id="cb22-9">    [r, g, b] <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [random.randint(<span class="dv" style="color: #AD0000;
 background-color: null;
@@ -10019,10 +10450,10 @@ background-color: null;
 font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">3</span>)]</span>
-<span id="cb22-8">    <span class="co" style="color: #5E5E5E;
+<span id="cb22-10">    <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># convert to hex format</span></span>
-<span id="cb22-9">    colors_dict[catVal] <span class="op" style="color: #5E5E5E;
+<span id="cb22-11">    colors_dict[catVal] <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
@@ -10033,18 +10464,18 @@ background-color: null;
 font-style: inherit;">"</span>.<span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">format</span>(r, g, b)</span>
-<span id="cb22-10"></span>
-<span id="cb22-11"><span class="co" style="color: #5E5E5E;
+<span id="cb22-12"></span>
+<span id="cb22-13"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># add to `uns` slot</span></span>
-<span id="cb22-12">colorName <span class="op" style="color: #5E5E5E;
+<span id="cb22-14">colorName <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"_"</span>.join((columnName, <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"colors"</span>))</span>
-<span id="cb22-13">adata.uns[colorName] <span class="op" style="color: #5E5E5E;
+<span id="cb22-15">adata.uns[colorName] <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [colors_dict[k] <span class="cf" style="color: #003B4F;
 background-color: null;
@@ -10053,7 +10484,6 @@ font-style: inherit;">for</span> k <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">in</span> adata.obs[columnName].cat.categories]</span></code></pre></div>
-</div>
 <p>At this point, we have a <code>anndata</code> object that could be exported to <code>.h5ad</code> file format and pass to other python-based single-cell analysis tools, like <a href="https://scanpy.readthedocs.io/en/stable/" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank"><code>squidpy</code></a>.</p>
 <div class="cell">
 <div class="code-with-filename">
@@ -10087,22 +10517,25 @@ font-style: inherit;">"Pancreas_basic.h5ad"</span>))</span></code></pre></div>
 </div>
 </div>
 <p>Let’s visualize the distribution of some cell meta data saved in this <code>anndata</code> object.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><span class="im" style="color: #00769E;
+<div class="sourceCode" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| eval: false</span></span>
+<span id="cb25-2"></span>
+<span id="cb25-3"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> matplotlib.pyplot <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> plt</span>
-<span id="cb25-2"><span class="im" style="color: #00769E;
+<span id="cb25-4"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> seaborn <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> sns</span>
-<span id="cb25-3"></span>
-<span id="cb25-4"><span class="co" style="color: #5E5E5E;
+<span id="cb25-5"></span>
+<span id="cb25-6"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># plot transcripts distribution</span></span>
-<span id="cb25-5">fig, axs <span class="op" style="color: #5E5E5E;
+<span id="cb25-7">fig, axs <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> plt.subplots(<span class="dv" style="color: #AD0000;
 background-color: null;
@@ -10115,80 +10548,82 @@ background-color: null;
 font-style: inherit;">15</span>, <span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">4</span>))</span>
-<span id="cb25-6"></span>
-<span id="cb25-7">axs[<span class="dv" style="color: #AD0000;
+<span id="cb25-8"></span>
+<span id="cb25-9">axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">0</span>].set_title(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Total RNA transcripts per cell"</span>)</span>
-<span id="cb25-8">sns.histplot(</span>
-<span id="cb25-9">    adata.obs[<span class="st" style="color: #20794D;
+<span id="cb25-10">sns.histplot(</span>
+<span id="cb25-11">    adata.obs[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"nCount_RNA"</span>],</span>
-<span id="cb25-10">    kde<span class="op" style="color: #5E5E5E;
+<span id="cb25-12">    kde<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span>,</span>
-<span id="cb25-11">    ax<span class="op" style="color: #5E5E5E;
+<span id="cb25-13">    ax<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">0</span>],</span>
-<span id="cb25-12">)</span>
-<span id="cb25-13"></span>
-<span id="cb25-14">axs[<span class="dv" style="color: #AD0000;
+<span id="cb25-14">)</span>
+<span id="cb25-15"></span>
+<span id="cb25-16">axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1</span>].set_title(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Unique RNA transcripts per cell"</span>)</span>
-<span id="cb25-15">sns.histplot(</span>
-<span id="cb25-16">    adata.obs[<span class="st" style="color: #20794D;
+<span id="cb25-17">sns.histplot(</span>
+<span id="cb25-18">    adata.obs[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"nFeature_RNA"</span>],</span>
-<span id="cb25-17">    kde<span class="op" style="color: #5E5E5E;
+<span id="cb25-19">    kde<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span>,</span>
-<span id="cb25-18">    ax<span class="op" style="color: #5E5E5E;
+<span id="cb25-20">    ax<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1</span>],</span>
-<span id="cb25-19">)</span>
-<span id="cb25-20"></span>
-<span id="cb25-21">axs[<span class="dv" style="color: #AD0000;
+<span id="cb25-21">)</span>
+<span id="cb25-22"></span>
+<span id="cb25-23">axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">2</span>].set_title(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Transcripts per FOV"</span>)</span>
-<span id="cb25-22">sns.histplot(</span>
-<span id="cb25-23">    adata.obs.groupby(<span class="st" style="color: #20794D;
+<span id="cb25-24">sns.histplot(</span>
+<span id="cb25-25">    adata.obs.groupby(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"fov"</span>).<span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">sum</span>()[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"nCount_RNA"</span>],</span>
-<span id="cb25-24">    kde<span class="op" style="color: #5E5E5E;
+<span id="cb25-26">    kde<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span>,</span>
-<span id="cb25-25">    ax<span class="op" style="color: #5E5E5E;
+<span id="cb25-27">    ax<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">2</span>],</span>
-<span id="cb25-26">)</span></code></pre></div>
-</div>
+<span id="cb25-28">)</span></code></pre></div>
 <p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-Pancreas-RNA-distribution.png" class="img-fluid"></p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><span class="co" style="color: #5E5E5E;
+<div class="sourceCode" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#| eval: false</span></span>
+<span id="cb26-2"></span>
+<span id="cb26-3"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># plot immune intensity distribution</span></span>
-<span id="cb26-2">fig, axs <span class="op" style="color: #5E5E5E;
+<span id="cb26-4">fig, axs <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> plt.subplots(<span class="dv" style="color: #AD0000;
 background-color: null;
@@ -10201,91 +10636,90 @@ background-color: null;
 font-style: inherit;">15</span>, <span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">4</span>))</span>
-<span id="cb26-3"></span>
-<span id="cb26-4">axs[<span class="dv" style="color: #AD0000;
+<span id="cb26-5"></span>
+<span id="cb26-6">axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">0</span>].set_title(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"PanCK"</span>)</span>
-<span id="cb26-5">sns.histplot(</span>
-<span id="cb26-6">    adata.obs[<span class="st" style="color: #20794D;
+<span id="cb26-7">sns.histplot(</span>
+<span id="cb26-8">    adata.obs[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Mean.PanCK"</span>],</span>
-<span id="cb26-7">    kde<span class="op" style="color: #5E5E5E;
+<span id="cb26-9">    kde<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span>,</span>
-<span id="cb26-8">    ax<span class="op" style="color: #5E5E5E;
+<span id="cb26-10">    ax<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">0</span>],</span>
-<span id="cb26-9">)</span>
-<span id="cb26-10"></span>
-<span id="cb26-11">axs[<span class="dv" style="color: #AD0000;
+<span id="cb26-11">)</span>
+<span id="cb26-12"></span>
+<span id="cb26-13">axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1</span>].set_title(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"CD68 &amp; CK8/18"</span>)</span>
-<span id="cb26-12">sns.histplot(</span>
-<span id="cb26-13">    adata.obs[<span class="st" style="color: #20794D;
+<span id="cb26-14">sns.histplot(</span>
+<span id="cb26-15">    adata.obs[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Mean.CD68_CK8_18"</span>],</span>
-<span id="cb26-14">    kde<span class="op" style="color: #5E5E5E;
+<span id="cb26-16">    kde<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span>,</span>
-<span id="cb26-15">    ax<span class="op" style="color: #5E5E5E;
+<span id="cb26-17">    ax<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1</span>],</span>
-<span id="cb26-16">)</span>
-<span id="cb26-17"></span>
-<span id="cb26-18">axs[<span class="dv" style="color: #AD0000;
+<span id="cb26-18">)</span>
+<span id="cb26-19"></span>
+<span id="cb26-20">axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">2</span>].set_title(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"CD298 &amp; B2M"</span>)</span>
-<span id="cb26-19">sns.histplot(</span>
-<span id="cb26-20">    adata.obs[<span class="st" style="color: #20794D;
+<span id="cb26-21">sns.histplot(</span>
+<span id="cb26-22">    adata.obs[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Mean.CD298_B2M"</span>],</span>
-<span id="cb26-21">    kde<span class="op" style="color: #5E5E5E;
+<span id="cb26-23">    kde<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span>,</span>
-<span id="cb26-22">    ax<span class="op" style="color: #5E5E5E;
+<span id="cb26-24">    ax<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">2</span>],</span>
-<span id="cb26-23">)</span>
-<span id="cb26-24"></span>
-<span id="cb26-25">axs[<span class="dv" style="color: #AD0000;
+<span id="cb26-25">)</span>
+<span id="cb26-26"></span>
+<span id="cb26-27">axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">3</span>].set_title(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"CD45"</span>)</span>
-<span id="cb26-26">sns.histplot(</span>
-<span id="cb26-27">    adata.obs[<span class="st" style="color: #20794D;
+<span id="cb26-28">sns.histplot(</span>
+<span id="cb26-29">    adata.obs[<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Mean.CD45"</span>],</span>
-<span id="cb26-28">    kde<span class="op" style="color: #5E5E5E;
+<span id="cb26-30">    kde<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">False</span>,</span>
-<span id="cb26-29">    ax<span class="op" style="color: #5E5E5E;
+<span id="cb26-31">    ax<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">3</span>],</span>
-<span id="cb26-30">)</span></code></pre></div>
-</div>
+<span id="cb26-32">)</span></code></pre></div>
 <p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-Pancreas-Membrane-Intensity-distribution.png" class="img-fluid"> For more details on how to analyze spatial data sets using python tools, please refer to the tutorials provided by <a href="https://scanpy.readthedocs.io/en/stable/tutorials/index.html" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/index.html" target="_blank"><code>squidpy</code></a> packages.</p>
 </section>
 <section id="sec-conclusions" class="level1" data-number="5">
@@ -10461,7 +10895,7 @@ Important note
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/figures/example1.png" class="img-fluid figure-img" width="471"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/figures/example1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -10484,7 +10918,7 @@ we will look at the level of reporters, not genes.</p>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/figures/example2.png" class="img-fluid figure-img" width="689"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/figures/example2.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -10496,7 +10930,7 @@ we will look at the level of reporters, not genes.</p>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/figures/exampleheatmap.png" class="img-fluid figure-img" width="626"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/figures/exampleheatmap.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -12451,7 +12885,7 @@ font-style: inherit;">2</span>)</span></code></pre></div>
 <div id="fig-seurat-export-option" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-seurat-export-option-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/AtoMx_seuratExport_image.png" class="img-fluid figure-img" width="866">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/AtoMx_seuratExport_image.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-seurat-export-option-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: Screenshot showing selection of Seurat object for export from AtoMx SIP.
@@ -12479,7 +12913,7 @@ font-style: inherit;">"/path/to/file/seurat_object.Rds"</span>)</span></code></p
 <div id="fig-flat-file-export-option" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-flat-file-export-option-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/AtoMx_flatFileExport_image.png" class="img-fluid figure-img" width="810">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/AtoMx_flatFileExport_image.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-flat-file-export-option-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;2: Screenshot showing selection of flat files for export from AtoMx SIP.
@@ -12810,7 +13244,7 @@ font-style: inherit;">NA</span>)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_allCellsInSpace-1.png" class="img-fluid figure-img" width="1152"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_allCellsInSpace-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -12872,7 +13306,7 @@ font-style: inherit;">FALSE</span>)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_genesOnImage-1.png" class="img-fluid figure-img" width="1152"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_genesOnImage-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -12916,7 +13350,7 @@ font-style: inherit;">99</span>)])</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_oneCosMxFOV-1.png" class="img-fluid figure-img" width="1152"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_oneCosMxFOV-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -12984,7 +13418,7 @@ font-style: inherit;">99</span>)])</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_FOVleiden-1.png" class="img-fluid figure-img" width="1152"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_FOVleiden-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -13019,7 +13453,7 @@ font-style: inherit;">"log10totalcounts"</span>)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_imageContinuousVariable-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_imageContinuousVariable-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -13053,7 +13487,7 @@ font-style: inherit;">"Slc17a7"</span>)</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_imageContinuousVariable_gene-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_imageContinuousVariable_gene-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -13137,7 +13571,7 @@ font-style: inherit;">99</span>)])</span></code></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_centroids-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_centroids-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -13177,7 +13611,7 @@ font-style: inherit;"># Suppress the legend since labels are plotted on top of U
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_umapCellTypes-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_umapCellTypes-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -13204,7 +13638,7 @@ font-style: inherit;"># plots cells in order of expression</span></span></code><
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_umapTranscriptExpression-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/seurat-cosmx-basics/figures/plot_umapTranscriptExpression-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -13239,7 +13673,7 @@ font-style: inherit;"># plots cells in order of expression</span></span></code><
 <div id="fig-pancreas" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-pancreas-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/pancreas.png" class="img-fluid figure-img" width="632">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/pancreas.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-pancreas-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: Nine Fields of View (FOVs) of a whole-transcriptome Pancreas dataset visualized with the <code>napari-cosmx</code> plugin. DAPI and PanCK are shown in blue and green, respectively. Endocrine cells in the Islets of Langerhans can be identified by their transcript abundance of marker genes (points). Red = <em>GCG</em> (alpha cells), orange = <em>INS</em> (beta cells), cyan = <em>SST</em> (delta cells).
@@ -13359,7 +13793,7 @@ Note
 <div id="fig-windows-installer" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-windows-installer-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/windows_installer.png" class="img-fluid figure-img" width="240">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/windows_installer.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-windows-installer-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;3: The Windows Installer.
@@ -13391,7 +13825,7 @@ Figure&nbsp;3: The Windows Installer.
 <div id="fig-windows-plugin-command" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-windows-plugin-command-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/windows_plugin_command.png" class="img-fluid figure-img" width="841">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/windows_plugin_command.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-windows-plugin-command-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;4: Example showing how to install the <code>napari-cosmx</code> file. Your file name and path will look different. Yellow circle shows the location of the &gt;_ ipython prompt.
@@ -13429,7 +13863,7 @@ Note
 <div id="fig-mac-pkg-download" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-mac-pkg-download-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/mac_install_pkg.png" class="img-fluid figure-img" width="699">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/mac_install_pkg.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-mac-pkg-download-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;5: Screenshot of Napari packages. Blue highlighted package is appropriate for Mac. Other operating systems’ packages are also available but untested.
@@ -13455,7 +13889,7 @@ Figure&nbsp;5: Screenshot of Napari packages. Blue highlighted package is approp
 <div id="fig-mac-plugin-command" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-mac-plugin-command-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/mac_plugin_command.png" class="img-fluid figure-img" width="1044">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/mac_plugin_command.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-mac-plugin-command-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;6: Example showing how to install the <code>napari-cosmx</code> file. Your file name and path will look different. Yellow circle shows the location of the &gt;_ ipython prompt.
@@ -13483,7 +13917,7 @@ Figure&nbsp;6: Example showing how to install the <code>napari-cosmx</code> file
 <div id="fig-napari-ready-folder" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-napari-ready-folder-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/napari-ready-format.png" class="img-fluid figure-img" width="1109">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/napari-ready-format.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-napari-ready-folder-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;7: Example layout of a napari-ready folder. In this example, the ‘parent folder’ (<em>i.e.</em>, the folder you would drag and drop into Napari) is named <code>single_fov_napari_example</code> and contains the <code>images</code> folder with subfolders containing various zarr files within and the <code>targets.hdf5</code> file.
@@ -13645,7 +14079,7 @@ Note
 <div id="fig-atomx-export1" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-atomx-export1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/export-fig1.png" class="img-fluid figure-img" width="1430">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/export-fig1.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-atomx-export1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;8: Click <code>Export</code> (available in AtoMx SIP version 1.3+).
@@ -13660,7 +14094,7 @@ Figure&nbsp;8: Click <code>Export</code> (available in AtoMx SIP version 1.3+).
 <div id="fig-atomx-export2" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-atomx-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/export-fig2.png" class="img-fluid figure-img" width="918">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/export-fig2.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-atomx-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;9: Example configuration for exporting. For more information on extracting cell-level metadata, see Section&nbsp;2.5.
@@ -13676,7 +14110,7 @@ Figure&nbsp;9: Example configuration for exporting. For more information on extr
 <div id="fig-atomx-export3" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-atomx-export3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/export-fig3.png" class="img-fluid figure-img" width="1028">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/export-fig3.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-atomx-export3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;10: Example configuration for Cyberduck SFTP.
@@ -13691,7 +14125,7 @@ Figure&nbsp;10: Example configuration for Cyberduck SFTP.
 <div id="fig-atomx-export4" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-atomx-export4-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/export-fig4.png" class="img-fluid figure-img" width="562">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/export-fig4.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-atomx-export4-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;11: Download raw data somewhere on your desktop.
@@ -13713,7 +14147,7 @@ Figure&nbsp;11: Download raw data somewhere on your desktop.
 <div id="fig-stitch-widget1" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-stitch-widget1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/stitch-widget1.png" class="img-fluid figure-img" width="1184">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/stitch-widget1.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;12: Example showing a launched <code>napari-cosmx</code> plugin with a possibly-unrelated slide. To stitch, a new slide, Click <code>Browse...</code> in the <code>Stitch Images</code> widget located on the right-hand side of Napari.
@@ -13729,7 +14163,7 @@ Figure&nbsp;12: Example showing a launched <code>napari-cosmx</code> plugin with
 <div id="fig-stitch-widget2" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-stitch-widget2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/stitch-widget2.png" class="img-fluid figure-img" width="805">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/stitch-widget2.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;13: Browsing to the location of the raw data that you want to stitched. For more information on the structure of the raw data, see <a href="../../posts/napari-cosmx-basics/using-napari-cosmx.html#sec-expected-raw-format" target="_blank">the next post in the series</a>.
@@ -13743,7 +14177,7 @@ Figure&nbsp;13: Browsing to the location of the raw data that you want to stitch
 <div id="fig-stitch-widget3" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-stitch-widget3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/stitch-widget3.png" class="img-fluid figure-img" width="682">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/stitch-widget3.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;14: Stitching widget prints the path to the correctly formatted raw data (left) or provides an error message if not formatted correctly (right). Note that only the correctly formatted location can proceed to the next step (choosing otuput folder).
@@ -13758,7 +14192,7 @@ Figure&nbsp;14: Stitching widget prints the path to the correctly formatted raw 
 <div id="fig-stitch-widget4" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-stitch-widget4-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/stitch-widget4.png" class="img-fluid figure-img" width="1020">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/stitch-widget4.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget4-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;15: Select output folder.
@@ -13774,7 +14208,7 @@ Figure&nbsp;15: Select output folder.
 <div id="fig-stitch-widget5" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-stitch-widget5-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/stitch-widget5.png" class="img-fluid figure-img" width="659">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/stitch-widget5.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-widget5-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;16: Messages from a successfully completed stitching run.
@@ -13909,7 +14343,7 @@ font-style: inherit;">FALSE</span>)</span></code></pre></div>
 <div id="fig-color-cells" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-color-cells-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/color-cells.png" class="img-fluid figure-img" width="1167">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/color-cells.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-color-cells-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;17: When metadata are available in the _metadata.csv file, it’s possible to color cells based on a cell-level metadata value (<em>e.g.</em>, cell types).
@@ -14169,62 +14603,6 @@ font-style: inherit;">which</span>(use))</span></code></pre></div>
   <category>algorithms</category>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/spatial-algorithm-zoo/</guid>
   <pubDate>Wed, 20 Mar 2024 00:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Cell typing: what we’ve found to work</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="cell-typing-basics" class="level1">
-<h1>Cell typing basics</h1>
-<section id="choice-of-cell-typing-algorithm" class="level2">
-<h2 class="anchored" data-anchor-id="choice-of-cell-typing-algorithm">Choice of cell typing algorithm</h2>
-<p>We cell type most studies using one of the following approaches:</p>
-<ol type="1">
-<li>Insitutype</li>
-<li>Leiden clustering</li>
-<li>Seurat’s label transfer algorithm</li>
-</ol>
-<section id="insitutype" class="level4">
-<h4 class="anchored" data-anchor-id="insitutype">Insitutype:</h4>
-<p>We created Insitutype for cell typing in CosMx data. It can perform unsupervised clustering, supervised cell typing if given a matrix of reference profiles, or semi-supervised cell typing to call pre-defined cell types alongside new clusters. Insitutype’s models the evidence provided by every gene in a cell’s profile; this makes it excel in cells / datasets with less signal.</p>
-<p>Insitutype resources:</p>
-<ul>
-<li>https://github.com/Nanostring-Biostats/insitutype (see the <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">FAQs.md</a> for detailed advice)</li>
-<li><a href="https://www.biorxiv.org/content/10.1101/2022.10.19.512902v1">https://www.biorxiv.org/content/10.1101/2022.10.19.512902v1</a></li>
-<li>A collection of cell profile reference matrices will be posted on https://github.com/Nanostring-Biostats in early 2024.</li>
-</ul>
-</section>
-<section id="leiden-clustering" class="level4">
-<h4 class="anchored" data-anchor-id="leiden-clustering">Leiden clustering:</h4>
-<p>A single-cell clustering mainstay. Unsupervised clustering only. Often run from principal components of the expression data. Seurat, Giotto and igraph all have convenient implementations.</p>
-</section>
-<section id="label-transfer-algorithms" class="level4">
-<h4 class="anchored" data-anchor-id="label-transfer-algorithms">Label transfer algorithms</h4>
-<p>If a full scRNA-seq reference dataset is available, and if no new cell types are expected in the CosMx data, then these algorithms can work well. We have found Seurat’s implementation to work in some studies.</p>
-</section>
-</section>
-<section id="general-cell-typing-notes" class="level2">
-<h2 class="anchored" data-anchor-id="general-cell-typing-notes">General cell typing notes</h2>
-<ul>
-<li>Leiden clustering and UMAP tend to see the world the same way - that is, they’re both based on networks connecting similar cells. This makes Leiden results agree well with the UMAP, whether or not they are truly more accurate. In other words, don’t take the UMAP as an impartial arbiter of cell typing truth.</li>
-<li>Insitutype tends to be the most resistant to batch effects; methods that rely on PCs tend to be the most easily fooled by batch effects.</li>
-<li>Most studies require careful scrutiny of cell typing results. Often clusters have to be merged or subclustered before results are satisfactory. See the Insitutype <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">FAQs.md</a> for a detailed discussion of how to QC &amp; refine cell typing results. Many of these QCs are useful for results of other methods.</li>
-</ul>
-
-
-</section>
-</section>
-
- ]]></description>
-  <category>cell typing</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/</guid>
-  <pubDate>Tue, 12 Mar 2024 00:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
