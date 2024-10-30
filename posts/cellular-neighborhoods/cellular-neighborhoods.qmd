@@ -16,7 +16,7 @@ toc-expand: 2
 toc-location: left
 number-sections: true
 number-depth: 4
-date: "2024-10-17"
+date: "2024-10-30"
 categories: [overview]
 draft: false
 image: figures/neighborhood-tile.png
@@ -75,7 +75,7 @@ Many of these analyses are achieved by simply applying techniques from single ce
 for example clustering the rows (cells) or columns (genes) of the matrix. 
 
 
-# Tools for analyzing cellular neighborhoods:
+# Tools for analyzing cellular neighborhoods
 
 A small R package implementing the building blocks of cellular neighborhood analysis is 
 [here](/_code/cellular-neighborhoods){target="_blank"}. 
@@ -83,7 +83,7 @@ A small R package implementing the building blocks of cellular neighborhood anal
 To install it:
 
 ```{r, echo = TRUE, eval = FALSE}
-devtools::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space@cellular-neighborhoods", subdir = "_code/cellular-neighborhoods")
+devtools::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space@Main", subdir = "_code/cellular-neighborhoods")
 ```
 
 To set up our examples, let's load the package and open its data:
@@ -98,7 +98,7 @@ celltype <- as.factor(cosmx_kidney$annot$celltype)
 xy <- cosmx_kidney$xy
 ```
 
-Now we're ready to demonstrate the basics:
+Now we're ready to demonstrate the basics.
 
 ## Defining a cell's neighbors
  
@@ -110,7 +110,10 @@ We prefer the K-nearest neighbors approach, mainly because radius-based neighbor
 The size of a neighborhood is up to the analyst's discretion. Try to choose a neighborhood 
 size that reflects your understanding of biology and that makes sense for your biological question. There is a Goldilocks zone, however: very small neighborhoods produce sparse and noisy data, 
 and very large neighborhoods become inaccurate representations of a cell's 3D surroundings. 
-(The problem with large neighborhoods: the area of your circular neighborhood increases with the square of the radius, but the volume of the corresponding (unobserved) 3D tissue region increases with the cube of the radius. This means that the larger the radius, the less of your 3D neighborhood falls in the narrow tissue slide you've assayed, and the more it consists of unseen cells increasingly far away in the Z-dimension.)
+
+:::{.callout-note}
+The problem with large neighborhoods: the area of your circular neighborhood increases with the square of the radius, but the volume of the corresponding (unobserved) 3D tissue region increases with the cube of the radius. This means that the larger the radius, the less of your 3D neighborhood falls in the narrow tissue slide you've assayed, and the more it consists of unseen cells increasingly far away in the Z-dimension.
+:::
 
 Here's code for defining cellular neighborhoods:
 ```{r}
@@ -182,7 +185,7 @@ str(spatialcontext_celltypes)
 ```
 
 
-# Analyzing the spatial context matrix:
+# Analyzing the spatial context matrix
 
 Now that we've got a spatial context matrix, we can play all our usual matrix analysis games with it. 
 Brief descriptions follow:
@@ -198,19 +201,19 @@ This is an exercise in clustering the rows (cells) of the spatial context matrix
 The Mclust library works well here. 
 If you use subsetted neighbors (via the \code{subsampleNeighborsByRow} function), then Louvain and Leiden clustering will also work. 
 
-### UMAPs:
+### UMAPs
 
 Two approaches lead to informative UMAP projections of spatial context matrices:
 
 1. Use \code{subsampleNeighborsByRow} to squash autocorrelation. 
 2. Simply plot a UMAP of a random subset of cells. 
 
-### Clustering genes:
+### Clustering genes
 
 To find sets of genes that are correlated with each other in space, we recommend the [InSituCor library](https://github.com/Nanostring-Biostats/InSituCor){target="_blank"},
  which applies many of the functions shown here and implements other insights to get more informative results. 
 
-### Evaluating single genes for spatial autocorrelation:
+### Evaluating single genes for spatial autocorrelation
 
 Lots of well-considered packages are available for this task, though cellular neighborhoods can also be used. 
 Simply take the correlation between a gene's (normalized) single cell expression and its mean expression across cellular neighborhoods, i.e. its column in the spatial context matrix. 
@@ -223,7 +226,7 @@ are well-suited for use as predictors in differential expression analysis.
 For example, you might model how tumor cell gene expression changes in response to the number of neighboring T-cells,
 or to neighborhood expression of interferon gamma. 
 
-### Ligand-receptor analysis:
+### Ligand-receptor analysis
 
 The cellular neighborhood framework lets us examine ligand-receptor interactions in a variety of ways:
 
