@@ -1,0 +1,64 @@
+---
+title: "Cell typing: advanced strategies"
+author:
+  - name: Patrick Danaher
+    orcid: 0000-0002-2844-5883
+    affiliations:
+      - ref: nstg
+      - ref: patrickjdanaher
+date: "2024-11-06"
+date-modified: "2024-11-06"
+categories: [cell typing]
+draft: false
+image: figures/celltyping-tile.png
+---
+
+# Background 
+
+Cell typing is always critical and occasionally difficult. 
+Here we'll discuss what to do when straightforward approaches fail.
+We'll assume that [the standard approaches](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/){target="_blank"} - InSituType, Leiden clustering
+and label transfer - have failed or are unsuitable to your data.
+If you're using InSituType, we'll also assume that you've tried the workflows described in the 
+[InSituType FAQS](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md){target="_blank"}.
+This last document provides detailed guidance on using InSituType's many options, 
+and its contents should be enough to guide you through most cell typing exercises. 
+
+We'll address four common difficulties:
+
+1. Fine subtyping, especially for immune cells
+2. Studies with batch effects
+3. Failure to find anchor cells / difficulties mapping reference profiles
+4. Reference cell types claiming the wrong cells
+
+# Fine subtyping
+
+Broad cell typing, e.g. discerning cancer cells vs. fibroblasts vs. immune cells, 
+does best using a large number of genes - the whole panel for 1k data, and at least half the 6k panel. 
+But when we turn to fine subtyping, e.g. discerning CD4 T-cells vs. Tregs, a much smaller 
+gene set is relevant. If we use a complete high-plex panel for this problem, we'll
+rely on potentially thousands of unhelpful genes: genes that are mainly in the background 
+for our cell types of interest, 
+genes for which cell segmentation errors have introduced high levels of contaminating signal into our cell types of interest,
+and genes with minimal variability among our cell types of interest. 
+These genes make fine cell typing harder by introducing noise, or, in the case of segmentation errors, bias. 
+You may find your subclusters to be driven by sample ID or by spatial context. 
+
+The solution is simple: after establishing your broad cell types, perform fine cell typing
+among related cell types using a useful subset of genes. 
+Hierarchical approaches like this are common in the single cell world. 
+Defining the "useful subset of genes" is straightforward: we want genes that differ meaningfully 
+between our closely-related cell types, and we want to avoid genes at risk of contamination from segmentation errors. 
+
+
+
+We advise against [relying on raw marker gene expression] (https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/){target="_blank"}
+for cell typing.
+However, [using smoothing/imputation to get cleaner marker gene expression values](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/){target="_blank"}
+ can enable a marker-driven approach. 
+
+ 
+
+# Resources
+
+- [Our very succinct preprint](https://www.biorxiv.org/content/10.1101/2023.09.19.558514v1){target="_blank"}
