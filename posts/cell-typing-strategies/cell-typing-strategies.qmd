@@ -50,7 +50,53 @@ Hierarchical approaches like this are common in the single cell world.
 Defining the "useful subset of genes" is straightforward: we want genes that differ meaningfully 
 between our closely-related cell types, and we want to avoid genes at risk of contamination from segmentation errors. 
 
+The below code shows how this approach would work:
 
+```{r hierarchical, eval=FALSE, echo=TRUE}
+#### assumed data ---------------------------------------
+# xy: 2-column matrix of cells' xy positions
+# refprofiles: matrix of expected expression in genes * cells types, as 
+#   is expected by InSituType.
+# counts: counts matrix, cells * genes.
+# clust: vector of broad cell type assignments.
+
+#### source functions for gene selection ---------------------------------------
+# install the smiDE repo first:
+devtools::install_github("smiDE_REPO_LOCATION")
+
+source(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cell-typing-advanced-strategies/getSubtypingGenes.R"))
+
+#### supervised subtyping workflow ---------------------------------------
+## Get useful genes for supervised subtyping:
+sub <- clust == "T-cell"                          # which cells are T-cells
+Tcellgenes <- getSubtypingGenes(
+  mat = counts[sub, ],                            # expression from just T-cells
+  ref = refprofiles[, c("CD4", "CD8", "Treg")],   # T-cell subtype profiles
+  xy = xy[sub, ])                                 # spatial positions of T-cells
+
+## supervised subtyping of T-cells:
+res <- insitutype(
+  x = counts[sub, ],
+  reference_profiles = refprofiles[Tcellgenes, c("CD4", "CD8", "Treg")],
+  n_clusts = 0)
+## update the cluster assignments:
+clust[sub] <- res$clust
+
+
+#### unsupervised subclustering workflow ---------------------------------------
+## Get useful genes for supervised subtyping:
+sub <- clust == "T-cell"                          # which cells are T-cells
+Tcellgenes <- getSubclusteringGenes(
+  mat = counts[sub, ],                            # expression from just T-cells
+  xy = xy[sub, ])                                 # spatial positions of T-cells
+
+## supervised subtyping of T-cells:
+res <- insitutype(
+  x = counts[sub, ],
+  n_clusts = 4)
+## update the cluster assignments:
+clust[sub] <- paste0("T-cell cluster ", res$clust)
+```
 
 We advise against [relying on raw marker gene expression] (https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/){target="_blank"}
 for cell typing.
