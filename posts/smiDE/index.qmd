@@ -16,13 +16,17 @@ image: figures/fig1_thumbnail.PNG
 
 # Differential Expression Analysis With Spatially Correlated Data
 
-Led by the brilliant Ana Gabriela Vasconcelos, we're excited to present a preprint ["Differential Expression Analysis for Spatially Correlated Data"](https://www.biorxiv.org/content/10.1101/2024.08.02.606405v1.full){target="_blank"} [@Vasconcelos2024], discussing exciting opportunities and unique challenges fundamental to differential expression analyses with spatial data.
+Led by the brilliant Ana Gabriela Vasconcelos, we're excited to present a preprint ["Differential Expression Analysis for Spatially Correlated Data"](https://www.biorxiv.org/content/10.1101/2024.08.02.606405v1.full){target="_blank"} [@Vasconcelos2024], discussing opportunities and unique challenges fundamental to differential expression (DE) analyses with spatial data. 
 
-We've implemented a number of tools for methods discussed in the paper in the R package [smiDE](https://github.com/Nanostring-Biostats/smiDE){target="_blank"}.  Vignettes and examples for using the techniques described below are available on the package's github page.
+We find that traditional DE methods applied to spatial data result in high rates of false discovery, and benchmark performance of different modeling strategies in terms of false discovery rates, power, effect size estimation, and computational complexity. 
+
+We provide general methodology recommendations for how a researcher should apply DE in their own study to avoid potential pitfalls that can damage the integrity of an analysis. Tools for methods discussed in the paper are implemented in the R package [smiDE](https://github.com/Nanostring-Biostats/smiDE){target="_blank"}, with vignettes and examples on the package's github page.
+
+A brief summary of highlights and takeaways from the paper are described throughout the rest of this post.
 
 ## Opportunities
 
-While Differential Expression (DE) analysis has long been a core component of gene expression studies, spatially resolved transcriptomic (SRT) data presents opportunities for addressing fundamental questions regarding how cells respond to their local environment and interact with other cell types.
+While DE analysis has long been a core component of gene expression studies, spatially resolved transcriptomic (SRT) data presents new opportunities for addressing fundamental questions regarding how cells respond to their local environment and interact with other cell types.
 
 As a motivating example, suppose I have annotated cell type and spatial context in my dataset; I might be broadly interested in T cells, cancer cells, and how they behave within different spatial contexts.
 
@@ -36,9 +40,9 @@ knitr::include_graphics("./figures/fig1_ab.PNG")
 
 Tons of interesting questions along these lines can be phrased as DE problems, for example
 
-*  How does the expression of genes in T cells differ when located in stroma vs. tumor bed?
-*  How does expression of genes in cancer cells in the tumor bed differ based on distance to the nearest T-cell?
-*  How is gene expression for T-cells in stroma modulated by distance to the tumor bed?
+*  How does the expression of genes in T cells differ when located in stroma vs. tumor bed? (Left panel, blue vs. purple points)
+*  How does expression of genes in cancer cells in the tumor bed differ based on distance to the nearest T-cell? (middle panel, cancer cells with arrow drawn to nearest T cell and colored by distance)
+*  How is gene expression for T-cells in stroma modulated by distance to the tumor bed? (Right panel, rings highlight benchmarks of "distance from tumor bed")
 
 
 ```{r}
@@ -51,7 +55,7 @@ knitr::include_graphics("./figures/fig1_thumbnail.PNG")
 
 ## Unique challenges for DE analyis with SRT data
 
-While the types of exciting questions we can tackle with DE are limitless, there are unique challenges associated with SRT technologies that can lead to false discoveries when not properly addressed.
+While the types of questions we can tackle with DE are limitless, there are unique challenges associated with SRT technologies that can lead to false discoveries when not properly addressed.
 
 Two primary issues include:
 
@@ -64,7 +68,7 @@ Below, we'll give a very brief overview of how these problems can lead to biased
 
 Even minor segmentation errors can distort DE results if the analysis doesn't properly account for them. For example, suppose I want to analyze the behavior of macrophage cells, and how gene expression differs for macrophages in tumor-infiltrated regions of tissue.
 
-The picture below shows KRT17 transcripts from neighboring epithelial cells falsely assigned to the macrophage cell inside a tumor region.
+The picture below shows KRT17 transcripts from neighboring epithelial (cancer) cells falsely assigned to the macrophage cell inside a tumor region.
 
 A naiive DE analysis may identify KRT17 as DE in the tumor, while an experienced bioinformatician may immediately recognize that this gene should not be expressed in the macrophage cell type at all (the very presence of the gene would challenge the cell type identity).
 
@@ -78,9 +82,9 @@ A naiive DE analysis may identify KRT17 as DE in the tumor, while an experienced
 knitr::include_graphics("./figures/napari_contam_example.png")
 ```
 
-Even if the number of falsely assigned transcripts is small, these errors are correlated with our DE question in a way that confounds the analysis.  Namely, the false positive KRT17 transcripts are more likely than not to occur in tumor regions compared to elsewhere because they come from the tumor-native epithelial cells!  
+Even if the number of falsely assigned transcripts is small, these errors are correlated with our DE question in a way that confounds the analysis.  Namely, the false positive KRT17 transcripts are more likely than not to occur in tumor regions compared to elsewhere because they come from the cancer cells!  
 
-We could describe this dilemma for a DE analysis through a directed-acyclic graph, where the neighboring KRT17 expression in epithelial cells acts as a confounder.
+We could describe this dilemma for a DE analysis through a directed-acyclic graph, where the neighboring KRT17 expression in cancer cells acts as a confounder.
 
 ```{r}
 #| eval: true
@@ -144,7 +148,7 @@ Below, we show how inference can change from a naiive DE analysis (left), to a '
 knitr::include_graphics("./figures/colon_cancer_volcanos.png")
 ```
 
-The ability to visually assess the behavior of the random effects can provide further context for the analysis.  For example, CD79A retains the significance in the SRE model, showing several concentrated regions of high expression captured by the random effect.  For WNT7A, numerous small regions of autocorrelated expression reduce the significance of the gene when taken into context of the model.
+The ability to visually assess the behavior of the random effects can provide further context for the analysis.  For example, CD79A retains significance in the SRE model, showing several concentrated regions of high expression captured by the random effect.  For WNT7A, numerous small regions of autocorrelated expression reduce the significance of the gene when taken into context of the model.
 
 ```{r}
 #| eval: true
@@ -157,7 +161,7 @@ knitr::include_graphics("./figures/visual_sre.png")
 
 # Conclusions 
 
-Here we've discussed exciting opportunities for DE analysis with SRT datasets, along with unique challenges this data type poses.
+Here we've discussed opportunities for DE analysis with SRT datasets, along with unique challenges this data type poses.
 All of the analysis tools described here are implemented in the [smiDE R package](https://github.com/Nanostring-Biostats/smiDE){target="_blank"}, with syntax examples and vignettes which can be found on the github page.  We hope the reader will also check out the [preprint](https://www.biorxiv.org/content/10.1101/2024.08.02.606405v1.full){target="_blank"} for more thorough detail on the our study of DE with spatially correlated data.
 
 # Resources
