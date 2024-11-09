@@ -67,32 +67,61 @@ devtools::install_github("smiDE_REPO_LOCATION")
 source(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cell-typing-advanced-strategies/getSubtypingGenes.R"))
 
 #### supervised subtyping workflow ---------------------------------------
+
+## get genes safe from contamination:
+safegenes <- findSafeGenes(
+  counts = counts,                    # note we're entering info for all cells           
+  xy = xy,                            # again entering info for all cells
+  ismycelltype = (clust == "T-cell"), # logical indicating the cells to subtype
+  tissue = NULL)$safegenes            # specify if tissues have xy overlap
+
+
 ## Get useful genes for supervised subtyping:
-sub <- clust == "T-cell"                          # which cells are T-cells
+
+sub <- clust == "T-cell"                        # which cells are T-cells
 Tcellgenes <- getSubtypingGenes(
-  mat = counts[sub, ],                            # expression from just T-cells
-  ref = refprofiles[, c("CD4", "CD8", "Treg")],   # T-cell subtype profiles
-  xy = xy[sub, ])                                 # spatial positions of T-cells
+  mat = counts[sub, ],                          # expression from just T-cells
+  ref = refprofiles[, c("CD4", "CD8", "Treg")], # T-cell subtype profiles
+  xy = xy[sub, ],                               # spatial positions of T-cells
+  ratiothresh = 2,                              # thresh for max/min in ref
+  expressionthresh = 0.2)                       # thresh for mean counts in mat
+
+## use genes meeting both requirements above:
+Tcellgenes <- intersect(Tcellgenes, safegenes)
 
 ## supervised subtyping of T-cells:
 res <- insitutype(
   x = counts[sub, ],
   reference_profiles = refprofiles[Tcellgenes, c("CD4", "CD8", "Treg")],
   n_clusts = 0)
+
 ## update the cluster assignments:
 clust[sub] <- res$clust
 
 
 #### unsupervised subclustering workflow ---------------------------------------
-## Get useful genes for supervised subtyping:
-sub <- clust == "T-cell"                          # which cells are T-cells
-Tcellgenes <- getSubclusteringGenes(
-  mat = counts[sub, ],                            # expression from just T-cells
-  xy = xy[sub, ])                                 # spatial positions of T-cells
+
+## get genes safe from contamination:
+safegenes <- findSafeGenes(
+  counts = counts,                    # note we're entering info for all cells           
+  xy = xy,                            # again entering info for all cells
+  ismycelltype = (clust == "T-cell"), # logical indicating the cells to subtype
+  tissue = NULL)$safegenes            # specify if tissues have xy overlap
+
+## Get highly variable genes in your subset:
+sub <- clust == "T-cell"                                 
+subsetHVGs <- getSubclusteringGenes(
+  mat = counts[sub, ],     # raw counts from only the cell type of interest
+  varratiothresh = 1,      # how much var beyond what mean expression predicts
+  expressionthresh = 0.2)  # min expression level
+
+
+## keep genes meeting both the above criteria:
+usegenes <- intersect(subsetHVGs, safegenes)
 
 ## supervised subtyping of T-cells:
 res <- insitutype(
-  x = counts[sub, ],
+  x = counts[sub, usegenes],
   n_clusts = 4)
 ## update the cluster assignments:
 clust[sub] <- paste0("T-cell cluster ", res$clust)
