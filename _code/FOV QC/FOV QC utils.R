@@ -344,18 +344,56 @@ cellxgene2squarexbit <- function(counts, grid, genes, barcodes) {
   bitmat = matrix(0, length(setdiff(unique(grid), NA)), nbits)
   colnames(bitmat) <- paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), c("B", "G", 'Y', "R"))
   rownames(bitmat) <- setdiff(unique(grid), NA)
+  
+  # sparse matrix of grid squares to cells: 
+  inasquare <- !is.na(grid)
+  counts <- counts[inasquare, ]
+  grid <- grid[inasquare]
+  
+  gridmap <- Matrix::sparseMatrix(
+    i = as.numeric(as.factor(grid)),
+    j = seq_len(length(grid)),
+    x = 1,
+    dims = c(length(levels(as.factor(grid))), length(grid)))
+  rownames(gridmap) <- levels(as.factor(grid))
+  colnames(gridmap) <- rownames(counts)
+  
+  # total expression of genes in grid squares:
+  gridxgenecounts <- gridmap[, rownames(counts)] %*% counts 
+  
+  # convert to mean:
+  ncellspergrid <- Matrix::rowSums(gridmap)
+  gridxgenecounts <- Matrix::Diagonal(x = 1/ncellspergrid) %*% gridxgenecounts
+  rownames(gridxgenecounts) <- rownames(gridmap)
+  
+  # make a sparse matrix of bit -> gene mappings
+  gene2bitmap <- barcode2bitmatrix(barcodes)
+  rownames(gene2bitmap) <- genes
+  
+  # total expression of BITs in grid squares:
+  sharedgenes <- intersect(genes, colnames(counts))
+  gridxbitcounts <- gridxgenecounts[, sharedgenes]%*% gene2bitmap[sharedgenes, ]
+  
+  return(as.matrix(gridxbitcounts))
+}
+
+
+#' Convert the barcode vector to a matrix of bit assignments (genes * bits)
+barcode2bitmatrix <- function(barcodes) {
+  # number of bits:
+  nreportercycles <- nchar(barcodes[1]) / 2
+  nbits <- nreportercycles * 4
+  bitmap <- matrix(0, length(barcodes), nbits)
+  colnames(bitmap) <- paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), rep(c("B", "Y", "G", "R"), nreportercycles))
+  # fill out matrix:
   for (i in seq_len(nreportercycles)) {
     barcodeposition <- i*2
     barcodehere <- substr(barcodes, barcodeposition, barcodeposition)
     for (col in c("B", "Y", "G", "R")) {
-      tempgenes <- setdiff(genes[barcodehere == col], NA)
-      tempgenes <- intersect(tempgenes, colnames(counts))
-      temptotal <- Matrix::rowSums(counts[, tempgenes, drop = FALSE])
-      tempsquaretotal <- by(temptotal, grid, mean)
-      bitmat[names(tempsquaretotal), paste0("reportercycle", i, col)] <- tempsquaretotal
+      bitmap[barcodehere == col, paste0("reportercycle", i, col)] <- 1
     }
   }
-  return(bitmat)
+  return(bitmap)
 }
 
 
