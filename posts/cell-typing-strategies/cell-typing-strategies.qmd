@@ -31,7 +31,7 @@ We'll address four common difficulties:
 3. Failure to find anchor cells / difficulties mapping reference profiles
 4. Reference cell types claiming the wrong cells
 
-# Fine subtyping
+# Fine subtyping: take a hierarchical approach and rely on gene selection
 
 Broad cell typing, e.g. discerning cancer cells vs. fibroblasts vs. immune cells, 
 does best using a large number of genes - the whole panel for 1k data, and at least half the 6k panel. 
@@ -61,8 +61,6 @@ The below code shows how this approach would work:
 # clust: vector of broad cell type assignments.
 
 #### source functions for gene selection ---------------------------------------
-# install the smiDE repo first:
-devtools::install_github("smiDE_REPO_LOCATION")
 
 source(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cell-typing-advanced-strategies/getSubtypingGenes.R"))
 
@@ -133,6 +131,27 @@ However, [using smoothing/imputation to get cleaner marker gene expression value
  can enable a marker-driven approach. 
 
  
+# Batch effects: well-considered workflows 
+
+*Short summary to expand on:*
+- Supervised: run insituitype with the rescale=TRUE option separately for each tissue
+- Unsup: batch-adjust (harmony etc) then run leiden. (batch correction not really suited to IST, since it expects raw data)
+- Semi-sup: difficult. Cell type one or a couple samples carefully, then apply their profiles to others using supervised IST and rescale=TRUE
+
+
+# Failure to find anchor cells
+
+*Short summary to expand on:*
+- high-plex in particular: lower values for anchor selection thresholds
+- if you only find anchors for a few cell types: use rescale = TRUE, refit = FALSE
+- if you have a whole ref dataset, not just profiles, then try seurat's label transfer or maxflow. 
+-- then using InSituType::spatialUpdate usually improves these further
+
+# Reference cell types claiming the wrong cells
+
+*Short summary to expand on:*
+- Just use refineClusters
+
 
 # Resources
 
