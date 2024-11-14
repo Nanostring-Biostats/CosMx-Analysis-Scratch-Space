@@ -1,5 +1,5 @@
 ---
-title: "Defining Regions of Interest in CosMx<sup>&#174;</sup> SMI data"
+title: "Defining Regions of Interest in CosMx<sup>&#174;</sup> SMI data using napari"
 author:
   - name: Evelyn Metzger
     orcid: 0000-0002-4074-9003
@@ -16,11 +16,11 @@ number-depth: 4
 code-fold: false
 code-line-numbers: false
 code-overflow: scroll
-date: "2024-11-04"
-categories: [napari, how-tos, python, Seurat, ROIs, subsetting]
+date: "2024-11-14"
+categories: [napari, how-tos, python, ROIs, subsetting, insitutype]
 draft: false
 # image: figures/fig-stitch-single-slide.png
-description: This post shows you how to manually select ROIs in python and R to enhance your 
+description: This post shows you how to manually select ROIs in python to enhance your 
   your analysis workflow.
 page-layout: full
 format: 
@@ -30,13 +30,6 @@ format:
       dark: darkly
 google-scholar: true
 ---
-
-
-
-
-
-
-
 
 # Introducion
 
@@ -68,12 +61,6 @@ starts with a simple polygon followed by adding additional code to make the proc
 of ROI creation more automated via keyboard shortcuts.
 -   @sec-selecting-individual-cells shows another way to selection "ROIs" and 
 that's by selecting individual cells.
-
-# Example Dataset
-
-to do - location where data can be downloaded.
-
-
 
 # Selecting Groups of Cells {#sec-selecting-groups-of-cells}
 
@@ -211,7 +198,7 @@ gem.viewer.layers['Shapes'].name = 'ROI001'
 ```
 
 We can also _save_ this ROI as a pickle file so we can later come back to it when
-we open the sampel again. 
+we open the sample again. 
 
 To save:
 
@@ -427,15 +414,80 @@ Name: count, dtype: int64
 As you can see in the code above, in the case you have hierarchial ROIs, a given
 cell that is present in multiple ROIs will be assigned the first ROI in the list.
 
-
 # Selecting Individual Cells {#sec-selecting-individual-cells}
 
+Sometimes I want to focus on individual cells instead of regions. A typical case
+for me is when I want to select "anchor" cells for use with InSituType. And while the
+above polygon-based ROI selection approach _does work_ on single cells, it's a little more
+effort than just clicking a cell.
+ 
+Here I to zoom into an arbitrary position, replace filled
+polygons with cell type contours, and turn on a few IF channels.
+
+```{.python}
+
+gem.viewer.layers['cell_type'].visible = False
+gem.color_cells("cell_type", color=my_colors, contour = 1)
+
+gem.viewer.window.set_geometry(0, 49, 1440, 773)
+gem.viewer.camera.center = (0.0, 2.2981841637346654, 12.99023480800836)
+gem.viewer.camera.zoom = 7477.634103126872
+
+gem.add_channel('CD68', colormap = 'red') 
+cd68 = gem.viewer.layers['CD68']
+cd68.contrast_limits = [1560.7958115183246, 5072.586387434555]
+
+gem.add_channel('PanCK', colormap = 'green') # PanCK
+PanCK = gem.viewer.layers['PanCK']
+PanCK.contrast_limits = [2331.937172774869, 9234.471204188483]
+
+gem.add_channel('Membrane', colormap = 'cyan') # membrane
+mem = gem.viewer.layers['Membrane']
+mem.contrast_limits = [3684.502617801047, 18176.879581151832]
+
+```
 
 
+In the video below, I selected a few cells using the Points layer.
+
+{{< video ./figures/selecting_cells.mov >}} 
+
+
+Here are those cell IDs. 
+
+```{.python}
+df = gem.layers_to_metadata(['Points'])
+df_filtered = df.loc[df['Points'] == True].cell_ID
+df_filtered
+```
+
+
+```
+UID
+13697552    c_1_151_3701
+14115200    c_1_151_3757
+14554376    c_1_151_3815
+15437192    c_1_151_3929
+15547400    c_1_151_3943
+16000151    c_1_151_4000
+16329832    c_1_151_4041
+19053376    c_1_151_4365
+19105792    c_1_151_4371
+19132027    c_1_151_4374
+Name: cell_ID, dtype: object
+
+```
 
 # Conclusion
 
-
+This blog post provides a step-by-step guide on defining Regions of Interest (ROIs)
+in CosMx SMI data using the napari-cosmx plugin. It demonstrated how to manually
+select ROIs with polygons, streamline the process with keyboard shortcuts for 
+efficiency, and subset data based on these selections. I also illustrated how to
+select individual cells using a Points layer in napari, offering a precise method
+for identifying cells of interest for further analysis. The code used here has not
+gone through the typical, vigorous testing process. Please reach out and file a
+Github issue if you find any bugs. 
 
 
 
