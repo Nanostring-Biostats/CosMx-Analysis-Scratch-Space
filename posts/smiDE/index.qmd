@@ -92,12 +92,12 @@ knitr::include_graphics("./figures/contam_example_dag.png")
 
 In the paper, we propose two approaches to deal with this issue.
 
-1. A 'contamination metric': Used to identify genes which may be irreparably contaminated and exclude them from cell-type specific DE analysis.  The metric computes the average expression in "macrophage cells", and the average expression in *spatial neighbors* of macrophage cells among all non-macrophage cell types.  The ratio of these two average expression vectors is a quick and useful way to discard implausible genes.
+1. A 'overlapping cells metric': Used to identify genes which may be expressed within specific cell types due primarily due to overlapping cells / segmentation errors , and exclude them from cell-type specific DE analysis.  The metric computes the average expression in "macrophage cells", and the average expression in *spatial neighbors* of macrophage cells among all non-macrophage cell types.  The ratio of these two average expression vectors is a quick and useful way to discard implausible genes.
 
 2. Covariate adjustment: We can compute the total expression of 'KRT17' in the spatial neighbors of macrophage cells among all non-macrophage neighbors, and include this as a control variable in the regression model.
 
 
-Below is a side-by-side summary of volcano plots before and after implementing these approaches, where genes are colored by their plausible cell type annotation from the Human Protein Atlas, and marked by whether or not the gene passes the contamination metric. 
+Below is a side-by-side summary of volcano plots before and after implementing these approaches, where genes are colored by their plausible cell type annotation from the Human Protein Atlas, and marked by whether or not the gene passes the overlapping cells metric. 
 
 On the left, a number of implausible brown genes which should be "Not detected in immune cells" are falsely identified as being upregulated in macrophages in the tumor region.
 Nearly all of these genes could be pre-filtered before DE is conducted, by nature of "failing the filter" metric.  
@@ -134,7 +134,7 @@ knitr::include_graphics("./figures/colon_cancer_sre.png")
 ```
 
 
-Below, we show how inference can change from a naiive DE analysis (left), to a 'contamination-aware' analysis (middle), to a DE analysis which also includes the spatial random effect (right).  The model with SRE identifies a set of 9 high-confidence DE genes with up-regulated expression in TLS interior, down from 141 DE genes identified through the naiive approach.
+Below, we show how inference can change from a naiive DE analysis (left), to a 'segmentation-aware' analysis (middle), to a DE analysis which also includes the spatial random effect (right).  The model with SRE identifies a set of 9 high-confidence DE genes with up-regulated expression in TLS interior, down from 141 DE genes identified through the naiive approach.
 
 ```{r}
 #| eval: true
