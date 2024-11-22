@@ -16,7 +16,7 @@ number-depth: 4
 code-fold: false
 code-line-numbers: false
 code-overflow: scroll
-date: "2024-11-14"
+date: "2024-11-20"
 categories: [napari, how-tos, python, ROIs, subsetting, insitutype]
 draft: false
 image: figures/fig-initial.png
@@ -67,14 +67,14 @@ that's by selecting individual cells.
 # Selecting Groups of Cells {#sec-selecting-groups-of-cells}
 
 There are two ways to interact with napari and the napari-cosmx plugin. The first is via the GUI (see [napari-cosmx plugin](../napari-cosmx-intro/index.qmd) and the [basics](../napari-cosmx-basics/using-napari-cosmx.qmd) for a refresher).
-If you're working with the GUI, drag and drop your CosMx SMI napari folder into napari's main window to view the tissue. Once openned, you can access the ipython terminal by clicking on the  `>_` icon which is located on the bottom left of the application ([see yellow arrow in the previous post](../napari-cosmx-basics/using-napari-cosmx.qmd#fig-initial){target="_blank"}. The main object that we'll work with is named `gem` (for Gemini). 
+If you're working with the GUI, drag and drop your CosMx SMI napari folder into napari's main window to view the tissue. Once opened, you can access the ipython terminal by clicking on the  `>_` icon which is located on the bottom left of the application ([see yellow arrow in the previous post](../napari-cosmx-basics/using-napari-cosmx.qmd#fig-initial){target="_blank"}). The main object that we'll work with is named `gem` (for Gemini). 
 
 For users more comfortable with 
 directly launching napari and napari-cosmx using the command line, this
 second method is for you. Activate your virtual environment containing the napari-cosmx plugin. 
 I'm testing this with Python 3.9, pyenv, [napari 0.5.4](https://napari.org/dev/release/release_0_5_4.html), PyQt5 5.15.11, and [napari_CosMx-0.4.17.1](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/05868d8643b2cba0d4248d0d402927284884f7ae/assets/napari-cosmx%20releases/napari_CosMx-0.4.17.1-py3-none-any.whl). After activation, launch ipython and then instantiate your `gem` object.
 
-```
+```{.bash}
 # in bash
 cd to_project_directory
 pyenv activate your_virtual_environment_name
@@ -91,19 +91,12 @@ import os
 from napari_cosmx.gemini import Gemini
 import pickle
 from os import listdir
-#from napari_animation import Animation
 import imageio
 
-data_dir = '/home/ec2-user/data/Evelyn/Marketing/LN4_6k_analysis/00-data/napari'
+data_dir = '/path/to/napari/data/files'
 gem = Gemini(data_dir)
 
 ````
-
-:::{.callout-note}
-If are working directly in ipython, you can open up the right hand widget using the
-`show_widget` method.
-:::
-
 
 Whichever method above you chose, our example dataset already has the metadata loaded. 
 
@@ -128,7 +121,14 @@ UID
 
 ```
 
-Let's cells by `cell_type`. I prefer the terminal for this task as I have finer
+:::{.callout-note}
+If you are working directly in ipython, you can open up the right hand widget using the
+`show_widget` method.
+:::
+
+
+
+Let's color cells by `cell_type`. I prefer the terminal for this task as I have finer
 control of the individual colors for each cell type. 
 
 ```{.python}
@@ -166,7 +166,7 @@ with imageio.get_writer(fig_path, dpi=(250, 250)) as writer:
 
 ```
 
-At this point, you're image should look like @fig-cell-types.
+At this point, your image should look like @fig-cell-types.
 
 ```{r}
 #| eval: true
@@ -213,6 +213,7 @@ And if we want to load that file later:
 ```{.python}
 gem.load_layers(['ROI001'], "path/to/output/data")
 ```
+
 
 ## More efficient ROI creation
 
@@ -343,6 +344,12 @@ UID                                                    ...
 4670103   c_1_182_2161  plasma cell       plasma cell  ...   False   False   False
 25664444   c_1_88_5066  plasma cell       plasma cell  ...   False   False   False
 ```
+
+:::{.callout-tip}
+Recall that you can save your new metadata file to disk so that it can be used
+later with the color cells widget. (_e.g._, `metadata.to_csv("_new_metadata.csv", index=False)`).
+:::
+
 
 ROIs can be hierarchical. For example, one can create concentric rings around a 
 focal region. So a given cell can be True for multiple ROIs. 
