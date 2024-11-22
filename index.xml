@@ -10,7 +10,970 @@
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
 <generator>quarto-1.5.57</generator>
-<lastBuildDate>Wed, 30 Oct 2024 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Wed, 20 Nov 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Defining Regions of Interest in CosMx® SMI data using napari</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-rois/cosmx-rois.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="introducion" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introducion</h1>
+<p>I am consistently impressed by the remarkable cellular resolution, sensitivity, and comprehensive spatial profiling capabilities that CosMx<sup>®</sup> SMI technology offers. Indeed, I often analyze datasets that consist of 10s of slides and millions of cells – numbers that are steadily growing with time.</p>
+<p>At several points in my analysis workflow I need to subset the data. For example, I may want to examine a specific niche or ask what the molecular composition of each kidney glomerulus looks like. While some of these subsets can be achieved by computational means, there are some scenarios where I isolate specific regions or specific cells by directly selecting them on the tissue. I refer to this as selecting Regions of Interest (ROIs).</p>
+<p>In this post, I will show you how to define ROIs using the <code>napari-cosmx</code> plugin. In a future post, we’ll show a similar approach using R.</p>
+<section id="preliminaries" class="level2" data-number="1.1">
+<h2 data-number="1.1" class="anchored" data-anchor-id="preliminaries"><span class="header-section-number">1.1</span> Preliminaries</h2>
+<p>This is the fourth installment of our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/#category=napari"><code>napari series</code></a>. Readers should be familiar with the <a href="../../posts/napari-cosmx-intro/index.html">napari-cosmx plugin</a> and the <a href="../../posts/napari-cosmx-basics/using-napari-cosmx.html">basics</a>. I’ll also make use of the python interpreter and users may benefit from reviewing the post on <a href="../../posts/napari-stitching/napari-cosmx-stitching.html">stitching</a> before reading further.</p>
+<ul>
+<li>Section&nbsp;2 shows a step-by-step guide to create ROIs. It starts with a simple polygon followed by adding additional code to make the process of ROI creation more automated via keyboard shortcuts.</li>
+<li>Section&nbsp;3 shows another way to selection “ROIs” and that’s by selecting individual cells.</li>
+</ul>
+</section>
+</section>
+<section id="sec-selecting-groups-of-cells" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Selecting Groups of Cells</h1>
+<p>There are two ways to interact with napari and the napari-cosmx plugin. The first is via the GUI (see <a href="../../posts/napari-cosmx-intro/index.html">napari-cosmx plugin</a> and the <a href="../../posts/napari-cosmx-basics/using-napari-cosmx.html">basics</a> for a refresher). If you’re working with the GUI, drag and drop your CosMx SMI napari folder into napari’s main window to view the tissue. Once opened, you can access the ipython terminal by clicking on the <code>&gt;_</code> icon which is located on the bottom left of the application (<a href="../../posts/napari-cosmx-basics/using-napari-cosmx.html#fig-initial" target="_blank">see yellow arrow in the previous post</a>). The main object that we’ll work with is named <code>gem</code> (for Gemini).</p>
+<p>For users more comfortable with directly launching napari and napari-cosmx using the command line, this second method is for you. Activate your virtual environment containing the napari-cosmx plugin. I’m testing this with Python 3.9, pyenv, <a href="https://napari.org/dev/release/release_0_5_4.html">napari 0.5.4</a>, PyQt5 5.15.11, and <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/05868d8643b2cba0d4248d0d402927284884f7ae/assets/napari-cosmx%20releases/napari_CosMx-0.4.17.1-py3-none-any.whl">napari_CosMx-0.4.17.1</a>. After activation, launch ipython and then instantiate your <code>gem</code> object.</p>
+<div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># in bash</span></span>
+<span id="cb1-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">cd</span> to_project_directory</span>
+<span id="cb1-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pyenv</span> activate your_virtual_environment_name</span>
+<span id="cb1-4"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">ipython</span></span></code></pre></div>
+<div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># in ipython/python</span></span>
+<span id="cb2-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> importlib.metadata <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> metadata</span>
+<span id="cb2-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> numpy</span>
+<span id="cb2-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pandas <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> pd</span>
+<span id="cb2-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> os</span>
+<span id="cb2-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> napari_cosmx.gemini <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Gemini</span>
+<span id="cb2-7"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pickle</span>
+<span id="cb2-8"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> os <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> listdir</span>
+<span id="cb2-9"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> imageio</span>
+<span id="cb2-10"></span>
+<span id="cb2-11">data_dir <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'/path/to/napari/data/files'</span></span>
+<span id="cb2-12">gem <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Gemini(data_dir)</span></code></pre></div>
+<p>In my example dataset, I have the metadata already loaded.</p>
+<div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">gem.metadata</span></code></pre></div>
+<pre><code>               cell_ID    cell_type initial_cell_type  leiden
+UID                                                          
+10101        c_1_100_1     B cell 1          B cell 1       0
+10200      c_1_100_100   CD4 T cell        CD4 T cell       2
+1000100   c_1_100_1000     B cell 1          B cell 1       0
+1002101   c_1_100_1001   CD4 T cell        CD4 T cell       2
+1004104   c_1_100_1002     B cell 1          B cell 1       0
+...                ...          ...               ...     ...
+350859     c_1_395_592   CD4 T cell        CD4 T cell       2
+20457783  c_1_254_4523     B cell 1          B cell 1       0
+3261907   c_1_271_1806     B cell 2          B cell 2       1
+4670103   c_1_182_2161  plasma cell       plasma cell      12
+25664444   c_1_88_5066  plasma cell       plasma cell      12
+</code></pre>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you are working directly in ipython, you can open up the right hand widget using the <code>show_widget</code> method.</p>
+</div>
+</div>
+<p>Let’s color cells by <code>cell_type</code>. I prefer the terminal for this task as I have finer control of the individual colors for each cell type.</p>
+<div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">my_colors <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {</span>
+<span id="cb5-2"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"B cell 1"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#AA0DFE"</span>,</span>
+<span id="cb5-3"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"B cell 2"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#3283FE"</span>, </span>
+<span id="cb5-4"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CD4 T cell"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#85660D"</span>, </span>
+<span id="cb5-5"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"B cell 3"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#782AB6"</span>, </span>
+<span id="cb5-6"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"fibroblast reticular cell 1"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#565656"</span>, </span>
+<span id="cb5-7"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"fibroblast reticular cell 2"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#1C8356"</span>, </span>
+<span id="cb5-8"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"macrophage"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#16FF32"</span>, </span>
+<span id="cb5-9"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"pericyte"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#F7E1A0"</span>, </span>
+<span id="cb5-10"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"GC B cell"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#E2E2E2"</span>, </span>
+<span id="cb5-11"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CD8 T cell"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#1CBE4F"</span>, </span>
+<span id="cb5-12"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"interferon-stimulated cell"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#C4451C"</span>, </span>
+<span id="cb5-13"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"APC 1"</span>:<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#DEA0FD"</span>, </span>
+<span id="cb5-14"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"plasma cell"</span>:<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#FE00FA"</span>, </span>
+<span id="cb5-15"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"NK cell"</span>:<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#325A9B"</span>, </span>
+<span id="cb5-16"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"nonspecific"</span>:<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#FEAF16"</span>, </span>
+<span id="cb5-17"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"epithelial cell"</span>:<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#F8A19F"</span>, </span>
+<span id="cb5-18"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"APC 2"</span>:<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#90AD1C"</span>, </span>
+<span id="cb5-19"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"dendritic cells"</span>:<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#F6222E"</span></span>
+<span id="cb5-20">}</span>
+<span id="cb5-21"></span>
+<span id="cb5-22">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Segmentation'</span>].visible <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb5-23">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'FOV labels'</span>].visible <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb5-24"></span>
+<span id="cb5-25">gem.color_cells(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cell_type"</span>, color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>my_colors)</span>
+<span id="cb5-26"></span>
+<span id="cb5-27"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Optional step</span></span>
+<span id="cb5-28">fig_path <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"./fig-cell-types.png"</span></span>
+<span id="cb5-29"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> imageio.get_writer(fig_path, dpi<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">250</span>)) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> writer:</span>
+<span id="cb5-30">        screenshot <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> gem.viewer.screenshot(canvas_only<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb5-31">        writer.append_data(screenshot)</span></code></pre></div>
+<p>At this point, your image should look like Figure&nbsp;1.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-cell-types" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-cell-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-rois/figures/fig-cell-types.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-cell-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Lymph node dataset with colors corresponding to cell types.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s create a single ROI around one of the nodules. Here are the steps:</p>
+<ol type="1">
+<li>Zoom and pan to desired region</li>
+<li>Create a Shapes layer by clicking the filled white polygon on the left side panel.</li>
+<li>Select face color and edge color. Tip: to show no face color, set the alpha to 0.</li>
+<li>Click on the shape type and draw polygon</li>
+<li>Optional: save ROI to disk</li>
+</ol>
+<p>Steps 1-4 can be seen in the video below.</p>
+<video width="800" controls="">
+<source src="./figures/creating_an_roi.mp4">
+</video>
+<p>We can rename that layer by double clicking it or with the command below.</p>
+<div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Shapes'</span>].name <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ROI001'</span></span></code></pre></div>
+<p>We can also <em>save</em> this ROI as a pickle file so we can later come back to it when we open the sample again.</p>
+<p>To save:</p>
+<div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">gem.save_layers([<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ROI001'</span>], <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"path/to/output/data"</span>)</span></code></pre></div>
+<p>And if we want to load that file later:</p>
+<div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">gem.load_layers([<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ROI001'</span>], <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"path/to/output/data"</span>)</span></code></pre></div>
+<section id="more-efficient-roi-creation" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="more-efficient-roi-creation"><span class="header-section-number">2.1</span> More efficient ROI creation</h2>
+<p>There are many nodules in this sample. While the process of creating an ROI is simple, this manual process can take time. It can be more efficient to look at computational approaches like defining these nodules based on shared cell type composition (<em>i.e.</em>, niche). But if we still want fine control of the ROIs, we can speed up this process by creating a few helper functions that do many of these steps for us.</p>
+<p>In the code below, we are creating a <em>keyboard shortcut</em> that will create a new shapes layer simply by pressing <code>n</code> on your keyboard. The new layer will be named ROI001 if it’s the first one; otherwise, it will add an integer to the ROI name (ROI002, ROI003…). After creating a new layer, pressing <code>p</code> will activate the polygon tool allowing you to select the vertices of a given polygon. Double-clicking the last vertex will “close” the polygon.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>I tend to keep the shapes layer inactive whenever possible. This limits the number of accidental vertex additions to a shape.</p>
+</div>
+</div>
+<p>Here’s the code. Be sure to add the shortcut definitions <em>after</em> creating the <code>gem</code> object. You can change the color and edge width to any valid value. Here I’ll make the border yellow with a width of 100.</p>
+<div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"></span>
+<span id="cb9-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> find_next_roi(my_list):</span>
+<span id="cb9-3">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Finds the next ROI code in a list of ROI strings.</span></span>
+<span id="cb9-4"></span>
+<span id="cb9-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">  Args:</span></span>
+<span id="cb9-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">      my_list: A list of strings in the format "ROIxxx" where xxx are digits.</span></span>
+<span id="cb9-7"></span>
+<span id="cb9-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">  Returns:</span></span>
+<span id="cb9-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">      The next ROI code in the sequence, or "ROI001" if the list is empty </span></span>
+<span id="cb9-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">      or the next sequential code if no gap is found.</span></span>
+<span id="cb9-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">  """</span></span>
+<span id="cb9-12"></span>
+<span id="cb9-13">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> my_list:  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Handle empty list</span></span>
+<span id="cb9-14">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ROI001"</span></span>
+<span id="cb9-15"></span>
+<span id="cb9-16">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Extract numeric parts and convert to integers</span></span>
+<span id="cb9-17">  numbers <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>(item[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>:]) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> item <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> my_list]</span>
+<span id="cb9-18"></span>
+<span id="cb9-19">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Sort the numbers in ascending order</span></span>
+<span id="cb9-20">  numbers.sort()</span>
+<span id="cb9-21"></span>
+<span id="cb9-22">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Find the first gap in the sequence</span></span>
+<span id="cb9-23">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(numbers) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>):</span>
+<span id="cb9-24">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> numbers[i <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> numbers[i] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>:</span>
+<span id="cb9-25">      next_number <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> numbers[i] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb9-26">      <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"ROI</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>next_number<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:03d}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-27"></span>
+<span id="cb9-28">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># If no gap is found, return the next sequential number</span></span>
+<span id="cb9-29">  next_number <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> numbers[<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Get the last number and increment</span></span>
+<span id="cb9-30">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"ROI</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>next_number<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:03d}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-31"></span>
+<span id="cb9-32"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># This keybinding makes it easier to create a new shape layer for ROIs</span></span>
+<span id="cb9-33"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@gem.viewer.bind_key</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'n'</span>, overwrite<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb9-34"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> new_roi_layer(viewer):</span>
+<span id="cb9-35">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Search layers for "ROI" pattern</span></span>
+<span id="cb9-36">    layers <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> viewer.layers</span>
+<span id="cb9-37">    names <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [x.name <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> x <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> layers]</span>
+<span id="cb9-38">    names_filtered <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [item <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> item <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> names <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ROI"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> item]</span>
+<span id="cb9-39">    new_roi_name <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> find_next_roi(names_filtered)</span>
+<span id="cb9-40">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Creating </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>new_roi_name<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> layer."</span>)</span>
+<span id="cb9-41">    viewer.add_shapes(</span>
+<span id="cb9-42">        shape_type<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'polygon'</span>,</span>
+<span id="cb9-43">        scale <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [gem.mm_per_px, gem.mm_per_px],</span>
+<span id="cb9-44">        name<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>new_roi_name,</span>
+<span id="cb9-45">        face_color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'transparent'</span>,</span>
+<span id="cb9-46">        edge_color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'yellow'</span>,</span>
+<span id="cb9-47">        edge_width<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span></span>
+<span id="cb9-48">    )</span>
+<span id="cb9-49"></span></code></pre></div>
+<p>In the video below, I am quickly creating a new shapes layer using the keyboard combination <code>n + p</code>.</p>
+<video width="800" controls="">
+<source src="./figures/creating_rois.mp4">
+</video>
+<p>And now that I have four ROIs, I can save them like this:</p>
+<div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">N<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span></span>
+<span id="cb10-2">roi_list <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ROI'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>(i).zfill(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, N<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)]</span>
+<span id="cb10-3">gem.save_layers(roi_list, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"path/to/output/data"</span>)</span></code></pre></div>
+</section>
+<section id="subsetting-based-on-rois" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="subsetting-based-on-rois"><span class="header-section-number">2.2</span> Subsetting Based on ROIs</h2>
+<p>What we would like to do now is to identify which of the cells are in each of these polygons. There’s a method available in <code>napari-cosmx</code> to do just that.</p>
+<p>Using the <code>roi_list</code> list we created above, we can generate a Boolean column in the metdata for all of the ROIs.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Depending on the size of the sample, the size of the ROI(s), and your hardware, this process can be computationally intense.</p>
+</div>
+</div>
+<div class="sourceCode" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1">new_metadata <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> gem.layers_to_metadata(roi_list)</span>
+<span id="cb11-2"></span>
+<span id="cb11-3">new_metadata</span></code></pre></div>
+<pre><code>               cell_ID    cell_type initial_cell_type  ...  ROI002  ROI003  ROI004
+UID                                                    ...                        
+10101        c_1_100_1     B cell 1          B cell 1  ...   False   False   False
+10200      c_1_100_100   CD4 T cell        CD4 T cell  ...   False   False   False
+1000100   c_1_100_1000     B cell 1          B cell 1  ...   False   False   False
+1002101   c_1_100_1001   CD4 T cell        CD4 T cell  ...   False   False   False
+1004104   c_1_100_1002     B cell 1          B cell 1  ...   False   False   False
+...                ...          ...               ...  ...     ...     ...     ...
+350859     c_1_395_592   CD4 T cell        CD4 T cell  ...   False   False   False
+20457783  c_1_254_4523     B cell 1          B cell 1  ...   False   False   False
+3261907   c_1_271_1806     B cell 2          B cell 2  ...   False   False   False
+4670103   c_1_182_2161  plasma cell       plasma cell  ...   False   False   False
+25664444   c_1_88_5066  plasma cell       plasma cell  ...   False   False   False</code></pre>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Recall that you can save your new metadata file to disk so that it can be used later with the color cells widget. (<em>e.g.</em>, <code>new_metadata.to_csv("_new_metadata.csv", index=False)</code>).</p>
+</div>
+</div>
+<p>ROIs can be hierarchical. For example, one can create concentric rings around a focal region. So a given cell can be True for multiple ROIs.</p>
+<p>If you prefer to have these extra columns converted into a single column with the name of the ROI a given cell is found in, you can use this function.</p>
+<div class="sourceCode" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"></span>
+<span id="cb13-2"></span>
+<span id="cb13-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> generate_roi_summary_column(df):</span>
+<span id="cb13-4">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""</span></span>
+<span id="cb13-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Generates a 'ROI' column based on all ROI columns in the dataframe and removes the individual ROI columns.</span></span>
+<span id="cb13-6"></span>
+<span id="cb13-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb13-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        df: The pandas dataframe containing ROI columns.</span></span>
+<span id="cb13-9"></span>
+<span id="cb13-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Returns:</span></span>
+<span id="cb13-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        The updated dataframe with the 'ROI' summary column and individual ROI columns removed.</span></span>
+<span id="cb13-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb13-13"></span>
+<span id="cb13-14">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Get all columns that start with 'ROI'</span></span>
+<span id="cb13-15">    roi_cols <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [col <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> col <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> df.columns <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> col.startswith(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ROI'</span>)]</span>
+<span id="cb13-16"></span>
+<span id="cb13-17">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Filter dataframe to only include ROI columns</span></span>
+<span id="cb13-18">    roi_df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> df[roi_cols]</span>
+<span id="cb13-19"></span>
+<span id="cb13-20">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Create a new column 'ROI' and initialize it with None</span></span>
+<span id="cb13-21">    df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ROI'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span></span>
+<span id="cb13-22"></span>
+<span id="cb13-23">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Iterate over each row</span></span>
+<span id="cb13-24">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> index, row <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> roi_df.iterrows():</span>
+<span id="cb13-25">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Check if all values in the row are False</span></span>
+<span id="cb13-26">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">any</span>(row):</span>
+<span id="cb13-27">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">continue</span>  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Keep 'ROI' as None</span></span>
+<span id="cb13-28"></span>
+<span id="cb13-29">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># If there's at least one True, find the first column name where it's True</span></span>
+<span id="cb13-30">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> col <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> roi_cols:</span>
+<span id="cb13-31">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> row[col]:</span>
+<span id="cb13-32">                df.loc[index, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ROI'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> col</span>
+<span id="cb13-33">                <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">break</span></span>
+<span id="cb13-34"></span>
+<span id="cb13-35">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Drop the ROI columns</span></span>
+<span id="cb13-36">    df.drop(columns<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>roi_cols, inplace<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb13-37"></span>
+<span id="cb13-38">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> df</span></code></pre></div>
+<p>Here’s a tabulation of the number of cells found in each ROI in this example.</p>
+<div class="sourceCode" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"></span>
+<span id="cb14-2">meta_summary <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> generate_roi_summary_column(new_metadata)</span>
+<span id="cb14-3"></span>
+<span id="cb14-4">meta_summary.ROI.value_counts()</span></code></pre></div>
+<pre><code>ROI
+ROI001    13503
+ROI003     8536
+ROI002     7686
+ROI004     5721
+Name: count, dtype: int64</code></pre>
+<p>As you can see in the code above, in the case you have hierarchial ROIs, a given cell that is present in multiple ROIs will be assigned the first ROI in the list.</p>
+</section>
+</section>
+<section id="sec-selecting-individual-cells" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Selecting Individual Cells</h1>
+<p>Sometimes I want to focus on individual cells instead of regions. A typical case for me is when I want to select “anchor” cells for use with InSituType. And while the above polygon-based ROI selection approach <em>does work</em> on single cells, it’s a little more effort than just clicking a cell.</p>
+<p>In the code below, I zoomed into an arbitrary position, replaced filled polygons with cell type contours, and turned on a few IF channels.</p>
+<div class="sourceCode" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"></span>
+<span id="cb16-2">gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cell_type'</span>].visible <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb16-3">gem.color_cells(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cell_type"</span>, color<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>my_colors, contour <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb16-4"></span>
+<span id="cb16-5">gem.viewer.window.set_geometry(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">49</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1440</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">773</span>)</span>
+<span id="cb16-6">gem.viewer.camera.center <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.0</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2.2981841637346654</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12.99023480800836</span>)</span>
+<span id="cb16-7">gem.viewer.camera.zoom <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">7477.634103126872</span></span>
+<span id="cb16-8"></span>
+<span id="cb16-9">gem.add_channel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CD68'</span>, colormap <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'red'</span>) </span>
+<span id="cb16-10">cd68 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CD68'</span>]</span>
+<span id="cb16-11">cd68.contrast_limits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1560.7958115183246</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5072.586387434555</span>]</span>
+<span id="cb16-12"></span>
+<span id="cb16-13">gem.add_channel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'PanCK'</span>, colormap <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'green'</span>) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># PanCK</span></span>
+<span id="cb16-14">PanCK <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'PanCK'</span>]</span>
+<span id="cb16-15">PanCK.contrast_limits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2331.937172774869</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9234.471204188483</span>]</span>
+<span id="cb16-16"></span>
+<span id="cb16-17">gem.add_channel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Membrane'</span>, colormap <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cyan'</span>) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># membrane</span></span>
+<span id="cb16-18">mem <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> gem.viewer.layers[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Membrane'</span>]</span>
+<span id="cb16-19">mem.contrast_limits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3684.502617801047</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">18176.879581151832</span>]</span></code></pre></div>
+<p>In the video below, I selected a few cells using the Points layer.</p>
+<video width="800" controls="">
+<source src="./figures/selecting_cells.mp4">
+</video>
+<p>Here are those cell IDs.</p>
+<div class="sourceCode" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1">df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> gem.layers_to_metadata([<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Points'</span>])</span>
+<span id="cb17-2">df_filtered <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> df.loc[df[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Points'</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>].cell_ID</span>
+<span id="cb17-3">df_filtered</span></code></pre></div>
+<pre><code>UID
+13697552    c_1_151_3701
+14115200    c_1_151_3757
+14554376    c_1_151_3815
+15437192    c_1_151_3929
+15547400    c_1_151_3943
+16000151    c_1_151_4000
+16329832    c_1_151_4041
+19053376    c_1_151_4365
+19105792    c_1_151_4371
+19132027    c_1_151_4374
+Name: cell_ID, dtype: object
+</code></pre>
+</section>
+<section id="conclusion" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Conclusion</h1>
+<p>This blog post provides a step-by-step guide on defining Regions of Interest (ROIs) in CosMx SMI data using the napari-cosmx plugin. It demonstrated how to manually select ROIs with polygons, streamline the process with keyboard shortcuts for efficiency, and subset data based on these selections. I also illustrated how to select individual cells using a Points layer in napari, offering a precise method for identifying cells of interest for further analysis. The code used here has not gone through the typical, vigorous testing process. Please reach out and file a Github issue if you find any bugs.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>napari</category>
+  <category>how-tos</category>
+  <category>python</category>
+  <category>ROIs</category>
+  <category>subsetting</category>
+  <category>insitutype</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-rois/cosmx-rois.html</guid>
+  <pubDate>Wed, 20 Nov 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-rois/figures/fig-initial.png" medium="image" type="image/png" height="137" width="144"/>
+</item>
 <item>
   <title>Cellular neighborhoods: a useful, simple and flexible analysis framework</title>
   <dc:creator>Patrick Danaher</dc:creator>
@@ -14369,240 +15332,6 @@ Figure&nbsp;17: When metadata are available in the _metadata.csv file, it’s po
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/</guid>
   <pubDate>Wed, 01 May 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/figures/prostate.gif" medium="image" type="image/gif"/>
-</item>
-<item>
-  <title>The spatial algorithms zoo: recommended algorithms and efficient code</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/spatial-algorithm-zoo/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="recommended-algorithms-for-spatial-biology" class="level1">
-<h1>Recommended algorithms for spatial biology</h1>
-<p>Spatial statistics is a well-developed field, with deep statistical methodology and highly efficient open-source tools. In CosMx data, where a single study can contain millions of cells, computational efficiency is vital. Here we recommend some toolkits we’ve found useful:</p>
-<section id="table-of-contents" class="level2">
-<h2 class="anchored" data-anchor-id="table-of-contents">Table of contents:</h2>
-<ol type="1">
-<li>Fast nearest-neighbors search</li>
-<li>Measuring a gene’s spatial autocorrelation</li>
-<li>Measuring spatial correlation between two genes</li>
-<li>Counting occurrences within cell neighborhoods</li>
-</ol>
-</section>
-<section id="fast-nearest-neighbors-search" class="level2">
-<h2 class="anchored" data-anchor-id="fast-nearest-neighbors-search">Fast nearest-neighbors search: <a name="neighbors"></a></h2>
-<section id="returning-the-indexes-and-distances-to-a-cells-k-nearest-neighbors" class="level4">
-<h4 class="anchored" data-anchor-id="returning-the-indexes-and-distances-to-a-cells-k-nearest-neighbors">Returning the indexes and distances to a cell’s K-nearest neighbors:</h4>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1">neighbors <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> FNN<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">get.knnx</span>(<span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">data =</span> xy, <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># 2-column matrix of xy locations</span></span>
-<span id="cb1-2">                           <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">query =</span> xy, </span>
-<span id="cb1-3">                           <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">k =</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">50</span>)</span>
-<span id="cb1-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># returns 2 outputs: a matrix of each cell's nearest neighbor indices (including itself),</span></span>
-<span id="cb1-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">#  and a matrix of distances to these neighbors.</span></span></code></pre></div>
-</div>
-<p>(This also works for neighbors in expression space - just input the top 20 PCs instead of xy locations.)</p>
-</section>
-<section id="returning-a-sparse-matrix-of-cells-k-nearest-neighbors" class="level4">
-<h4 class="anchored" data-anchor-id="returning-a-sparse-matrix-of-cells-k-nearest-neighbors">Returning a sparse matrix of cells’ K-nearest neighbors</h4>
-<p>See the function <a href="https://github.com/Nanostring-Biostats/InSituCor/blob/main/R/NeighborhoodCalculations.R">nearestNeighborGraph in the Insitucor package</a></p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># xy is a 2-column matrix of xy locations</span></span>
-<span id="cb2-2">neighbors <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> InSituCor<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">nearestNeighborGraph</span>(<span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">x =</span> xy[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>], <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">y =</span> xy[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>], <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">n=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">50</span>)</span></code></pre></div>
-</div>
-<p>Note this matrix is populated by <em>distances</em>, not by simple 1/0 values.</p>
-</section>
-<section id="returning-a-sparse-matrix-of-cells-neighbors-within-a-radius" class="level4">
-<h4 class="anchored" data-anchor-id="returning-a-sparse-matrix-of-cells-neighbors-within-a-radius">Returning a sparse matrix of cells’ neighbors within a radius</h4>
-<p>See the function <a href="https://github.com/Nanostring-Biostats/InSituCor/blob/main/R/NeighborhoodCalculations.R">radiusBasedGraph in the Insitucor package</a></p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># xy is a 2-column matrix of xy locations</span></span>
-<span id="cb3-2">neighbors <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> InSituCor<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">radiusBasedGraph</span>(<span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">x =</span> xy[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>], <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">y =</span> xy[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>], <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">R =</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span>)</span></code></pre></div>
-</div>
-<p>Note this matrix is populated by <em>distances</em>, not by simple 1/0 values.</p>
-</section>
-</section>
-<section id="measuring-a-genes-spatial-autocorrelation" class="level2">
-<h2 class="anchored" data-anchor-id="measuring-a-genes-spatial-autocorrelation">Measuring a gene’s spatial autocorrelation <a name="correlation"></a></h2>
-<p>Our goal here is to measure how much a gene’s expression depends on spatial location. Genes with strong spatial dependence are presumably more interesting, deserving human attention. A much-less-than-comprehensive list of methods is below.</p>
-<p>Methods:</p>
-<ul>
-<li>Moran’s I statistic: This is a time-honored method in spatial statistics, published in 1950. Using the analytical rather than the permutation p-value speeds it up greatly, and we find their performance to be similar.</li>
-<li><a href="https://github.com/Teichlab/SpatialDE">SpatialDE</a>: the first attempt to measure spatial autocorrelation in spatial transcriptomics. Can be slow.</li>
-<li><a href="https://github.com/dcjones/maxspin">Maxspin</a>: A more recent method using machine learning and information theory to get performance improvements. Can be slow.</li>
-<li><a href="https://github.com/xzhoulab/SPARK">SPARK-X</a>: Runs at speed similar to Moran’s I.</li>
-</ul>
-</section>
-<section id="measuring-spatial-correlation-between-two-genes" class="level2">
-<h2 class="anchored" data-anchor-id="measuring-spatial-correlation-between-two-genes">Measuring spatial correlation between two genes <a name="correlation2"></a></h2>
-<p>When two or more genes are spatially correlated it can be of high biological interest. These genes might regulate each other via cell-cell communication, or they could be jointly regulated by some latent variable in the microenvironment.</p>
-<p>Methods for measuring spatial correlation between genes include:</p>
-<ul>
-<li>Lee’s L: another spatial statistics classic.</li>
-<li><a href="https://github.com/Teichlab/SpatialDE">SpatialDE</a></li>
-</ul>
-<p>However, we have found methods like the above to be unsatisfying, since genes with cell-type-specific expression end up sharing strong spatial correlations. E.g. CD19 and MS4A1 are expressed mainly by B-cells, so if B-cells are spatially clustered, then these genes will be spatially correlated, but for biologically trivial reasons. To isolate more interesting spatial correlations, we developed: - <a href="https://github.com/Nanostring-Biostats/insitucor">InSituCor</a>. This is our recommended approach. It can analyze hundreds of thousands of cells and thousands of genes in minutes.</p>
-</section>
-<section id="counting-occurrences-within-cell-neighborhoods" class="level2">
-<h2 class="anchored" data-anchor-id="counting-occurrences-within-cell-neighborhoods">Counting occurrences within cell neighborhoods <a name="counting"></a></h2>
-<p>Analysts will often want to score cells for how often something occurs in their neighborhoods. For example, you might want to know how many T-cell neighbors each cell has, or how many transcripts of a gene surround it.</p>
-<p>The below code demonstrates how to use the spatstat::marktable function to do this.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># "xy"" is a 2-column matrix of cell locations</span></span>
-<span id="cb4-2"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># "clust"" is a vector of cell type assignments</span></span>
-<span id="cb4-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># create a point process object:</span></span>
-<span id="cb4-4">pp <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> spatstat.geom<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">ppp</span>(xy[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>], xy[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>], <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">xrange =</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">range</span>(xy[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]), <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">yrange =</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">range</span>(xy[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>]))</span>
-<span id="cb4-5"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">marks</span>(pp) <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> clust</span>
-<span id="cb4-6"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">marks</span>(pp) <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">as.factor</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">marks</span>(pp))</span>
-<span id="cb4-7"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># count neighbors of each db cluster:</span></span>
-<span id="cb4-8">mt05 <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> spatstat<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">marktable</span>(<span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">X =</span> pp, <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">R =</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.05</span>, <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">N =</span> <span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">NULL</span>, <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">exclude=</span><span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">TRUE</span>, <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">collapse=</span><span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">FALSE</span>)</span>
-<span id="cb4-9"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">rownames</span>(mt05) <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">names</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">which</span>(use))</span></code></pre></div>
-</div>
-
-
-</section>
-</section>
-
- ]]></description>
-  <category>algorithms</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/spatial-algorithm-zoo/</guid>
-  <pubDate>Wed, 20 Mar 2024 00:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
