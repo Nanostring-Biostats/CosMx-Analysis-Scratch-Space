@@ -1,7 +1,6 @@
 ![image](https://github.com/Nanostring-Biostats/InSituDiff/assets/4357938/609a70d1-8bb2-40bc-a0e1-d04672e90ee6)
 # InSituDiff
 
-
 ## Motivation
 
 This is an R package for exploring spatial transcriptomics datasets containing control and disease samples. 
@@ -21,4 +20,4 @@ devtools::install_github("https://github.com/Nanostring-Biostats/CosMx-Analysis-
 
 ## Usage:
 
-See the vignette. 
+See the vignette.   
