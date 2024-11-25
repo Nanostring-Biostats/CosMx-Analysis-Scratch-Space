@@ -1,0 +1,132 @@
+---
+title: "Using a tree-based approach to cell type CosMx datasets"
+author:
+  - name: Claire Williams
+    affiliations:
+      - ref: bsb
+      - ref: crwilliams11
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+number-sections: true
+number-depth: 4
+date: "2024-11-25"
+date-modified: last-modified
+categories: [cell typing, algorithms]
+image: figures/Fig1-CellTypeTree.png
+description: "Use a tree-based approach to sequentially cluster cells into finer cell types."
+draft: false
+---
+
+# Introduction 
+We originally developed the [InSituType](https://github.com/Nanostring-Biostats/InSituType){target="_blank"} algorithm to cell type 1000-plex CosMx<sup>&#174;</sup> spatial molecular imager (SMI) RNA data, and we find that in many datasets this approach works well. However, when working with higher-plex datasets or attempting to perform fine-grained cell typing, we have found that a nested approach can sometimes improve the cell typing results. Here we provide a small package, InSituTree, that builds on InSituType and provides a specialized application for its use. For more ideas and suggestions on cell typing, please see [other posts on the Scratch Space blog](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/#category=cell%20typing) and [the FAQs provided with the InSituType package](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md){target="_blank"}.
+
+Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
+the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
+
+sections:
+- @sec-package-overview Overview of InSituTree approach
+- @sec-example-implementation Example usage of InSituTree
+- @sec-conclusions Conclusions
+
+# InSituTree Overview: How does it work? {#sec-package-overview}
+
+This package adds on to the [InSituType package](https://github.com/Nanostring-Biostats/InSituType){target='_blank'} 
+and takes a nested approach to supervised cell typing. Rather than immediately 
+trying to assign cells to all subtypes available, it first starts by classifying
+cells into broad categories and then assigns cells to finer subtypes.
+
+There are two core concepts that underlie this tree approach and differentiate 
+it from the standard supervised InSituType:
+
+1. Here, we break up the cell typing into a series of annotation decisions, starting at coarse cell type categories and proceeding down to fine categories
+    + Example: Immune -> Lymphoid -> T-cell -> T4 -> Treg -> Activated Treg
+2. The genes used for each decision point are optimized for maximum contrast given the cell types under consideration.
+
+Aligned with these two core concepts, there are two additional types of input that
+need to be provided to the function call beyond what is required for supervised InSituType:
+
+* `cell_type_tree`:  a nested list object that describes the relationship between cell types
+* `quantile_absolute_expression_difference_param` and `quantile_percent_expression_difference_param`: numbers that define how differentiating
+each gene must be to be included in the supervised cell type approach
+
+# InSituTree Example: Running the package {#sec-example-implementation}
+
+You can find the InSituTree package [here](/_code/InSituTree){target="_blank"}. See the corresponding [vignette](/_code/InSituTree/vignettes/InSituTree_basicVignette.Rmd){target="_blank"} inside the package for more details. 
+
+For this example we work with the immune-focused cell type profiles included
+in the InSituType package. We start by setting up a nested list of cell types.
+```{r setupCellTypeTree, message=FALSE, eval = FALSE}
+# Read in io profiles
+data(ioprofiles)
+
+# Establish a nested list of cell types
+celltype_hierarchy_list <- list(
+  "structural" = c(
+    "endothelial", 
+    "fibroblast"),
+  "myeloid" = c(
+    "macrophage", 
+    "mast", 
+    "mDC", 
+    "monocyte", 
+    "neutrophil"),
+  "lymphoid" = list(
+    "B-lymphoid" = c(
+      "B-cell", 
+      "pDC",
+      "plasmablast"),
+    "T-lymphoid" = list(
+      "T4" = c(
+        "T CD4 memory", 
+        "T CD4 naive", 
+        "Treg"),
+      "T8" = c(
+        "T CD8 memory", 
+        "T CD8 naive"),
+      "NK")
+    )
+)
+
+
+```
+
+:::{.callout-tip}
+If you're working from a CosMx-derived cell profile from our [CosMx Cell Profile library](https://github.com/Nanostring-Biostats/CosMx-Cell-Profiles/tree/main){target="_blank"}, formatted nested cell type lists are available as `.celltypeslist.R` files.
+:::
+
+Once we have this cell type tree, we can use InSituTree to run supervised cell typing with a nested approach.
+```{r runInSituTree, message=FALSE, eval = FALSE}
+# Load basic data consisting of:
+#   - counts: cell x gene count matrix
+#   - negmeans: vector of mean negative probe counts per cell
+
+load("mini_nsclc")
+
+# Run InSituTree with basic options
+res <- InSituTree(
+  x = as(mini_nsclc$counts, "CsparseMatrix"),
+  neg = rowMeans(mini_nsclc$neg),
+  full_profiles = ioprofiles,
+  cth = celltype_hierarchy_list,
+  name_for_new_annotation = "nested_cell_type",
+  cohort = NULL,
+  excluded_genes = NULL,
+  quantile_absolute_expression_difference_param = 0.5, # Include genes in the top 0.5 fraction in absolute expression differences
+  quantile_percent_expression_difference_param = 0.5, # Include genes in the top 0.5 fraction in percentage expression differences
+  return_summary_annotation = TRUE
+)
+
+# Access the final summarized cell typing results
+res$summaryAnnotation
+
+```
+
+# Conclusions {#sec-conclusions}
+The nested approach to supervised cell typing presented here adds another option for cell typing, particularly useful when looking to identify fine cell subtypes. The summarized output provides annotations at each level of the cell typing tree, allowing the user to choose how finely they'd like to subcluster. 
+
+#Acknowledgements
+The initial idea and code for this approach were developed largely by [Mark Gregory](https://github.com/mtgregory){target='_blank'}.
+

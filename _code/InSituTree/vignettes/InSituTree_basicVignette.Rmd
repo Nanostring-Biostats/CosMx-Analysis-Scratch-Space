@@ -1,0 +1,215 @@
+---
+title: "InSituTree hierarchical cell typing"
+author: "Claire Williams"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{InSituTree hierarchical cell typing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Overview
+
+The InSituTree package is a small package that builds on InSituType and provides a specialized application for its use. With this approach, you can perform supervised cell typing in a hierarchical manner -- first making broad cell type assignments and then making progressively finer classifications.
+
+## Installation
+
+```{r installation, eval=FALSE}
+# Download the package and install from file
+devtools::install("/path/to/package/InSituTree.zip")
+```
+
+## Data prepataion
+
+Load the package as well as example data. For the example data, we use a small CosMx SMI dataset of non small cell lung cancer (nsclc) that is included with the InSituType package.
+```{r load_data}
+library(InSituType)
+library(InSituTree)
+
+# Basic dataset
+data("mini_nsclc")
+str(mini_nsclc)
+
+# Cell type reference profile
+data("ioprofiles")
+```
+
+## Necessary inputs
+
+Here we show the format of each of the necessary inputs to run InSituTree. Many of these mirror inputs for InSituType, and more information can be found in that package.
+
+1. A sparse matrix of counts data, cells x genes
+
+```{r strcounts}
+counts <- mini_nsclc$counts
+counts <- as(counts, "CsparseMatrix")
+str(counts)
+counts[5:10,10:15]
+```
+
+2. A vector giving each cell's mean negative control value:
+
+```{r strnegmean}
+negmean <- Matrix::rowMeans(mini_nsclc$neg)
+head(negmean)
+```
+
+3. Reference profile including mean expression per gene for all cell subtypes. Major cell types are not needed. The reference matrix must be linear-scale, not log-scale. Genes (rows) do not need to be aligned to the counts matrix.
+
+```{r strprofiles}
+str(ioprofiles)
+ioprofiles[1:5,]
+```
+
+4. A nested list of the *c*ell *t*yping *h*ierarchy. Here we set up one that groups the immune cells into multiple subclusters.
+
+```{r strcth}
+celltype_hierarchy_list <- list(
+  "structural" = c(
+    "endothelial", 
+    "fibroblast"),
+  "myeloid" = c(
+    "macrophage", 
+    "mast", 
+    "mDC", 
+    "monocyte", 
+    "neutrophil"),
+  "lymphoid" = list(
+    "B-lymphoid" = c(
+      "B-cell", 
+      "pDC",
+      "plasmablast"),
+    "T-lymphoid" = list(
+      "T4" = c(
+        "T CD4 memory", 
+        "T CD4 naive", 
+        "Treg"),
+      "T8" = c(
+        "T CD8 memory", 
+        "T CD8 naive"),
+      "NK")
+    )
+)
+```
+
+5. A character name for the new annotations. This will be appended with the annotation depth in the final summary annotation.
+
+```{r strannotNames}
+annotation_names <- "nestedAnnotation"
+```
+
+## Optional inputs
+
+The remaining inputs to InSituTree are optional, with some having default values.
+
+6. A vector of cohorts provides a grouping of cells based on alternative data types, such as immunofluorescent staining, cell shape metrics, tissue structures, etc. In this small example we will not use cohorts, but it is generally recommended. The random vector below is provided to give an example of the expected structure. See the InSituType package for more information about how to generate cohorts.
+
+```{r strcohorts}
+# These will not be used in this vignette and should not be random. This is an example to show the structure.
+set.seed(2024)
+example_cohorts <- sample(1:30, size = ncol(counts), replace = TRUE)
+```
+
+7. A character vector of genes to exclude from the cell typing. Often these will be highly and broadly expressed genes in the CosMx dataset that we don't want to influence the cell typing. Defaults to NULL.
+
+```{r strExcludedGenes}
+genes_to_exclude <- c("MALAT1")
+```
+
+8. A numeric value between 0 and 1 that indicates the quantile of absolute difference for a given gene between the cell type with the highest expression and that with the lowest expression for a gene to be included in cell typing. Only genes in the quantile above this level and above the next quantile level will be considered. Defaults to 0.5.
+
+```{r strQuantileAbsoluteDifference}
+quantile_abs_difference <- 0.5
+
+# For reference, the absolute differences in expression for a set of five genes across the whole ioprofile are:
+diffs <- sapply(c("CD3D", "CD3E", "JCHAIN", "KRT18", "VIM", "MALAT1"), function(gene){
+    diff(range(ioprofiles[gene, ]))
+  } )
+diffs
+
+# The 50% quantile is:
+quantile(diffs, 0.5)
+
+# Genes from the first five passing this filter if only five were considered:
+names(diffs)[diffs > quantile(diffs, quantile_abs_difference, na.rm = T)]
+```
+
+9. A numeric value between 0 and 1 that indicates the quantile of percentage difference for a given gene between the cell type with the highest expression and that with the lowest expression for a gene to be included in cell typing. Only genes in the quantile above this level and above the previous quantile level will be considered. Defaults to 0.5.
+
+```{r strQuantilePercentageDifference}
+quantile_perc_difference <- 0.5
+
+# For reference, the percent differences in expression for a set of five genes across the whole ioprofile are:
+percs <- sapply(c("CD3E", "JCHAIN", "KRT18", "VIM", "MALAT1"), function(gene){
+    diff(range(ioprofiles[gene, ])) / max(ioprofiles[gene,])
+  } )
+percs
+
+# The 50% quantile is:
+quantile(percs, 0.5)
+
+# Genes from the first five passing this filter if only five were considered:
+names(percs)[percs > quantile(percs, quantile_perc_difference, na.rm = T)]
+```
+
+The only gene passing both of the above filters is JCHAIN, and so in this small example where we're considering all cell types together and only five genes, only this gene would be considered as having high differentiating power. Note that when fewer cell types are considered after merging subtypes we expect to see more variability in the diffs and percs.
+
+10. A logical value indicating whether to return the final summary annotation. This data frame shows the annotation that has been made for each cell at each level of the annotation tree. Recommendation is to keep this at its default value of TRUE.
+
+```{r strReturnSummary}
+return_summary_df <- TRUE
+```
+
+## Tree-style cell typing
+
+First, we can print a simple structured list to visualize the cell type hierarchy we've laid out with our cell type hierarchy list.
+
+```{r cellTypeStructure, fig.width=6, fig.height=4}
+printTree(celltype_hierarchy_list)
+```
+
+Once we've verified that this tree shows the hierarchy and cell type relationships that we'd expect, we can run supervised nested cell typing.
+
+```{r runInSituTree}
+res <- runInSituTree(x = counts,
+                          neg = negmean,
+                          full_profiles = ioprofiles,
+                          cth = celltype_hierarchy_list,
+                          name_for_new_annotation = annotation_names,
+                          cohort = NULL,
+                          excluded_genes = genes_to_exclude,
+                          quantile_absolute_expression_difference_param = quantile_abs_difference,
+                          quantile_percent_expression_difference_param = quantile_perc_difference,
+                          return_summary_annotation = return_summary_df)
+```
+
+In the messages that print out, we see that a handful of cells are removed from cell typing if they have zero counts in any of the gene subsets used for typing.
+
+## Review results
+
+The results from running InSituTree contain two main components:
+
+1) Nested list of results from each run of InSituTypeML
+
+2) Summary of annotations at each level of the tree
+
+The nested results list contains the typical outputs of InSituType for each round of cell typing, as well as one additional metric: the counts per cell for each cell for the given round of subclustering. We include counts per cell among the genes considered for each subclustering as an additional metric since cell assignments for low-count cells are likely to be less confident. As an example, we look at the first major cell types assignment and use the flightpath tool from InSituType to visualize how well cells were assigned to these major types.
+
+```{r resList}
+str(res$nestedAnnotation$result)
+
+InSituType::flightpath_plot(insitutype_result = res$nestedAnnotation$result)
+```
+
+The summary annotation data frame shows the cell type assigned at each level of annotation, as well as the posterior probability for each assignment. Any final cell type, found at the bottom of the cell type hierarchy, are cascaded right to further annotation levels. For example, cells assigned to 'endothelial' at annotation level 2 in this example will also be labeled as 'endothelial' for annotation levels 3 and 4.
+```{r resSummary}
+head(res$summaryAnnotation)
+```
