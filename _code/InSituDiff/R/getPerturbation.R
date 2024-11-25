@@ -121,7 +121,7 @@ initializeISD <- function(mat, xy, tissue, iscontrol,
 #' named list in which each element holds a vector of gene names for a given module, e.g. 
 #' as output by \code{buildGeneModules}. 
 #' @param residtype Either "log2ratio" or "diff"
-#' @param eps For log2ratio calculations, mean neighborhood expression will be thresholded below at this value.
+#' @param eps For log2ratio calculations, this value is added to mean neighborhood expression levels.
 #'  This is an important parameter: low eps will have higher sensitivity and poorer
 #'  specificity for detecting perturbations in low expressers. 
 #'  The default of 1 is a somewhat conservative choice. 
@@ -181,6 +181,7 @@ getPerturbations <- function(x, obj, cells = NULL, genes = NULL, residtype = "lo
 #' @param env Environment matrix of target cells
 #' @param controlenv Environment matrix of best-matching controls
 #' @param residtype Either "log2ratio" or "diff"
+#' @param eps Value added to expression matrices for log2ratio differences
 #' @return A matrix of changes from nearest controls, in the same dimension as x
 #' @export
 scoreDiff <- function(env, controlenv, residtype, eps = 1) {

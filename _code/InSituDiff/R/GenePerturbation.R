@@ -14,7 +14,7 @@
 #' @param residtype Either "log2ratio" or "diff"
 #' @param plotresults Logical, for whether to make a summary plot of the results
 #' @param subsetsize Number of cells to use for these calculations
-#' @param eps For log2ratio calculations, mean neighborhood expression will be thresholded below at this value
+#' @param eps For log2ratio calculations, this value is added to mean neighborhood expression levels.
 #' @param ratioeps Added to means and means+2sds when calculating ratios between disease and controls.
 #' @export
 summarizeGenePerturbation <- function(x, obj, cells = NULL, residtype = "log2ratio", plotresults = FALSE, eps = 1, ratioeps = 0.1, subsetsize = 1e5) {

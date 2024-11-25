@@ -26,7 +26,7 @@ as output by \code{buildGeneModules}.}
 
 \item{residtype}{Either "log2ratio" or "diff"}
 
-\item{eps}{For log2ratio calculations, mean neighborhood expression will be thresholded below at this value.
+\item{eps}{For log2ratio calculations, this value is added to mean neighborhood expression levels.
 This is an important parameter: low eps will have higher sensitivity and poorer
 specificity for detecting perturbations in low expressers.
 The default of 1 is a somewhat conservative choice.}

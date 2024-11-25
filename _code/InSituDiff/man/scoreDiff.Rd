@@ -12,6 +12,8 @@ scoreDiff(env, controlenv, residtype, eps = 1)
 \item{controlenv}{Environment matrix of best-matching controls}
 
 \item{residtype}{Either "log2ratio" or "diff"}
+
+\item{eps}{Value added to expression matrices for log2ratio differences}
 }
 \value{
 A matrix of changes from nearest controls, in the same dimension as x

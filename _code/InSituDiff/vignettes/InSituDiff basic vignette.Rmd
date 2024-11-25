@@ -85,7 +85,15 @@ Below we'll show three useful analyses of perturbations we can perform.
 But first, at any time you like, you can easily compute a matrix of perturbation scores
  for any cells and genes you like. 
 To get perturbations for all cells and genes, just enter ```cells = NULL, genes = NULL```.
+
 *Warning*: for larger datasets, attempting to compute this matrix for all cells and all genes risks overwhelming your R session's memory.
+
+*Note*: The \code{eps} parameter is important. It is added to expression values before taking log2ratios. 
+The upshot is that higher values stabilize calculations for low-expressing genes
+but also suppress the apparent perturbations in these genes. Lower \code{eps} values 
+confer better sensitivity to see perturbations in low expressers, but also lead to 
+noisier results. 
+
 
 ```{r getdata}
 selectedperturbations <- getPerturbations(
@@ -103,7 +111,7 @@ selectedperturbations[1:5,1:5]
 
 We summarize genes' degree of perturbation in two ways: how broadly perturbed they are, 
  and how intensely perturbed they are.
-We calculate "breadth" of perturbation by comparing a gene's medium perturbation score in disease vs. control. 
+We calculate "breadth" of perturbation by comparing a gene's median perturbation score in disease vs. control. 
 We calculate "intensity" of perturbation by comparing a gene's mean+2SD perturbation score in disease vs. control. 
 
 Plotting these scores against each other gives a good sense of how genes are perturbed:
@@ -176,7 +184,7 @@ moduleperturbations <- getPerturbations(
   x = minisle$norm, 
   obj = obj, 
   cells = NULL, # only look at one tissue
-  genes = modules[1:2], # arbitrarily plotting the first and third modules
+  genes = modules[1:2], # arbitrarily plotting the first and second modules
   residtype = "log2ratio",  # look at perturbations on the scale of log fold-changes
   eps = 0.2)
 

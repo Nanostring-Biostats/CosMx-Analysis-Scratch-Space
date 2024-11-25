@@ -27,7 +27,7 @@ All control cells will be included regardless. Default of NULL includes all cell
 
 \item{plotresults}{Logical, for whether to make a summary plot of the results}
 
-\item{eps}{For log2ratio calculations, mean neighborhood expression will be thresholded below at this value}
+\item{eps}{For log2ratio calculations, this value is added to mean neighborhood expression levels.}
 
 \item{ratioeps}{Added to means and means+2sds when calculating ratios between disease and controls.}
 
