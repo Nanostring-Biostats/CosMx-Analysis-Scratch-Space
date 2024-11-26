@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Claire Williams" />
+
+<meta name="date" content="2024-11-26" />
+
+<title>InSituTree hierarchical cell typing</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">InSituTree hierarchical cell typing</h1>
+<h4 class="author">Claire Williams</h4>
+<h4 class="date">2024-11-26</h4>
+
+
+
+<div id="overview" class="section level2">
+<h2>Overview</h2>
+<p>The InSituTree package is a small package that builds on InSituType
+and provides a specialized application for its use. With this approach,
+you can perform supervised cell typing in a hierarchical manner – first
+making broad cell type assignments and then making progressively finer
+classifications.</p>
+</div>
+<div id="installation" class="section level2">
+<h2>Installation</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># Download the package and install from file</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>devtools<span class="sc">::</span><span class="fu">install</span>(<span class="st">&quot;/path/to/package/InSituTree.zip&quot;</span>)</span></code></pre></div>
+</div>
+<div id="data-prepataion" class="section level2">
+<h2>Data prepataion</h2>
+<p>Load the package as well as example data. For the example data, we
+use a small CosMx SMI dataset of non small cell lung cancer (nsclc) that
+is included with the InSituType package.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(InSituType)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">library</span>(InSituTree)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># Basic dataset</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;mini_nsclc&quot;</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">str</span>(mini_nsclc)</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; List of 5</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&gt;  $ counts: num [1:2198, 1:960] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:960] &quot;AATK&quot; &quot;ABL1&quot; &quot;ABL2&quot; &quot;ACE&quot; ...</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co">#&gt;  $ neg   : num [1:2198, 1:20] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:20] &quot;NegPrb3&quot; &quot;NegPrb6&quot; &quot;NegPrb15&quot; &quot;NegPrb18&quot; ...</span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co">#&gt;  $ x     : num [1:2198] 7.34 7.4 7.42 7.46 7.53 ...</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co">#&gt;  $ y     : num [1:2198] -6.5 -6.5 -6.5 -6.5 -6.5 ...</span></span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="co">#&gt;  $ umap  : num [1:2198, 1:2] 1.489 -0.774 -1.915 1.927 1.135 ...</span></span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : NULL</span></span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a></span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="co"># Cell type reference profile</span></span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;ioprofiles&quot;</span>)</span></code></pre></div>
+</div>
+<div id="necessary-inputs" class="section level2">
+<h2>Necessary inputs</h2>
+<p>Here we show the format of each of the necessary inputs to run
+InSituTree. Many of these mirror inputs for InSituType, and more
+information can be found in that package.</p>
+<ol style="list-style-type: decimal">
+<li>A sparse matrix of counts data, cells x genes</li>
+</ol>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>counts <span class="ot">&lt;-</span> mini_nsclc<span class="sc">$</span>counts</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>counts <span class="ot">&lt;-</span> <span class="fu">as</span>(counts, <span class="st">&quot;CsparseMatrix&quot;</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">str</span>(counts)</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt; Formal class &#39;dgCMatrix&#39; [package &quot;Matrix&quot;] with 6 slots</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt;   ..@ i       : int [1:187015] 99 360 842 1506 1568 1609 1679 1791 1816 1827 ...</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt;   ..@ p       : int [1:961] 0 21 74 189 262 313 439 507 579 722 ...</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt;   ..@ Dim     : int [1:2] 2198 960</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt;   ..@ Dimnames:List of 2</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:960] &quot;AATK&quot; &quot;ABL1&quot; &quot;ABL2&quot; &quot;ACE&quot; ...</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&gt;   ..@ x       : num [1:187015] 1 1 1 1 1 1 1 1 1 1 ...</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt;   ..@ factors : list()</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>counts[<span class="dv">5</span><span class="sc">:</span><span class="dv">10</span>,<span class="dv">10</span><span class="sc">:</span><span class="dv">15</span>]</span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt; 6 x 6 sparse Matrix of class &quot;dgCMatrix&quot;</span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="co">#&gt;           ACTG2 ACVR1 ACVR1B ACVR2A ACVRL1 ADGRA2</span></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co">#&gt; c_3_18_6      .     .      .      .      .      .</span></span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#&gt; c_3_18_7      .     .      .      .      .      .</span></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt; c_3_18_10     .     .      .      .      .      .</span></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="co">#&gt; c_3_18_11     .     .      .      .      .      .</span></span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="co">#&gt; c_3_18_12     .     .      1      .      1      .</span></span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="co">#&gt; c_3_18_19     .     .      .      .      .      .</span></span></code></pre></div>
+<ol start="2" style="list-style-type: decimal">
+<li>A vector giving each cell’s mean negative control value:</li>
+</ol>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>negmean <span class="ot">&lt;-</span> Matrix<span class="sc">::</span><span class="fu">rowMeans</span>(mini_nsclc<span class="sc">$</span>neg)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">head</span>(negmean)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; c_3_18_2 c_3_18_3 c_3_18_4 c_3_18_5 c_3_18_6 c_3_18_7 </span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt;     0.00     0.00     0.00     0.05     0.00     0.00</span></span></code></pre></div>
+<ol start="3" style="list-style-type: decimal">
+<li>Reference profile including mean expression per gene for all cell
+subtypes. Major cell types are not needed. The reference matrix must be
+linear-scale, not log-scale. Genes (rows) do not need to be aligned to
+the counts matrix.</li>
+</ol>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">str</span>(ioprofiles)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">#&gt;  num [1:27161, 1:16] 2.10e+01 4.59e-04 2.13e-02 4.59e-04 4.15e-03 ...</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt;  - attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt;   ..$ : chr [1:27161] &quot;FAM138A&quot; &quot;OR4F5&quot; &quot;RNU6-1100P&quot; &quot;AC114498.1&quot; ...</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#&gt;   ..$ : chr [1:16] &quot;B-cell&quot; &quot;endothelial&quot; &quot;fibroblast&quot; &quot;macrophage&quot; ...</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>ioprofiles[<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>,]</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt;                  B-cell endothelial fibroblast macrophage mast          mDC</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; FAM138A    2.096034e+01           0          0          0    0 1.390347e+01</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt; OR4F5      4.585635e-04           0          0          0    0 4.959941e-04</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; RNU6-1100P 2.131342e-02           0          0          0    0 3.364625e-02</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt; AC114498.1 4.585635e-04           0          0          0    0 4.959941e-04</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt; RNU6-1199P 4.145011e-03           0          0          0    0 4.959941e-04</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt;                monocyte   neutrophil           NK          pDC  plasmablast</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt; FAM138A    1.525272e+01  47.51214042 13.700490052 14.709188917 11.922652363</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt; OR4F5      5.048288e-04   0.00107558  0.000374971  0.000468242  0.001279865</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#&gt; RNU6-1100P 2.395197e+01 333.72730875  0.000374971  0.028842730  0.432247095</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#&gt; AC114498.1 5.048288e-04   0.00107558  0.000374971  0.000468242  0.001279865</span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co">#&gt; RNU6-1199P 5.048288e-04   0.00107558  0.000374971  0.007623073  0.001279865</span></span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co">#&gt;            T CD4 memory  T CD4 naive T CD8 memory  T CD8 naive         Treg</span></span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="co">#&gt; FAM138A    1.494321e+01 1.122716e+01 5.3871876931 0.9259157510 1.354705e+01</span></span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="co">#&gt; OR4F5      4.071673e-04 4.089748e-04 0.0004038248 0.0004066689 3.847774e-04</span></span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="co">#&gt; RNU6-1100P 4.514122e-02 3.990783e-03 0.0203505401 0.0031968972 1.260998e-01</span></span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="co">#&gt; AC114498.1 6.060066e-04 4.089748e-04 0.0019765979 0.0004066689 3.847774e-04</span></span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="co">#&gt; RNU6-1199P 1.520570e-03 4.089748e-04 0.0010411853 0.0004066689 1.938572e-02</span></span></code></pre></div>
+<ol start="4" style="list-style-type: decimal">
+<li>A nested list of the <strong>c</strong>ell <strong>t</strong>yping
+<strong>h</strong>ierarchy. Here we set up one that groups the immune
+cells into multiple subclusters.</li>
+</ol>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>celltype_hierarchy_list <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="st">&quot;structural&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    <span class="st">&quot;endothelial&quot;</span>, </span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    <span class="st">&quot;fibroblast&quot;</span>),</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="st">&quot;myeloid&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    <span class="st">&quot;macrophage&quot;</span>, </span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    <span class="st">&quot;mast&quot;</span>, </span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>    <span class="st">&quot;mDC&quot;</span>, </span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>    <span class="st">&quot;monocyte&quot;</span>, </span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>    <span class="st">&quot;neutrophil&quot;</span>),</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>  <span class="st">&quot;lymphoid&quot;</span> <span class="ot">=</span> <span class="fu">list</span>(</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>    <span class="st">&quot;B-lymphoid&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(</span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>      <span class="st">&quot;B-cell&quot;</span>, </span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>      <span class="st">&quot;pDC&quot;</span>,</span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>      <span class="st">&quot;plasmablast&quot;</span>),</span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a>    <span class="st">&quot;T-lymphoid&quot;</span> <span class="ot">=</span> <span class="fu">list</span>(</span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>      <span class="st">&quot;T4&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(</span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>        <span class="st">&quot;T CD4 memory&quot;</span>, </span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a>        <span class="st">&quot;T CD4 naive&quot;</span>, </span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a>        <span class="st">&quot;Treg&quot;</span>),</span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a>      <span class="st">&quot;T8&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(</span>
+<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a>        <span class="st">&quot;T CD8 memory&quot;</span>, </span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>        <span class="st">&quot;T CD8 naive&quot;</span>),</span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>      <span class="st">&quot;NK&quot;</span>)</span>
+<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a>    )</span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a>)</span></code></pre></div>
+<ol start="5" style="list-style-type: decimal">
+<li>A character name for the new annotations. This will be appended with
+the annotation depth in the final summary annotation.</li>
+</ol>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>annotation_names <span class="ot">&lt;-</span> <span class="st">&quot;nestedAnnotation&quot;</span></span></code></pre></div>
+</div>
+<div id="optional-inputs" class="section level2">
+<h2>Optional inputs</h2>
+<p>The remaining inputs to InSituTree are optional, with some having
+default values.</p>
+<ol start="6" style="list-style-type: decimal">
+<li>A vector of cohorts provides a grouping of cells based on
+alternative data types, such as immunofluorescent staining, cell shape
+metrics, tissue structures, etc. In this small example we will not use
+cohorts, but it is generally recommended. The random vector below is
+provided to give an example of the expected structure. See the
+InSituType package for more information about how to generate
+cohorts.</li>
+</ol>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># These will not be used in this vignette and should not be random. This is an example to show the structure.</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2024</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>example_cohorts <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, <span class="at">size =</span> <span class="fu">ncol</span>(counts), <span class="at">replace =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<ol start="7" style="list-style-type: decimal">
+<li>A character vector of genes to exclude from the cell typing. Often
+these will be highly and broadly expressed genes in the CosMx dataset
+that we don’t want to influence the cell typing. Defaults to NULL.</li>
+</ol>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>genes_to_exclude <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;MALAT1&quot;</span>)</span></code></pre></div>
+<ol start="8" style="list-style-type: decimal">
+<li>A numeric value between 0 and 1 that indicates the quantile of
+absolute difference for a given gene between the cell type with the
+highest expression and that with the lowest expression for a gene to be
+included in cell typing. Only genes in the quantile above this level and
+above the next quantile level will be considered. Defaults to 0.5.</li>
+</ol>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>quantile_abs_difference <span class="ot">&lt;-</span> <span class="fl">0.5</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co"># For reference, the absolute differences in expression for a set of five genes across the whole ioprofile are:</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>diffs <span class="ot">&lt;-</span> <span class="fu">sapply</span>(<span class="fu">c</span>(<span class="st">&quot;CD3D&quot;</span>, <span class="st">&quot;CD3E&quot;</span>, <span class="st">&quot;JCHAIN&quot;</span>, <span class="st">&quot;KRT18&quot;</span>, <span class="st">&quot;VIM&quot;</span>, <span class="st">&quot;MALAT1&quot;</span>), <span class="cf">function</span>(gene){</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    <span class="fu">diff</span>(<span class="fu">range</span>(ioprofiles[gene, ]))</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  } )</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>diffs</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="co">#&gt;        CD3D        CD3E      JCHAIN       KRT18         VIM      MALAT1 </span></span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="co">#&gt;   1243.0416   2353.2094 301705.8527    108.1911  18024.1937  59850.4078</span></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a></span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="co"># The 50% quantile is:</span></span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="fu">quantile</span>(diffs, <span class="fl">0.5</span>)</span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="co">#&gt;     50% </span></span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a><span class="co">#&gt; 10188.7</span></span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a><span class="co"># Genes from the first five passing this filter if only five were considered:</span></span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a><span class="fu">names</span>(diffs)[diffs <span class="sc">&gt;</span> <span class="fu">quantile</span>(diffs, quantile_abs_difference, <span class="at">na.rm =</span> T)]</span>
+<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a><span class="co">#&gt; [1] &quot;JCHAIN&quot; &quot;VIM&quot;    &quot;MALAT1&quot;</span></span></code></pre></div>
+<ol start="9" style="list-style-type: decimal">
+<li>A numeric value between 0 and 1 that indicates the quantile of
+percentage difference for a given gene between the cell type with the
+highest expression and that with the lowest expression for a gene to be
+included in cell typing. Only genes in the quantile above this level and
+above the previous quantile level will be considered. Defaults to
+0.5.</li>
+</ol>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>quantile_perc_difference <span class="ot">&lt;-</span> <span class="fl">0.5</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co"># For reference, the percent differences in expression for a set of five genes across the whole ioprofile are:</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>percs <span class="ot">&lt;-</span> <span class="fu">sapply</span>(<span class="fu">c</span>(<span class="st">&quot;CD3E&quot;</span>, <span class="st">&quot;JCHAIN&quot;</span>, <span class="st">&quot;KRT18&quot;</span>, <span class="st">&quot;VIM&quot;</span>, <span class="st">&quot;MALAT1&quot;</span>), <span class="cf">function</span>(gene){</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    <span class="fu">diff</span>(<span class="fu">range</span>(ioprofiles[gene, ])) <span class="sc">/</span> <span class="fu">max</span>(ioprofiles[gene,])</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  } )</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>percs</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="co">#&gt;      CD3E    JCHAIN     KRT18       VIM    MALAT1 </span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="co">#&gt; 0.9998957 0.9999837 0.9924013 0.9540667 0.8778193</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="co"># The 50% quantile is:</span></span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a><span class="fu">quantile</span>(percs, <span class="fl">0.5</span>)</span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="co">#&gt;       50% </span></span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="co">#&gt; 0.9924013</span></span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a></span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a><span class="co"># Genes from the first five passing this filter if only five were considered:</span></span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a><span class="fu">names</span>(percs)[percs <span class="sc">&gt;</span> <span class="fu">quantile</span>(percs, quantile_perc_difference, <span class="at">na.rm =</span> T)]</span>
+<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a><span class="co">#&gt; [1] &quot;CD3E&quot;   &quot;JCHAIN&quot;</span></span></code></pre></div>
+<p>The only gene passing both of the above filters is JCHAIN, and so in
+this small example where we’re considering all cell types together and
+only five genes, only this gene would be considered as having high
+differentiating power. Note that when fewer cell types are considered
+after merging subtypes we expect to see more variability in the diffs
+and percs.</p>
+<ol start="10" style="list-style-type: decimal">
+<li>A logical value indicating whether to return the final summary
+annotation. This data frame shows the annotation that has been made for
+each cell at each level of the annotation tree. Recommendation is to
+keep this at its default value of TRUE.</li>
+</ol>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>return_summary_df <span class="ot">&lt;-</span> <span class="cn">TRUE</span></span></code></pre></div>
+</div>
+<div id="tree-style-cell-typing" class="section level2">
+<h2>Tree-style cell typing</h2>
+<p>First, we can print a simple structured list to visualize the cell
+type hierarchy we’ve laid out with our cell type hierarchy list.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">printTree</span>(celltype_hierarchy_list)</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="co">#&gt;  structural </span></span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="co">#&gt;    endothelial </span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt;    fibroblast </span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="co">#&gt;  myeloid </span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt;    macrophage </span></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co">#&gt;    mast </span></span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a><span class="co">#&gt;    mDC </span></span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a><span class="co">#&gt;    monocyte </span></span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a><span class="co">#&gt;    neutrophil </span></span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a><span class="co">#&gt;  lymphoid </span></span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a><span class="co">#&gt;    B-lymphoid </span></span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a><span class="co">#&gt;      B-cell </span></span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a><span class="co">#&gt;      pDC </span></span>
+<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a><span class="co">#&gt;      plasmablast </span></span>
+<span id="cb13-16"><a href="#cb13-16" tabindex="-1"></a><span class="co">#&gt;    T-lymphoid </span></span>
+<span id="cb13-17"><a href="#cb13-17" tabindex="-1"></a><span class="co">#&gt;      T4 </span></span>
+<span id="cb13-18"><a href="#cb13-18" tabindex="-1"></a><span class="co">#&gt;        T CD4 memory </span></span>
+<span id="cb13-19"><a href="#cb13-19" tabindex="-1"></a><span class="co">#&gt;        T CD4 naive </span></span>
+<span id="cb13-20"><a href="#cb13-20" tabindex="-1"></a><span class="co">#&gt;        Treg </span></span>
+<span id="cb13-21"><a href="#cb13-21" tabindex="-1"></a><span class="co">#&gt;      T8 </span></span>
+<span id="cb13-22"><a href="#cb13-22" tabindex="-1"></a><span class="co">#&gt;        T CD8 memory </span></span>
+<span id="cb13-23"><a href="#cb13-23" tabindex="-1"></a><span class="co">#&gt;        T CD8 naive </span></span>
+<span id="cb13-24"><a href="#cb13-24" tabindex="-1"></a><span class="co">#&gt;      NK</span></span></code></pre></div>
+<p>Once we’ve verified that this tree shows the hierarchy and cell type
+relationships that we’d expect, we can run supervised nested cell
+typing.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">runInSituTree</span>(<span class="at">x =</span> counts,</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>                          <span class="at">neg =</span> negmean,</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>                          <span class="at">full_profiles =</span> ioprofiles,</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>                          <span class="at">cth =</span> celltype_hierarchy_list,</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>                          <span class="at">name_for_new_annotation =</span> annotation_names,</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>                          <span class="at">cohort =</span> <span class="cn">NULL</span>,</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>                          <span class="at">excluded_genes =</span> genes_to_exclude,</span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>                          <span class="at">quantile_absolute_expression_difference_param =</span> quantile_abs_difference,</span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>                          <span class="at">quantile_percent_expression_difference_param =</span> quantile_perc_difference,</span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>                          <span class="at">return_summary_annotation =</span> return_summary_df)</span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a><span class="co">#&gt; These are the selected 244 genes for subclustering:</span></span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a><span class="co">#&gt; c(&quot;ACKR1&quot;, &quot;ACTG2&quot;, &quot;ACVRL1&quot;, &quot;ADGRF5&quot;, &quot;ADGRG3&quot;, &quot;ADGRG5&quot;, &quot;ADGRL2&quot;, </span></span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a><span class="co">#&gt; &quot;ADGRL4&quot;, &quot;ANGPT2&quot;, &quot;APOD&quot;, &quot;ATF3&quot;, &quot;BAG3&quot;, &quot;BGN&quot;, &quot;BTK&quot;, &quot;C11orf96&quot;, </span></span>
+<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a><span class="co">#&gt; &quot;C1QA&quot;, &quot;C1QB&quot;, &quot;C1QC&quot;, &quot;CALD1&quot;, &quot;CAV1&quot;, &quot;CCL19&quot;, &quot;CCL2&quot;, &quot;CCL21&quot;, </span></span>
+<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a><span class="co">#&gt; &quot;CCND1&quot;, &quot;CCR2&quot;, &quot;CCR7&quot;, &quot;CD163&quot;, &quot;CD19&quot;, &quot;CD2&quot;, &quot;CD27&quot;, &quot;CD276&quot;, </span></span>
+<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a><span class="co">#&gt; &quot;CD300A&quot;, &quot;CD33&quot;, &quot;CD34&quot;, &quot;CD37&quot;, &quot;CD38&quot;, &quot;CD3D&quot;, &quot;CD3E&quot;, &quot;CD3G&quot;, </span></span>
+<span id="cb14-17"><a href="#cb14-17" tabindex="-1"></a><span class="co">#&gt; &quot;CD48&quot;, &quot;CD52&quot;, &quot;CD53&quot;, &quot;CD69&quot;, &quot;CD79A&quot;, &quot;CD84&quot;, &quot;CD86&quot;, &quot;CD8A&quot;, </span></span>
+<span id="cb14-18"><a href="#cb14-18" tabindex="-1"></a><span class="co">#&gt; &quot;CD8B&quot;, &quot;CD9&quot;, &quot;CDH11&quot;, &quot;CDH5&quot;, &quot;CHI3L1&quot;, &quot;CLEC10A&quot;, &quot;CLEC12A&quot;, </span></span>
+<span id="cb14-19"><a href="#cb14-19" tabindex="-1"></a><span class="co">#&gt; &quot;CLEC14A&quot;, &quot;CLEC4A&quot;, &quot;CLEC4E&quot;, &quot;CLEC7A&quot;, &quot;COL11A1&quot;, &quot;COL12A1&quot;, </span></span>
+<span id="cb14-20"><a href="#cb14-20" tabindex="-1"></a><span class="co">#&gt; &quot;COL15A1&quot;, &quot;COL1A1&quot;, &quot;COL1A2&quot;, &quot;COL3A1&quot;, &quot;COL4A1&quot;, &quot;COL4A2&quot;, </span></span>
+<span id="cb14-21"><a href="#cb14-21" tabindex="-1"></a><span class="co">#&gt; &quot;COL5A1&quot;, &quot;COL5A2&quot;, &quot;COL6A1&quot;, &quot;COL6A2&quot;, &quot;COL6A3&quot;, &quot;COL8A1&quot;, &quot;CPA3&quot;, </span></span>
+<span id="cb14-22"><a href="#cb14-22" tabindex="-1"></a><span class="co">#&gt; &quot;CRYAB&quot;, &quot;CSF1&quot;, &quot;CSF1R&quot;, &quot;CSF2RA&quot;, &quot;CSF3R&quot;, &quot;CST7&quot;, &quot;CTSG&quot;, </span></span>
+<span id="cb14-23"><a href="#cb14-23" tabindex="-1"></a><span class="co">#&gt; &quot;CTSW&quot;, &quot;CX3CL1&quot;, &quot;CX3CR1&quot;, &quot;CXCL1&quot;, &quot;CXCL12&quot;, &quot;CXCL14&quot;, &quot;CXCL2&quot;, </span></span>
+<span id="cb14-24"><a href="#cb14-24" tabindex="-1"></a><span class="co">#&gt; &quot;CXCL3&quot;, &quot;CXCL8&quot;, &quot;CXCL9&quot;, &quot;CXCR1&quot;, &quot;CXCR2&quot;, &quot;CXCR3&quot;, &quot;DCN&quot;, </span></span>
+<span id="cb14-25"><a href="#cb14-25" tabindex="-1"></a><span class="co">#&gt; &quot;DDR2&quot;, &quot;EFNA1&quot;, &quot;EFNB2&quot;, &quot;ENG&quot;, &quot;ESAM&quot;, &quot;FCER1G&quot;, &quot;FCGR3A&quot;, </span></span>
+<span id="cb14-26"><a href="#cb14-26" tabindex="-1"></a><span class="co">#&gt; &quot;FCRLA&quot;, &quot;FFAR2&quot;, &quot;FGR&quot;, &quot;FLT1&quot;, &quot;FN1&quot;, &quot;FPR1&quot;, &quot;FZD4&quot;, &quot;FZD6&quot;, </span></span>
+<span id="cb14-27"><a href="#cb14-27" tabindex="-1"></a><span class="co">#&gt; &quot;GNLY&quot;, &quot;GPNMB&quot;, &quot;GPR183&quot;, &quot;GPX3&quot;, &quot;GZMA&quot;, &quot;GZMB&quot;, &quot;GZMH&quot;, &quot;HAVCR2&quot;, </span></span>
+<span id="cb14-28"><a href="#cb14-28" tabindex="-1"></a><span class="co">#&gt; &quot;HBA1&quot;, &quot;HBB&quot;, &quot;HCAR2&quot;, &quot;HCAR3&quot;, &quot;HCK&quot;, &quot;HPGDS&quot;, &quot;HSPA1A&quot;, &quot;HSPA1B&quot;, </span></span>
+<span id="cb14-29"><a href="#cb14-29" tabindex="-1"></a><span class="co">#&gt; &quot;HSPB1&quot;, &quot;IDO1&quot;, &quot;IER3&quot;, &quot;IFI27&quot;, &quot;IFITM3&quot;, &quot;IGFBP3&quot;, &quot;IGFBP5&quot;, </span></span>
+<span id="cb14-30"><a href="#cb14-30" tabindex="-1"></a><span class="co">#&gt; &quot;IGFBP6&quot;, &quot;IGFBP7&quot;, &quot;IGHA1&quot;, &quot;IGHD&quot;, &quot;IGHG1&quot;, &quot;IGHG2&quot;, &quot;IGHM&quot;, </span></span>
+<span id="cb14-31"><a href="#cb14-31" tabindex="-1"></a><span class="co">#&gt; &quot;IGKC&quot;, &quot;IL10RA&quot;, &quot;IL1B&quot;, &quot;IL1R1&quot;, &quot;IL1R2&quot;, &quot;IL1RL1&quot;, &quot;IL1RN&quot;, </span></span>
+<span id="cb14-32"><a href="#cb14-32" tabindex="-1"></a><span class="co">#&gt; &quot;IL2RB&quot;, &quot;IL33&quot;, &quot;IL6&quot;, &quot;INHBA&quot;, &quot;ITGA6&quot;, &quot;ITGAL&quot;, &quot;ITGAX&quot;, &quot;ITGB2&quot;, </span></span>
+<span id="cb14-33"><a href="#cb14-33" tabindex="-1"></a><span class="co">#&gt; &quot;ITGB5&quot;, &quot;ITK&quot;, &quot;JAG1&quot;, &quot;JCHAIN&quot;, &quot;KDR&quot;, &quot;KIT&quot;, &quot;KLRK1&quot;, &quot;KRT23&quot;, </span></span>
+<span id="cb14-34"><a href="#cb14-34" tabindex="-1"></a><span class="co">#&gt; &quot;LAIR1&quot;, &quot;LIF&quot;, &quot;LIFR&quot;, &quot;LTB&quot;, &quot;LUM&quot;, &quot;LYZ&quot;, &quot;MARCO&quot;, &quot;MECOM&quot;, </span></span>
+<span id="cb14-35"><a href="#cb14-35" tabindex="-1"></a><span class="co">#&gt; &quot;MEG3&quot;, &quot;MGP&quot;, &quot;MMP1&quot;, &quot;MMP14&quot;, &quot;MMP19&quot;, &quot;MMP2&quot;, &quot;MMP9&quot;, &quot;MRC2&quot;, </span></span>
+<span id="cb14-36"><a href="#cb14-36" tabindex="-1"></a><span class="co">#&gt; &quot;MS4A1&quot;, &quot;MS4A4A&quot;, &quot;MT1X&quot;, &quot;MT2A&quot;, &quot;MXRA8&quot;, &quot;MYL9&quot;, &quot;MZB1&quot;, &quot;NKG7&quot;, </span></span>
+<span id="cb14-37"><a href="#cb14-37" tabindex="-1"></a><span class="co">#&gt; &quot;NLRP3&quot;, &quot;OSM&quot;, &quot;OSMR&quot;, &quot;P2RX5&quot;, &quot;PDGFRA&quot;, &quot;PDGFRB&quot;, &quot;PLAC8&quot;, </span></span>
+<span id="cb14-38"><a href="#cb14-38" tabindex="-1"></a><span class="co">#&gt; &quot;PRF1&quot;, &quot;PROK2&quot;, &quot;PTGS2&quot;, &quot;PTPRC&quot;, &quot;PTPRCAP&quot;, &quot;RAC2&quot;, &quot;RAMP2&quot;, </span></span>
+<span id="cb14-39"><a href="#cb14-39" tabindex="-1"></a><span class="co">#&gt; &quot;RAMP3&quot;, &quot;RARRES2&quot;, &quot;RGS5&quot;, &quot;RPS4Y1&quot;, &quot;S100A8&quot;, &quot;S100A9&quot;, &quot;SELL&quot;, </span></span>
+<span id="cb14-40"><a href="#cb14-40" tabindex="-1"></a><span class="co">#&gt; &quot;SELPLG&quot;, &quot;SERPINA1&quot;, &quot;SERPINH1&quot;, &quot;SNAI1&quot;, &quot;SNAI2&quot;, &quot;SPARCL1&quot;, </span></span>
+<span id="cb14-41"><a href="#cb14-41" tabindex="-1"></a><span class="co">#&gt; &quot;SPP1&quot;, &quot;SPRY4&quot;, &quot;STAT4&quot;, &quot;SYK&quot;, &quot;TAGLN&quot;, &quot;TCL1A&quot;, &quot;TEK&quot;, &quot;TGFB3&quot;, </span></span>
+<span id="cb14-42"><a href="#cb14-42" tabindex="-1"></a><span class="co">#&gt; &quot;THBS1&quot;, &quot;THBS2&quot;, &quot;TIE1&quot;, &quot;TIMP1&quot;, &quot;TLR2&quot;, &quot;TLR4&quot;, &quot;TLR8&quot;, &quot;TM4SF1&quot;, </span></span>
+<span id="cb14-43"><a href="#cb14-43" tabindex="-1"></a><span class="co">#&gt; &quot;TNF&quot;, &quot;TNFAIP6&quot;, &quot;TNFRSF13B&quot;, &quot;TNFRSF17&quot;, &quot;TPM1&quot;, &quot;TPM2&quot;, &quot;TPSAB1&quot;, </span></span>
+<span id="cb14-44"><a href="#cb14-44" tabindex="-1"></a><span class="co">#&gt; &quot;TPSB2&quot;, &quot;TXK&quot;, &quot;TYROBP&quot;, &quot;VCAM1&quot;, &quot;VCAN&quot;, &quot;VEGFA&quot;, &quot;VEGFC&quot;, </span></span>
+<span id="cb14-45"><a href="#cb14-45" tabindex="-1"></a><span class="co">#&gt; &quot;VWF&quot;)</span></span>
+<span id="cb14-46"><a href="#cb14-46" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
+<span id="cb14-47"><a href="#cb14-47" tabindex="-1"></a><span class="co">#&gt; There are fewer than 300 genes being used to subcluster cells into structural,</span></span>
+<span id="cb14-48"><a href="#cb14-48" tabindex="-1"></a><span class="co">#&gt; myeloid, lymphoid. These annotations may be unstable.</span></span>
+<span id="cb14-49"><a href="#cb14-49" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
+<span id="cb14-50"><a href="#cb14-50" tabindex="-1"></a><span class="co">#&gt; 2 cells have 0 counts in the subclustering gene panel.</span></span>
+<span id="cb14-51"><a href="#cb14-51" tabindex="-1"></a><span class="co">#&gt; structural</span></span>
+<span id="cb14-52"><a href="#cb14-52" tabindex="-1"></a><span class="co">#&gt; Annotating  structural cells...</span></span>
+<span id="cb14-53"><a href="#cb14-53" tabindex="-1"></a><span class="co">#&gt; These are the selected 257 genes for subclustering:</span></span>
+<span id="cb14-54"><a href="#cb14-54" tabindex="-1"></a><span class="co">#&gt; c(&quot;ACE&quot;, &quot;ACKR1&quot;, &quot;ACKR3&quot;, &quot;ACTA2&quot;, &quot;ACTG2&quot;, &quot;ACVRL1&quot;, &quot;ADGRA3&quot;, </span></span>
+<span id="cb14-55"><a href="#cb14-55" tabindex="-1"></a><span class="co">#&gt; &quot;ADGRD1&quot;, &quot;ADGRE2&quot;, &quot;ADGRF5&quot;, &quot;ADGRG1&quot;, &quot;ADGRG6&quot;, &quot;ADGRL2&quot;, &quot;ADGRL4&quot;, </span></span>
+<span id="cb14-56"><a href="#cb14-56" tabindex="-1"></a><span class="co">#&gt; &quot;ADIRF&quot;, &quot;ADORA2A&quot;, &quot;ANGPT1&quot;, &quot;ANGPT2&quot;, &quot;APOD&quot;, &quot;APP&quot;, &quot;AR&quot;, </span></span>
+<span id="cb14-57"><a href="#cb14-57" tabindex="-1"></a><span class="co">#&gt; &quot;ARHGDIB&quot;, &quot;AXL&quot;, &quot;BATF3&quot;, &quot;BGN&quot;, &quot;BMP5&quot;, &quot;BMP6&quot;, &quot;BMPR1A&quot;, &quot;BMPR2&quot;, </span></span>
+<span id="cb14-58"><a href="#cb14-58" tabindex="-1"></a><span class="co">#&gt; &quot;BMX&quot;, &quot;BST1&quot;, &quot;BST2&quot;, &quot;C11orf96&quot;, &quot;CALD1&quot;, &quot;CAV1&quot;, &quot;CCL11&quot;, </span></span>
+<span id="cb14-59"><a href="#cb14-59" tabindex="-1"></a><span class="co">#&gt; &quot;CCL19&quot;, &quot;CCL21&quot;, &quot;CCL26&quot;, &quot;CCRL2&quot;, &quot;CD14&quot;, &quot;CD274&quot;, &quot;CD34&quot;, </span></span>
+<span id="cb14-60"><a href="#cb14-60" tabindex="-1"></a><span class="co">#&gt; &quot;CD36&quot;, &quot;CD4&quot;, &quot;CD44&quot;, &quot;CD68&quot;, &quot;CD74&quot;, &quot;CDH11&quot;, &quot;CDH5&quot;, &quot;CEACAM1&quot;, </span></span>
+<span id="cb14-61"><a href="#cb14-61" tabindex="-1"></a><span class="co">#&gt; &quot;CFD&quot;, &quot;CFLAR&quot;, &quot;CHI3L1&quot;, &quot;CIITA&quot;, &quot;CLDN4&quot;, &quot;CLEC14A&quot;, &quot;CLEC1A&quot;, </span></span>
+<span id="cb14-62"><a href="#cb14-62" tabindex="-1"></a><span class="co">#&gt; &quot;CLEC2B&quot;, &quot;COL11A1&quot;, &quot;COL12A1&quot;, &quot;COL14A1&quot;, &quot;COL16A1&quot;, &quot;COL1A1&quot;, </span></span>
+<span id="cb14-63"><a href="#cb14-63" tabindex="-1"></a><span class="co">#&gt; &quot;COL1A2&quot;, &quot;COL27A1&quot;, &quot;COL3A1&quot;, &quot;COL5A1&quot;, &quot;COL5A2&quot;, &quot;COL5A3&quot;, </span></span>
+<span id="cb14-64"><a href="#cb14-64" tabindex="-1"></a><span class="co">#&gt; &quot;COL6A1&quot;, &quot;COL6A2&quot;, &quot;COL6A3&quot;, &quot;COL8A1&quot;, &quot;CRYAB&quot;, &quot;CSF2RB&quot;, &quot;CSF3&quot;, </span></span>
+<span id="cb14-65"><a href="#cb14-65" tabindex="-1"></a><span class="co">#&gt; &quot;CX3CL1&quot;, &quot;CXCL12&quot;, &quot;CXCL14&quot;, &quot;CXCL2&quot;, &quot;CXCR4&quot;, &quot;CYP1B1&quot;, &quot;DCN&quot;, </span></span>
+<span id="cb14-66"><a href="#cb14-66" tabindex="-1"></a><span class="co">#&gt; &quot;DDR2&quot;, &quot;DPP4&quot;, &quot;DUSP5&quot;, &quot;DUSP6&quot;, &quot;EFNA1&quot;, &quot;EFNB2&quot;, &quot;EGFR&quot;, &quot;ENG&quot;, </span></span>
+<span id="cb14-67"><a href="#cb14-67" tabindex="-1"></a><span class="co">#&gt; &quot;EPHA2&quot;, &quot;EPHA3&quot;, &quot;EPHA4&quot;, &quot;EPHB4&quot;, &quot;ERBB2&quot;, &quot;ESAM&quot;, &quot;ETS1&quot;, </span></span>
+<span id="cb14-68"><a href="#cb14-68" tabindex="-1"></a><span class="co">#&gt; &quot;FABP4&quot;, &quot;FABP5&quot;, &quot;FAS&quot;, &quot;FES&quot;, &quot;FGF1&quot;, &quot;FGF12&quot;, &quot;FGF7&quot;, &quot;FGFR2&quot;, </span></span>
+<span id="cb14-69"><a href="#cb14-69" tabindex="-1"></a><span class="co">#&gt; &quot;FGR&quot;, &quot;FLT1&quot;, &quot;FN1&quot;, &quot;FOXF1&quot;, &quot;FZD1&quot;, &quot;FZD4&quot;, &quot;FZD6&quot;, &quot;FZD7&quot;, </span></span>
+<span id="cb14-70"><a href="#cb14-70" tabindex="-1"></a><span class="co">#&gt; &quot;GPER1&quot;, &quot;GPNMB&quot;, &quot;GPX3&quot;, &quot;HGF&quot;, &quot;HLA-DPA1&quot;, &quot;HLA-DPB1&quot;, &quot;HLA-DQA1&quot;, </span></span>
+<span id="cb14-71"><a href="#cb14-71" tabindex="-1"></a><span class="co">#&gt; &quot;HLA-DQB1&quot;, &quot;HLA-DRA&quot;, &quot;HLA-DRB1&quot;, &quot;HLA-DRB5&quot;, &quot;HLA-E&quot;, &quot;ICAM2&quot;, </span></span>
+<span id="cb14-72"><a href="#cb14-72" tabindex="-1"></a><span class="co">#&gt; &quot;IDO1&quot;, &quot;IFI27&quot;, &quot;IGFBP5&quot;, &quot;IGFBP6&quot;, &quot;IGHA1&quot;, &quot;IGHD&quot;, &quot;IGHG1&quot;, </span></span>
+<span id="cb14-73"><a href="#cb14-73" tabindex="-1"></a><span class="co">#&gt; &quot;IGHG2&quot;, &quot;IGHM&quot;, &quot;IGKC&quot;, &quot;IL15&quot;, &quot;IL16&quot;, &quot;IL1RL1&quot;, &quot;IL2RG&quot;, &quot;IL33&quot;, </span></span>
+<span id="cb14-74"><a href="#cb14-74" tabindex="-1"></a><span class="co">#&gt; &quot;IL3RA&quot;, &quot;IL4R&quot;, &quot;INHBA&quot;, &quot;INHBB&quot;, &quot;INSR&quot;, &quot;ITGA5&quot;, &quot;ITGA6&quot;, </span></span>
+<span id="cb14-75"><a href="#cb14-75" tabindex="-1"></a><span class="co">#&gt; &quot;ITGA9&quot;, &quot;ITGB4&quot;, &quot;ITGB5&quot;, &quot;ITGB8&quot;, &quot;ITM2A&quot;, &quot;JCHAIN&quot;, &quot;KDR&quot;, </span></span>
+<span id="cb14-76"><a href="#cb14-76" tabindex="-1"></a><span class="co">#&gt; &quot;KIT&quot;, &quot;KLF2&quot;, &quot;KRT19&quot;, &quot;KRT7&quot;, &quot;LDLR&quot;, &quot;LGALS1&quot;, &quot;LGALS3BP&quot;, </span></span>
+<span id="cb14-77"><a href="#cb14-77" tabindex="-1"></a><span class="co">#&gt; &quot;LGALS9&quot;, &quot;LIFR&quot;, &quot;LTF&quot;, &quot;LUM&quot;, &quot;LYN&quot;, &quot;MECOM&quot;, &quot;MEG3&quot;, &quot;MET&quot;, </span></span>
+<span id="cb14-78"><a href="#cb14-78" tabindex="-1"></a><span class="co">#&gt; &quot;MMP1&quot;, &quot;MMP14&quot;, &quot;MMP19&quot;, &quot;MMP2&quot;, &quot;MMP3&quot;, &quot;MMP9&quot;, &quot;MRC2&quot;, &quot;MXRA8&quot;, </span></span>
+<span id="cb14-79"><a href="#cb14-79" tabindex="-1"></a><span class="co">#&gt; &quot;MYL9&quot;, &quot;MZB1&quot;, &quot;NOTCH1&quot;, &quot;NOTCH2&quot;, &quot;NOTCH3&quot;, &quot;NPR1&quot;, &quot;NPR3&quot;, </span></span>
+<span id="cb14-80"><a href="#cb14-80" tabindex="-1"></a><span class="co">#&gt; &quot;PDGFB&quot;, &quot;PDGFC&quot;, &quot;PDGFRA&quot;, &quot;PDGFRB&quot;, &quot;PLA2R1&quot;, &quot;PPARG&quot;, &quot;PTGDS&quot;, </span></span>
+<span id="cb14-81"><a href="#cb14-81" tabindex="-1"></a><span class="co">#&gt; &quot;PTGES&quot;, &quot;RAMP2&quot;, &quot;RAMP3&quot;, &quot;RARB&quot;, &quot;RARRES1&quot;, &quot;RARRES2&quot;, &quot;RGCC&quot;, </span></span>
+<span id="cb14-82"><a href="#cb14-82" tabindex="-1"></a><span class="co">#&gt; &quot;RGS1&quot;, &quot;RGS2&quot;, &quot;RGS5&quot;, &quot;ROR1&quot;, &quot;S100A4&quot;, &quot;SAA1&quot;, &quot;SCG5&quot;, &quot;SELL&quot;, </span></span>
+<span id="cb14-83"><a href="#cb14-83" tabindex="-1"></a><span class="co">#&gt; &quot;SERPINA3&quot;, &quot;SIGIRR&quot;, &quot;SMO&quot;, &quot;SNAI1&quot;, &quot;SNAI2&quot;, &quot;SOSTDC1&quot;, &quot;SOX9&quot;, </span></span>
+<span id="cb14-84"><a href="#cb14-84" tabindex="-1"></a><span class="co">#&gt; &quot;SPARCL1&quot;, &quot;SPOCK2&quot;, &quot;SPP1&quot;, &quot;SPRY4&quot;, &quot;SRC&quot;, &quot;SRGN&quot;, &quot;ST6GAL1&quot;, </span></span>
+<span id="cb14-85"><a href="#cb14-85" tabindex="-1"></a><span class="co">#&gt; &quot;ST6GALNAC3&quot;, &quot;TAGLN&quot;, &quot;TEK&quot;, &quot;TGFB3&quot;, &quot;TGFBR2&quot;, &quot;THBS2&quot;, &quot;TIE1&quot;, </span></span>
+<span id="cb14-86"><a href="#cb14-86" tabindex="-1"></a><span class="co">#&gt; &quot;TIMP1&quot;, &quot;TLR4&quot;, &quot;TM4SF1&quot;, &quot;TNFAIP6&quot;, &quot;TNFRSF10A&quot;, &quot;TNFRSF10D&quot;, </span></span>
+<span id="cb14-87"><a href="#cb14-87" tabindex="-1"></a><span class="co">#&gt; &quot;TNFRSF12A&quot;, &quot;TNFRSF19&quot;, &quot;TNFRSF1B&quot;, &quot;TNFRSF21&quot;, &quot;TNFRSF4&quot;, &quot;TNFSF10&quot;, </span></span>
+<span id="cb14-88"><a href="#cb14-88" tabindex="-1"></a><span class="co">#&gt; &quot;TNFSF13B&quot;, &quot;TNFSF4&quot;, &quot;TPM1&quot;, &quot;TPM2&quot;, &quot;TWIST1&quot;, &quot;TWIST2&quot;, &quot;VCAN&quot;, </span></span>
+<span id="cb14-89"><a href="#cb14-89" tabindex="-1"></a><span class="co">#&gt; &quot;VEGFA&quot;, &quot;VEGFB&quot;, &quot;VEGFC&quot;, &quot;VWF&quot;, &quot;WNT2&quot;, &quot;WNT5A&quot;, &quot;YES1&quot;, &quot;ZFP36&quot;</span></span>
+<span id="cb14-90"><a href="#cb14-90" tabindex="-1"></a><span class="co">#&gt; )</span></span>
+<span id="cb14-91"><a href="#cb14-91" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
+<span id="cb14-92"><a href="#cb14-92" tabindex="-1"></a><span class="co">#&gt; There are fewer than 300 genes being used to subcluster cells into endothelial,</span></span>
+<span id="cb14-93"><a href="#cb14-93" tabindex="-1"></a><span class="co">#&gt; fibroblast. These annotations may be unstable.</span></span>
+<span id="cb14-94"><a href="#cb14-94" tabindex="-1"></a><span class="co">#&gt; myeloid</span></span>
+<span id="cb14-95"><a href="#cb14-95" tabindex="-1"></a><span class="co">#&gt; Annotating  myeloid cells...</span></span>
+<span id="cb14-96"><a href="#cb14-96" tabindex="-1"></a><span class="co">#&gt; These are the selected 166 genes for subclustering:</span></span>
+<span id="cb14-97"><a href="#cb14-97" tabindex="-1"></a><span class="co">#&gt; c(&quot;ABL2&quot;, &quot;ACE&quot;, &quot;ACVRL1&quot;, &quot;ADGRG3&quot;, &quot;ADGRL1&quot;, &quot;ADORA2A&quot;, &quot;AHI1&quot;, </span></span>
+<span id="cb14-98"><a href="#cb14-98" tabindex="-1"></a><span class="co">#&gt; &quot;AHR&quot;, &quot;ANXA2&quot;, &quot;AQP3&quot;, &quot;AREG&quot;, &quot;ATF3&quot;, &quot;AXL&quot;, &quot;B3GNT7&quot;, &quot;BAG3&quot;, </span></span>
+<span id="cb14-99"><a href="#cb14-99" tabindex="-1"></a><span class="co">#&gt; &quot;BCL2&quot;, &quot;BMPR1A&quot;, &quot;C1QA&quot;, &quot;C1QB&quot;, &quot;C1QC&quot;, &quot;CCL13&quot;, &quot;CCL2&quot;, &quot;CCL20&quot;, </span></span>
+<span id="cb14-100"><a href="#cb14-100" tabindex="-1"></a><span class="co">#&gt; &quot;CCL8&quot;, &quot;CCR2&quot;, &quot;CCR5&quot;, &quot;CD14&quot;, &quot;CD2&quot;, &quot;CD209&quot;, &quot;CD274&quot;, &quot;CD276&quot;, </span></span>
+<span id="cb14-101"><a href="#cb14-101" tabindex="-1"></a><span class="co">#&gt; &quot;CD36&quot;, &quot;CD40&quot;, &quot;CD69&quot;, &quot;CD81&quot;, &quot;CD86&quot;, &quot;CD9&quot;, &quot;CDKN1A&quot;, &quot;CHI3L1&quot;, </span></span>
+<span id="cb14-102"><a href="#cb14-102" tabindex="-1"></a><span class="co">#&gt; &quot;CLEC10A&quot;, &quot;CLEC4E&quot;, &quot;CLEC7A&quot;, &quot;CLU&quot;, &quot;CMKLR1&quot;, &quot;COL6A1&quot;, &quot;CPA3&quot;, </span></span>
+<span id="cb14-103"><a href="#cb14-103" tabindex="-1"></a><span class="co">#&gt; &quot;CRIP1&quot;, &quot;CSF1&quot;, &quot;CSF1R&quot;, &quot;CSF2&quot;, &quot;CSF3R&quot;, &quot;CTSG&quot;, &quot;CX3CR1&quot;, </span></span>
+<span id="cb14-104"><a href="#cb14-104" tabindex="-1"></a><span class="co">#&gt; &quot;CXCL1&quot;, &quot;CXCL10&quot;, &quot;CXCL2&quot;, &quot;CXCL3&quot;, &quot;CXCL5&quot;, &quot;CXCL9&quot;, &quot;CXCR1&quot;, </span></span>
+<span id="cb14-105"><a href="#cb14-105" tabindex="-1"></a><span class="co">#&gt; &quot;CXCR2&quot;, &quot;DPP4&quot;, &quot;DUSP4&quot;, &quot;EFNB2&quot;, &quot;ENG&quot;, &quot;FABP4&quot;, &quot;FASN&quot;, &quot;FCGR3A&quot;, </span></span>
+<span id="cb14-106"><a href="#cb14-106" tabindex="-1"></a><span class="co">#&gt; &quot;FN1&quot;, &quot;FPR1&quot;, &quot;FYN&quot;, &quot;FZD3&quot;, &quot;GPBAR1&quot;, &quot;GPNMB&quot;, &quot;GPR183&quot;, &quot;GSTP1&quot;, </span></span>
+<span id="cb14-107"><a href="#cb14-107" tabindex="-1"></a><span class="co">#&gt; &quot;HAVCR2&quot;, &quot;HBA1&quot;, &quot;HLA-DPA1&quot;, &quot;HLA-DPB1&quot;, &quot;HLA-DQA1&quot;, &quot;HLA-DQB1&quot;, </span></span>
+<span id="cb14-108"><a href="#cb14-108" tabindex="-1"></a><span class="co">#&gt; &quot;HLA-DRA&quot;, &quot;HLA-DRB1&quot;, &quot;HLA-DRB5&quot;, &quot;HPGDS&quot;, &quot;HSP90AB1&quot;, &quot;HSPA1B&quot;, </span></span>
+<span id="cb14-109"><a href="#cb14-109" tabindex="-1"></a><span class="co">#&gt; &quot;HSPB1&quot;, &quot;ICAM3&quot;, &quot;ICOSLG&quot;, &quot;IFI27&quot;, &quot;IGF1&quot;, &quot;IGKC&quot;, &quot;IL10RA&quot;, </span></span>
+<span id="cb14-110"><a href="#cb14-110" tabindex="-1"></a><span class="co">#&gt; &quot;IL17RB&quot;, &quot;IL18R1&quot;, &quot;IL1A&quot;, &quot;IL1RL1&quot;, &quot;IL27RA&quot;, &quot;IL2RA&quot;, &quot;IL6&quot;, </span></span>
+<span id="cb14-111"><a href="#cb14-111" tabindex="-1"></a><span class="co">#&gt; &quot;INHBA&quot;, &quot;ITGA9&quot;, &quot;ITGAV&quot;, &quot;ITGB5&quot;, &quot;ITM2A&quot;, &quot;JUN&quot;, &quot;KIT&quot;, &quot;KRT1&quot;, </span></span>
+<span id="cb14-112"><a href="#cb14-112" tabindex="-1"></a><span class="co">#&gt; &quot;KRT10&quot;, &quot;KRT23&quot;, &quot;LAIR1&quot;, &quot;LGALS1&quot;, &quot;LIF&quot;, &quot;LMNA&quot;, &quot;MAF&quot;, &quot;MARCO&quot;, </span></span>
+<span id="cb14-113"><a href="#cb14-113" tabindex="-1"></a><span class="co">#&gt; &quot;MEG3&quot;, &quot;MERTK&quot;, &quot;MMP14&quot;, &quot;MMP19&quot;, &quot;MMP9&quot;, &quot;MS4A4A&quot;, &quot;MT1X&quot;, </span></span>
+<span id="cb14-114"><a href="#cb14-114" tabindex="-1"></a><span class="co">#&gt; &quot;MYC&quot;, &quot;NRIP3&quot;, &quot;OLR1&quot;, &quot;PHLDA2&quot;, &quot;PPARG&quot;, &quot;PROK2&quot;, &quot;PTGDS&quot;, </span></span>
+<span id="cb14-115"><a href="#cb14-115" tabindex="-1"></a><span class="co">#&gt; &quot;PTGS1&quot;, &quot;RARRES1&quot;, &quot;RGCC&quot;, &quot;RGS1&quot;, &quot;RPL22&quot;, &quot;RPL32&quot;, &quot;RPL37&quot;, </span></span>
+<span id="cb14-116"><a href="#cb14-116" tabindex="-1"></a><span class="co">#&gt; &quot;RPS4Y1&quot;, &quot;RUNX3&quot;, &quot;S100A10&quot;, &quot;S100A8&quot;, &quot;S100A9&quot;, &quot;S100P&quot;, &quot;SELL&quot;, </span></span>
+<span id="cb14-117"><a href="#cb14-117" tabindex="-1"></a><span class="co">#&gt; &quot;SERPINH1&quot;, &quot;SNAI1&quot;, &quot;SOX4&quot;, &quot;SPP1&quot;, &quot;STMN1&quot;, &quot;THBS1&quot;, &quot;TIE1&quot;, </span></span>
+<span id="cb14-118"><a href="#cb14-118" tabindex="-1"></a><span class="co">#&gt; &quot;TLR1&quot;, &quot;TLR7&quot;, &quot;TNFRSF18&quot;, &quot;TNFRSF21&quot;, &quot;TNFSF15&quot;, &quot;TPSAB1&quot;, </span></span>
+<span id="cb14-119"><a href="#cb14-119" tabindex="-1"></a><span class="co">#&gt; &quot;TPSB2&quot;, &quot;TSC22D1&quot;, &quot;TYMS&quot;, &quot;VCAN&quot;, &quot;VEGFA&quot;, &quot;VEGFB&quot;, &quot;YES1&quot;)</span></span>
+<span id="cb14-120"><a href="#cb14-120" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
+<span id="cb14-121"><a href="#cb14-121" tabindex="-1"></a><span class="co">#&gt; There are fewer than 300 genes being used to subcluster cells into macrophage,</span></span>
+<span id="cb14-122"><a href="#cb14-122" tabindex="-1"></a><span class="co">#&gt; mast, mDC, monocyte, neutrophil. These annotations may be unstable.</span></span>
+<span id="cb14-123"><a href="#cb14-123" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
+<span id="cb14-124"><a href="#cb14-124" tabindex="-1"></a><span class="co">#&gt; 1 cells have 0 counts in the subclustering gene panel.</span></span>
+<span id="cb14-125"><a href="#cb14-125" tabindex="-1"></a><span class="co">#&gt; lymphoid</span></span>
+<span id="cb14-126"><a href="#cb14-126" tabindex="-1"></a><span class="co">#&gt; Annotating  lymphoid cells...</span></span>
+<span id="cb14-127"><a href="#cb14-127" tabindex="-1"></a><span class="co">#&gt; These are the selected 278 genes for subclustering:</span></span>
+<span id="cb14-128"><a href="#cb14-128" tabindex="-1"></a><span class="co">#&gt; c(&quot;ACKR3&quot;, &quot;ACTA2&quot;, &quot;ACVR2A&quot;, &quot;ADGRE5&quot;, &quot;ADGRG1&quot;, &quot;ADGRG3&quot;, &quot;ADGRV1&quot;, </span></span>
+<span id="cb14-129"><a href="#cb14-129" tabindex="-1"></a><span class="co">#&gt; &quot;ADORA2A&quot;, &quot;ALCAM&quot;, &quot;ANXA1&quot;, &quot;APP&quot;, &quot;ATG10&quot;, &quot;ATM&quot;, &quot;ATR&quot;, &quot;B3GNT7&quot;, </span></span>
+<span id="cb14-130"><a href="#cb14-130" tabindex="-1"></a><span class="co">#&gt; &quot;BAG3&quot;, &quot;BCL2&quot;, &quot;BST1&quot;, &quot;BTG1&quot;, &quot;BTK&quot;, &quot;CALM1&quot;, &quot;CALM3&quot;, &quot;CASP8&quot;, </span></span>
+<span id="cb14-131"><a href="#cb14-131" tabindex="-1"></a><span class="co">#&gt; &quot;CAV1&quot;, &quot;CCL28&quot;, &quot;CCR2&quot;, &quot;CCR7&quot;, &quot;CD14&quot;, &quot;CD19&quot;, &quot;CD2&quot;, &quot;CD274&quot;, </span></span>
+<span id="cb14-132"><a href="#cb14-132" tabindex="-1"></a><span class="co">#&gt; &quot;CD28&quot;, &quot;CD300A&quot;, &quot;CD36&quot;, &quot;CD3D&quot;, &quot;CD3E&quot;, &quot;CD3G&quot;, &quot;CD40&quot;, &quot;CD40LG&quot;, </span></span>
+<span id="cb14-133"><a href="#cb14-133" tabindex="-1"></a><span class="co">#&gt; &quot;CD44&quot;, &quot;CD58&quot;, &quot;CD63&quot;, &quot;CD68&quot;, &quot;CD69&quot;, &quot;CD74&quot;, &quot;CD79A&quot;, &quot;CD84&quot;, </span></span>
+<span id="cb14-134"><a href="#cb14-134" tabindex="-1"></a><span class="co">#&gt; &quot;CD86&quot;, &quot;CD8A&quot;, &quot;CD8B&quot;, &quot;CDKN1A&quot;, &quot;CIITA&quot;, &quot;CLEC2B&quot;, &quot;CLEC2D&quot;, </span></span>
+<span id="cb14-135"><a href="#cb14-135" tabindex="-1"></a><span class="co">#&gt; &quot;CLU&quot;, &quot;COL6A2&quot;, &quot;COL9A3&quot;, &quot;CSF2RB&quot;, &quot;CST7&quot;, &quot;CTLA4&quot;, &quot;CTSW&quot;, </span></span>
+<span id="cb14-136"><a href="#cb14-136" tabindex="-1"></a><span class="co">#&gt; &quot;CX3CR1&quot;, &quot;CXCL8&quot;, &quot;CXCR1&quot;, &quot;CXCR2&quot;, &quot;CXCR4&quot;, &quot;CXCR6&quot;, &quot;DCN&quot;, </span></span>
+<span id="cb14-137"><a href="#cb14-137" tabindex="-1"></a><span class="co">#&gt; &quot;DDIT3&quot;, &quot;DDX58&quot;, &quot;DNMT1&quot;, &quot;DNMT3A&quot;, &quot;DPP4&quot;, &quot;DUSP1&quot;, &quot;DUSP2&quot;, </span></span>
+<span id="cb14-138"><a href="#cb14-138" tabindex="-1"></a><span class="co">#&gt; &quot;EFNA1&quot;, &quot;EFNA5&quot;, &quot;ENG&quot;, &quot;ENTPD1&quot;, &quot;EOMES&quot;, &quot;EPHA2&quot;, &quot;EPHA4&quot;, </span></span>
+<span id="cb14-139"><a href="#cb14-139" tabindex="-1"></a><span class="co">#&gt; &quot;EPHB4&quot;, &quot;EPHB6&quot;, &quot;EPOR&quot;, &quot;ERBB2&quot;, &quot;ETS1&quot;, &quot;FAS&quot;, &quot;FASLG&quot;, &quot;FCGR3A&quot;, </span></span>
+<span id="cb14-140"><a href="#cb14-140" tabindex="-1"></a><span class="co">#&gt; &quot;FCRLA&quot;, &quot;FGFR1&quot;, &quot;FGR&quot;, &quot;FLT3LG&quot;, &quot;FN1&quot;, &quot;FOS&quot;, &quot;FOXP3&quot;, &quot;FYN&quot;, </span></span>
+<span id="cb14-141"><a href="#cb14-141" tabindex="-1"></a><span class="co">#&gt; &quot;G6PD&quot;, &quot;GAS6&quot;, &quot;GATA3&quot;, &quot;GNLY&quot;, &quot;GZMA&quot;, &quot;GZMH&quot;, &quot;GZMK&quot;, &quot;HAVCR2&quot;, </span></span>
+<span id="cb14-142"><a href="#cb14-142" tabindex="-1"></a><span class="co">#&gt; &quot;HBA1&quot;, &quot;HBB&quot;, &quot;HCK&quot;, &quot;HCST&quot;, &quot;HDAC1&quot;, &quot;HDAC11&quot;, &quot;HDAC4&quot;, &quot;HLA-C&quot;, </span></span>
+<span id="cb14-143"><a href="#cb14-143" tabindex="-1"></a><span class="co">#&gt; &quot;HLA-DQA1&quot;, &quot;HLA-DQB1&quot;, &quot;HLA-DRA&quot;, &quot;HLA-DRB5&quot;, &quot;HLA-E&quot;, &quot;HSPB1&quot;, </span></span>
+<span id="cb14-144"><a href="#cb14-144" tabindex="-1"></a><span class="co">#&gt; &quot;HTT&quot;, &quot;ICAM2&quot;, &quot;ICAM3&quot;, &quot;ICOS&quot;, &quot;IFITM1&quot;, &quot;IFITM3&quot;, &quot;IFNG&quot;, </span></span>
+<span id="cb14-145"><a href="#cb14-145" tabindex="-1"></a><span class="co">#&gt; &quot;IGF1&quot;, &quot;IGF1R&quot;, &quot;IGF2R&quot;, &quot;IGFBP7&quot;, &quot;IGHA1&quot;, &quot;IGHD&quot;, &quot;IGHG1&quot;, </span></span>
+<span id="cb14-146"><a href="#cb14-146" tabindex="-1"></a><span class="co">#&gt; &quot;IGHG2&quot;, &quot;IGHM&quot;, &quot;IGKC&quot;, &quot;IL10RA&quot;, &quot;IL11RA&quot;, &quot;IL12RB1&quot;, &quot;IL12RB2&quot;, </span></span>
+<span id="cb14-147"><a href="#cb14-147" tabindex="-1"></a><span class="co">#&gt; &quot;IL13RA1&quot;, &quot;IL17RA&quot;, &quot;IL17RB&quot;, &quot;IL1B&quot;, &quot;IL1RAP&quot;, &quot;IL23A&quot;, &quot;IL27RA&quot;, </span></span>
+<span id="cb14-148"><a href="#cb14-148" tabindex="-1"></a><span class="co">#&gt; &quot;IL2RA&quot;, &quot;IL2RB&quot;, &quot;IL2RG&quot;, &quot;IL32&quot;, &quot;IL3RA&quot;, &quot;IL6ST&quot;, &quot;IL7R&quot;, </span></span>
+<span id="cb14-149"><a href="#cb14-149" tabindex="-1"></a><span class="co">#&gt; &quot;IRF4&quot;, &quot;ITGA1&quot;, &quot;ITGA5&quot;, &quot;ITGA6&quot;, &quot;ITGAL&quot;, &quot;ITGAM&quot;, &quot;ITGAV&quot;, </span></span>
+<span id="cb14-150"><a href="#cb14-150" tabindex="-1"></a><span class="co">#&gt; &quot;ITGAX&quot;, &quot;ITGB1&quot;, &quot;ITGB2&quot;, &quot;ITK&quot;, &quot;ITM2A&quot;, &quot;JAK1&quot;, &quot;JCHAIN&quot;, </span></span>
+<span id="cb14-151"><a href="#cb14-151" tabindex="-1"></a><span class="co">#&gt; &quot;JUNB&quot;, &quot;KLF2&quot;, &quot;KLRB1&quot;, &quot;KLRK1&quot;, &quot;KRT5&quot;, &quot;LAG3&quot;, &quot;LAMP3&quot;, &quot;LGALS3BP&quot;, </span></span>
+<span id="cb14-152"><a href="#cb14-152" tabindex="-1"></a><span class="co">#&gt; &quot;LMNA&quot;, &quot;LY75&quot;, &quot;LYZ&quot;, &quot;MAF&quot;, &quot;MAML2&quot;, &quot;MAPK13&quot;, &quot;MAPK14&quot;, &quot;MS4A1&quot;, </span></span>
+<span id="cb14-153"><a href="#cb14-153" tabindex="-1"></a><span class="co">#&gt; &quot;MS4A4A&quot;, &quot;MT1X&quot;, &quot;MT2A&quot;, &quot;MXRA8&quot;, &quot;MYC&quot;, &quot;MZB1&quot;, &quot;NCR1&quot;, &quot;NEAT1&quot;, </span></span>
+<span id="cb14-154"><a href="#cb14-154" tabindex="-1"></a><span class="co">#&gt; &quot;NFKB1&quot;, &quot;NKG7&quot;, &quot;NLRC5&quot;, &quot;NLRP1&quot;, &quot;NOSIP&quot;, &quot;NOTCH1&quot;, &quot;NPR2&quot;, </span></span>
+<span id="cb14-155"><a href="#cb14-155" tabindex="-1"></a><span class="co">#&gt; &quot;NR1H3&quot;, &quot;OAS3&quot;, &quot;OASL&quot;, &quot;OSM&quot;, &quot;P2RX5&quot;, &quot;PDCD1&quot;, &quot;PDGFB&quot;, &quot;PDGFD&quot;, </span></span>
+<span id="cb14-156"><a href="#cb14-156" tabindex="-1"></a><span class="co">#&gt; &quot;PDGFRB&quot;, &quot;PNOC&quot;, &quot;PPARD&quot;, &quot;PRF1&quot;, &quot;PTPRC&quot;, &quot;RARG&quot;, &quot;RELA&quot;, &quot;RGCC&quot;, </span></span>
+<span id="cb14-157"><a href="#cb14-157" tabindex="-1"></a><span class="co">#&gt; &quot;RNF43&quot;, &quot;RORA&quot;, &quot;RPL32&quot;, &quot;RUNX3&quot;, &quot;RXRB&quot;, &quot;RYK&quot;, &quot;S100A4&quot;, &quot;S100A8&quot;, </span></span>
+<span id="cb14-158"><a href="#cb14-158" tabindex="-1"></a><span class="co">#&gt; &quot;S100A9&quot;, &quot;S100B&quot;, &quot;SERPINA1&quot;, &quot;SERPINH1&quot;, &quot;SIGIRR&quot;, &quot;SLC40A1&quot;, </span></span>
+<span id="cb14-159"><a href="#cb14-159" tabindex="-1"></a><span class="co">#&gt; &quot;SMAD2&quot;, &quot;SMAD4&quot;, &quot;SOD1&quot;, &quot;SPOCK2&quot;, &quot;SRC&quot;, &quot;SREBF1&quot;, &quot;STAT3&quot;, </span></span>
+<span id="cb14-160"><a href="#cb14-160" tabindex="-1"></a><span class="co">#&gt; &quot;STAT4&quot;, &quot;STAT5A&quot;, &quot;STAT5B&quot;, &quot;STAT6&quot;, &quot;SYK&quot;, &quot;TAP2&quot;, &quot;TBX21&quot;, </span></span>
+<span id="cb14-161"><a href="#cb14-161" tabindex="-1"></a><span class="co">#&gt; &quot;TCL1A&quot;, &quot;TGFB1&quot;, &quot;TGFBR1&quot;, &quot;TGFBR2&quot;, &quot;THBS1&quot;, &quot;TIGIT&quot;, &quot;TIMP1&quot;, </span></span>
+<span id="cb14-162"><a href="#cb14-162" tabindex="-1"></a><span class="co">#&gt; &quot;TLR3&quot;, &quot;TLR5&quot;, &quot;TLR7&quot;, &quot;TNFRSF10A&quot;, &quot;TNFRSF10B&quot;, &quot;TNFRSF10D&quot;, </span></span>
+<span id="cb14-163"><a href="#cb14-163" tabindex="-1"></a><span class="co">#&gt; &quot;TNFRSF13B&quot;, &quot;TNFRSF14&quot;, &quot;TNFRSF17&quot;, &quot;TNFRSF18&quot;, &quot;TNFRSF1A&quot;, </span></span>
+<span id="cb14-164"><a href="#cb14-164" tabindex="-1"></a><span class="co">#&gt; &quot;TNFRSF1B&quot;, &quot;TNFRSF21&quot;, &quot;TNFRSF4&quot;, &quot;TNFSF12&quot;, &quot;TNFSF14&quot;, &quot;TNFSF8&quot;, </span></span>
+<span id="cb14-165"><a href="#cb14-165" tabindex="-1"></a><span class="co">#&gt; &quot;TOX&quot;, &quot;TPM1&quot;, &quot;TPM2&quot;, &quot;TSHZ2&quot;, &quot;TXK&quot;, &quot;VCAN&quot;, &quot;VPREB3&quot;, &quot;WNT10B&quot;, </span></span>
+<span id="cb14-166"><a href="#cb14-166" tabindex="-1"></a><span class="co">#&gt; &quot;XCL2&quot;, &quot;YES1&quot;)</span></span>
+<span id="cb14-167"><a href="#cb14-167" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
+<span id="cb14-168"><a href="#cb14-168" tabindex="-1"></a><span class="co">#&gt; There are fewer than 300 genes being used to subcluster cells into B-lymphoid,</span></span>
+<span id="cb14-169"><a href="#cb14-169" tabindex="-1"></a><span class="co">#&gt; T-lymphoid. These annotations may be unstable.</span></span>
+<span id="cb14-170"><a href="#cb14-170" tabindex="-1"></a><span class="co">#&gt; B-lymphoid</span></span>
+<span id="cb14-171"><a href="#cb14-171" tabindex="-1"></a><span class="co">#&gt; Annotating  B-lymphoid cells...</span></span>
+<span id="cb14-172"><a href="#cb14-172" tabindex="-1"></a><span class="co">#&gt; These are the selected 235 genes for subclustering:</span></span>
+<span id="cb14-173"><a href="#cb14-173" tabindex="-1"></a><span class="co">#&gt; c(&quot;ADGRA3&quot;, &quot;ADGRE2&quot;, &quot;ADGRG5&quot;, &quot;ADORA2A&quot;, &quot;AHI1&quot;, &quot;ALCAM&quot;, &quot;ANGPTL1&quot;, </span></span>
+<span id="cb14-174"><a href="#cb14-174" tabindex="-1"></a><span class="co">#&gt; &quot;ANXA4&quot;, &quot;APP&quot;, &quot;AQP3&quot;, &quot;AREG&quot;, &quot;ARG1&quot;, &quot;AXL&quot;, &quot;B3GNT7&quot;, &quot;BCL2&quot;, </span></span>
+<span id="cb14-175"><a href="#cb14-175" tabindex="-1"></a><span class="co">#&gt; &quot;BEST1&quot;, &quot;BID&quot;, &quot;BST1&quot;, &quot;BTG1&quot;, &quot;CALM2&quot;, &quot;CAV1&quot;, &quot;CCL28&quot;, &quot;CCR1&quot;, </span></span>
+<span id="cb14-176"><a href="#cb14-176" tabindex="-1"></a><span class="co">#&gt; &quot;CCR2&quot;, &quot;CCR5&quot;, &quot;CCR7&quot;, &quot;CD14&quot;, &quot;CD164&quot;, &quot;CD19&quot;, &quot;CD2&quot;, &quot;CD27&quot;, </span></span>
+<span id="cb14-177"><a href="#cb14-177" tabindex="-1"></a><span class="co">#&gt; &quot;CD300A&quot;, &quot;CD33&quot;, &quot;CD36&quot;, &quot;CD37&quot;, &quot;CD3E&quot;, &quot;CD4&quot;, &quot;CD40&quot;, &quot;CD52&quot;, </span></span>
+<span id="cb14-178"><a href="#cb14-178" tabindex="-1"></a><span class="co">#&gt; &quot;CD68&quot;, &quot;CD69&quot;, &quot;CD74&quot;, &quot;CD79A&quot;, &quot;CD81&quot;, &quot;CD83&quot;, &quot;CD84&quot;, &quot;CDH1&quot;, </span></span>
+<span id="cb14-179"><a href="#cb14-179" tabindex="-1"></a><span class="co">#&gt; &quot;CEACAM1&quot;, &quot;CELSR1&quot;, &quot;CIITA&quot;, &quot;CLCF1&quot;, &quot;CLDN4&quot;, &quot;CLEC10A&quot;, &quot;CLEC12A&quot;, </span></span>
+<span id="cb14-180"><a href="#cb14-180" tabindex="-1"></a><span class="co">#&gt; &quot;CLEC4A&quot;, &quot;CLEC7A&quot;, &quot;CLU&quot;, &quot;CMKLR1&quot;, &quot;CSF1R&quot;, &quot;CSF2RA&quot;, &quot;CST7&quot;, </span></span>
+<span id="cb14-181"><a href="#cb14-181" tabindex="-1"></a><span class="co">#&gt; &quot;CTSW&quot;, &quot;CXCL16&quot;, &quot;CXCL2&quot;, &quot;CXCL8&quot;, &quot;CXCR2&quot;, &quot;CXCR3&quot;, &quot;CXCR4&quot;, </span></span>
+<span id="cb14-182"><a href="#cb14-182" tabindex="-1"></a><span class="co">#&gt; &quot;CXCR5&quot;, &quot;CYP1B1&quot;, &quot;CYSTM1&quot;, &quot;DDR1&quot;, &quot;DDX58&quot;, &quot;DPP4&quot;, &quot;DST&quot;, </span></span>
+<span id="cb14-183"><a href="#cb14-183" tabindex="-1"></a><span class="co">#&gt; &quot;DUSP1&quot;, &quot;DUSP2&quot;, &quot;DUSP5&quot;, &quot;ENG&quot;, &quot;EPHA2&quot;, &quot;EPHB4&quot;, &quot;EPHB6&quot;, </span></span>
+<span id="cb14-184"><a href="#cb14-184" tabindex="-1"></a><span class="co">#&gt; &quot;EPOR&quot;, &quot;ESAM&quot;, &quot;FCER1G&quot;, &quot;FCGR3A&quot;, &quot;FCRLA&quot;, &quot;FES&quot;, &quot;FGR&quot;, &quot;FN1&quot;, </span></span>
+<span id="cb14-185"><a href="#cb14-185" tabindex="-1"></a><span class="co">#&gt; &quot;FOS&quot;, &quot;FYN&quot;, &quot;FZD3&quot;, &quot;GAS6&quot;, &quot;GLUL&quot;, &quot;GNLY&quot;, &quot;GPBAR1&quot;, &quot;GPR183&quot;, </span></span>
+<span id="cb14-186"><a href="#cb14-186" tabindex="-1"></a><span class="co">#&gt; &quot;GPX1&quot;, &quot;GSN&quot;, &quot;GZMA&quot;, &quot;GZMB&quot;, &quot;HAVCR2&quot;, &quot;HBA1&quot;, &quot;HBB&quot;, &quot;HCK&quot;, </span></span>
+<span id="cb14-187"><a href="#cb14-187" tabindex="-1"></a><span class="co">#&gt; &quot;HLA-DPA1&quot;, &quot;HLA-DPB1&quot;, &quot;HLA-DQA1&quot;, &quot;HLA-DQB1&quot;, &quot;HLA-DRA&quot;, &quot;HLA-DRB1&quot;, </span></span>
+<span id="cb14-188"><a href="#cb14-188" tabindex="-1"></a><span class="co">#&gt; &quot;HLA-DRB5&quot;, &quot;HSPB1&quot;, &quot;ICAM1&quot;, &quot;ICOSLG&quot;, &quot;IFITM3&quot;, &quot;IFNGR1&quot;, &quot;IGF1&quot;, </span></span>
+<span id="cb14-189"><a href="#cb14-189" tabindex="-1"></a><span class="co">#&gt; &quot;IGF1R&quot;, &quot;IGF2R&quot;, &quot;IGFBP3&quot;, &quot;IGHA1&quot;, &quot;IGHD&quot;, &quot;IGHG1&quot;, &quot;IGHG2&quot;, </span></span>
+<span id="cb14-190"><a href="#cb14-190" tabindex="-1"></a><span class="co">#&gt; &quot;IGHM&quot;, &quot;IGKC&quot;, &quot;IL10RA&quot;, &quot;IL12A&quot;, &quot;IL13RA1&quot;, &quot;IL15&quot;, &quot;IL15RA&quot;, </span></span>
+<span id="cb14-191"><a href="#cb14-191" tabindex="-1"></a><span class="co">#&gt; &quot;IL18&quot;, &quot;IL18R1&quot;, &quot;IL1B&quot;, &quot;IL1RAP&quot;, &quot;IL1RN&quot;, &quot;IL24&quot;, &quot;IL2RA&quot;, </span></span>
+<span id="cb14-192"><a href="#cb14-192" tabindex="-1"></a><span class="co">#&gt; &quot;IL3RA&quot;, &quot;IL4R&quot;, &quot;IL6&quot;, &quot;IL7&quot;, &quot;ITGA5&quot;, &quot;ITGA6&quot;, &quot;ITGAM&quot;, &quot;ITGAX&quot;, </span></span>
+<span id="cb14-193"><a href="#cb14-193" tabindex="-1"></a><span class="co">#&gt; &quot;ITGB4&quot;, &quot;JUNB&quot;, &quot;KLF2&quot;, &quot;KLRK1&quot;, &quot;KRT5&quot;, &quot;LAIR1&quot;, &quot;LGALS3&quot;, </span></span>
+<span id="cb14-194"><a href="#cb14-194" tabindex="-1"></a><span class="co">#&gt; &quot;LGALS3BP&quot;, &quot;LGALS9&quot;, &quot;LPAR5&quot;, &quot;LTB&quot;, &quot;LTBR&quot;, &quot;MAML2&quot;, &quot;MAPK13&quot;, </span></span>
+<span id="cb14-195"><a href="#cb14-195" tabindex="-1"></a><span class="co">#&gt; &quot;MS4A1&quot;, &quot;MS4A4A&quot;, &quot;MYC&quot;, &quot;NANOG&quot;, &quot;NDRG1&quot;, &quot;NKG7&quot;, &quot;NLRC5&quot;, </span></span>
+<span id="cb14-196"><a href="#cb14-196" tabindex="-1"></a><span class="co">#&gt; &quot;NLRP1&quot;, &quot;NOTCH2&quot;, &quot;NR3C1&quot;, &quot;NRG4&quot;, &quot;P2RX5&quot;, &quot;PDGFC&quot;, &quot;PLAC8&quot;, </span></span>
+<span id="cb14-197"><a href="#cb14-197" tabindex="-1"></a><span class="co">#&gt; &quot;PPBP&quot;, &quot;PRF1&quot;, &quot;PSAP&quot;, &quot;PTGDS&quot;, &quot;PTGS1&quot;, &quot;PTGS2&quot;, &quot;PTK2&quot;, &quot;RELT&quot;, </span></span>
+<span id="cb14-198"><a href="#cb14-198" tabindex="-1"></a><span class="co">#&gt; &quot;RYK&quot;, &quot;S100A8&quot;, &quot;S100A9&quot;, &quot;SELL&quot;, &quot;SELPLG&quot;, &quot;SERPINA1&quot;, &quot;SERPINH1&quot;, </span></span>
+<span id="cb14-199"><a href="#cb14-199" tabindex="-1"></a><span class="co">#&gt; &quot;SIGIRR&quot;, &quot;SLC2A1&quot;, &quot;SLC40A1&quot;, &quot;SMAD3&quot;, &quot;SNAI1&quot;, &quot;SOX4&quot;, &quot;SPOCK2&quot;, </span></span>
+<span id="cb14-200"><a href="#cb14-200" tabindex="-1"></a><span class="co">#&gt; &quot;SRC&quot;, &quot;ST6GALNAC3&quot;, &quot;STAT4&quot;, &quot;STAT5A&quot;, &quot;STAT6&quot;, &quot;STMN1&quot;, &quot;TAGLN&quot;, </span></span>
+<span id="cb14-201"><a href="#cb14-201" tabindex="-1"></a><span class="co">#&gt; &quot;TCL1A&quot;, &quot;TGFB1&quot;, &quot;TGFBR1&quot;, &quot;TGFBR2&quot;, &quot;TIMP1&quot;, &quot;TLR2&quot;, &quot;TLR4&quot;, </span></span>
+<span id="cb14-202"><a href="#cb14-202" tabindex="-1"></a><span class="co">#&gt; &quot;TLR5&quot;, &quot;TLR7&quot;, &quot;TLR8&quot;, &quot;TNF&quot;, &quot;TNFRSF10A&quot;, &quot;TNFRSF10B&quot;, &quot;TNFRSF13B&quot;, </span></span>
+<span id="cb14-203"><a href="#cb14-203" tabindex="-1"></a><span class="co">#&gt; &quot;TNFRSF18&quot;, &quot;TNFRSF19&quot;, &quot;TNFRSF1A&quot;, &quot;TNFRSF21&quot;, &quot;TNFSF12&quot;, &quot;TNFSF13B&quot;, </span></span>
+<span id="cb14-204"><a href="#cb14-204" tabindex="-1"></a><span class="co">#&gt; &quot;TNFSF4&quot;, &quot;TNFSF8&quot;, &quot;TPM2&quot;, &quot;TSC22D1&quot;, &quot;TYROBP&quot;, &quot;UPK3A&quot;, &quot;VCAN&quot;, </span></span>
+<span id="cb14-205"><a href="#cb14-205" tabindex="-1"></a><span class="co">#&gt; &quot;VEGFB&quot;, &quot;VPREB3&quot;, &quot;YBX3&quot;)</span></span>
+<span id="cb14-206"><a href="#cb14-206" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
+<span id="cb14-207"><a href="#cb14-207" tabindex="-1"></a><span class="co">#&gt; There are fewer than 300 genes being used to subcluster cells into B-cell, pDC,</span></span>
+<span id="cb14-208"><a href="#cb14-208" tabindex="-1"></a><span class="co">#&gt; plasmablast. These annotations may be unstable.</span></span>
+<span id="cb14-209"><a href="#cb14-209" tabindex="-1"></a><span class="co">#&gt; T-lymphoid</span></span>
+<span id="cb14-210"><a href="#cb14-210" tabindex="-1"></a><span class="co">#&gt; Annotating  T-lymphoid cells...</span></span>
+<span id="cb14-211"><a href="#cb14-211" tabindex="-1"></a><span class="co">#&gt; These are the selected 238 genes for subclustering:</span></span>
+<span id="cb14-212"><a href="#cb14-212" tabindex="-1"></a><span class="co">#&gt; c(&quot;ACE&quot;, &quot;ACVR1&quot;, &quot;ADGRB2&quot;, &quot;ADGRE1&quot;, &quot;ADGRG1&quot;, &quot;ADGRG3&quot;, &quot;ADGRG5&quot;, </span></span>
+<span id="cb14-213"><a href="#cb14-213" tabindex="-1"></a><span class="co">#&gt; &quot;ADORA2A&quot;, &quot;AHR&quot;, &quot;ALCAM&quot;, &quot;ANXA4&quot;, &quot;APP&quot;, &quot;AQP3&quot;, &quot;AREG&quot;, &quot;B3GNT7&quot;, </span></span>
+<span id="cb14-214"><a href="#cb14-214" tabindex="-1"></a><span class="co">#&gt; &quot;BAG3&quot;, &quot;BCL2&quot;, &quot;BCL2L1&quot;, &quot;BTK&quot;, &quot;CCR1&quot;, &quot;CCR10&quot;, &quot;CCR2&quot;, &quot;CCR7&quot;, </span></span>
+<span id="cb14-215"><a href="#cb14-215" tabindex="-1"></a><span class="co">#&gt; &quot;CCRL2&quot;, &quot;CD27&quot;, &quot;CD28&quot;, &quot;CD300A&quot;, &quot;CD33&quot;, &quot;CD38&quot;, &quot;CD3D&quot;, &quot;CD3E&quot;, </span></span>
+<span id="cb14-216"><a href="#cb14-216" tabindex="-1"></a><span class="co">#&gt; &quot;CD3G&quot;, &quot;CD4&quot;, &quot;CD40LG&quot;, &quot;CD52&quot;, &quot;CD55&quot;, &quot;CD63&quot;, &quot;CD69&quot;, &quot;CD79A&quot;, </span></span>
+<span id="cb14-217"><a href="#cb14-217" tabindex="-1"></a><span class="co">#&gt; &quot;CD84&quot;, &quot;CD86&quot;, &quot;CD8A&quot;, &quot;CD8B&quot;, &quot;CD9&quot;, &quot;CEACAM1&quot;, &quot;CIITA&quot;, &quot;CLCF1&quot;, </span></span>
+<span id="cb14-218"><a href="#cb14-218" tabindex="-1"></a><span class="co">#&gt; &quot;CLEC12A&quot;, &quot;CLU&quot;, &quot;CMKLR1&quot;, &quot;COL18A1&quot;, &quot;COL6A2&quot;, &quot;COL6A3&quot;, &quot;COTL1&quot;, </span></span>
+<span id="cb14-219"><a href="#cb14-219" tabindex="-1"></a><span class="co">#&gt; &quot;CSF2RB&quot;, &quot;CSF3R&quot;, &quot;CST7&quot;, &quot;CTLA4&quot;, &quot;CTSW&quot;, &quot;CX3CR1&quot;, &quot;CXCL8&quot;, </span></span>
+<span id="cb14-220"><a href="#cb14-220" tabindex="-1"></a><span class="co">#&gt; &quot;CXCR1&quot;, &quot;CXCR2&quot;, &quot;CXCR4&quot;, &quot;CXCR5&quot;, &quot;DDR1&quot;, &quot;DLL1&quot;, &quot;DNMT3A&quot;, </span></span>
+<span id="cb14-221"><a href="#cb14-221" tabindex="-1"></a><span class="co">#&gt; &quot;DPP4&quot;, &quot;DST&quot;, &quot;DUSP4&quot;, &quot;DUSP6&quot;, &quot;EFNA1&quot;, &quot;EFNA5&quot;, &quot;EOMES&quot;, &quot;EPHB6&quot;, </span></span>
+<span id="cb14-222"><a href="#cb14-222" tabindex="-1"></a><span class="co">#&gt; &quot;ERBB2&quot;, &quot;ERBB3&quot;, &quot;FABP5&quot;, &quot;FASLG&quot;, &quot;FCER1G&quot;, &quot;FCGR3A&quot;, &quot;FES&quot;, </span></span>
+<span id="cb14-223"><a href="#cb14-223" tabindex="-1"></a><span class="co">#&gt; &quot;FGF9&quot;, &quot;FGR&quot;, &quot;FLT3LG&quot;, &quot;FOXP3&quot;, &quot;G6PD&quot;, &quot;GLUL&quot;, &quot;GNLY&quot;, &quot;GPR183&quot;, </span></span>
+<span id="cb14-224"><a href="#cb14-224" tabindex="-1"></a><span class="co">#&gt; &quot;GPX1&quot;, &quot;GPX3&quot;, &quot;GSN&quot;, &quot;GZMA&quot;, &quot;GZMB&quot;, &quot;GZMH&quot;, &quot;GZMK&quot;, &quot;HAVCR2&quot;, </span></span>
+<span id="cb14-225"><a href="#cb14-225" tabindex="-1"></a><span class="co">#&gt; &quot;HBA1&quot;, &quot;HBB&quot;, &quot;HCK&quot;, &quot;HCST&quot;, &quot;HLA-DPA1&quot;, &quot;HLA-DQB1&quot;, &quot;HLA-DRA&quot;, </span></span>
+<span id="cb14-226"><a href="#cb14-226" tabindex="-1"></a><span class="co">#&gt; &quot;HLA-DRB1&quot;, &quot;HSPB1&quot;, &quot;ICOS&quot;, &quot;IFNG&quot;, &quot;IFNGR2&quot;, &quot;IGF2R&quot;, &quot;IGFBP3&quot;, </span></span>
+<span id="cb14-227"><a href="#cb14-227" tabindex="-1"></a><span class="co">#&gt; &quot;IGFBP7&quot;, &quot;IGKC&quot;, &quot;IL11RA&quot;, &quot;IL12A&quot;, &quot;IL12RB2&quot;, &quot;IL17B&quot;, &quot;IL17RB&quot;, </span></span>
+<span id="cb14-228"><a href="#cb14-228" tabindex="-1"></a><span class="co">#&gt; &quot;IL18&quot;, &quot;IL18R1&quot;, &quot;IL1B&quot;, &quot;IL23A&quot;, &quot;IL24&quot;, &quot;IL2RA&quot;, &quot;IL2RB&quot;, </span></span>
+<span id="cb14-229"><a href="#cb14-229" tabindex="-1"></a><span class="co">#&gt; &quot;IL4R&quot;, &quot;IL6R&quot;, &quot;IL6ST&quot;, &quot;IL7&quot;, &quot;IL7R&quot;, &quot;ITGA3&quot;, &quot;ITGA6&quot;, &quot;ITGAL&quot;, </span></span>
+<span id="cb14-230"><a href="#cb14-230" tabindex="-1"></a><span class="co">#&gt; &quot;ITGAM&quot;, &quot;ITGAX&quot;, &quot;ITGB2&quot;, &quot;ITK&quot;, &quot;ITM2A&quot;, &quot;JCHAIN&quot;, &quot;JUNB&quot;, </span></span>
+<span id="cb14-231"><a href="#cb14-231" tabindex="-1"></a><span class="co">#&gt; &quot;KIT&quot;, &quot;KLF2&quot;, &quot;KLRB1&quot;, &quot;KLRK1&quot;, &quot;KRT18&quot;, &quot;KRT86&quot;, &quot;LAG3&quot;, &quot;LAMP3&quot;, </span></span>
+<span id="cb14-232"><a href="#cb14-232" tabindex="-1"></a><span class="co">#&gt; &quot;LDLR&quot;, &quot;LGALS3BP&quot;, &quot;LGALS9&quot;, &quot;LMNA&quot;, &quot;LPAR5&quot;, &quot;LTB&quot;, &quot;LTBR&quot;, </span></span>
+<span id="cb14-233"><a href="#cb14-233" tabindex="-1"></a><span class="co">#&gt; &quot;LYN&quot;, &quot;LYZ&quot;, &quot;MAF&quot;, &quot;MAML2&quot;, &quot;MS4A1&quot;, &quot;MXRA8&quot;, &quot;MYC&quot;, &quot;NCR1&quot;, </span></span>
+<span id="cb14-234"><a href="#cb14-234" tabindex="-1"></a><span class="co">#&gt; &quot;NFKB1&quot;, &quot;NKG7&quot;, &quot;NLRP2&quot;, &quot;NOSIP&quot;, &quot;NOTCH1&quot;, &quot;NPR2&quot;, &quot;NRG4&quot;, </span></span>
+<span id="cb14-235"><a href="#cb14-235" tabindex="-1"></a><span class="co">#&gt; &quot;NRIP3&quot;, &quot;OASL&quot;, &quot;P2RX5&quot;, &quot;PDCD1&quot;, &quot;PDGFB&quot;, &quot;PDGFD&quot;, &quot;PDGFRB&quot;, </span></span>
+<span id="cb14-236"><a href="#cb14-236" tabindex="-1"></a><span class="co">#&gt; &quot;PLAC8&quot;, &quot;PPBP&quot;, &quot;PRF1&quot;, &quot;PTGDR2&quot;, &quot;PTGDS&quot;, &quot;PTTG1&quot;, &quot;RAMP1&quot;, </span></span>
+<span id="cb14-237"><a href="#cb14-237" tabindex="-1"></a><span class="co">#&gt; &quot;RGCC&quot;, &quot;RGS1&quot;, &quot;RPL21&quot;, &quot;RPL22&quot;, &quot;RPL32&quot;, &quot;RPL34&quot;, &quot;RPL37&quot;, </span></span>
+<span id="cb14-238"><a href="#cb14-238" tabindex="-1"></a><span class="co">#&gt; &quot;RPS4Y1&quot;, &quot;RUNX3&quot;, &quot;RXRA&quot;, &quot;S100A9&quot;, &quot;S100B&quot;, &quot;SELL&quot;, &quot;SERPINA1&quot;, </span></span>
+<span id="cb14-239"><a href="#cb14-239" tabindex="-1"></a><span class="co">#&gt; &quot;SLC40A1&quot;, &quot;SOD1&quot;, &quot;SOD2&quot;, &quot;SREBF1&quot;, &quot;ST6GALNAC3&quot;, &quot;STAT4&quot;, &quot;SYK&quot;, </span></span>
+<span id="cb14-240"><a href="#cb14-240" tabindex="-1"></a><span class="co">#&gt; &quot;TBX21&quot;, &quot;TFEB&quot;, &quot;TGFB3&quot;, &quot;TGFBR1&quot;, &quot;THBS1&quot;, &quot;TIE1&quot;, &quot;TLR1&quot;, </span></span>
+<span id="cb14-241"><a href="#cb14-241" tabindex="-1"></a><span class="co">#&gt; &quot;TLR3&quot;, &quot;TLR5&quot;, &quot;TNFRSF10A&quot;, &quot;TNFRSF10B&quot;, &quot;TNFRSF10D&quot;, &quot;TNFRSF11A&quot;, </span></span>
+<span id="cb14-242"><a href="#cb14-242" tabindex="-1"></a><span class="co">#&gt; &quot;TNFRSF18&quot;, &quot;TNFRSF1B&quot;, &quot;TNFRSF4&quot;, &quot;TNFSF10&quot;, &quot;TNFSF13B&quot;, &quot;TNFSF14&quot;, </span></span>
+<span id="cb14-243"><a href="#cb14-243" tabindex="-1"></a><span class="co">#&gt; &quot;TNFSF8&quot;, &quot;TOP2A&quot;, &quot;TOX&quot;, &quot;TSHZ2&quot;, &quot;TYROBP&quot;, &quot;VIM&quot;, &quot;WNT7A&quot;, </span></span>
+<span id="cb14-244"><a href="#cb14-244" tabindex="-1"></a><span class="co">#&gt; &quot;XCL1&quot;, &quot;XCL2&quot;, &quot;YBX3&quot;, &quot;YES1&quot;, &quot;ZFP36&quot;)</span></span>
+<span id="cb14-245"><a href="#cb14-245" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
+<span id="cb14-246"><a href="#cb14-246" tabindex="-1"></a><span class="co">#&gt; There are fewer than 300 genes being used to subcluster cells into T4, T8, NK.</span></span>
+<span id="cb14-247"><a href="#cb14-247" tabindex="-1"></a><span class="co">#&gt; These annotations may be unstable.</span></span>
+<span id="cb14-248"><a href="#cb14-248" tabindex="-1"></a><span class="co">#&gt; T4</span></span>
+<span id="cb14-249"><a href="#cb14-249" tabindex="-1"></a><span class="co">#&gt; Annotating  T4 cells...</span></span>
+<span id="cb14-250"><a href="#cb14-250" tabindex="-1"></a><span class="co">#&gt; These are the selected 222 genes for subclustering:</span></span>
+<span id="cb14-251"><a href="#cb14-251" tabindex="-1"></a><span class="co">#&gt; c(&quot;ACE&quot;, &quot;ACTG2&quot;, &quot;ADGRA3&quot;, &quot;ADGRE1&quot;, &quot;ADGRE2&quot;, &quot;ADGRF3&quot;, &quot;ADGRG5&quot;, </span></span>
+<span id="cb14-252"><a href="#cb14-252" tabindex="-1"></a><span class="co">#&gt; &quot;AHR&quot;, &quot;ALCAM&quot;, &quot;ANXA1&quot;, &quot;ANXA2&quot;, &quot;ANXA4&quot;, &quot;APP&quot;, &quot;AREG&quot;, &quot;ARG1&quot;, </span></span>
+<span id="cb14-253"><a href="#cb14-253" tabindex="-1"></a><span class="co">#&gt; &quot;BAG3&quot;, &quot;BCL2L1&quot;, &quot;BIRC5&quot;, &quot;BTG1&quot;, &quot;CASP8&quot;, &quot;CCR10&quot;, &quot;CCR2&quot;, </span></span>
+<span id="cb14-254"><a href="#cb14-254" tabindex="-1"></a><span class="co">#&gt; &quot;CCR5&quot;, &quot;CCR7&quot;, &quot;CCRL2&quot;, &quot;CD27&quot;, &quot;CD274&quot;, &quot;CD300A&quot;, &quot;CD38&quot;, &quot;CD40&quot;, </span></span>
+<span id="cb14-255"><a href="#cb14-255" tabindex="-1"></a><span class="co">#&gt; &quot;CD40LG&quot;, &quot;CD55&quot;, &quot;CD58&quot;, &quot;CD63&quot;, &quot;CD70&quot;, &quot;CD74&quot;, &quot;CD79A&quot;, &quot;CD80&quot;, </span></span>
+<span id="cb14-256"><a href="#cb14-256" tabindex="-1"></a><span class="co">#&gt; &quot;CD84&quot;, &quot;CD9&quot;, &quot;CDKN1A&quot;, &quot;CDKN3&quot;, &quot;CEACAM1&quot;, &quot;CLCF1&quot;, &quot;CLU&quot;, </span></span>
+<span id="cb14-257"><a href="#cb14-257" tabindex="-1"></a><span class="co">#&gt; &quot;COL18A1&quot;, &quot;COL5A2&quot;, &quot;COL6A2&quot;, &quot;COL9A2&quot;, &quot;COTL1&quot;, &quot;CRIP1&quot;, &quot;CSF1&quot;, </span></span>
+<span id="cb14-258"><a href="#cb14-258" tabindex="-1"></a><span class="co">#&gt; &quot;CSF2RA&quot;, &quot;CSF2RB&quot;, &quot;CST7&quot;, &quot;CTLA4&quot;, &quot;CXCR3&quot;, &quot;CXCR6&quot;, &quot;DDR1&quot;, </span></span>
+<span id="cb14-259"><a href="#cb14-259" tabindex="-1"></a><span class="co">#&gt; &quot;DLL1&quot;, &quot;DNMT3A&quot;, &quot;DST&quot;, &quot;DUSP1&quot;, &quot;DUSP2&quot;, &quot;DUSP4&quot;, &quot;DUSP5&quot;, </span></span>
+<span id="cb14-260"><a href="#cb14-260" tabindex="-1"></a><span class="co">#&gt; &quot;DUSP6&quot;, &quot;EFNA1&quot;, &quot;ENG&quot;, &quot;ENTPD1&quot;, &quot;EOMES&quot;, &quot;EPHA4&quot;, &quot;EPHB6&quot;, </span></span>
+<span id="cb14-261"><a href="#cb14-261" tabindex="-1"></a><span class="co">#&gt; &quot;ESAM&quot;, &quot;EZR&quot;, &quot;FABP5&quot;, &quot;FAS&quot;, &quot;FASLG&quot;, &quot;FCER1G&quot;, &quot;FFAR2&quot;, &quot;FGR&quot;, </span></span>
+<span id="cb14-262"><a href="#cb14-262" tabindex="-1"></a><span class="co">#&gt; &quot;FLT1&quot;, &quot;FOS&quot;, &quot;FOXP3&quot;, &quot;GAS6&quot;, &quot;GATA3&quot;, &quot;GPX3&quot;, &quot;GZMA&quot;, &quot;GZMB&quot;, </span></span>
+<span id="cb14-263"><a href="#cb14-263" tabindex="-1"></a><span class="co">#&gt; &quot;GZMK&quot;, &quot;HAVCR2&quot;, &quot;HDAC11&quot;, &quot;HILPDA&quot;, &quot;HLA-DPB1&quot;, &quot;HLA-DQA1&quot;, </span></span>
+<span id="cb14-264"><a href="#cb14-264" tabindex="-1"></a><span class="co">#&gt; &quot;HLA-DQB1&quot;, &quot;HLA-DRA&quot;, &quot;HLA-DRB1&quot;, &quot;HLA-DRB5&quot;, &quot;HPGDS&quot;, &quot;ICAM1&quot;, </span></span>
+<span id="cb14-265"><a href="#cb14-265" tabindex="-1"></a><span class="co">#&gt; &quot;IFNG&quot;, &quot;IFNGR2&quot;, &quot;IGF1R&quot;, &quot;IGFBP3&quot;, &quot;IGHA1&quot;, &quot;IGHG1&quot;, &quot;IGHM&quot;, </span></span>
+<span id="cb14-266"><a href="#cb14-266" tabindex="-1"></a><span class="co">#&gt; &quot;IGKC&quot;, &quot;IL10RA&quot;, &quot;IL12A&quot;, &quot;IL12RB2&quot;, &quot;IL15&quot;, &quot;IL15RA&quot;, &quot;IL17B&quot;, </span></span>
+<span id="cb14-267"><a href="#cb14-267" tabindex="-1"></a><span class="co">#&gt; &quot;IL17RA&quot;, &quot;IL17RB&quot;, &quot;IL17RE&quot;, &quot;IL18R1&quot;, &quot;IL1R1&quot;, &quot;IL24&quot;, &quot;IL2RA&quot;, </span></span>
+<span id="cb14-268"><a href="#cb14-268" tabindex="-1"></a><span class="co">#&gt; &quot;IL2RB&quot;, &quot;IL32&quot;, &quot;IL3RA&quot;, &quot;IL4R&quot;, &quot;IL6ST&quot;, &quot;IL7&quot;, &quot;IL7R&quot;, &quot;IRF4&quot;, </span></span>
+<span id="cb14-269"><a href="#cb14-269" tabindex="-1"></a><span class="co">#&gt; &quot;ITGA1&quot;, &quot;ITGA6&quot;, &quot;ITGAM&quot;, &quot;ITGAV&quot;, &quot;ITGB1&quot;, &quot;KLRB1&quot;, &quot;KRT10&quot;, </span></span>
+<span id="cb14-270"><a href="#cb14-270" tabindex="-1"></a><span class="co">#&gt; &quot;KRT18&quot;, &quot;LAMP3&quot;, &quot;LGALS1&quot;, &quot;LGALS3&quot;, &quot;LGALS3BP&quot;, &quot;LGALS9&quot;, &quot;LMNA&quot;, </span></span>
+<span id="cb14-271"><a href="#cb14-271" tabindex="-1"></a><span class="co">#&gt; &quot;LPAR5&quot;, &quot;MAF&quot;, &quot;MAML2&quot;, &quot;MGP&quot;, &quot;MKI67&quot;, &quot;MRC2&quot;, &quot;MS4A1&quot;, &quot;MT1X&quot;, </span></span>
+<span id="cb14-272"><a href="#cb14-272" tabindex="-1"></a><span class="co">#&gt; &quot;MXRA8&quot;, &quot;NDRG1&quot;, &quot;NLRP3&quot;, &quot;NOD2&quot;, &quot;NOSIP&quot;, &quot;NOTCH1&quot;, &quot;NOTCH3&quot;, </span></span>
+<span id="cb14-273"><a href="#cb14-273" tabindex="-1"></a><span class="co">#&gt; &quot;NPR2&quot;, &quot;NRIP3&quot;, &quot;OAS1&quot;, &quot;OASL&quot;, &quot;OSM&quot;, &quot;PDCD1&quot;, &quot;PDGFB&quot;, &quot;PLAC8&quot;, </span></span>
+<span id="cb14-274"><a href="#cb14-274" tabindex="-1"></a><span class="co">#&gt; &quot;PPARG&quot;, &quot;PRF1&quot;, &quot;PTGDR2&quot;, &quot;PTGDS&quot;, &quot;PTK2&quot;, &quot;PTTG1&quot;, &quot;RAD51&quot;, </span></span>
+<span id="cb14-275"><a href="#cb14-275" tabindex="-1"></a><span class="co">#&gt; &quot;RGS1&quot;, &quot;RGS2&quot;, &quot;RGS5&quot;, &quot;RORA&quot;, &quot;RPL37&quot;, &quot;RPS4Y1&quot;, &quot;RXRA&quot;, &quot;S100A10&quot;, </span></span>
+<span id="cb14-276"><a href="#cb14-276" tabindex="-1"></a><span class="co">#&gt; &quot;S100A4&quot;, &quot;SAT1&quot;, &quot;SCG5&quot;, &quot;SELL&quot;, &quot;SLC40A1&quot;, &quot;SMAD3&quot;, &quot;SOX4&quot;, </span></span>
+<span id="cb14-277"><a href="#cb14-277" tabindex="-1"></a><span class="co">#&gt; &quot;SREBF1&quot;, &quot;SRGN&quot;, &quot;ST6GALNAC3&quot;, &quot;STMN1&quot;, &quot;TGFB3&quot;, &quot;TGFBR2&quot;, &quot;TIGIT&quot;, </span></span>
+<span id="cb14-278"><a href="#cb14-278" tabindex="-1"></a><span class="co">#&gt; &quot;TIMP1&quot;, &quot;TLR5&quot;, &quot;TNF&quot;, &quot;TNFRSF10D&quot;, &quot;TNFRSF11A&quot;, &quot;TNFRSF18&quot;, </span></span>
+<span id="cb14-279"><a href="#cb14-279" tabindex="-1"></a><span class="co">#&gt; &quot;TNFRSF19&quot;, &quot;TNFRSF1B&quot;, &quot;TNFRSF4&quot;, &quot;TNFRSF9&quot;, &quot;TNFSF14&quot;, &quot;TOP2A&quot;, </span></span>
+<span id="cb14-280"><a href="#cb14-280" tabindex="-1"></a><span class="co">#&gt; &quot;TOX&quot;, &quot;TPM2&quot;, &quot;TSHZ2&quot;, &quot;TUBB4B&quot;, &quot;TXK&quot;, &quot;TYMS&quot;, &quot;TYROBP&quot;, &quot;UBE2C&quot;, </span></span>
+<span id="cb14-281"><a href="#cb14-281" tabindex="-1"></a><span class="co">#&gt; &quot;VEGFB&quot;, &quot;WNT10B&quot;, &quot;WNT7A&quot;, &quot;YBX3&quot;, &quot;YES1&quot;, &quot;ZFP36&quot;)</span></span>
+<span id="cb14-282"><a href="#cb14-282" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
+<span id="cb14-283"><a href="#cb14-283" tabindex="-1"></a><span class="co">#&gt; There are fewer than 300 genes being used to subcluster cells into T CD4</span></span>
+<span id="cb14-284"><a href="#cb14-284" tabindex="-1"></a><span class="co">#&gt; memory, T CD4 naive, Treg. These annotations may be unstable.</span></span>
+<span id="cb14-285"><a href="#cb14-285" tabindex="-1"></a><span class="co">#&gt; T8</span></span>
+<span id="cb14-286"><a href="#cb14-286" tabindex="-1"></a><span class="co">#&gt; Annotating  T8 cells...</span></span>
+<span id="cb14-287"><a href="#cb14-287" tabindex="-1"></a><span class="co">#&gt; These are the selected 257 genes for subclustering:</span></span>
+<span id="cb14-288"><a href="#cb14-288" tabindex="-1"></a><span class="co">#&gt; c(&quot;ABL2&quot;, &quot;ACE&quot;, &quot;ACTG2&quot;, &quot;ACVR1B&quot;, &quot;ACVR2A&quot;, &quot;ADGRA3&quot;, &quot;ADGRE1&quot;, </span></span>
+<span id="cb14-289"><a href="#cb14-289" tabindex="-1"></a><span class="co">#&gt; &quot;ADGRF1&quot;, &quot;ADGRF3&quot;, &quot;ADGRG1&quot;, &quot;ADGRG5&quot;, &quot;ADGRG6&quot;, &quot;ADGRL1&quot;, &quot;ADORA2A&quot;, </span></span>
+<span id="cb14-290"><a href="#cb14-290" tabindex="-1"></a><span class="co">#&gt; &quot;ANGPT2&quot;, &quot;ANXA1&quot;, &quot;ANXA2&quot;, &quot;ANXA4&quot;, &quot;APP&quot;, &quot;AQP3&quot;, &quot;AREG&quot;, &quot;ATM&quot;, </span></span>
+<span id="cb14-291"><a href="#cb14-291" tabindex="-1"></a><span class="co">#&gt; &quot;BAG3&quot;, &quot;BCL2&quot;, &quot;BCL2L1&quot;, &quot;BMP1&quot;, &quot;BMPR2&quot;, &quot;CALD1&quot;, &quot;CCL28&quot;, </span></span>
+<span id="cb14-292"><a href="#cb14-292" tabindex="-1"></a><span class="co">#&gt; &quot;CCR1&quot;, &quot;CCR2&quot;, &quot;CCR5&quot;, &quot;CCR7&quot;, &quot;CD163&quot;, &quot;CD27&quot;, &quot;CD274&quot;, &quot;CD28&quot;, </span></span>
+<span id="cb14-293"><a href="#cb14-293" tabindex="-1"></a><span class="co">#&gt; &quot;CD300A&quot;, &quot;CD4&quot;, &quot;CD40LG&quot;, &quot;CD55&quot;, &quot;CD58&quot;, &quot;CD63&quot;, &quot;CD70&quot;, &quot;CD74&quot;, </span></span>
+<span id="cb14-294"><a href="#cb14-294" tabindex="-1"></a><span class="co">#&gt; &quot;CD79A&quot;, &quot;CD81&quot;, &quot;CD84&quot;, &quot;CD8B&quot;, &quot;CD9&quot;, &quot;CDKN1A&quot;, &quot;CDKN3&quot;, &quot;CEACAM1&quot;, </span></span>
+<span id="cb14-295"><a href="#cb14-295" tabindex="-1"></a><span class="co">#&gt; &quot;CFD&quot;, &quot;CIITA&quot;, &quot;CLCF1&quot;, &quot;CLDN4&quot;, &quot;CLEC4A&quot;, &quot;CLU&quot;, &quot;CMKLR1&quot;, </span></span>
+<span id="cb14-296"><a href="#cb14-296" tabindex="-1"></a><span class="co">#&gt; &quot;COL18A1&quot;, &quot;COL1A1&quot;, &quot;COL6A1&quot;, &quot;COL6A3&quot;, &quot;COL9A2&quot;, &quot;CRIP1&quot;, &quot;CST7&quot;, </span></span>
+<span id="cb14-297"><a href="#cb14-297" tabindex="-1"></a><span class="co">#&gt; &quot;CTLA4&quot;, &quot;CTSW&quot;, &quot;CX3CR1&quot;, &quot;CXCL16&quot;, &quot;CXCR2&quot;, &quot;CXCR3&quot;, &quot;CXCR6&quot;, </span></span>
+<span id="cb14-298"><a href="#cb14-298" tabindex="-1"></a><span class="co">#&gt; &quot;DDR1&quot;, &quot;DLL1&quot;, &quot;DNMT1&quot;, &quot;DNMT3A&quot;, &quot;DPP4&quot;, &quot;DUSP2&quot;, &quot;DUSP4&quot;, </span></span>
+<span id="cb14-299"><a href="#cb14-299" tabindex="-1"></a><span class="co">#&gt; &quot;DUSP5&quot;, &quot;DUSP6&quot;, &quot;EFNA1&quot;, &quot;EFNA5&quot;, &quot;ENG&quot;, &quot;EOMES&quot;, &quot;EPHA4&quot;, </span></span>
+<span id="cb14-300"><a href="#cb14-300" tabindex="-1"></a><span class="co">#&gt; &quot;EPHB4&quot;, &quot;EPHB6&quot;, &quot;ERBB3&quot;, &quot;ESAM&quot;, &quot;ETV5&quot;, &quot;EZR&quot;, &quot;FAS&quot;, &quot;FASLG&quot;, </span></span>
+<span id="cb14-301"><a href="#cb14-301" tabindex="-1"></a><span class="co">#&gt; &quot;FCER1G&quot;, &quot;FCGR3A&quot;, &quot;FGF9&quot;, &quot;FGR&quot;, &quot;FLT3LG&quot;, &quot;FN1&quot;, &quot;FPR1&quot;, &quot;FYN&quot;, </span></span>
+<span id="cb14-302"><a href="#cb14-302" tabindex="-1"></a><span class="co">#&gt; &quot;FZD6&quot;, &quot;GLUL&quot;, &quot;GNLY&quot;, &quot;GPX1&quot;, &quot;GZMA&quot;, &quot;GZMB&quot;, &quot;GZMH&quot;, &quot;GZMK&quot;, </span></span>
+<span id="cb14-303"><a href="#cb14-303" tabindex="-1"></a><span class="co">#&gt; &quot;HBB&quot;, &quot;HLA-DPA1&quot;, &quot;HLA-DPB1&quot;, &quot;HLA-DQA1&quot;, &quot;HLA-DQB1&quot;, &quot;HLA-DRA&quot;, </span></span>
+<span id="cb14-304"><a href="#cb14-304" tabindex="-1"></a><span class="co">#&gt; &quot;HLA-DRB1&quot;, &quot;HLA-DRB5&quot;, &quot;HMGB2&quot;, &quot;HSP90AB1&quot;, &quot;HSPA1A&quot;, &quot;HSPA1B&quot;, </span></span>
+<span id="cb14-305"><a href="#cb14-305" tabindex="-1"></a><span class="co">#&gt; &quot;ICAM1&quot;, &quot;IER3&quot;, &quot;IFIT1&quot;, &quot;IFNG&quot;, &quot;IFNGR2&quot;, &quot;IGF1R&quot;, &quot;IGFBP7&quot;, </span></span>
+<span id="cb14-306"><a href="#cb14-306" tabindex="-1"></a><span class="co">#&gt; &quot;IL10RA&quot;, &quot;IL11RA&quot;, &quot;IL12RB2&quot;, &quot;IL15&quot;, &quot;IL15RA&quot;, &quot;IL16&quot;, &quot;IL17B&quot;, </span></span>
+<span id="cb14-307"><a href="#cb14-307" tabindex="-1"></a><span class="co">#&gt; &quot;IL17RA&quot;, &quot;IL18R1&quot;, &quot;IL23A&quot;, &quot;IL24&quot;, &quot;IL2RA&quot;, &quot;IL2RB&quot;, &quot;IL3RA&quot;, </span></span>
+<span id="cb14-308"><a href="#cb14-308" tabindex="-1"></a><span class="co">#&gt; &quot;IL6R&quot;, &quot;IL6ST&quot;, &quot;IL7R&quot;, &quot;IRF4&quot;, &quot;ITGA1&quot;, &quot;ITGA6&quot;, &quot;ITGAL&quot;, &quot;ITGAM&quot;, </span></span>
+<span id="cb14-309"><a href="#cb14-309" tabindex="-1"></a><span class="co">#&gt; &quot;ITGAX&quot;, &quot;ITGB1&quot;, &quot;ITK&quot;, &quot;JUN&quot;, &quot;KLF2&quot;, &quot;KLRB1&quot;, &quot;KRT10&quot;, &quot;KRT18&quot;, </span></span>
+<span id="cb14-310"><a href="#cb14-310" tabindex="-1"></a><span class="co">#&gt; &quot;LAG3&quot;, &quot;LAIR1&quot;, &quot;LAMP3&quot;, &quot;LGALS1&quot;, &quot;LGALS3&quot;, &quot;LGALS3BP&quot;, &quot;LMNA&quot;, </span></span>
+<span id="cb14-311"><a href="#cb14-311" tabindex="-1"></a><span class="co">#&gt; &quot;LTB&quot;, &quot;LYN&quot;, &quot;LYZ&quot;, &quot;MAF&quot;, &quot;MAML2&quot;, &quot;MGP&quot;, &quot;MMP7&quot;, &quot;MRC2&quot;, &quot;MS4A1&quot;, </span></span>
+<span id="cb14-312"><a href="#cb14-312" tabindex="-1"></a><span class="co">#&gt; &quot;MT1X&quot;, &quot;MXRA8&quot;, &quot;MYC&quot;, &quot;MYH11&quot;, &quot;NCR1&quot;, &quot;NFKB1&quot;, &quot;NFKBIA&quot;, &quot;NKG7&quot;, </span></span>
+<span id="cb14-313"><a href="#cb14-313" tabindex="-1"></a><span class="co">#&gt; &quot;NLRP1&quot;, &quot;NLRP3&quot;, &quot;NOD2&quot;, &quot;NOSIP&quot;, &quot;NOTCH3&quot;, &quot;NPR2&quot;, &quot;NR1H3&quot;, </span></span>
+<span id="cb14-314"><a href="#cb14-314" tabindex="-1"></a><span class="co">#&gt; &quot;NRG4&quot;, &quot;OAS1&quot;, &quot;OASL&quot;, &quot;OLR1&quot;, &quot;PDCD1&quot;, &quot;PDGFD&quot;, &quot;PDGFRA&quot;, &quot;PPARD&quot;, </span></span>
+<span id="cb14-315"><a href="#cb14-315" tabindex="-1"></a><span class="co">#&gt; &quot;PRF1&quot;, &quot;PROK2&quot;, &quot;PTGDS&quot;, &quot;PTK2&quot;, &quot;RARG&quot;, &quot;RGCC&quot;, &quot;RGS1&quot;, &quot;RGS2&quot;, </span></span>
+<span id="cb14-316"><a href="#cb14-316" tabindex="-1"></a><span class="co">#&gt; &quot;RGS5&quot;, &quot;RNF43&quot;, &quot;RPL21&quot;, &quot;RPL22&quot;, &quot;RPL32&quot;, &quot;RPL34&quot;, &quot;RPL37&quot;, </span></span>
+<span id="cb14-317"><a href="#cb14-317" tabindex="-1"></a><span class="co">#&gt; &quot;RXRA&quot;, &quot;S100A10&quot;, &quot;S100A4&quot;, &quot;S100B&quot;, &quot;SELL&quot;, &quot;SERPINH1&quot;, &quot;SLC40A1&quot;, </span></span>
+<span id="cb14-318"><a href="#cb14-318" tabindex="-1"></a><span class="co">#&gt; &quot;SMAD3&quot;, &quot;SOX4&quot;, &quot;SREBF1&quot;, &quot;SRGN&quot;, &quot;ST6GALNAC3&quot;, &quot;TBX21&quot;, &quot;TFEB&quot;, </span></span>
+<span id="cb14-319"><a href="#cb14-319" tabindex="-1"></a><span class="co">#&gt; &quot;TGFB1&quot;, &quot;TGFB3&quot;, &quot;TGFBR2&quot;, &quot;THBS1&quot;, &quot;TIGIT&quot;, &quot;TLR3&quot;, &quot;TLR5&quot;, </span></span>
+<span id="cb14-320"><a href="#cb14-320" tabindex="-1"></a><span class="co">#&gt; &quot;TNF&quot;, &quot;TNFRSF10D&quot;, &quot;TNFRSF19&quot;, &quot;TNFRSF1B&quot;, &quot;TNFRSF9&quot;, &quot;TNFSF10&quot;, </span></span>
+<span id="cb14-321"><a href="#cb14-321" tabindex="-1"></a><span class="co">#&gt; &quot;TNFSF14&quot;, &quot;TNFSF4&quot;, &quot;TNFSF8&quot;, &quot;TNFSF9&quot;, &quot;TOX&quot;, &quot;TPM2&quot;, &quot;TUBB4B&quot;, </span></span>
+<span id="cb14-322"><a href="#cb14-322" tabindex="-1"></a><span class="co">#&gt; &quot;TXK&quot;, &quot;TYMS&quot;, &quot;TYROBP&quot;, &quot;WNT7A&quot;, &quot;XCL1&quot;, &quot;XCL2&quot;, &quot;YBX3&quot;, &quot;ZFP36&quot;</span></span>
+<span id="cb14-323"><a href="#cb14-323" tabindex="-1"></a><span class="co">#&gt; )</span></span>
+<span id="cb14-324"><a href="#cb14-324" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
+<span id="cb14-325"><a href="#cb14-325" tabindex="-1"></a><span class="co">#&gt; There are fewer than 300 genes being used to subcluster cells into T CD8</span></span>
+<span id="cb14-326"><a href="#cb14-326" tabindex="-1"></a><span class="co">#&gt; memory, T CD8 naive. These annotations may be unstable.</span></span>
+<span id="cb14-327"><a href="#cb14-327" tabindex="-1"></a><span class="co">#&gt; Summarizing group: nestedAnnotation</span></span>
+<span id="cb14-328"><a href="#cb14-328" tabindex="-1"></a><span class="co">#&gt; endothelial &amp; fibroblast</span></span>
+<span id="cb14-329"><a href="#cb14-329" tabindex="-1"></a><span class="co">#&gt; Summarizing group: structural</span></span>
+<span id="cb14-330"><a href="#cb14-330" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: structural</span></span>
+<span id="cb14-331"><a href="#cb14-331" tabindex="-1"></a><span class="co">#&gt; macrophage &amp; mast &amp; monocyte &amp; neutrophil &amp; mDC</span></span>
+<span id="cb14-332"><a href="#cb14-332" tabindex="-1"></a><span class="co">#&gt; Summarizing group: myeloid</span></span>
+<span id="cb14-333"><a href="#cb14-333" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: myeloid</span></span>
+<span id="cb14-334"><a href="#cb14-334" tabindex="-1"></a><span class="co">#&gt; B-lymphoid &amp; T-lymphoid</span></span>
+<span id="cb14-335"><a href="#cb14-335" tabindex="-1"></a><span class="co">#&gt; Summarizing group: lymphoid</span></span>
+<span id="cb14-336"><a href="#cb14-336" tabindex="-1"></a><span class="co">#&gt; B-cell &amp; plasmablast &amp; pDC</span></span>
+<span id="cb14-337"><a href="#cb14-337" tabindex="-1"></a><span class="co">#&gt; Summarizing group: B-lymphoid</span></span>
+<span id="cb14-338"><a href="#cb14-338" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: B-lymphoid</span></span>
+<span id="cb14-339"><a href="#cb14-339" tabindex="-1"></a><span class="co">#&gt; T8 &amp; T4 &amp; NK</span></span>
+<span id="cb14-340"><a href="#cb14-340" tabindex="-1"></a><span class="co">#&gt; Summarizing group: T-lymphoid</span></span>
+<span id="cb14-341"><a href="#cb14-341" tabindex="-1"></a><span class="co">#&gt; Treg</span></span>
+<span id="cb14-342"><a href="#cb14-342" tabindex="-1"></a><span class="co">#&gt; Summarizing group: T4</span></span>
+<span id="cb14-343"><a href="#cb14-343" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: T4</span></span>
+<span id="cb14-344"><a href="#cb14-344" tabindex="-1"></a><span class="co">#&gt; T CD8 memory</span></span>
+<span id="cb14-345"><a href="#cb14-345" tabindex="-1"></a><span class="co">#&gt; Summarizing group: T8</span></span>
+<span id="cb14-346"><a href="#cb14-346" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: T8</span></span>
+<span id="cb14-347"><a href="#cb14-347" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: T-lymphoid</span></span>
+<span id="cb14-348"><a href="#cb14-348" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: lymphoid</span></span>
+<span id="cb14-349"><a href="#cb14-349" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: nestedAnnotation</span></span></code></pre></div>
+<p>In the messages that print out, we see that a handful of cells are
+removed from cell typing if they have zero counts in any of the gene
+subsets used for typing.</p>
+</div>
+<div id="review-results" class="section level2">
+<h2>Review results</h2>
+<p>The results from running InSituTree contain two main components:</p>
+<ol style="list-style-type: decimal">
+<li><p>Nested list of results from each run of InSituTypeML</p></li>
+<li><p>Summary of annotations at each level of the tree</p></li>
+</ol>
+<p>The nested results list contains the typical outputs of InSituType
+for each round of cell typing, as well as one additional metric: the
+counts per cell for each cell for the given round of subclustering. We
+include counts per cell among the genes considered for each
+subclustering as an additional metric since cell assignments for
+low-count cells are likely to be less confident. As an example, we look
+at the first major cell types assignment and use the flightpath tool
+from InSituType to visualize how well cells were assigned to these major
+types.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">str</span>(res<span class="sc">$</span>nestedAnnotation<span class="sc">$</span>result)</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="co">#&gt; List of 7</span></span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="co">#&gt;  $ clust                      : Named chr [1:2196] &quot;myeloid&quot; &quot;myeloid&quot; &quot;myeloid&quot; &quot;myeloid&quot; ...</span></span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;names&quot;)= chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="co">#&gt;  $ prob                       : Named num [1:2196] 1 1 1 1 1 ...</span></span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;names&quot;)= chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="co">#&gt;  $ profiles                   : num [1:244, 1:3] 0.14347 0.02459 0.08869 0.07354 0.00361 ...</span></span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:244] &quot;ACKR1&quot; &quot;ACTG2&quot; &quot;ACVRL1&quot; &quot;ADGRF5&quot; ...</span></span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:3] &quot;structural&quot; &quot;myeloid&quot; &quot;lymphoid&quot;</span></span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a><span class="co">#&gt;  $ sds                        : NULL</span></span>
+<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a><span class="co">#&gt;  $ logliks                    : num [1:2196, 1:3] -49.1 -61.7 -180.3 -62.4 -80.1 ...</span></span>
+<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:3] &quot;structural&quot; &quot;myeloid&quot; &quot;lymphoid&quot;</span></span>
+<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a><span class="co">#&gt;  $ logliks_from_lost_celltypes: num [1:2196, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
+<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr &quot;undefined&quot;</span></span>
+<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a><span class="co">#&gt;  $ ctsPerCell                 : Named num [1:2198] 7 10 33 10 44 12 31 29 59 41 ...</span></span>
+<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;names&quot;)= chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-22"><a href="#cb15-22" tabindex="-1"></a></span>
+<span id="cb15-23"><a href="#cb15-23" tabindex="-1"></a>InSituType<span class="sc">::</span><span class="fu">flightpath_plot</span>(<span class="at">insitutype_result =</span> res<span class="sc">$</span>nestedAnnotation<span class="sc">$</span>result)</span>
+<span id="cb15-24"><a href="#cb15-24" tabindex="-1"></a><span class="co">#&gt; Warning: failed creating initial embedding; using random embedding instead</span></span>
+<span id="cb15-25"><a href="#cb15-25" tabindex="-1"></a><span class="co">#&gt; Saving flightpath_plot to: ./NBClust-Plots/2024-11-26_19-26-35-UTC-flightpath_plot.png</span></span></code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>The summary annotation data frame shows the cell type assigned at
+each level of annotation, as well as the posterior probability for each
+assignment. Any final cell types, found at the bottom of the cell type
+hierarchy, are cascaded right to further annotation levels. For example,
+cells assigned to ‘endothelial’ at annotation level 2 in this example
+will also be labeled as ‘endothelial’ for annotation levels 3 and 4.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">head</span>(res<span class="sc">$</span>summaryAnnotation)</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="co">#&gt;          annotLevel_1 probs_annotLevel_1 annotLevel_2 probs_annotLevel_2</span></span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#&gt; c_3_18_2      myeloid          1.0000000   macrophage          0.7109515</span></span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co">#&gt; c_3_18_3      myeloid          1.0000000   macrophage          0.9570978</span></span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="co">#&gt; c_3_18_4      myeloid          1.0000000   macrophage          1.0000000</span></span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a><span class="co">#&gt; c_3_18_5      myeloid          0.9999974   macrophage          0.8044057</span></span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a><span class="co">#&gt; c_3_18_6   structural          1.0000000  endothelial          1.0000000</span></span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a><span class="co">#&gt; c_3_18_7      myeloid          0.9999948   macrophage          0.9950331</span></span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a><span class="co">#&gt;          annotLevel_3 probs_annotLevel_3 annotLevel_4 probs_annotLevel_4</span></span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a><span class="co">#&gt; c_3_18_2   macrophage          0.7109515   macrophage          0.7109515</span></span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a><span class="co">#&gt; c_3_18_3   macrophage          0.9570978   macrophage          0.9570978</span></span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a><span class="co">#&gt; c_3_18_4   macrophage          1.0000000   macrophage          1.0000000</span></span>
+<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a><span class="co">#&gt; c_3_18_5   macrophage          0.8044057   macrophage          0.8044057</span></span>
+<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a><span class="co">#&gt; c_3_18_6  endothelial          1.0000000  endothelial          1.0000000</span></span>
+<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a><span class="co">#&gt; c_3_18_7   macrophage          0.9950331   macrophage          0.9950331</span></span></code></pre></div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
