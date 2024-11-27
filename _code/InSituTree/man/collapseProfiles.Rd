@@ -31,10 +31,12 @@ test_profiles <- structure(c(20.9603386399337, 0.000458563513110102, 0.021313419
 0.0288427303176309, 11.9226523626362, 0.00127986493534602, 0.432247094843415,
 13.0851834981941, 0.000408071052724823, 0.0245660028716463, 3.1565517220473,
 0.000405246861377072, 0.0117737186541241, 13.5470516404443, 0.0003847773659826,
-0.126099834470038), .Dim = c(3L, 14L), .Dimnames = list(c("FAM138A",
-                                                          "OR4F5", "RNU6-1100P"), c("B-cell", "endothelial", "fibroblast",
-                                                                                    "macrophage", "mast", "mDC", "monocyte", "neutrophil", "NK",
-                                                                                    "pDC", "plasmablast", "T4", "T8", "Treg")))
+0.126099834470038), 
+.Dim = c(3L, 14L), 
+.Dimnames = list(c("FAM138A", "OR4F5", "RNU6-1100P"),
+    c("B-cell", "endothelial", "fibroblast",
+    "macrophage", "mast", "mDC", "monocyte", "neutrophil", "NK",
+    "pDC", "plasmablast", "T4", "T8", "Treg")))
 
 cth_list <- list(structural = c("endothelial", "fibroblast")
                   , lymphoid = list(`B-lymphoid` = c("B-cell", "pDC", "plasmablast")

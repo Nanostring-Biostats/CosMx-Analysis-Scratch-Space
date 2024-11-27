@@ -16,19 +16,21 @@
 #'
 #' @examples
 #'
-#' test_celltype_relationship_list <- list("structural" = c("endothelial", "fibroblast")
-#'                                         , "myeloid" = c("macrophage", "mast", "mDC", "monocyte", "neutrophil")
-#'                                         , "lymphoid" = list("B-lymphoid" = c("B-cell", "pDC","plasmablast")
-#'                                                             , "T-lymphoid" = list(
-#'                                                             "T4" = c("T CD4 memory", "T CD4 naive", "Treg"),
-#'                                                             "T8" = c("T CD8 memory", "T CD8 naive"),
-#'                                                             "NK")
-#'                                         )
+#' test_celltype_relationship_list <- list("structural" = 
+#'   c("endothelial", "fibroblast")
+#'   , "myeloid" = c("macrophage", "mast", "mDC", "monocyte", "neutrophil")
+#'   , "lymphoid" = list("B-lymphoid" = c("B-cell", "pDC","plasmablast")
+#'     , "T-lymphoid" = list(
+#'         "T4" = c("T CD4 memory", "T CD4 naive", "Treg"),
+#'         "T8" = c("T CD8 memory", "T CD8 naive"),
+#'         "NK")
+#'         )
 #' )
 #'
 #' # Extract expression data from insitutype package
-#' data('mini_nsclc')
-#' data('ioprofiles')
+#' library(InSituType)
+#' data(mini_nsclc)
+#' data(ioprofiles)
 #'
 #'
 #' res <- runInSituTree(full_profiles = ioprofiles
@@ -37,7 +39,8 @@
 #'                    , neg = Matrix::rowMeans(mini_nsclc$neg)
 #'                    , name_for_new_annotation = "test"
 #'                    , cohort = NULL
-#'                    , excluded_genes = c("MALAT1", "B2M", "CD298", "MZT2A", "HLA-A", "HLA-B", "HLA-C")
+#'                    , excluded_genes = c("MALAT1", "B2M", "CD298", 
+#'                       "MZT2A", "HLA-A", "HLA-B", "HLA-C")
 #'                    )
 #'
 #'

@@ -8,6 +8,8 @@ printTree(cth, prefix = "")
 }
 \arguments{
 \item{cth}{Cell type hierarchy, as a nested list}
+
+\item{prefix}{Prefix for nested list printing, used in recursive call. Recommended to leave alone.}
 }
 \description{
 Prints nested list in an easy to read format

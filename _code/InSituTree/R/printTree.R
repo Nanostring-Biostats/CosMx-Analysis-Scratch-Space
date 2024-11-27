@@ -1,6 +1,7 @@
 #' Prints nested list in an easy to read format
 #'
 #' @param cth Cell type hierarchy, as a nested list
+#' @param prefix Prefix for nested list printing, used in recursive call. Recommended to leave alone.
 #' @export
 #'
 #' @examples
