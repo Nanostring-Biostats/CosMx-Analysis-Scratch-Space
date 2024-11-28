@@ -22,7 +22,8 @@ runInSituTree(
 
 \item{neg}{Vector of mean negative controls for each cell}
 
-\item{full_profiles}{Cell profile matrix, genes x cell types, for all end point cell types}
+\item{full_profiles}{Cell profile matrix, genes x cell types,
+for all end point cell types}
 
 \item{cth}{Cell type hierarchy, as a nested list}
 
@@ -32,29 +33,36 @@ runInSituTree(
 
 \item{excluded_genes}{Genes to be excluded during fitting with InSituType}
 
-\item{quantile_absolute_expression_difference_param}{Quantile cutoff for absolute expression.  Default = 0.5. Both quantile cutoffs must be passed to retain gene.}
+\item{quantile_absolute_expression_difference_param}{Quantile cutoff for absolute expression.  Default = 0.5.
+Both quantile cutoffs must be passed to retain gene.}
 
-\item{quantile_percent_expression_difference_param}{Quantile cutoff for percent expression.  Default = 0.5. Both quantile cutoffs must be passed to retain gene.}
+\item{quantile_percent_expression_difference_param}{Quantile cutoff for percent expression.  Default = 0.5.
+Both quantile cutoffs must be passed to retain gene.}
 
-\item{return_summary_annotation}{option to return a summary of celltypes.  Default is TRUE.}
+\item{return_summary_annotation}{option to return a summary of celltypes.
+Default is TRUE.}
 }
 \value{
-List of each InSituType result and a summary of all cell type annotations.
+List of each InSituType result and
+a summary of all cell type annotations.
 }
 \description{
 Tree-style cell typing
 }
 \examples{
 
-test_celltype_relationship_list <- list("structural" = 
-  c("endothelial", "fibroblast")
-  , "myeloid" = c("macrophage", "mast", "mDC", "monocyte", "neutrophil")
-  , "lymphoid" = list("B-lymphoid" = c("B-cell", "pDC","plasmablast")
-    , "T-lymphoid" = list(
-        "T4" = c("T CD4 memory", "T CD4 naive", "Treg"),
-        "T8" = c("T CD8 memory", "T CD8 naive"),
-        "NK")
-        )
+test_celltype_relationship_list <- list(
+  "structural" =
+    c("endothelial", "fibroblast"),
+  "myeloid" = c("macrophage", "mast", "mDC", "monocyte", "neutrophil"),
+  "lymphoid" = list(
+    "B-lymphoid" = c("B-cell", "pDC", "plasmablast"),
+    "T-lymphoid" = list(
+      "T4" = c("T CD4 memory", "T CD4 naive", "Treg"),
+      "T8" = c("T CD8 memory", "T CD8 naive"),
+      "NK"
+    )
+  )
 )
 
 # Extract expression data from insitutype package
@@ -63,15 +71,17 @@ data(mini_nsclc)
 data(ioprofiles)
 
 
-res <- runInSituTree(full_profiles = ioprofiles
-                   , cth = test_celltype_relationship_list
-                   , x = as(mini_nsclc$counts, "CsparseMatrix")
-                   , neg = Matrix::rowMeans(mini_nsclc$neg)
-                   , name_for_new_annotation = "test"
-                   , cohort = NULL
-                   , excluded_genes = c("MALAT1", "B2M", "CD298", 
-                      "MZT2A", "HLA-A", "HLA-B", "HLA-C")
-                   )
-
+res <- runInSituTree(
+  full_profiles = ioprofiles,
+  cth = test_celltype_relationship_list,
+  x = as(mini_nsclc$counts, "CsparseMatrix"),
+  neg = Matrix::rowMeans(mini_nsclc$neg),
+  name_for_new_annotation = "test",
+  cohort = NULL,
+  excluded_genes = c(
+    "MALAT1", "B2M", "CD298",
+    "MZT2A", "HLA-A", "HLA-B", "HLA-C"
+  )
+)
 
 }

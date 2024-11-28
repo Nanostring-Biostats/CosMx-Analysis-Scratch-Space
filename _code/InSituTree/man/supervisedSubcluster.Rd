@@ -21,9 +21,11 @@ supervisedSubcluster(
 
 \item{neg}{Vector of mean negative controls for each cell}
 
-\item{quantile_absolute_expression_difference}{Quantile cutoff for absolute expression.  Default = 0.5. Both quantile cutoffs must be passed to retain gene.}
+\item{quantile_absolute_expression_difference}{Quantile cutoff for absolute expression.  Default = 0.5.
+Both quantile cutoffs must be passed to retain gene.}
 
-\item{quantile_percent_expression_difference}{Quantile cutoff for percent expression.  Default = 0.5. Both quantile cutoffs must be passed to retain gene.}
+\item{quantile_percent_expression_difference}{Quantile cutoff for percent expression.  Default = 0.5.
+Both quantile cutoffs must be passed to retain gene.}
 
 \item{excluded_genes}{Genes to be excluded during fitting with InSituType}
 

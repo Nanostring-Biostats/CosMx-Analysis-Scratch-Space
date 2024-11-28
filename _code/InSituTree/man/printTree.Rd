@@ -9,17 +9,21 @@ printTree(cth, prefix = "")
 \arguments{
 \item{cth}{Cell type hierarchy, as a nested list}
 
-\item{prefix}{Prefix for nested list printing, used in recursive call. Recommended to leave alone.}
+\item{prefix}{Prefix for nested list printing, used in recursive call.
+Recommended to leave alone.}
 }
 \description{
 Prints nested list in an easy to read format
 }
 \examples{
-cth_list <- list(structural = c("endothelial", "fibroblast")
-                  , lymphoid = list(`B-lymphoid` = c("B-cell", "pDC", "plasmablast")
-                                    , `T-lymphoid` = c("NK", "T4", "T8", "Treg"))
-                  , myeloid = c("macrophage", "mast", "mDC", "monocyte", "neutrophil")
-                  )
+cth_list <- list(
+  structural = c("endothelial", "fibroblast"),
+  lymphoid = list(
+    `B-lymphoid` = c("B-cell", "pDC", "plasmablast"),
+    `T-lymphoid` = c("NK", "T4", "T8", "Treg")
+  ),
+  myeloid = c("macrophage", "mast", "mDC", "monocyte", "neutrophil")
+)
 printTree(cth_list)
 
 }
