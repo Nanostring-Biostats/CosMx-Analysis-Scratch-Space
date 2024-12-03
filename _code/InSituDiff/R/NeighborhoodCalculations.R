@@ -27,6 +27,10 @@ getNeighborhoodExpression <- function(x, neighbors, makedense = TRUE) {
 #' @return sparse matrix holding neighbor assignments
 #' @export
 getNeighbors <- function(xy, neighbors, tissue, k, radius, verbose) {
+  # format xy as matrix:
+  if (!is.matrix(xy)) {
+    xy <- as.matrix(xy)
+  }
   # need xy or neighbors:
   if (is.null(xy) && is.null(neighbors)) {
     stop("need to provide either xy coords or a neighbors network")
