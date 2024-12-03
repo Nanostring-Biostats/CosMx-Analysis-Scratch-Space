@@ -1,9 +1,10 @@
-#' Collapse a hierarchy of cell expression profiles
-#' according to cell relationship list
-#'
-#' @param cth Cell type hierarchy, as a nested list
+#' Collapse a hierarchy of cell expression profiles to the root level
+#' as described in the nested list for cell type hierarchy
+#' 
+#' @param cth Cell type hierarchy, as a nested list with end point cell types
+#' in full_profiles
 #' @param full_profiles Cell profile matrix, genes x cell types,
-#' for all end point cell types
+#' include all end point cell types in cth
 #' @param verbose Option to print progress to console
 #' @param print_tree Option to print a structure of the nested lsit
 #'
@@ -13,24 +14,12 @@
 #'
 #' @examples
 #'
+#' set.seed(123)
 #' test_profiles <- structure(
-#'   c(
-#'     20.9603386399337, 0.000458563513110102,
-#'     0.0213134197201323, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-#'     13.9034661915883, 0.000495994103622096,
-#'     0.0336462476129761, 15.2527213840745, 0.00050482883622113,
-#'     23.9519748436983, 47.5121404233421, 0.00107558038855557,
-#'     333.727308745673, 13.7004900517181, 0.00037497098661991,
-#'     0.00037497098661991, 14.7091889168433, 0.000468241957476138,
-#'     0.0288427303176309, 11.9226523626362, 0.00127986493534602,
-#'     0.432247094843415, 13.0851834981941, 0.000408071052724823,
-#'     0.0245660028716463, 3.1565517220473,
-#'     0.000405246861377072, 0.0117737186541241, 13.5470516404443,
-#'     0.0003847773659826, 0.126099834470038
-#'   ),
+#'   rnorm(42, mean = 3, sd = 1),
 #'   .Dim = c(3L, 14L),
 #'   .Dimnames = list(
-#'     c("FAM138A", "OR4F5", "RNU6-1100P"),
+#'     c("GeneA", "GeneB", "GeneC"),
 #'     c(
 #'       "B-cell", "endothelial", "fibroblast",
 #'       "macrophage", "mast", "mDC", "monocyte", "neutrophil", "NK",

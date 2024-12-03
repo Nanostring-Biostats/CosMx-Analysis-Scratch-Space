@@ -21,18 +21,22 @@ supervisedSubcluster(
 
 \item{neg}{Vector of mean negative controls for each cell}
 
-\item{quantile_absolute_expression_difference}{Quantile cutoff for absolute expression.  Default = 0.5.
-Both quantile cutoffs must be passed to retain gene.}
+\item{quantile_absolute_expression_difference}{Minimum absolute expression
+difference within reference_profiles in terms of quantile level among all
+genes. Default = 0.5. Both quantile cutoffs must be passed to retain gene.}
 
-\item{quantile_percent_expression_difference}{Quantile cutoff for percent expression.  Default = 0.5.
-Both quantile cutoffs must be passed to retain gene.}
+\item{quantile_percent_expression_difference}{Minimum percentage expression
+difference within reference_profiles in terms of quantile level among all
+genes. Default = 0.5. Both quantile cutoffs must be passed to retain gene.}
 
 \item{excluded_genes}{Genes to be excluded during fitting with InSituType}
 
 \item{cohort}{Vector of cells' cohort membership}
 }
 \value{
-Insitutype result list.
+a list with all elements returned by InSituType::insitutypeML() and
+additional element \code{ctsPerCell} for a vector of counts per cell within the
+chosen subset of genes.
 }
 \description{
 Supervised subclustering using a gene subset and insitutypeML

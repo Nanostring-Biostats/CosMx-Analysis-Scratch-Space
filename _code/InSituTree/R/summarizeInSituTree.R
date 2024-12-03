@@ -3,7 +3,7 @@
 #' @param nestList Nested insitutype objects returned from runInSituType()
 #' @param annotationLevel Used for recursive looping.  Do not adjust.
 #'
-#' @return Dataframe of celltype annotation and posterior probabilities
+#' @return data.frame of celltype annotation and posterior probabilities
 #' @export
 #' @import dplyr
 #' @import tibble

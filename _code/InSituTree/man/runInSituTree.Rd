@@ -9,7 +9,7 @@ runInSituTree(
   neg,
   full_profiles,
   cth,
-  name_for_new_annotation,
+  name_for_new_annotation = "nestedAnnotation",
   cohort = NULL,
   excluded_genes = c(),
   quantile_absolute_expression_difference_param = 0.5,

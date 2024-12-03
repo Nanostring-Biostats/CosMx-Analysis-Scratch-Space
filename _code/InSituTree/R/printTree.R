@@ -2,7 +2,7 @@
 #'
 #' @param cth Cell type hierarchy, as a nested list
 #' @param prefix Prefix for nested list printing, used in recursive call.
-#' Recommended to leave alone.
+#' Optional.
 #' @export
 #'
 #' @examples
@@ -25,7 +25,7 @@ printTree <- function(cth, prefix = "") {
         cat(prefix, cth[[i]], "\n")
       } else {
         cat(prefix, names(cth)[i], "\n")
-        printTree(cth[[i]], paste0(prefix, "  "))
+        printTree(cth[[i]], paste0("  ", prefix))
       }
     }
   } else {

@@ -61,7 +61,7 @@ runInSituTree <- function(
     neg,
     full_profiles,
     cth,
-    name_for_new_annotation,
+    name_for_new_annotation = "nestedAnnotation",
     cohort = NULL,
     excluded_genes = c(),
     quantile_absolute_expression_difference_param = 0.5,
@@ -81,10 +81,6 @@ runInSituTree <- function(
   if (!is.list(cth) && !is.vector(cth)) {
     print(paste0("cth is of class ", class(cth)))
     stop("Error: cth must be a list or vector of cell types.")
-  }
-
-  if (!is(x, "dgCMatrix")) {
-    stop("Error: x must be a sparse matrix of type dgCMatrix.")
   }
 
   if (!is.numeric(neg)) {

@@ -10,7 +10,7 @@ printTree(cth, prefix = "")
 \item{cth}{Cell type hierarchy, as a nested list}
 
 \item{prefix}{Prefix for nested list printing, used in recursive call.
-Recommended to leave alone.}
+Optional.}
 }
 \description{
 Prints nested list in an easy to read format

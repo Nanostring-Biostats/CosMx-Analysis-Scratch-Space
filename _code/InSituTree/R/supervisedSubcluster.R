@@ -3,18 +3,20 @@
 #' @param reference_profiles Matrix of expression profiles, genes x cell types
 #' @param x Counts matrix, cells x genes
 #' @param neg Vector of mean negative controls for each cell
-#' @param quantile_absolute_expression_difference
-#' Quantile cutoff for absolute expression.  Default = 0.5.
-#' Both quantile cutoffs must be passed to retain gene.
-#' @param quantile_percent_expression_difference
-#' Quantile cutoff for percent expression.  Default = 0.5.
-#' Both quantile cutoffs must be passed to retain gene.
+#' @param quantile_absolute_expression_difference Minimum absolute expression
+#' difference within reference_profiles in terms of quantile level among all
+#' genes. Default = 0.5. Both quantile cutoffs must be passed to retain gene.
+#' @param quantile_percent_expression_difference Minimum percentage expression
+#' difference within reference_profiles in terms of quantile level among all
+#' genes. Default = 0.5. Both quantile cutoffs must be passed to retain gene.
 #' @param excluded_genes Genes to be excluded during fitting with InSituType
 #' @param cohort Vector of cells' cohort membership
 #'
 #' @import InSituType
 #'
-#' @return Insitutype result list.
+#' @return a list with all elements returned by InSituType::insitutypeML() and 
+#' additional element `ctsPerCell` for a vector of counts per cell within the 
+#' chosen subset of genes.
 #' @export
 
 supervisedSubcluster <- function(reference_profiles,
@@ -70,6 +72,11 @@ supervisedSubcluster <- function(reference_profiles,
   if (!all(nonZeroCount_idx)) warning(paste0(sum(!nonZeroCount_idx),
                                              " cells have 0 counts 
                                              in the subclustering gene panel."))
+  
+  # Convert counts to dgCMatrix
+  if(!is(x, "dgCMatrix")){
+    x <- convertToDgCMatrix(x)
+  }
 
   # Run supervised InSituType on cell and gene subet
   sup_res <- insitutypeML(x[nonZeroCount_idx, use_genes],

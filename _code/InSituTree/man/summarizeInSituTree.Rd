@@ -12,7 +12,7 @@ summarizeInSituTree(nestList, annotationLevel = 1)
 \item{annotationLevel}{Used for recursive looping.  Do not adjust.}
 }
 \value{
-Dataframe of celltype annotation and posterior probabilities
+data.frame of celltype annotation and posterior probabilities
 }
 \description{
 Summarize the annotations for runInSituTree() function
