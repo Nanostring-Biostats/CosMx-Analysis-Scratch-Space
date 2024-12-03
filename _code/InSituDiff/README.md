@@ -14,7 +14,8 @@ most comparable control neighborhoods. Applications include:
 ## Installation
 
 ```
-devtools::install_github("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/InSituDiff")
+devtools::install_github("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
+                         subdir = "_code/InSituDiff")
 ```
 
 ## Usage:
