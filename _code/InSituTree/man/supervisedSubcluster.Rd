@@ -11,7 +11,8 @@ supervisedSubcluster(
   quantile_absolute_expression_difference = 0.5,
   quantile_percent_expression_difference = 0.5,
   excluded_genes = NULL,
-  cohort = NULL
+  cohort = NULL,
+  ...
 )
 }
 \arguments{
@@ -32,6 +33,8 @@ genes. Default = 0.5. Both quantile cutoffs must be passed to retain gene.}
 \item{excluded_genes}{Genes to be excluded during fitting with InSituType}
 
 \item{cohort}{Vector of cells' cohort membership}
+
+\item{...}{Additional parameters passed on to \code{insitutypeML}}
 }
 \value{
 a list with all elements returned by InSituType::insitutypeML() and

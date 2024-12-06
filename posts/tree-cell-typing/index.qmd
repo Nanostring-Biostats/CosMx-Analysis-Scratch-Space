@@ -12,7 +12,7 @@ toc-expand: 2
 toc-location: left
 number-sections: true
 number-depth: 4
-date: "2024-11-26"
+date: "2024-12-09"
 date-modified: last-modified
 categories:
   - cell typing
@@ -30,6 +30,7 @@ the usual caveats and [license](https://nanostring-biostats.github.io/CosMx-Anal
 
 - @sec-package-overview Overview of InSituTree approach
 - @sec-example-implementation Example usage of InSituTree
+- @sec-additional-recommendations Additional recommendations
 - @sec-conclusions Conclusions
 
 # InSituTree Overview: How does it work? {#sec-package-overview}
@@ -114,6 +115,18 @@ If you're working from a CosMx-derived cell profile from our [CosMx Cell Profile
 If you'd like to create your own reference profile, see [this](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles) Scratch Space Post for additional guidance on generating reference profiles. 
 :::
 
+To make your own cell type hierarchy, you can generate one based on your subject matter expertise or by examining the similarity of cell types in your reference profile. Importantly, the cell type hierarchy should reflect similarity in gene expression, which may or may not correspond to cell type lineages. For a convenient way to visualize the similarity of cell types in your reference profile, use the function `plotProfileSimilarity`.
+
+```{r, eval = FALSE}
+plotProfileSimilarity(ioprofiles)
+```
+
+```{r}
+#| fig-cap: "Similarity matrix of reference profile cell types can be used to help inform cell type hierarchy."
+knitr::include_graphics("./figures/io_profile_similarity_heatmap.png")
+```
+
+As two examples from this heatmap, we can see that T cell subtypes as well as NK cells have high similarity and so should be grouped together. Additionally, endothelial and fibroblast cell types are highly similar, supporting our grouping of them into a 'structural' major cell type.
 
 Once we have this cell type tree, we can use `InSituTree` to run supervised cell typing with a nested approach.
 ```{r runInSituTree, message=FALSE, eval = FALSE}
@@ -142,8 +155,16 @@ res$summaryAnnotation
 
 ```
 
+
+# Additional recommendations {#sec-additional-recommendations}
+The structure of the cell type hierarchy list is a key determinant of how well this approach works. Major cell types that are unnecessarily broad may lead to poor cell typing if the average gene expression is too distinct from the expression of individual cells. As an example, the cell type lists available at our [CosMx Cell Profile library](https://github.com/Nanostring-Biostats/CosMx-Cell-Profiles/tree/main){target="_blank"} often contain an initial grouping of cell types into 'Tissue' or 'Immune'; we would recommend removing that large group and providing the next level down as top annotations. `InSituTree` does run quickly, so in cases of uncertainty we would recommend running the algorithm with multiple cell type hierarchies and choosing the one that gives the best cell typing. Evaluate the results as cell typing is typically evaluated: spatial distribution of cell types, top markers for each cell type, and clustering of similar cell types in UMAP space.
+
+The approach above only works for fully supervised cell typing. In datasets where you have novel cell types not captured in your reference profile, one option is first to run semi-supervised `InSituType` on your whole dataset. Second, you could either create a reference profile from your CosMx data and run `InSituTree` using these new cell type definitions. Alternatively, you could select out only cells of interest from your full dataset cell typing annotations, for example only the immune cells, and run targeted subclustering with `InSituTree` on those cells only.
+
+
+
 # Conclusions {#sec-conclusions}
-The nested approach to supervised cell typing presented here adds another option for cell typing, particularly useful when looking to identify fine cell subtypes. The summarized output provides annotations at each level of the cell typing tree, allowing the user to choose how finely they'd like to subcluster. 
+The nested approach to supervised cell typing presented here adds another option for cell typing, particularly useful when looking to identify fine cell subtypes. This approach is one of many, and users are encouraged to consider this tool in concert with other approaches including unsupervised clustering, [gene smoothing](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/), [cell type refinement](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md), and label transfer approaches.
 
 # Acknowledgements
 The initial idea and code for this nested approach of `InSituType`-based cell typing were developed largely by [Mark Gregory](https://github.com/mtgregory){target='_blank'}.

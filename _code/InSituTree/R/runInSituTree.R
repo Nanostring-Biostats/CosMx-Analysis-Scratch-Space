@@ -16,6 +16,7 @@
 #' Both quantile cutoffs must be passed to retain gene.
 #' @param return_summary_annotation option to return a summary of celltypes.
 #' Default is TRUE.
+#' @param ... additional arguments passed on to `insitutypeML`
 #'
 #' @return List of each InSituType result and
 #' a summary of all cell type annotations.
@@ -66,7 +67,8 @@ runInSituTree <- function(
     excluded_genes = c(),
     quantile_absolute_expression_difference_param = 0.5,
     quantile_percent_expression_difference_param = 0.5,
-    return_summary_annotation = TRUE) {
+    return_summary_annotation = TRUE,
+    ...) {
   # Argument checks
   if (missing(full_profiles) || missing(cth) || missing(x) || missing(neg) ||
         missing(name_for_new_annotation)) {
@@ -129,7 +131,8 @@ runInSituTree <- function(
     quantile_absolute_expression_difference =
       quantile_absolute_expression_difference_param,
     quantile_percent_expression_difference =
-      quantile_percent_expression_difference_param
+      quantile_percent_expression_difference_param,
+    ...
   )
   out[[name_for_new_annotation]] <- list()
   out[[name_for_new_annotation]][["result"]] <- res
@@ -160,13 +163,14 @@ runInSituTree <- function(
         x = x[selected_cells, ],
         neg = neg[selected_cells],
         name_for_new_annotation = i,
-        cohort = cohort[selected_cells, ],
+        cohort = cohort[selected_cells],
         excluded_genes = excluded_genes,
         quantile_absolute_expression_difference_param =
           quantile_absolute_expression_difference_param,
         quantile_percent_expression_difference_param =
           quantile_percent_expression_difference_param,
-        return_summary_annotation = FALSE
+        return_summary_annotation = FALSE,
+        ...
       )
       out[[name_for_new_annotation]][["subclusterings"]] <-
         append(out[[name_for_new_annotation]][["subclusterings"]], sub_res)

@@ -26,8 +26,9 @@ cell type assignments and then making progressively finer classifications.
 ## Installation
 
 ```{r installation, eval=FALSE}
-# Download the package and install from file
-devtools::install("/path/to/package/InSituTree.zip")
+# Install from github
+devtools::install_github("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
+                         subdir = "_code/InSituTree")
 ```
 
 ## Data preparation
@@ -54,7 +55,7 @@ Here we show the format of each of the necessary inputs to run `InSituTree`.
 Many of these mirror inputs for `InSituType`, and more information can be found
 in that package.
 
-1. A matrix of counts data, cells x genes
+1. `x`: A matrix of counts data, cells x genes
 
 ```{r strcounts}
 counts <- mini_nsclc$counts
@@ -62,14 +63,14 @@ str(counts)
 counts[5:10, 10:15]
 ```
 
-2. A vector giving each cell's mean negative control value:
+2. `neg`: A vector giving each cell's mean negative control value:
 
 ```{r strnegmean}
 negmean <- Matrix::rowMeans(mini_nsclc$neg)
 head(negmean)
 ```
 
-3. Reference profile giving the expected expression profile of each cell
+3. `full_profiles`: Reference profile giving the expected expression profile of each cell
 subtype, with genes in rows and cell subtypes in columns. Major cell types are
 not needed. The reference matrix must be linear-scale, not log-scale. Genes
 (rows) do not need to be aligned to the counts matrix. For more information
@@ -80,7 +81,7 @@ str(ioprofiles)
 ioprofiles[1:5, ]
 ```
 
-4. A nested list of the **c**ell **t**yping **h**ierarchy. Here we set up one
+4. `cth`: A nested list of the **c**ell **t**yping **h**ierarchy. Here we set up one
 that groups the immune cells into multiple subclusters.
 
 ```{r strcth}
@@ -118,7 +119,7 @@ celltype_hierarchy_list <- list(
 )
 ```
 
-5. A character name for the new annotations. This will be appended with the
+5. `name_for_new_annotation`: A character name for the new annotations. This will be appended with the
 annotation depth in the final summary annotation.
 
 ```{r strannotNames}
@@ -130,7 +131,7 @@ annotation_names <- "nestedAnnotation"
 The remaining inputs to `InSituTree` are optional, with some having default
 values.
 
-6. A vector of cohorts provides a grouping of cells based on alternative,
+6. `cohort`: A vector of cohorts provides a grouping of cells based on alternative,
 non-RNA, data types, such as immunofluorescent staining, cell shape metrics,
 tissue structures, etc. 
 One way to generate these cohorts is to use the `fastCohorting` function in the
@@ -151,7 +152,7 @@ set.seed(2024)
 example_cohorts <- sample(1:30, size = ncol(counts), replace = TRUE)
 ```
 
-7. A character vector of genes to exclude from the cell typing. For example,
+7. `excluded_genes`: A character vector of genes to exclude from the cell typing. For example,
 these may be genes with a strong platform effect between the query dataset and
 reference profiles. Defaults to NULL.
 
@@ -159,10 +160,9 @@ reference profiles. Defaults to NULL.
 genes_to_exclude <- c("MALAT1")
 ```
 
-8. A lower limit for the fraction of genes to include based on absolute
+8. `quantile_absolute_expression_difference_param`: A lower limit for the fraction of genes to include based on absolute
 difference in expression between the cell type with the highest expression and
-that with the lowest expression. Only genes in the quantile above this level
-and above the next quantile level will be considered for cell typing. Value
+that with the lowest expression. Value
 indicates quantile and should be between 0 and 1; defaults to 0.5.
 
 ```{r strQuantileAbsoluteDifference}
@@ -185,10 +185,9 @@ quantile(diffs, 0.5)
 names(diffs)[diffs > quantile(diffs, quantile_abs_difference, na.rm = TRUE)]
 ```
 
-9. A lower limit for the fraction of genes to include based on percentage
+9. `quantile_percent_expression_difference_param`: A lower limit for the fraction of genes to include based on percentage
 difference in expression between the cell type with the highest expression and
-that with the lowest expression. Only genes in the quantile above this level
-and above the next quantile level will be considered for cell typing. Value
+that with the lowest expression. Value
 indicates quantile and should be between 0 and 1; defaults to 0.5.
 
 ```{r strQuantilePercentageDifference}
@@ -217,7 +216,7 @@ at the given granularity level. Note that when fewer cell types or subtypes are
 considered simultaneously, we expect to see more variability in the diffs and
 percs.
 
-10. A logical value indicating whether to return the final summary annotation.
+10. `return_summary_annotation`: A logical value indicating whether to return the final summary annotation.
 This data frame shows the annotation that has been made for each cell at each
 level of the annotation tree. Recommendation is to keep this at its default
 value of TRUE.

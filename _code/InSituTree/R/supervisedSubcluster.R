@@ -11,6 +11,7 @@
 #' genes. Default = 0.5. Both quantile cutoffs must be passed to retain gene.
 #' @param excluded_genes Genes to be excluded during fitting with InSituType
 #' @param cohort Vector of cells' cohort membership
+#' @param ... Additional parameters passed on to `insitutypeML`
 #'
 #' @import InSituType
 #'
@@ -25,7 +26,8 @@ supervisedSubcluster <- function(reference_profiles,
                                  quantile_absolute_expression_difference = 0.5,
                                  quantile_percent_expression_difference = 0.5,
                                  excluded_genes = NULL,
-                                 cohort = NULL) {
+                                 cohort = NULL,
+                                 ...) {
   nsprofiles <- reference_profiles[intersect(colnames(x),
                                              rownames(reference_profiles)), ]
   # normalize the profiles
@@ -82,7 +84,8 @@ supervisedSubcluster <- function(reference_profiles,
   sup_res <- insitutypeML(x[nonZeroCount_idx, use_genes],
     neg = neg[nonZeroCount_idx],
     reference_profiles = nsprofiles,
-    cohort = cohort[nonZeroCount_idx]
+    cohort = cohort[nonZeroCount_idx],
+    ...
   )
 
   # Add counts per cell with the reduced panel
