@@ -12,7 +12,7 @@
 
 <meta name="author" content="Claire Williams" />
 
-<meta name="date" content="2024-12-05" />
+<meta name="date" content="2024-12-06" />
 
 <title>InSituTree hierarchical cell typing</title>
 
@@ -340,7 +340,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <h1 class="title toc-ignore">InSituTree hierarchical cell typing</h1>
 <h4 class="author">Claire Williams</h4>
-<h4 class="date">2024-12-05</h4>
+<h4 class="date">2024-12-06</h4>
 
 
 
@@ -356,8 +356,9 @@ classifications.</p>
 <div id="installation" class="section level2">
 <h2>Installation</h2>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># Install from github</span></span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>devtools<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">&quot;https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space&quot;</span>,</span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>                         <span class="at">subdir =</span> <span class="st">&quot;_code/InSituTree&quot;</span>)</span></code></pre></div>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>devtools<span class="sc">::</span><span class="fu">install_github</span>(</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>  <span class="st">&quot;https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space&quot;</span>,</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>                         <span class="at">subdir =</span> <span class="st">&quot;_code/InSituTree&quot;</span>)</span></code></pre></div>
 </div>
 <div id="data-preparation" class="section level2">
 <h2>Data preparation</h2>
@@ -460,7 +461,9 @@ reference profile, see <a href="https://nanostring-biostats.github.io/CosMx-Anal
 <ol start="4" style="list-style-type: decimal">
 <li><code>cth</code>: A nested list of the <strong>c</strong>ell
 <strong>t</strong>yping <strong>h</strong>ierarchy. Here we set up one
-that groups the immune cells into multiple subclusters.</li>
+that groups the immune cells into multiple subclusters. Any single-child
+nodes will be treated as endpoints. Endpoints can be named or unnamed;
+see “NK” for an example of an endpoint that is unnamed.</li>
 </ol>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>celltype_hierarchy_list <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="st">&quot;structural&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(</span>
@@ -496,10 +499,11 @@ that groups the immune cells into multiple subclusters.</li>
 <span id="cb6-32"><a href="#cb6-32" tabindex="-1"></a>)</span></code></pre></div>
 <ol start="5" style="list-style-type: decimal">
 <li><code>name_for_new_annotation</code>: A character name for the new
-annotations. This will be appended with the annotation depth in the
-final summary annotation.</li>
+annotations. This will appear as the name for the top level cell typing
+results and is used in a recursive function call. Recommendation is to
+leave at the default value of “topLevel”.</li>
 </ol>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>annotation_names <span class="ot">&lt;-</span> <span class="st">&quot;nestedAnnotation&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>annotation_names <span class="ot">&lt;-</span> <span class="st">&quot;topLevel&quot;</span></span></code></pre></div>
 </div>
 <div id="optional-inputs" class="section level2">
 <h2>Optional inputs</h2>
@@ -519,7 +523,7 @@ cell typing exercise (and therefore from this function). In this small
 example we will not use cohorts, but it is generally recommended. The
 random vector below is provided to give an example of the expected
 structure. See the <code>InSituType</code> package for more information
-about how to generate cohorts with the <code>fastCohorting</code>
+about how to generate cohorts with the <code>fastCohorting()</code>
 function.</li>
 </ol>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># These will not be used in this vignette and should not be random.</span></span>
@@ -535,10 +539,10 @@ Defaults to NULL.</li>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>genes_to_exclude <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;MALAT1&quot;</span>)</span></code></pre></div>
 <ol start="8" style="list-style-type: decimal">
 <li><code>quantile_absolute_expression_difference_param</code>: A lower
-limit for the fraction of genes to include based on absolute difference
-in expression between the cell type with the highest expression and that
-with the lowest expression. Value indicates quantile and should be
-between 0 and 1; defaults to 0.5.</li>
+quantile limit for gene selection based on absolute difference in
+expression between the cell type with the highest expression and that
+with the lowest expression among all cell types considered for a given
+branch. Value should be between 0 and 1; defaults to 0.5.</li>
 </ol>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>quantile_abs_difference <span class="ot">&lt;-</span> <span class="fl">0.5</span></span>
 <span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
@@ -564,10 +568,10 @@ between 0 and 1; defaults to 0.5.</li>
 <span id="cb10-22"><a href="#cb10-22" tabindex="-1"></a><span class="co">#&gt; [1] &quot;JCHAIN&quot; &quot;VIM&quot;    &quot;MALAT1&quot;</span></span></code></pre></div>
 <ol start="9" style="list-style-type: decimal">
 <li><code>quantile_percent_expression_difference_param</code>: A lower
-limit for the fraction of genes to include based on percentage
-difference in expression between the cell type with the highest
-expression and that with the lowest expression. Value indicates quantile
-and should be between 0 and 1; defaults to 0.5.</li>
+quantile limit for gene selection based on percentage difference in
+expression between the cell type with the highest expression and that
+with the lowest expression among all cell types considered for a given
+branch. Value should be between 0 and 1; defaults to 0.5.</li>
 </ol>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>quantile_perc_difference <span class="ot">&lt;-</span> <span class="fl">0.5</span></span>
 <span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a></span>
@@ -964,7 +968,7 @@ typing.</p>
 <span id="cb14-326"><a href="#cb14-326" tabindex="-1"></a><span class="co">#&gt; Warning in supervisedSubcluster(reference_profiles = prof, x = x, neg = neg, :</span></span>
 <span id="cb14-327"><a href="#cb14-327" tabindex="-1"></a><span class="co">#&gt; There are fewer than 300 genes being used to subcluster cells into T CD8</span></span>
 <span id="cb14-328"><a href="#cb14-328" tabindex="-1"></a><span class="co">#&gt; memory, T CD8 naive. These annotations may be unstable.</span></span>
-<span id="cb14-329"><a href="#cb14-329" tabindex="-1"></a><span class="co">#&gt; Summarizing group: nestedAnnotation</span></span>
+<span id="cb14-329"><a href="#cb14-329" tabindex="-1"></a><span class="co">#&gt; Summarizing group: topLevel</span></span>
 <span id="cb14-330"><a href="#cb14-330" tabindex="-1"></a><span class="co">#&gt; endothelial &amp; fibroblast</span></span>
 <span id="cb14-331"><a href="#cb14-331" tabindex="-1"></a><span class="co">#&gt; Summarizing group: structural</span></span>
 <span id="cb14-332"><a href="#cb14-332" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: structural</span></span>
@@ -986,7 +990,7 @@ typing.</p>
 <span id="cb14-348"><a href="#cb14-348" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: T8</span></span>
 <span id="cb14-349"><a href="#cb14-349" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: T-lymphoid</span></span>
 <span id="cb14-350"><a href="#cb14-350" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: lymphoid</span></span>
-<span id="cb14-351"><a href="#cb14-351" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: nestedAnnotation</span></span></code></pre></div>
+<span id="cb14-351"><a href="#cb14-351" tabindex="-1"></a><span class="co">#&gt; Completed summarizing group: topLevel</span></span></code></pre></div>
 <p>In the messages that print out, we see that a handful of cells are
 removed from cell typing if they have zero counts in any of the gene
 subsets used for typing.</p>
@@ -1002,199 +1006,221 @@ components:</p>
 </ol>
 <p>The nested results list contains the typical outputs of
 <code>InSituType</code> for each round of cell typing, and one
-additional metric,
-<code>ctsPerCell, which is the  counts of the selected genes for each cell at the given round of subclustering. This counts metric could be used to evaluate the confidence of a particular round of subclustering, since cell type assignments for low-count cells are likely to be less confident. As an example, we look at the assignment of structural cells to fibroblast or endothelial and use the flightpath tool from</code>InSituType`
-to visualize how well cells were assigned to these major types.</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">str</span>(res<span class="sc">$</span>nestedAnnotation<span class="sc">$</span>result)</span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="co">#&gt; List of 7</span></span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="co">#&gt;  $ clust                      : Named chr [1:2196] &quot;myeloid&quot; &quot;myeloid&quot; &quot;myeloid&quot; &quot;myeloid&quot; ...</span></span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;names&quot;)= chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="co">#&gt;  $ prob                       : Named num [1:2196] 1 1 1 1 1 ...</span></span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;names&quot;)= chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="co">#&gt;  $ profiles                   : num [1:244, 1:3] 0.14347 0.02459 0.08869 0.07354 0.00361 ...</span></span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:244] &quot;ACKR1&quot; &quot;ACTG2&quot; &quot;ACVRL1&quot; &quot;ADGRF5&quot; ...</span></span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:3] &quot;structural&quot; &quot;myeloid&quot; &quot;lymphoid&quot;</span></span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a><span class="co">#&gt;  $ sds                        : NULL</span></span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a><span class="co">#&gt;  $ logliks                    : num [1:2196, 1:3] -49.1 -61.7 -180.3 -62.4 -80.1 ...</span></span>
-<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:3] &quot;structural&quot; &quot;myeloid&quot; &quot;lymphoid&quot;</span></span>
-<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a><span class="co">#&gt;  $ logliks_from_lost_celltypes: num [1:2196, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
-<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr &quot;undefined&quot;</span></span>
-<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a><span class="co">#&gt;  $ ctsPerCell                 : Named num [1:2198] 7 10 33 10 44 12 31 29 59 41 ...</span></span>
-<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;names&quot;)= chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb15-22"><a href="#cb15-22" tabindex="-1"></a></span>
-<span id="cb15-23"><a href="#cb15-23" tabindex="-1"></a><span class="fu">str</span>(res<span class="sc">$</span>nestedAnnotation<span class="sc">$</span>subclusterings)</span>
-<span id="cb15-24"><a href="#cb15-24" tabindex="-1"></a><span class="co">#&gt; List of 3</span></span>
-<span id="cb15-25"><a href="#cb15-25" tabindex="-1"></a><span class="co">#&gt;  $ structural:List of 3</span></span>
-<span id="cb15-26"><a href="#cb15-26" tabindex="-1"></a><span class="co">#&gt;   ..$ result        :List of 7</span></span>
-<span id="cb15-27"><a href="#cb15-27" tabindex="-1"></a><span class="co">#&gt;   .. ..$ clust                      : Named chr [1:858] &quot;endothelial&quot; &quot;endothelial&quot; &quot;endothelial&quot; &quot;endothelial&quot; ...</span></span>
-<span id="cb15-28"><a href="#cb15-28" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:858] &quot;c_3_18_6&quot; &quot;c_3_18_10&quot; &quot;c_3_18_12&quot; &quot;c_3_18_20&quot; ...</span></span>
-<span id="cb15-29"><a href="#cb15-29" tabindex="-1"></a><span class="co">#&gt;   .. ..$ prob                       : Named num [1:858] 1 1 0.998 1 1 ...</span></span>
-<span id="cb15-30"><a href="#cb15-30" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:858] &quot;c_3_18_6&quot; &quot;c_3_18_10&quot; &quot;c_3_18_12&quot; &quot;c_3_18_20&quot; ...</span></span>
-<span id="cb15-31"><a href="#cb15-31" tabindex="-1"></a><span class="co">#&gt;   .. ..$ profiles                   : num [1:257, 1:2] 0.0205 0.2059 0.0205 0.0625 0.0275 ...</span></span>
-<span id="cb15-32"><a href="#cb15-32" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-33"><a href="#cb15-33" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:257] &quot;ACE&quot; &quot;ACKR1&quot; &quot;ACKR3&quot; &quot;ACTA2&quot; ...</span></span>
-<span id="cb15-34"><a href="#cb15-34" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:2] &quot;endothelial&quot; &quot;fibroblast&quot;</span></span>
-<span id="cb15-35"><a href="#cb15-35" tabindex="-1"></a><span class="co">#&gt;   .. ..$ sds                        : NULL</span></span>
-<span id="cb15-36"><a href="#cb15-36" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks                    : num [1:858, 1:2] -204 -231 -165 -194 -412 ...</span></span>
-<span id="cb15-37"><a href="#cb15-37" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-38"><a href="#cb15-38" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:858] &quot;c_3_18_6&quot; &quot;c_3_18_10&quot; &quot;c_3_18_12&quot; &quot;c_3_18_20&quot; ...</span></span>
-<span id="cb15-39"><a href="#cb15-39" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:2] &quot;endothelial&quot; &quot;fibroblast&quot;</span></span>
-<span id="cb15-40"><a href="#cb15-40" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks_from_lost_celltypes: num [1:858, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
-<span id="cb15-41"><a href="#cb15-41" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-42"><a href="#cb15-42" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:858] &quot;c_3_18_6&quot; &quot;c_3_18_10&quot; &quot;c_3_18_12&quot; &quot;c_3_18_20&quot; ...</span></span>
-<span id="cb15-43"><a href="#cb15-43" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr &quot;undefined&quot;</span></span>
-<span id="cb15-44"><a href="#cb15-44" tabindex="-1"></a><span class="co">#&gt;   .. ..$ ctsPerCell                 : Named num [1:858] 68 57 46 43 121 4 20 25 15 25 ...</span></span>
-<span id="cb15-45"><a href="#cb15-45" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:858] &quot;c_3_18_6&quot; &quot;c_3_18_10&quot; &quot;c_3_18_12&quot; &quot;c_3_18_20&quot; ...</span></span>
-<span id="cb15-46"><a href="#cb15-46" tabindex="-1"></a><span class="co">#&gt;   ..$ subclusterings: list()</span></span>
-<span id="cb15-47"><a href="#cb15-47" tabindex="-1"></a><span class="co">#&gt;   ..$ name          : chr &quot;structural&quot;</span></span>
-<span id="cb15-48"><a href="#cb15-48" tabindex="-1"></a><span class="co">#&gt;  $ myeloid   :List of 3</span></span>
-<span id="cb15-49"><a href="#cb15-49" tabindex="-1"></a><span class="co">#&gt;   ..$ result        :List of 7</span></span>
-<span id="cb15-50"><a href="#cb15-50" tabindex="-1"></a><span class="co">#&gt;   .. ..$ clust                      : Named chr [1:1063] &quot;macrophage&quot; &quot;macrophage&quot; &quot;macrophage&quot; &quot;macrophage&quot; ...</span></span>
-<span id="cb15-51"><a href="#cb15-51" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:1063] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb15-52"><a href="#cb15-52" tabindex="-1"></a><span class="co">#&gt;   .. ..$ prob                       : Named num [1:1063] 0.711 0.957 1 0.804 0.995 ...</span></span>
-<span id="cb15-53"><a href="#cb15-53" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:1063] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb15-54"><a href="#cb15-54" tabindex="-1"></a><span class="co">#&gt;   .. ..$ profiles                   : num [1:166, 1:5] 0.0315 0.0242 0.0254 0 0 ...</span></span>
-<span id="cb15-55"><a href="#cb15-55" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-56"><a href="#cb15-56" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:166] &quot;ABL2&quot; &quot;ACE&quot; &quot;ACVRL1&quot; &quot;ADGRG3&quot; ...</span></span>
-<span id="cb15-57"><a href="#cb15-57" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:5] &quot;macrophage&quot; &quot;mast&quot; &quot;mDC&quot; &quot;monocyte&quot; ...</span></span>
-<span id="cb15-58"><a href="#cb15-58" tabindex="-1"></a><span class="co">#&gt;   .. ..$ sds                        : NULL</span></span>
-<span id="cb15-59"><a href="#cb15-59" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks                    : num [1:1063, 1:5] -11.2 -29.7 -80.7 -29.9 -36.3 ...</span></span>
-<span id="cb15-60"><a href="#cb15-60" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-61"><a href="#cb15-61" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:1063] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb15-62"><a href="#cb15-62" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:5] &quot;macrophage&quot; &quot;mast&quot; &quot;mDC&quot; &quot;monocyte&quot; ...</span></span>
-<span id="cb15-63"><a href="#cb15-63" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks_from_lost_celltypes: num [1:1063, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
-<span id="cb15-64"><a href="#cb15-64" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-65"><a href="#cb15-65" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:1063] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb15-66"><a href="#cb15-66" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr &quot;undefined&quot;</span></span>
-<span id="cb15-67"><a href="#cb15-67" tabindex="-1"></a><span class="co">#&gt;   .. ..$ ctsPerCell                 : Named num [1:1064] 2 10 38 6 13 12 25 62 60 8 ...</span></span>
-<span id="cb15-68"><a href="#cb15-68" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:1064] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb15-69"><a href="#cb15-69" tabindex="-1"></a><span class="co">#&gt;   ..$ subclusterings: list()</span></span>
-<span id="cb15-70"><a href="#cb15-70" tabindex="-1"></a><span class="co">#&gt;   ..$ name          : chr &quot;myeloid&quot;</span></span>
-<span id="cb15-71"><a href="#cb15-71" tabindex="-1"></a><span class="co">#&gt;  $ lymphoid  :List of 3</span></span>
-<span id="cb15-72"><a href="#cb15-72" tabindex="-1"></a><span class="co">#&gt;   ..$ result        :List of 7</span></span>
-<span id="cb15-73"><a href="#cb15-73" tabindex="-1"></a><span class="co">#&gt;   .. ..$ clust                      : Named chr [1:274] &quot;B-lymphoid&quot; &quot;B-lymphoid&quot; &quot;B-lymphoid&quot; &quot;B-lymphoid&quot; ...</span></span>
-<span id="cb15-74"><a href="#cb15-74" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:274] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
-<span id="cb15-75"><a href="#cb15-75" tabindex="-1"></a><span class="co">#&gt;   .. ..$ prob                       : Named num [1:274] 1 1 1 1 1 ...</span></span>
-<span id="cb15-76"><a href="#cb15-76" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:274] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
-<span id="cb15-77"><a href="#cb15-77" tabindex="-1"></a><span class="co">#&gt;   .. ..$ profiles                   : num [1:278, 1:2] 0.0268 0.0145 0.0309 0.0719 0.0186 ...</span></span>
-<span id="cb15-78"><a href="#cb15-78" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-79"><a href="#cb15-79" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:278] &quot;ACKR3&quot; &quot;ACTA2&quot; &quot;ACVR2A&quot; &quot;ADGRE5&quot; ...</span></span>
-<span id="cb15-80"><a href="#cb15-80" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:2] &quot;B-lymphoid&quot; &quot;T-lymphoid&quot;</span></span>
-<span id="cb15-81"><a href="#cb15-81" tabindex="-1"></a><span class="co">#&gt;   .. ..$ sds                        : NULL</span></span>
-<span id="cb15-82"><a href="#cb15-82" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks                    : num [1:274, 1:2] -113.9 -40.5 -136.9 -202 -99.6 ...</span></span>
-<span id="cb15-83"><a href="#cb15-83" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-84"><a href="#cb15-84" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:274] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
-<span id="cb15-85"><a href="#cb15-85" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:2] &quot;B-lymphoid&quot; &quot;T-lymphoid&quot;</span></span>
-<span id="cb15-86"><a href="#cb15-86" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks_from_lost_celltypes: num [1:274, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
-<span id="cb15-87"><a href="#cb15-87" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-88"><a href="#cb15-88" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:274] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
-<span id="cb15-89"><a href="#cb15-89" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr &quot;undefined&quot;</span></span>
-<span id="cb15-90"><a href="#cb15-90" tabindex="-1"></a><span class="co">#&gt;   .. ..$ ctsPerCell                 : Named num [1:274] 30 42 101 128 20 134 61 40 99 5 ...</span></span>
-<span id="cb15-91"><a href="#cb15-91" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:274] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
-<span id="cb15-92"><a href="#cb15-92" tabindex="-1"></a><span class="co">#&gt;   ..$ subclusterings:List of 2</span></span>
-<span id="cb15-93"><a href="#cb15-93" tabindex="-1"></a><span class="co">#&gt;   .. ..$ B-lymphoid:List of 3</span></span>
-<span id="cb15-94"><a href="#cb15-94" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ result        :List of 7</span></span>
-<span id="cb15-95"><a href="#cb15-95" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ clust                      : Named chr [1:244] &quot;B-cell&quot; &quot;plasmablast&quot; &quot;plasmablast&quot; &quot;plasmablast&quot; ...</span></span>
-<span id="cb15-96"><a href="#cb15-96" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:244] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
-<span id="cb15-97"><a href="#cb15-97" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ prob                       : Named num [1:244] 1 1 1 1 1 ...</span></span>
-<span id="cb15-98"><a href="#cb15-98" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:244] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
-<span id="cb15-99"><a href="#cb15-99" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ profiles                   : num [1:235, 1:3] 0.03387 0 0.11989 0.02312 0.00161 ...</span></span>
-<span id="cb15-100"><a href="#cb15-100" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-101"><a href="#cb15-101" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:235] &quot;ADGRA3&quot; &quot;ADGRE2&quot; &quot;ADGRG5&quot; &quot;ADORA2A&quot; ...</span></span>
-<span id="cb15-102"><a href="#cb15-102" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:3] &quot;B-cell&quot; &quot;pDC&quot; &quot;plasmablast&quot;</span></span>
-<span id="cb15-103"><a href="#cb15-103" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ sds                        : NULL</span></span>
-<span id="cb15-104"><a href="#cb15-104" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ logliks                    : num [1:244, 1:3] -125 -114 -286 -323 -259 ...</span></span>
-<span id="cb15-105"><a href="#cb15-105" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-106"><a href="#cb15-106" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:244] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
-<span id="cb15-107"><a href="#cb15-107" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:3] &quot;B-cell&quot; &quot;pDC&quot; &quot;plasmablast&quot;</span></span>
-<span id="cb15-108"><a href="#cb15-108" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ logliks_from_lost_celltypes: num [1:244, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
-<span id="cb15-109"><a href="#cb15-109" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-110"><a href="#cb15-110" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:244] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
-<span id="cb15-111"><a href="#cb15-111" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr &quot;undefined&quot;</span></span>
-<span id="cb15-112"><a href="#cb15-112" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ ctsPerCell                 : Named num [1:244] 38 38 86 138 120 68 47 100 9 129 ...</span></span>
-<span id="cb15-113"><a href="#cb15-113" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:244] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
-<span id="cb15-114"><a href="#cb15-114" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ subclusterings: list()</span></span>
-<span id="cb15-115"><a href="#cb15-115" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ name          : chr &quot;B-lymphoid&quot;</span></span>
-<span id="cb15-116"><a href="#cb15-116" tabindex="-1"></a><span class="co">#&gt;   .. ..$ T-lymphoid:List of 3</span></span>
-<span id="cb15-117"><a href="#cb15-117" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ result        :List of 7</span></span>
-<span id="cb15-118"><a href="#cb15-118" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ clust                      : Named chr [1:30] &quot;T8&quot; &quot;T8&quot; &quot;T4&quot; &quot;NK&quot; ...</span></span>
-<span id="cb15-119"><a href="#cb15-119" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:30] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_537&quot; &quot;c_3_18_566&quot; ...</span></span>
-<span id="cb15-120"><a href="#cb15-120" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ prob                       : Named num [1:30] 0.958 0.613 0.965 0.977 0.831 ...</span></span>
-<span id="cb15-121"><a href="#cb15-121" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:30] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_537&quot; &quot;c_3_18_566&quot; ...</span></span>
-<span id="cb15-122"><a href="#cb15-122" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ profiles                   : num [1:238, 1:3] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
-<span id="cb15-123"><a href="#cb15-123" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-124"><a href="#cb15-124" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:238] &quot;ACE&quot; &quot;ACVR1&quot; &quot;ADGRB2&quot; &quot;ADGRE1&quot; ...</span></span>
-<span id="cb15-125"><a href="#cb15-125" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:3] &quot;T4&quot; &quot;T8&quot; &quot;NK&quot;</span></span>
-<span id="cb15-126"><a href="#cb15-126" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ sds                        : NULL</span></span>
-<span id="cb15-127"><a href="#cb15-127" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ logliks                    : num [1:30, 1:3] -66.4 -76.7 -41.4 -35.6 -107 ...</span></span>
-<span id="cb15-128"><a href="#cb15-128" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-129"><a href="#cb15-129" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:30] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_537&quot; &quot;c_3_18_566&quot; ...</span></span>
-<span id="cb15-130"><a href="#cb15-130" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:3] &quot;T4&quot; &quot;T8&quot; &quot;NK&quot;</span></span>
-<span id="cb15-131"><a href="#cb15-131" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ logliks_from_lost_celltypes: num [1:30, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
-<span id="cb15-132"><a href="#cb15-132" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-133"><a href="#cb15-133" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:30] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_537&quot; &quot;c_3_18_566&quot; ...</span></span>
-<span id="cb15-134"><a href="#cb15-134" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr &quot;undefined&quot;</span></span>
-<span id="cb15-135"><a href="#cb15-135" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ ctsPerCell                 : Named num [1:30] 15 19 9 6 33 13 21 14 19 9 ...</span></span>
-<span id="cb15-136"><a href="#cb15-136" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:30] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_537&quot; &quot;c_3_18_566&quot; ...</span></span>
-<span id="cb15-137"><a href="#cb15-137" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ subclusterings:List of 2</span></span>
-<span id="cb15-138"><a href="#cb15-138" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ T4:List of 3</span></span>
-<span id="cb15-139"><a href="#cb15-139" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ result        :List of 7</span></span>
-<span id="cb15-140"><a href="#cb15-140" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ clust                      : Named chr [1:7] &quot;Treg&quot; &quot;Treg&quot; &quot;Treg&quot; &quot;Treg&quot; ...</span></span>
-<span id="cb15-141"><a href="#cb15-141" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:7] &quot;c_3_18_537&quot; &quot;c_3_18_1163&quot; &quot;c_3_18_1347&quot; &quot;c_3_18_2865&quot; ...</span></span>
-<span id="cb15-142"><a href="#cb15-142" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ prob                       : Named num [1:7] 0.51 0.581 0.954 0.482 0.885 ...</span></span>
-<span id="cb15-143"><a href="#cb15-143" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:7] &quot;c_3_18_537&quot; &quot;c_3_18_1163&quot; &quot;c_3_18_1347&quot; &quot;c_3_18_2865&quot; ...</span></span>
-<span id="cb15-144"><a href="#cb15-144" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ profiles                   : num [1:222, 1] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
-<span id="cb15-145"><a href="#cb15-145" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-146"><a href="#cb15-146" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:222] &quot;ACE&quot; &quot;ACTG2&quot; &quot;ADGRA3&quot; &quot;ADGRE1&quot; ...</span></span>
-<span id="cb15-147"><a href="#cb15-147" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr &quot;Treg&quot;</span></span>
-<span id="cb15-148"><a href="#cb15-148" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ sds                        : NULL</span></span>
-<span id="cb15-149"><a href="#cb15-149" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ logliks                    : num [1:7, 1] -49.5 -47.5 -32.1 -59.1 -109 ...</span></span>
-<span id="cb15-150"><a href="#cb15-150" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-151"><a href="#cb15-151" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:7] &quot;c_3_18_537&quot; &quot;c_3_18_1163&quot; &quot;c_3_18_1347&quot; &quot;c_3_18_2865&quot; ...</span></span>
-<span id="cb15-152"><a href="#cb15-152" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr &quot;Treg&quot;</span></span>
-<span id="cb15-153"><a href="#cb15-153" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ logliks_from_lost_celltypes: num [1:7, 1:3] -50 -47.8 -35.5 -59.2 -111 ...</span></span>
-<span id="cb15-154"><a href="#cb15-154" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-155"><a href="#cb15-155" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:7] &quot;c_3_18_537&quot; &quot;c_3_18_1163&quot; &quot;c_3_18_1347&quot; &quot;c_3_18_2865&quot; ...</span></span>
-<span id="cb15-156"><a href="#cb15-156" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:3] &quot;T CD4 memory&quot; &quot;T CD4 naive&quot; &quot;undefined&quot;</span></span>
-<span id="cb15-157"><a href="#cb15-157" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ ctsPerCell                 : Named num [1:7] 9 9 8 11 29 48 39</span></span>
-<span id="cb15-158"><a href="#cb15-158" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:7] &quot;c_3_18_537&quot; &quot;c_3_18_1163&quot; &quot;c_3_18_1347&quot; &quot;c_3_18_2865&quot; ...</span></span>
-<span id="cb15-159"><a href="#cb15-159" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ subclusterings: list()</span></span>
-<span id="cb15-160"><a href="#cb15-160" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ name          : chr &quot;T4&quot;</span></span>
-<span id="cb15-161"><a href="#cb15-161" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ T8:List of 3</span></span>
-<span id="cb15-162"><a href="#cb15-162" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ result        :List of 7</span></span>
-<span id="cb15-163"><a href="#cb15-163" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ clust                      : Named chr [1:15] &quot;T CD8 memory&quot; &quot;T CD8 memory&quot; &quot;T CD8 memory&quot; &quot;T CD8 memory&quot; ...</span></span>
-<span id="cb15-164"><a href="#cb15-164" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:15] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_631&quot; &quot;c_3_18_747&quot; ...</span></span>
-<span id="cb15-165"><a href="#cb15-165" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ prob                       : Named num [1:15] 1 1 1 1 1 ...</span></span>
-<span id="cb15-166"><a href="#cb15-166" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:15] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_631&quot; &quot;c_3_18_747&quot; ...</span></span>
-<span id="cb15-167"><a href="#cb15-167" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ profiles                   : num [1:257, 1] 0 0 0 0 0 ...</span></span>
-<span id="cb15-168"><a href="#cb15-168" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-169"><a href="#cb15-169" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:257] &quot;ABL2&quot; &quot;ACE&quot; &quot;ACTG2&quot; &quot;ACVR1B&quot; ...</span></span>
-<span id="cb15-170"><a href="#cb15-170" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr &quot;T CD8 memory&quot;</span></span>
-<span id="cb15-171"><a href="#cb15-171" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ sds                        : NULL</span></span>
-<span id="cb15-172"><a href="#cb15-172" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ logliks                    : num [1:15, 1] -156.9 -103.1 -205.3 -44.1 -108 ...</span></span>
-<span id="cb15-173"><a href="#cb15-173" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-174"><a href="#cb15-174" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:15] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_631&quot; &quot;c_3_18_747&quot; ...</span></span>
-<span id="cb15-175"><a href="#cb15-175" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr &quot;T CD8 memory&quot;</span></span>
-<span id="cb15-176"><a href="#cb15-176" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ logliks_from_lost_celltypes: num [1:15, 1:2] -187.6 -124.8 -234.9 -53.7 -142.2 ...</span></span>
-<span id="cb15-177"><a href="#cb15-177" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb15-178"><a href="#cb15-178" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:15] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_631&quot; &quot;c_3_18_747&quot; ...</span></span>
-<span id="cb15-179"><a href="#cb15-179" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:2] &quot;T CD8 naive&quot; &quot;undefined&quot;</span></span>
-<span id="cb15-180"><a href="#cb15-180" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ ctsPerCell                 : Named num [1:15] 30 25 59 9 32 26 12 7 12 20 ...</span></span>
-<span id="cb15-181"><a href="#cb15-181" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:15] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_631&quot; &quot;c_3_18_747&quot; ...</span></span>
-<span id="cb15-182"><a href="#cb15-182" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ subclusterings: list()</span></span>
-<span id="cb15-183"><a href="#cb15-183" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ name          : chr &quot;T8&quot;</span></span>
-<span id="cb15-184"><a href="#cb15-184" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ name          : chr &quot;T-lymphoid&quot;</span></span>
-<span id="cb15-185"><a href="#cb15-185" tabindex="-1"></a><span class="co">#&gt;   ..$ name          : chr &quot;lymphoid&quot;</span></span>
-<span id="cb15-186"><a href="#cb15-186" tabindex="-1"></a></span>
-<span id="cb15-187"><a href="#cb15-187" tabindex="-1"></a>InSituType<span class="sc">::</span><span class="fu">flightpath_plot</span>(<span class="at">insitutype_result =</span></span>
-<span id="cb15-188"><a href="#cb15-188" tabindex="-1"></a>                              res<span class="sc">$</span>nestedAnnotation<span class="sc">$</span>subclusterings<span class="sc">$</span>structural<span class="sc">$</span>result)</span>
-<span id="cb15-189"><a href="#cb15-189" tabindex="-1"></a><span class="co">#&gt; Warning: constructing layout for a very small input dataset</span></span>
-<span id="cb15-190"><a href="#cb15-190" tabindex="-1"></a><span class="co">#&gt; Saving flightpath_plot to: ./NBClust-Plots/2024-12-05_18-51-43-UTC-flightpath_plot.png</span></span></code></pre></div>
+additional metric, <code>ctsPerCell</code>, which is the counts of the
+selected genes for each cell at the given round of subclustering. This
+counts metric could be used to evaluate the confidence of a particular
+round of subclustering, since cell type assignments for low-count cells
+are likely to be less confident. Each level of the results list
+contains:</p>
+<ul>
+<li><p><code>result</code>: The <code>InSituType</code> results plus
+counts per cell</p></li>
+<li><p><code>subclusterings</code>: A nested list of clustering results
+for the next level down of annotations.</p></li>
+<li><p><code>name</code>: The name of the celltype that was
+subclustered.</p></li>
+</ul>
+<p>As an example, we look at the assignment of structural cells to
+fibroblast or endothelial and use the flightpath tool from
+<code>InSituType</code> to visualize how well cells were assigned to
+these major types.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">names</span>(res)</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;topLevel&quot;          &quot;summaryAnnotation&quot;</span></span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="fu">names</span>(res<span class="sc">$</span>topLevel)</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;result&quot;         &quot;subclusterings&quot; &quot;name&quot;</span></span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a></span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="fu">str</span>(res<span class="sc">$</span>topLevel<span class="sc">$</span>result)</span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a><span class="co">#&gt; List of 7</span></span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a><span class="co">#&gt;  $ clust                      : Named chr [1:2196] &quot;myeloid&quot; &quot;myeloid&quot; &quot;myeloid&quot; &quot;myeloid&quot; ...</span></span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;names&quot;)= chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a><span class="co">#&gt;  $ prob                       : Named num [1:2196] 1 1 1 1 1 ...</span></span>
+<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;names&quot;)= chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a><span class="co">#&gt;  $ profiles                   : num [1:244, 1:3] 0.14347 0.02459 0.08869 0.07354 0.00361 ...</span></span>
+<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:244] &quot;ACKR1&quot; &quot;ACTG2&quot; &quot;ACVRL1&quot; &quot;ADGRF5&quot; ...</span></span>
+<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:3] &quot;structural&quot; &quot;myeloid&quot; &quot;lymphoid&quot;</span></span>
+<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a><span class="co">#&gt;  $ sds                        : NULL</span></span>
+<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="co">#&gt;  $ logliks                    : num [1:2196, 1:3] -49.1 -61.7 -180.3 -62.4 -80.1 ...</span></span>
+<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:3] &quot;structural&quot; &quot;myeloid&quot; &quot;lymphoid&quot;</span></span>
+<span id="cb15-22"><a href="#cb15-22" tabindex="-1"></a><span class="co">#&gt;  $ logliks_from_lost_celltypes: num [1:2196, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
+<span id="cb15-23"><a href="#cb15-23" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-24"><a href="#cb15-24" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2196] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-25"><a href="#cb15-25" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr &quot;undefined&quot;</span></span>
+<span id="cb15-26"><a href="#cb15-26" tabindex="-1"></a><span class="co">#&gt;  $ ctsPerCell                 : Named num [1:2198] 7 10 33 10 44 12 31 29 59 41 ...</span></span>
+<span id="cb15-27"><a href="#cb15-27" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;names&quot;)= chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-28"><a href="#cb15-28" tabindex="-1"></a></span>
+<span id="cb15-29"><a href="#cb15-29" tabindex="-1"></a><span class="fu">str</span>(res<span class="sc">$</span>topLevel<span class="sc">$</span>subclusterings)</span>
+<span id="cb15-30"><a href="#cb15-30" tabindex="-1"></a><span class="co">#&gt; List of 3</span></span>
+<span id="cb15-31"><a href="#cb15-31" tabindex="-1"></a><span class="co">#&gt;  $ structural:List of 3</span></span>
+<span id="cb15-32"><a href="#cb15-32" tabindex="-1"></a><span class="co">#&gt;   ..$ result        :List of 7</span></span>
+<span id="cb15-33"><a href="#cb15-33" tabindex="-1"></a><span class="co">#&gt;   .. ..$ clust                      : Named chr [1:858] &quot;endothelial&quot; &quot;endothelial&quot; &quot;endothelial&quot; &quot;endothelial&quot; ...</span></span>
+<span id="cb15-34"><a href="#cb15-34" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:858] &quot;c_3_18_6&quot; &quot;c_3_18_10&quot; &quot;c_3_18_12&quot; &quot;c_3_18_20&quot; ...</span></span>
+<span id="cb15-35"><a href="#cb15-35" tabindex="-1"></a><span class="co">#&gt;   .. ..$ prob                       : Named num [1:858] 1 1 0.998 1 1 ...</span></span>
+<span id="cb15-36"><a href="#cb15-36" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:858] &quot;c_3_18_6&quot; &quot;c_3_18_10&quot; &quot;c_3_18_12&quot; &quot;c_3_18_20&quot; ...</span></span>
+<span id="cb15-37"><a href="#cb15-37" tabindex="-1"></a><span class="co">#&gt;   .. ..$ profiles                   : num [1:257, 1:2] 0.0205 0.2059 0.0205 0.0625 0.0275 ...</span></span>
+<span id="cb15-38"><a href="#cb15-38" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-39"><a href="#cb15-39" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:257] &quot;ACE&quot; &quot;ACKR1&quot; &quot;ACKR3&quot; &quot;ACTA2&quot; ...</span></span>
+<span id="cb15-40"><a href="#cb15-40" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:2] &quot;endothelial&quot; &quot;fibroblast&quot;</span></span>
+<span id="cb15-41"><a href="#cb15-41" tabindex="-1"></a><span class="co">#&gt;   .. ..$ sds                        : NULL</span></span>
+<span id="cb15-42"><a href="#cb15-42" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks                    : num [1:858, 1:2] -204 -231 -165 -194 -412 ...</span></span>
+<span id="cb15-43"><a href="#cb15-43" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-44"><a href="#cb15-44" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:858] &quot;c_3_18_6&quot; &quot;c_3_18_10&quot; &quot;c_3_18_12&quot; &quot;c_3_18_20&quot; ...</span></span>
+<span id="cb15-45"><a href="#cb15-45" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:2] &quot;endothelial&quot; &quot;fibroblast&quot;</span></span>
+<span id="cb15-46"><a href="#cb15-46" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks_from_lost_celltypes: num [1:858, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
+<span id="cb15-47"><a href="#cb15-47" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-48"><a href="#cb15-48" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:858] &quot;c_3_18_6&quot; &quot;c_3_18_10&quot; &quot;c_3_18_12&quot; &quot;c_3_18_20&quot; ...</span></span>
+<span id="cb15-49"><a href="#cb15-49" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr &quot;undefined&quot;</span></span>
+<span id="cb15-50"><a href="#cb15-50" tabindex="-1"></a><span class="co">#&gt;   .. ..$ ctsPerCell                 : Named num [1:858] 68 57 46 43 121 4 20 25 15 25 ...</span></span>
+<span id="cb15-51"><a href="#cb15-51" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:858] &quot;c_3_18_6&quot; &quot;c_3_18_10&quot; &quot;c_3_18_12&quot; &quot;c_3_18_20&quot; ...</span></span>
+<span id="cb15-52"><a href="#cb15-52" tabindex="-1"></a><span class="co">#&gt;   ..$ subclusterings: list()</span></span>
+<span id="cb15-53"><a href="#cb15-53" tabindex="-1"></a><span class="co">#&gt;   ..$ name          : chr &quot;structural&quot;</span></span>
+<span id="cb15-54"><a href="#cb15-54" tabindex="-1"></a><span class="co">#&gt;  $ myeloid   :List of 3</span></span>
+<span id="cb15-55"><a href="#cb15-55" tabindex="-1"></a><span class="co">#&gt;   ..$ result        :List of 7</span></span>
+<span id="cb15-56"><a href="#cb15-56" tabindex="-1"></a><span class="co">#&gt;   .. ..$ clust                      : Named chr [1:1063] &quot;macrophage&quot; &quot;macrophage&quot; &quot;macrophage&quot; &quot;macrophage&quot; ...</span></span>
+<span id="cb15-57"><a href="#cb15-57" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:1063] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-58"><a href="#cb15-58" tabindex="-1"></a><span class="co">#&gt;   .. ..$ prob                       : Named num [1:1063] 0.711 0.957 1 0.804 0.995 ...</span></span>
+<span id="cb15-59"><a href="#cb15-59" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:1063] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-60"><a href="#cb15-60" tabindex="-1"></a><span class="co">#&gt;   .. ..$ profiles                   : num [1:166, 1:5] 0.0315 0.0242 0.0254 0 0 ...</span></span>
+<span id="cb15-61"><a href="#cb15-61" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-62"><a href="#cb15-62" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:166] &quot;ABL2&quot; &quot;ACE&quot; &quot;ACVRL1&quot; &quot;ADGRG3&quot; ...</span></span>
+<span id="cb15-63"><a href="#cb15-63" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:5] &quot;macrophage&quot; &quot;mast&quot; &quot;mDC&quot; &quot;monocyte&quot; ...</span></span>
+<span id="cb15-64"><a href="#cb15-64" tabindex="-1"></a><span class="co">#&gt;   .. ..$ sds                        : NULL</span></span>
+<span id="cb15-65"><a href="#cb15-65" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks                    : num [1:1063, 1:5] -11.2 -29.7 -80.7 -29.9 -36.3 ...</span></span>
+<span id="cb15-66"><a href="#cb15-66" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-67"><a href="#cb15-67" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:1063] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-68"><a href="#cb15-68" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:5] &quot;macrophage&quot; &quot;mast&quot; &quot;mDC&quot; &quot;monocyte&quot; ...</span></span>
+<span id="cb15-69"><a href="#cb15-69" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks_from_lost_celltypes: num [1:1063, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
+<span id="cb15-70"><a href="#cb15-70" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-71"><a href="#cb15-71" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:1063] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-72"><a href="#cb15-72" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr &quot;undefined&quot;</span></span>
+<span id="cb15-73"><a href="#cb15-73" tabindex="-1"></a><span class="co">#&gt;   .. ..$ ctsPerCell                 : Named num [1:1064] 2 10 38 6 13 12 25 62 60 8 ...</span></span>
+<span id="cb15-74"><a href="#cb15-74" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:1064] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb15-75"><a href="#cb15-75" tabindex="-1"></a><span class="co">#&gt;   ..$ subclusterings: list()</span></span>
+<span id="cb15-76"><a href="#cb15-76" tabindex="-1"></a><span class="co">#&gt;   ..$ name          : chr &quot;myeloid&quot;</span></span>
+<span id="cb15-77"><a href="#cb15-77" tabindex="-1"></a><span class="co">#&gt;  $ lymphoid  :List of 3</span></span>
+<span id="cb15-78"><a href="#cb15-78" tabindex="-1"></a><span class="co">#&gt;   ..$ result        :List of 7</span></span>
+<span id="cb15-79"><a href="#cb15-79" tabindex="-1"></a><span class="co">#&gt;   .. ..$ clust                      : Named chr [1:274] &quot;B-lymphoid&quot; &quot;B-lymphoid&quot; &quot;B-lymphoid&quot; &quot;B-lymphoid&quot; ...</span></span>
+<span id="cb15-80"><a href="#cb15-80" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:274] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
+<span id="cb15-81"><a href="#cb15-81" tabindex="-1"></a><span class="co">#&gt;   .. ..$ prob                       : Named num [1:274] 1 1 1 1 1 ...</span></span>
+<span id="cb15-82"><a href="#cb15-82" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:274] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
+<span id="cb15-83"><a href="#cb15-83" tabindex="-1"></a><span class="co">#&gt;   .. ..$ profiles                   : num [1:278, 1:2] 0.0268 0.0145 0.0309 0.0719 0.0186 ...</span></span>
+<span id="cb15-84"><a href="#cb15-84" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-85"><a href="#cb15-85" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:278] &quot;ACKR3&quot; &quot;ACTA2&quot; &quot;ACVR2A&quot; &quot;ADGRE5&quot; ...</span></span>
+<span id="cb15-86"><a href="#cb15-86" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:2] &quot;B-lymphoid&quot; &quot;T-lymphoid&quot;</span></span>
+<span id="cb15-87"><a href="#cb15-87" tabindex="-1"></a><span class="co">#&gt;   .. ..$ sds                        : NULL</span></span>
+<span id="cb15-88"><a href="#cb15-88" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks                    : num [1:274, 1:2] -113.9 -40.5 -136.9 -202 -99.6 ...</span></span>
+<span id="cb15-89"><a href="#cb15-89" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-90"><a href="#cb15-90" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:274] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
+<span id="cb15-91"><a href="#cb15-91" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:2] &quot;B-lymphoid&quot; &quot;T-lymphoid&quot;</span></span>
+<span id="cb15-92"><a href="#cb15-92" tabindex="-1"></a><span class="co">#&gt;   .. ..$ logliks_from_lost_celltypes: num [1:274, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
+<span id="cb15-93"><a href="#cb15-93" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-94"><a href="#cb15-94" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr [1:274] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
+<span id="cb15-95"><a href="#cb15-95" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ : chr &quot;undefined&quot;</span></span>
+<span id="cb15-96"><a href="#cb15-96" tabindex="-1"></a><span class="co">#&gt;   .. ..$ ctsPerCell                 : Named num [1:274] 30 42 101 128 20 134 61 40 99 5 ...</span></span>
+<span id="cb15-97"><a href="#cb15-97" tabindex="-1"></a><span class="co">#&gt;   .. .. ..- attr(*, &quot;names&quot;)= chr [1:274] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
+<span id="cb15-98"><a href="#cb15-98" tabindex="-1"></a><span class="co">#&gt;   ..$ subclusterings:List of 2</span></span>
+<span id="cb15-99"><a href="#cb15-99" tabindex="-1"></a><span class="co">#&gt;   .. ..$ B-lymphoid:List of 3</span></span>
+<span id="cb15-100"><a href="#cb15-100" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ result        :List of 7</span></span>
+<span id="cb15-101"><a href="#cb15-101" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ clust                      : Named chr [1:244] &quot;B-cell&quot; &quot;plasmablast&quot; &quot;plasmablast&quot; &quot;plasmablast&quot; ...</span></span>
+<span id="cb15-102"><a href="#cb15-102" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:244] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
+<span id="cb15-103"><a href="#cb15-103" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ prob                       : Named num [1:244] 1 1 1 1 1 ...</span></span>
+<span id="cb15-104"><a href="#cb15-104" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:244] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
+<span id="cb15-105"><a href="#cb15-105" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ profiles                   : num [1:235, 1:3] 0.03387 0 0.11989 0.02312 0.00161 ...</span></span>
+<span id="cb15-106"><a href="#cb15-106" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-107"><a href="#cb15-107" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:235] &quot;ADGRA3&quot; &quot;ADGRE2&quot; &quot;ADGRG5&quot; &quot;ADORA2A&quot; ...</span></span>
+<span id="cb15-108"><a href="#cb15-108" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:3] &quot;B-cell&quot; &quot;pDC&quot; &quot;plasmablast&quot;</span></span>
+<span id="cb15-109"><a href="#cb15-109" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ sds                        : NULL</span></span>
+<span id="cb15-110"><a href="#cb15-110" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ logliks                    : num [1:244, 1:3] -125 -114 -286 -323 -259 ...</span></span>
+<span id="cb15-111"><a href="#cb15-111" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-112"><a href="#cb15-112" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:244] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
+<span id="cb15-113"><a href="#cb15-113" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:3] &quot;B-cell&quot; &quot;pDC&quot; &quot;plasmablast&quot;</span></span>
+<span id="cb15-114"><a href="#cb15-114" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ logliks_from_lost_celltypes: num [1:244, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
+<span id="cb15-115"><a href="#cb15-115" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-116"><a href="#cb15-116" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:244] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
+<span id="cb15-117"><a href="#cb15-117" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr &quot;undefined&quot;</span></span>
+<span id="cb15-118"><a href="#cb15-118" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ ctsPerCell                 : Named num [1:244] 38 38 86 138 120 68 47 100 9 129 ...</span></span>
+<span id="cb15-119"><a href="#cb15-119" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:244] &quot;c_3_18_11&quot; &quot;c_3_18_19&quot; &quot;c_3_18_34&quot; &quot;c_3_18_40&quot; ...</span></span>
+<span id="cb15-120"><a href="#cb15-120" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ subclusterings: list()</span></span>
+<span id="cb15-121"><a href="#cb15-121" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ name          : chr &quot;B-lymphoid&quot;</span></span>
+<span id="cb15-122"><a href="#cb15-122" tabindex="-1"></a><span class="co">#&gt;   .. ..$ T-lymphoid:List of 3</span></span>
+<span id="cb15-123"><a href="#cb15-123" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ result        :List of 7</span></span>
+<span id="cb15-124"><a href="#cb15-124" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ clust                      : Named chr [1:30] &quot;T8&quot; &quot;T8&quot; &quot;T4&quot; &quot;NK&quot; ...</span></span>
+<span id="cb15-125"><a href="#cb15-125" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:30] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_537&quot; &quot;c_3_18_566&quot; ...</span></span>
+<span id="cb15-126"><a href="#cb15-126" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ prob                       : Named num [1:30] 0.958 0.613 0.965 0.977 0.831 ...</span></span>
+<span id="cb15-127"><a href="#cb15-127" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:30] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_537&quot; &quot;c_3_18_566&quot; ...</span></span>
+<span id="cb15-128"><a href="#cb15-128" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ profiles                   : num [1:238, 1:3] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span id="cb15-129"><a href="#cb15-129" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-130"><a href="#cb15-130" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:238] &quot;ACE&quot; &quot;ACVR1&quot; &quot;ADGRB2&quot; &quot;ADGRE1&quot; ...</span></span>
+<span id="cb15-131"><a href="#cb15-131" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:3] &quot;T4&quot; &quot;T8&quot; &quot;NK&quot;</span></span>
+<span id="cb15-132"><a href="#cb15-132" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ sds                        : NULL</span></span>
+<span id="cb15-133"><a href="#cb15-133" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ logliks                    : num [1:30, 1:3] -66.4 -76.7 -41.4 -35.6 -107 ...</span></span>
+<span id="cb15-134"><a href="#cb15-134" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-135"><a href="#cb15-135" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:30] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_537&quot; &quot;c_3_18_566&quot; ...</span></span>
+<span id="cb15-136"><a href="#cb15-136" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:3] &quot;T4&quot; &quot;T8&quot; &quot;NK&quot;</span></span>
+<span id="cb15-137"><a href="#cb15-137" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ logliks_from_lost_celltypes: num [1:30, 1] -Inf -Inf -Inf -Inf -Inf ...</span></span>
+<span id="cb15-138"><a href="#cb15-138" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-139"><a href="#cb15-139" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr [1:30] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_537&quot; &quot;c_3_18_566&quot; ...</span></span>
+<span id="cb15-140"><a href="#cb15-140" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ : chr &quot;undefined&quot;</span></span>
+<span id="cb15-141"><a href="#cb15-141" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ ctsPerCell                 : Named num [1:30] 15 19 9 6 33 13 21 14 19 9 ...</span></span>
+<span id="cb15-142"><a href="#cb15-142" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:30] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_537&quot; &quot;c_3_18_566&quot; ...</span></span>
+<span id="cb15-143"><a href="#cb15-143" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ subclusterings:List of 2</span></span>
+<span id="cb15-144"><a href="#cb15-144" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ T4:List of 3</span></span>
+<span id="cb15-145"><a href="#cb15-145" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ result        :List of 7</span></span>
+<span id="cb15-146"><a href="#cb15-146" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ clust                      : Named chr [1:7] &quot;Treg&quot; &quot;Treg&quot; &quot;Treg&quot; &quot;Treg&quot; ...</span></span>
+<span id="cb15-147"><a href="#cb15-147" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:7] &quot;c_3_18_537&quot; &quot;c_3_18_1163&quot; &quot;c_3_18_1347&quot; &quot;c_3_18_2865&quot; ...</span></span>
+<span id="cb15-148"><a href="#cb15-148" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ prob                       : Named num [1:7] 0.51 0.581 0.954 0.482 0.885 ...</span></span>
+<span id="cb15-149"><a href="#cb15-149" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:7] &quot;c_3_18_537&quot; &quot;c_3_18_1163&quot; &quot;c_3_18_1347&quot; &quot;c_3_18_2865&quot; ...</span></span>
+<span id="cb15-150"><a href="#cb15-150" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ profiles                   : num [1:222, 1] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span id="cb15-151"><a href="#cb15-151" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-152"><a href="#cb15-152" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:222] &quot;ACE&quot; &quot;ACTG2&quot; &quot;ADGRA3&quot; &quot;ADGRE1&quot; ...</span></span>
+<span id="cb15-153"><a href="#cb15-153" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr &quot;Treg&quot;</span></span>
+<span id="cb15-154"><a href="#cb15-154" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ sds                        : NULL</span></span>
+<span id="cb15-155"><a href="#cb15-155" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ logliks                    : num [1:7, 1] -49.5 -47.5 -32.1 -59.1 -109 ...</span></span>
+<span id="cb15-156"><a href="#cb15-156" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-157"><a href="#cb15-157" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:7] &quot;c_3_18_537&quot; &quot;c_3_18_1163&quot; &quot;c_3_18_1347&quot; &quot;c_3_18_2865&quot; ...</span></span>
+<span id="cb15-158"><a href="#cb15-158" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr &quot;Treg&quot;</span></span>
+<span id="cb15-159"><a href="#cb15-159" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ logliks_from_lost_celltypes: num [1:7, 1:3] -50 -47.8 -35.5 -59.2 -111 ...</span></span>
+<span id="cb15-160"><a href="#cb15-160" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-161"><a href="#cb15-161" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:7] &quot;c_3_18_537&quot; &quot;c_3_18_1163&quot; &quot;c_3_18_1347&quot; &quot;c_3_18_2865&quot; ...</span></span>
+<span id="cb15-162"><a href="#cb15-162" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:3] &quot;T CD4 memory&quot; &quot;T CD4 naive&quot; &quot;undefined&quot;</span></span>
+<span id="cb15-163"><a href="#cb15-163" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ ctsPerCell                 : Named num [1:7] 9 9 8 11 29 48 39</span></span>
+<span id="cb15-164"><a href="#cb15-164" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:7] &quot;c_3_18_537&quot; &quot;c_3_18_1163&quot; &quot;c_3_18_1347&quot; &quot;c_3_18_2865&quot; ...</span></span>
+<span id="cb15-165"><a href="#cb15-165" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ subclusterings: list()</span></span>
+<span id="cb15-166"><a href="#cb15-166" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ name          : chr &quot;T4&quot;</span></span>
+<span id="cb15-167"><a href="#cb15-167" tabindex="-1"></a><span class="co">#&gt;   .. .. .. ..$ T8:List of 3</span></span>
+<span id="cb15-168"><a href="#cb15-168" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ result        :List of 7</span></span>
+<span id="cb15-169"><a href="#cb15-169" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ clust                      : Named chr [1:15] &quot;T CD8 memory&quot; &quot;T CD8 memory&quot; &quot;T CD8 memory&quot; &quot;T CD8 memory&quot; ...</span></span>
+<span id="cb15-170"><a href="#cb15-170" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:15] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_631&quot; &quot;c_3_18_747&quot; ...</span></span>
+<span id="cb15-171"><a href="#cb15-171" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ prob                       : Named num [1:15] 1 1 1 1 1 ...</span></span>
+<span id="cb15-172"><a href="#cb15-172" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:15] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_631&quot; &quot;c_3_18_747&quot; ...</span></span>
+<span id="cb15-173"><a href="#cb15-173" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ profiles                   : num [1:257, 1] 0 0 0 0 0 ...</span></span>
+<span id="cb15-174"><a href="#cb15-174" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-175"><a href="#cb15-175" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:257] &quot;ABL2&quot; &quot;ACE&quot; &quot;ACTG2&quot; &quot;ACVR1B&quot; ...</span></span>
+<span id="cb15-176"><a href="#cb15-176" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr &quot;T CD8 memory&quot;</span></span>
+<span id="cb15-177"><a href="#cb15-177" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ sds                        : NULL</span></span>
+<span id="cb15-178"><a href="#cb15-178" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ logliks                    : num [1:15, 1] -156.9 -103.1 -205.3 -44.1 -108 ...</span></span>
+<span id="cb15-179"><a href="#cb15-179" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-180"><a href="#cb15-180" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:15] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_631&quot; &quot;c_3_18_747&quot; ...</span></span>
+<span id="cb15-181"><a href="#cb15-181" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr &quot;T CD8 memory&quot;</span></span>
+<span id="cb15-182"><a href="#cb15-182" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ logliks_from_lost_celltypes: num [1:15, 1:2] -187.6 -124.8 -234.9 -53.7 -142.2 ...</span></span>
+<span id="cb15-183"><a href="#cb15-183" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb15-184"><a href="#cb15-184" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:15] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_631&quot; &quot;c_3_18_747&quot; ...</span></span>
+<span id="cb15-185"><a href="#cb15-185" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. .. ..$ : chr [1:2] &quot;T CD8 naive&quot; &quot;undefined&quot;</span></span>
+<span id="cb15-186"><a href="#cb15-186" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. ..$ ctsPerCell                 : Named num [1:15] 30 25 59 9 32 26 12 7 12 20 ...</span></span>
+<span id="cb15-187"><a href="#cb15-187" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. .. .. ..- attr(*, &quot;names&quot;)= chr [1:15] &quot;c_3_18_107&quot; &quot;c_3_18_442&quot; &quot;c_3_18_631&quot; &quot;c_3_18_747&quot; ...</span></span>
+<span id="cb15-188"><a href="#cb15-188" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ subclusterings: list()</span></span>
+<span id="cb15-189"><a href="#cb15-189" tabindex="-1"></a><span class="co">#&gt;   .. .. .. .. ..$ name          : chr &quot;T8&quot;</span></span>
+<span id="cb15-190"><a href="#cb15-190" tabindex="-1"></a><span class="co">#&gt;   .. .. ..$ name          : chr &quot;T-lymphoid&quot;</span></span>
+<span id="cb15-191"><a href="#cb15-191" tabindex="-1"></a><span class="co">#&gt;   ..$ name          : chr &quot;lymphoid&quot;</span></span>
+<span id="cb15-192"><a href="#cb15-192" tabindex="-1"></a></span>
+<span id="cb15-193"><a href="#cb15-193" tabindex="-1"></a>InSituType<span class="sc">::</span><span class="fu">flightpath_plot</span>(</span>
+<span id="cb15-194"><a href="#cb15-194" tabindex="-1"></a>  <span class="at">insitutype_result =</span></span>
+<span id="cb15-195"><a href="#cb15-195" tabindex="-1"></a>    res<span class="sc">$</span>topLevel<span class="sc">$</span>subclusterings<span class="sc">$</span>structural<span class="sc">$</span>result)</span>
+<span id="cb15-196"><a href="#cb15-196" tabindex="-1"></a><span class="co">#&gt; Warning: constructing layout for a very small input dataset</span></span>
+<span id="cb15-197"><a href="#cb15-197" tabindex="-1"></a><span class="co">#&gt; Saving flightpath_plot to: ./NBClust-Plots/2024-12-06_23-03-24-UTC-flightpath_plot.png</span></span></code></pre></div>
 <p><img src="data:image/png;base64,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" /><!-- --></p>
 <p>The summary annotation data frame shows the cell type assigned at
 each level of annotation, as well as the posterior probability for each
@@ -1204,21 +1230,34 @@ cells assigned to ‘endothelial’ at annotation level 2 in this example
 will also be labeled as ‘endothelial’ for annotation levels 3 and 4. In
 other words, the the right most <code>annotLevel</code> will contain the
 final cluster assignment at the finest level.</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">head</span>(res<span class="sc">$</span>summaryAnnotation)</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="co">#&gt;          annotLevel_1 probs_annotLevel_1 annotLevel_2 probs_annotLevel_2</span></span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#&gt; c_3_18_2      myeloid          1.0000000   macrophage          0.7109515</span></span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co">#&gt; c_3_18_3      myeloid          1.0000000   macrophage          0.9570978</span></span>
-<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="co">#&gt; c_3_18_4      myeloid          1.0000000   macrophage          1.0000000</span></span>
-<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a><span class="co">#&gt; c_3_18_5      myeloid          0.9999974   macrophage          0.8044057</span></span>
-<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a><span class="co">#&gt; c_3_18_6   structural          1.0000000  endothelial          1.0000000</span></span>
-<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a><span class="co">#&gt; c_3_18_7      myeloid          0.9999948   macrophage          0.9950331</span></span>
-<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a><span class="co">#&gt;          annotLevel_3 probs_annotLevel_3 annotLevel_4 probs_annotLevel_4</span></span>
-<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a><span class="co">#&gt; c_3_18_2   macrophage          0.7109515   macrophage          0.7109515</span></span>
-<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a><span class="co">#&gt; c_3_18_3   macrophage          0.9570978   macrophage          0.9570978</span></span>
-<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a><span class="co">#&gt; c_3_18_4   macrophage          1.0000000   macrophage          1.0000000</span></span>
-<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a><span class="co">#&gt; c_3_18_5   macrophage          0.8044057   macrophage          0.8044057</span></span>
-<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a><span class="co">#&gt; c_3_18_6  endothelial          1.0000000  endothelial          1.0000000</span></span>
-<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a><span class="co">#&gt; c_3_18_7   macrophage          0.9950331   macrophage          0.9950331</span></span></code></pre></div>
+<p>Note that any cells which did not have any counts in the genes used
+for subclustering will not get a cell type assignment; if this happens
+in the first round of annotation, these cells will show ‘NA’ for all
+annotation levels. If this happens at later rounds of annotation, the
+last assignment will be cascaded right.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">head</span>(res<span class="sc">$</span>summaryAnnotation, <span class="dv">10</span>)</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="co">#&gt;           annotLevel_1 probs_annotLevel_1 annotLevel_2 probs_annotLevel_2</span></span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#&gt; c_3_18_2       myeloid          1.0000000   macrophage          0.7109515</span></span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co">#&gt; c_3_18_3       myeloid          1.0000000   macrophage          0.9570978</span></span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="co">#&gt; c_3_18_4       myeloid          1.0000000   macrophage          1.0000000</span></span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a><span class="co">#&gt; c_3_18_5       myeloid          0.9999974   macrophage          0.8044057</span></span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a><span class="co">#&gt; c_3_18_6    structural          1.0000000  endothelial          1.0000000</span></span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a><span class="co">#&gt; c_3_18_7       myeloid          0.9999948   macrophage          0.9950331</span></span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a><span class="co">#&gt; c_3_18_10   structural          1.0000000  endothelial          1.0000000</span></span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a><span class="co">#&gt; c_3_18_11     lymphoid          0.9999996   B-lymphoid          1.0000000</span></span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a><span class="co">#&gt; c_3_18_12   structural          1.0000000  endothelial          0.9981063</span></span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a><span class="co">#&gt; c_3_18_19     lymphoid          1.0000000   B-lymphoid          1.0000000</span></span>
+<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a><span class="co">#&gt;           annotLevel_3 probs_annotLevel_3 annotLevel_4 probs_annotLevel_4</span></span>
+<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a><span class="co">#&gt; c_3_18_2    macrophage          0.7109515   macrophage          0.7109515</span></span>
+<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a><span class="co">#&gt; c_3_18_3    macrophage          0.9570978   macrophage          0.9570978</span></span>
+<span id="cb16-16"><a href="#cb16-16" tabindex="-1"></a><span class="co">#&gt; c_3_18_4    macrophage          1.0000000   macrophage          1.0000000</span></span>
+<span id="cb16-17"><a href="#cb16-17" tabindex="-1"></a><span class="co">#&gt; c_3_18_5    macrophage          0.8044057   macrophage          0.8044057</span></span>
+<span id="cb16-18"><a href="#cb16-18" tabindex="-1"></a><span class="co">#&gt; c_3_18_6   endothelial          1.0000000  endothelial          1.0000000</span></span>
+<span id="cb16-19"><a href="#cb16-19" tabindex="-1"></a><span class="co">#&gt; c_3_18_7    macrophage          0.9950331   macrophage          0.9950331</span></span>
+<span id="cb16-20"><a href="#cb16-20" tabindex="-1"></a><span class="co">#&gt; c_3_18_10  endothelial          1.0000000  endothelial          1.0000000</span></span>
+<span id="cb16-21"><a href="#cb16-21" tabindex="-1"></a><span class="co">#&gt; c_3_18_11       B-cell          1.0000000       B-cell          1.0000000</span></span>
+<span id="cb16-22"><a href="#cb16-22" tabindex="-1"></a><span class="co">#&gt; c_3_18_12  endothelial          0.9981063  endothelial          0.9981063</span></span>
+<span id="cb16-23"><a href="#cb16-23" tabindex="-1"></a><span class="co">#&gt; c_3_18_19  plasmablast          1.0000000  plasmablast          1.0000000</span></span></code></pre></div>
 <div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span>
 <span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a><span class="co">#&gt; R version 4.3.3 (2024-02-29)</span></span>
 <span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="co">#&gt; Platform: x86_64-pc-linux-gnu (64-bit)</span></span>

@@ -1,6 +1,6 @@
 #' Collapse a hierarchy of cell expression profiles to the root level
 #' as described in the nested list for cell type hierarchy
-#' 
+#'
 #' @param cth Cell type hierarchy, as a nested list with end point cell types
 #' in full_profiles
 #' @param full_profiles Cell profile matrix, genes x cell types,

@@ -27,8 +27,9 @@ cell type assignments and then making progressively finer classifications.
 
 ```{r installation, eval=FALSE}
 # Install from github
-devtools::install_github("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
-                         subdir = "_code/InSituTree")
+devtools::install_github(
+  "https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
+  subdir = "_code/InSituTree")
 ```
 
 ## Data preparation
@@ -70,19 +71,21 @@ negmean <- Matrix::rowMeans(mini_nsclc$neg)
 head(negmean)
 ```
 
-3. `full_profiles`: Reference profile giving the expected expression profile of each cell
-subtype, with genes in rows and cell subtypes in columns. Major cell types are
-not needed. The reference matrix must be linear-scale, not log-scale. Genes
-(rows) do not need to be aligned to the counts matrix. For more information
-about generating a reference profile, see [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/).
+3. `full_profiles`: Reference profile giving the expected expression profile of
+each cell subtype, with genes in rows and cell subtypes in columns. Major cell
+types are not needed. The reference matrix must be linear-scale, not log-scale.
+Genes (rows) do not need to be aligned to the counts matrix. For more
+information about generating a reference profile, see [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/).
 
 ```{r strprofiles}
 str(ioprofiles)
 ioprofiles[1:5, ]
 ```
 
-4. `cth`: A nested list of the **c**ell **t**yping **h**ierarchy. Here we set up one
-that groups the immune cells into multiple subclusters.
+4. `cth`: A nested list of the **c**ell **t**yping **h**ierarchy. Here we set up
+one that groups the immune cells into multiple subclusters. Any single-child
+nodes will be treated as endpoints. Endpoints can be named or unnamed; see "NK"
+for an example of an endpoint that is unnamed.
 
 ```{r strcth}
 celltype_hierarchy_list <- list(
@@ -119,11 +122,13 @@ celltype_hierarchy_list <- list(
 )
 ```
 
-5. `name_for_new_annotation`: A character name for the new annotations. This will be appended with the
-annotation depth in the final summary annotation.
+5. `name_for_new_annotation`: A character name for the new annotations. This
+will appear as the name for the top level cell typing results and is used in a
+recursive function call. Recommendation is to leave at the default value of 
+"topLevel".
 
 ```{r strannotNames}
-annotation_names <- "nestedAnnotation"
+annotation_names <- "topLevel"
 ```
 
 ## Optional inputs
@@ -131,9 +136,9 @@ annotation_names <- "nestedAnnotation"
 The remaining inputs to `InSituTree` are optional, with some having default
 values.
 
-6. `cohort`: A vector of cohorts provides a grouping of cells based on alternative,
-non-RNA, data types, such as immunofluorescent staining, cell shape metrics,
-tissue structures, etc. 
+6. `cohort`: A vector of cohorts provides a grouping of cells based on
+alternative, non-RNA, data types, such as immunofluorescent staining, cell
+shape metrics, tissue structures, etc. 
 One way to generate these cohorts is to use the `fastCohorting` function in the
 `InSituType` package and include any variables that might be informative for
 cell typing, *except* variables you'll want to analyze later. For example, if
@@ -143,7 +148,7 @@ therefore from this function).
 In this small example we will not use cohorts, but it is generally recommended.
 The random vector below is provided to give an example of the expected
 structure. See the `InSituType` package for more information about how to
-generate cohorts with the `fastCohorting` function.
+generate cohorts with the `fastCohorting()` function.
 
 ```{r strcohorts}
 # These will not be used in this vignette and should not be random.
@@ -152,18 +157,19 @@ set.seed(2024)
 example_cohorts <- sample(1:30, size = ncol(counts), replace = TRUE)
 ```
 
-7. `excluded_genes`: A character vector of genes to exclude from the cell typing. For example,
-these may be genes with a strong platform effect between the query dataset and
-reference profiles. Defaults to NULL.
+7. `excluded_genes`: A character vector of genes to exclude from the cell
+typing. For example, these may be genes with a strong platform effect between
+the query dataset and reference profiles. Defaults to NULL.
 
 ```{r strExcludedGenes}
 genes_to_exclude <- c("MALAT1")
 ```
 
-8. `quantile_absolute_expression_difference_param`: A lower limit for the fraction of genes to include based on absolute
-difference in expression between the cell type with the highest expression and
-that with the lowest expression. Value
-indicates quantile and should be between 0 and 1; defaults to 0.5.
+8. `quantile_absolute_expression_difference_param`: A lower quantile limit for
+gene selection based on absolute difference in expression between the cell type
+with the highest expression and that with the lowest expression among all cell
+types considered for a given branch. Value should be between 0 and 1; defaults
+to 0.5.
 
 ```{r strQuantileAbsoluteDifference}
 quantile_abs_difference <- 0.5
@@ -180,15 +186,16 @@ diffs
 quantile(diffs, 0.5)
 
 # Genes satisfying the expression criteria for absolute difference,
-# ie.e genes with expression difference bigger than the 50% of all genes' 
+# ie.e genes with expression difference bigger than the 50% of all genes'
 # expression differences, if only six were considered:
 names(diffs)[diffs > quantile(diffs, quantile_abs_difference, na.rm = TRUE)]
 ```
 
-9. `quantile_percent_expression_difference_param`: A lower limit for the fraction of genes to include based on percentage
-difference in expression between the cell type with the highest expression and
-that with the lowest expression. Value
-indicates quantile and should be between 0 and 1; defaults to 0.5.
+9. `quantile_percent_expression_difference_param`: A lower quantile limit for
+gene selection based on percentage difference in expression between the cell
+type with the highest expression and that with the lowest expression among all
+cell types considered for a given branch. Value should be between 0 and 1;
+defaults to 0.5.
 
 ```{r strQuantilePercentageDifference}
 quantile_perc_difference <- 0.5
@@ -204,7 +211,7 @@ percs
 quantile(percs, 0.5)
 
 # Genes satisfying the expression criteria for percentage difference,
-# ie.e genes with expression difference bigger than the 50% of all genes' 
+# ie.e genes with expression difference bigger than the 50% of all genes'
 # percentage expression differences, if only six were considered:
 names(percs)[percs > quantile(percs, quantile_perc_difference, na.rm = TRUE)]
 ```
@@ -216,7 +223,8 @@ at the given granularity level. Note that when fewer cell types or subtypes are
 considered simultaneously, we expect to see more variability in the diffs and
 percs.
 
-10. `return_summary_annotation`: A logical value indicating whether to return the final summary annotation.
+10. `return_summary_annotation`: A logical value indicating whether to return
+the final summary annotation.
 This data frame shows the annotation that has been made for each cell at each
 level of the annotation tree. Recommendation is to keep this at its default
 value of TRUE.
@@ -264,22 +272,37 @@ The results from running `InSituTree` contain two main components:
 2) Summary of annotations at each level of the tree
 
 The nested results list contains the typical outputs of `InSituType` for each
-round of cell typing, and one additional metric, `ctsPerCell, which is the 
+round of cell typing, and one additional metric, `ctsPerCell`, which is the 
 counts of the selected genes for each cell at the given round of subclustering.
 This counts metric could be used to evaluate the confidence of a particular
 round of subclustering, since cell type assignments for low-count cells are
-likely to be less confident. As an example, we look at the assignment of
+likely to be less confident. 
+Each level of the results list contains:
+
+- `result`: The `InSituType` results plus counts per cell
+
+- `subclusterings`: A nested list of clustering results for the next level down
+of annotations.
+
+- `name`: The name of the celltype that was subclustered.
+
+As an example, we look at the assignment of
 structural cells to fibroblast or endothelial
 and use the flightpath tool from `InSituType` to visualize how well cells were
 assigned to these major types.
 
 ```{r resList}
-str(res$nestedAnnotation$result)
+names(res)
 
-str(res$nestedAnnotation$subclusterings)
+names(res$topLevel)
 
-InSituType::flightpath_plot(insitutype_result =
-                              res$nestedAnnotation$subclusterings$structural$result)
+str(res$topLevel$result)
+
+str(res$topLevel$subclusterings)
+
+InSituType::flightpath_plot(
+  insitutype_result =
+    res$topLevel$subclusterings$structural$result)
 ```
 
 The summary annotation data frame shows the cell type assigned at each level of
@@ -290,8 +313,14 @@ annotation level 2 in this example will also be labeled as 'endothelial' for
 annotation levels 3 and 4. In other words, the the right most `annotLevel`
 will contain the final cluster assignment at the finest level.
 
+Note that any cells which did not have any counts in the genes used for
+subclustering will not get a cell type assignment; if this happens in the first
+round of annotation, these cells will show 'NA' for all annotation levels. If
+this happens at later rounds of annotation, the last assignment will be cascaded
+right.
+
 ```{r resSummary}
-head(res$summaryAnnotation)
+head(res$summaryAnnotation, 10)
 ```
 
 

@@ -9,7 +9,9 @@
 
 
 # Define a generic function for type conversion
-setGeneric("convertToDgCMatrix", function(x) standardGeneric("convertToDgCMatrix"))
+setGeneric("convertToDgCMatrix", function(x) {
+  standardGeneric("convertToDgCMatrix")
+})
 
 # Method for dgTMatrix
 setMethod("convertToDgCMatrix", signature(x = "dgTMatrix"), function(x) {
