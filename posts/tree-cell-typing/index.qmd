@@ -67,8 +67,9 @@ You can find the `InSituTree` package [here](https://github.com/Nanostring-Biost
 
 For this example we work with the immune-focused cell type profiles 
 as well as the mini non-small cell lung cancer dataset included
-in the `InSituType` package. We start by setting up a nested list of cell types.
-```{r setupCellTypeTree, message=FALSE, eval = FALSE}
+in the `InSituType` package. 
+
+```{r setup, message=FALSE, eval = FALSE}
 # Load libraries
 library(InSituType)
 library(InSituTree)
@@ -76,6 +77,24 @@ library(InSituTree)
 # Read in io profiles
 data(ioprofiles)
 
+head(ioprofiles)
+```
+
+```{r, eval = TRUE, echo = FALSE}
+profile_head <- readRDS("./assets/io_head.rds")
+head(profile_head)
+```
+
+We start by setting up a nested list of cell types,
+visualized with the helper function `printTree()`.
+The nested list should have names for major cell types (for example,
+"B-lymphoid" or "structural" below), and should include all cell types in the
+reference profile as endpoints (for example, "B-cell" or "endothelial" below).
+The endpoint cell types do not need to be set up as lists (for example, see "NK"
+below which is not set as "NK" = "NK"), though setting them as lists will not
+cause errors.
+
+```{r setupCellTypeTree, message=FALSE, eval = FALSE}
 # Establish a nested list of cell types
 celltype_hierarchy_list <- list(
   "structural" = c(
@@ -104,7 +123,53 @@ celltype_hierarchy_list <- list(
     )
 )
 
+printTree(celltype_hierarchy_list, prefix = "|-")
+```
 
+```{r, eval = TRUE, echo = FALSE, warning=FALSE}
+tree_text <- readLines("./assets/cth_tree.txt")
+cat(tree_text, sep = "\n")
+```
+
+
+Importantly, any middle nodes that have only a single child will
+act as end points for cell type assignments. See the example below:
+```{r poorCellTypeTree, eval = FALSE}
+# Example of a tree with a single child node
+cth_single_child_node <- list(
+  "structural" = c(
+    "endothelial", 
+    "fibroblast"),
+  "myeloid" = c(
+    "macrophage", 
+    "monocyte"),
+  "lymphoid" = list( # This is a single child node: all cells annotated as 
+    # lymphoid would also be 'B and T cells' and so annotations will not
+    # continue beyond this point.
+    "B and T cells" = list(
+      "B-lymphoid" = c(
+        "B-cell", 
+        "pDC",
+        "plasmablast"),
+      "T-lymphoid" = list(
+        "T4" = c(
+          "T CD4 memory", 
+          "T CD4 naive", 
+          "Treg"),
+        "T8" = c(
+          "T CD8 memory", 
+          "T CD8 naive"),
+        "NK")
+    )
+  )
+)
+
+printTree(cth_single_child_node, prefix = "|-")
+```
+
+```{r, eval = TRUE, echo = FALSE, warning=FALSE}
+tree_text <- readLines("./assets/cth_single_child_tree.txt")
+cat(tree_text, sep = "\n")
 ```
 
 :::{.callout-tip}
@@ -115,13 +180,13 @@ If you're working from a CosMx-derived cell profile from our [CosMx Cell Profile
 If you'd like to create your own reference profile, see [this](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles) Scratch Space Post for additional guidance on generating reference profiles. 
 :::
 
-To make your own cell type hierarchy, you can generate one based on your subject matter expertise or by examining the similarity of cell types in your reference profile. Importantly, the cell type hierarchy should reflect similarity in gene expression, which may or may not correspond to cell type lineages. For a convenient way to visualize the similarity of cell types in your reference profile, use the function `plotProfileSimilarity`.
+To make your own cell type hierarchy, you can generate one based on your subject matter expertise or by examining the similarity of cell types in your reference profile. The cell type hierarchy should reflect similarity in gene expression, which may or may not correspond to cell type lineages. For a convenient way to visualize the similarity of cell types in your reference profile, use the function `plotProfileSimilarity()`.
 
 ```{r, eval = FALSE}
 plotProfileSimilarity(ioprofiles)
 ```
 
-```{r}
+```{r, echo = FALSE}
 #| fig-cap: "Similarity matrix of reference profile cell types can be used to help inform cell type hierarchy."
 knitr::include_graphics("./figures/io_profile_similarity_heatmap.png")
 ```
@@ -137,12 +202,11 @@ Once we have this cell type tree, we can use `InSituTree` to run supervised cell
 load("mini_nsclc")
 
 # Run InSituTree with basic options
-res <- InSituTree(
-  x = as(mini_nsclc$counts, "CsparseMatrix"),
+res <- runInSituTree(
+  x = mini_nsclc$counts,
   neg = rowMeans(mini_nsclc$neg),
   full_profiles = ioprofiles,
   cth = celltype_hierarchy_list,
-  name_for_new_annotation = "nested_cell_type",
   cohort = NULL,
   excluded_genes = NULL,
   quantile_absolute_expression_difference_param = 0.5, # Include genes in the top 0.5 fraction in absolute expression differences
@@ -151,10 +215,16 @@ res <- InSituTree(
 )
 
 # Access the final summarized cell typing results
-res$summaryAnnotation
+head(res$summaryAnnotation, 10)
 
 ```
 
+```{r echo = FALSE, warning = FALSE, eval = TRUE}
+
+res <- readRDS("./assets/small_results.rds")
+
+head(res, 10)
+```
 
 # Additional recommendations {#sec-additional-recommendations}
 The structure of the cell type hierarchy list is a key determinant of how well this approach works. Major cell types that are unnecessarily broad may lead to poor cell typing if the average gene expression is too distinct from the expression of individual cells. As an example, the cell type lists available at our [CosMx Cell Profile library](https://github.com/Nanostring-Biostats/CosMx-Cell-Profiles/tree/main){target="_blank"} often contain an initial grouping of cell types into 'Tissue' or 'Immune'; we would recommend removing that large group and providing the next level down as top annotations. `InSituTree` does run quickly, so in cases of uncertainty we would recommend running the algorithm with multiple cell type hierarchies and choosing the one that gives the best cell typing. Evaluate the results as cell typing is typically evaluated: spatial distribution of cell types, top markers for each cell type, and clustering of similar cell types in UMAP space.

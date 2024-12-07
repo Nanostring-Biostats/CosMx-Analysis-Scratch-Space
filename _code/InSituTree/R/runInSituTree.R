@@ -5,7 +5,8 @@
 #' @param cth Cell type hierarchy, as a nested list
 #' @param x Counts matrix, cells x genes
 #' @param neg Vector of mean negative controls for each cell
-#' @param name_for_new_annotation Name for this annotation
+#' @param name_for_new_annotation Used in recursive calls, recommended to leave
+#' at default of 'topLevel'.
 #' @param cohort Vector of cells' cohort membership
 #' @param excluded_genes Genes to be excluded during fitting with InSituType
 #' @param quantile_absolute_expression_difference_param
@@ -62,7 +63,7 @@ runInSituTree <- function(
     neg,
     full_profiles,
     cth,
-    name_for_new_annotation = "nestedAnnotation",
+    name_for_new_annotation = "topLevel",
     cohort = NULL,
     excluded_genes = c(),
     quantile_absolute_expression_difference_param = 0.5,
@@ -70,10 +71,9 @@ runInSituTree <- function(
     return_summary_annotation = TRUE,
     ...) {
   # Argument checks
-  if (missing(full_profiles) || missing(cth) || missing(x) || missing(neg) ||
-        missing(name_for_new_annotation)) {
-    stop("Error: All required arguments (full_profiles, cth, x, neg, 
-         name_for_new_annotation) must be provided.")
+  if (missing(full_profiles) || missing(cth) || missing(x) || missing(neg)) {
+    stop("Error: All required arguments (full_profiles, cth, x, neg)
+         must be provided.")
   }
 
   if (!is.matrix(full_profiles)) {
@@ -180,6 +180,10 @@ runInSituTree <- function(
   # return the nested list of insitutype objects
   if (return_summary_annotation) {
     summaryAnnotation <- summarizeInSituTree(out[[1]])
+    if (any(!row.names(x) %in% row.names(summaryAnnotation))) {
+      summaryAnnotation <- summaryAnnotation[row.names(x), ]
+      row.names(summaryAnnotation) <- row.names(x)
+    }
     out$summaryAnnotation <- summaryAnnotation
   }
 

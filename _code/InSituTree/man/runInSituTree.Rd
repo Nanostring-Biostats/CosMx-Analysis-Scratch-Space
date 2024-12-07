@@ -9,7 +9,7 @@ runInSituTree(
   neg,
   full_profiles,
   cth,
-  name_for_new_annotation = "nestedAnnotation",
+  name_for_new_annotation = "topLevel",
   cohort = NULL,
   excluded_genes = c(),
   quantile_absolute_expression_difference_param = 0.5,
@@ -28,7 +28,8 @@ for all end point cell types}
 
 \item{cth}{Cell type hierarchy, as a nested list}
 
-\item{name_for_new_annotation}{Name for this annotation}
+\item{name_for_new_annotation}{Used in recursive calls, recommended to leave
+at default of 'topLevel'.}
 
 \item{cohort}{Vector of cells' cohort membership}
 

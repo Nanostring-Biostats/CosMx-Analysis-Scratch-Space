@@ -15,8 +15,8 @@
 #'
 #' @import InSituType
 #'
-#' @return a list with all elements returned by InSituType::insitutypeML() and 
-#' additional element `ctsPerCell` for a vector of counts per cell within the 
+#' @return a list with all elements returned by InSituType::insitutypeML() and
+#' additional element `ctsPerCell` for a vector of counts per cell within the
 #' chosen subset of genes.
 #' @export
 
@@ -74,9 +74,9 @@ supervisedSubcluster <- function(reference_profiles,
   if (!all(nonZeroCount_idx)) warning(paste0(sum(!nonZeroCount_idx),
                                              " cells have 0 counts 
                                              in the subclustering gene panel."))
-  
+
   # Convert counts to dgCMatrix
-  if(!is(x, "dgCMatrix")){
+  if (!is(x, "dgCMatrix")) {
     x <- convertToDgCMatrix(x)
   }
 
