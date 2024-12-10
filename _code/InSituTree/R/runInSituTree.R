@@ -17,11 +17,19 @@
 #' Both quantile cutoffs must be passed to retain gene.
 #' @param return_summary_annotation option to return a summary of celltypes.
 #' Default is TRUE.
-#' @param ... additional arguments passed on to `insitutypeML`
 #'
 #' @return List of each InSituType result and
 #' a summary of all cell type annotations.
 #' @export
+#'
+#' @details Any cells which did not have any counts in the genes used for
+#' subclustering will not get a cell type assignment; if this happens in the
+#' first round of annotation, these cells will show 'NA' for all annotation
+#' levels. If this happens at later rounds of annotation, the last assignment
+#' will be cascaded right.
+#' Warnings will be shown if the number of genes chosen is small or if the
+#' counts per cell are low, as both can reduce confidence in the cell type
+#' assignments.
 #'
 #' @examples
 #'
@@ -68,59 +76,59 @@ runInSituTree <- function(
     excluded_genes = c(),
     quantile_absolute_expression_difference_param = 0.5,
     quantile_percent_expression_difference_param = 0.5,
-    return_summary_annotation = TRUE,
-    ...) {
+    return_summary_annotation = TRUE
+) {
   # Argument checks
   if (missing(full_profiles) || missing(cth) || missing(x) || missing(neg)) {
     stop("Error: All required arguments (full_profiles, cth, x, neg)
          must be provided.")
   }
-
+  
   if (!is.matrix(full_profiles)) {
     stop("Error: full_profiles must be a matrix.")
   }
-
+  
   if (!is.list(cth) && !is.vector(cth)) {
     print(paste0("cth is of class ", class(cth)))
     stop("Error: cth must be a list or vector of cell types.")
   }
-
+  
   if (!is.numeric(neg)) {
     stop("Error: neg must be a numeric vector.")
   }
-
+  
   if (!is.character(name_for_new_annotation) ||
-        nchar(name_for_new_annotation) == 0) {
+      nchar(name_for_new_annotation) == 0) {
     stop("Error: name_for_new_annotation must be a non-empty character string.")
   }
-
+  
   if (!is.null(cohort) && !is.vector(cohort)) {
     stop("Error: cohort must be a vector if provided.")
   }
-
+  
   if (!is.null(excluded_genes) && !is.character(excluded_genes)) {
     stop("Error: excluded_genes must be a character vector.")
   }
-
+  
   if (!is.numeric(quantile_absolute_expression_difference_param) ||
-        quantile_absolute_expression_difference_param < 0 ||
-        quantile_absolute_expression_difference_param > 1) {
+      quantile_absolute_expression_difference_param < 0 ||
+      quantile_absolute_expression_difference_param > 1) {
     stop("Error: quantile_absolute_expression_difference_param must be
            a numeric value between 0 and 1.")
   }
-
+  
   if (!is.numeric(quantile_percent_expression_difference_param) ||
-        quantile_percent_expression_difference_param < 0 ||
-        quantile_percent_expression_difference_param > 1) {
+      quantile_percent_expression_difference_param < 0 ||
+      quantile_percent_expression_difference_param > 1) {
     stop("Error: quantile_percent_expression_difference_param must be
            a numeric value between 0 and 1.")
   }
-
+  
   out <- list()
-
+  
   # Make combined profile
   prof <- collapseProfiles(cth = cth, full_profiles = full_profiles)
-
+  
   # annotate with InSituType
   res <- supervisedSubcluster(
     reference_profiles = prof,
@@ -131,16 +139,15 @@ runInSituTree <- function(
     quantile_absolute_expression_difference =
       quantile_absolute_expression_difference_param,
     quantile_percent_expression_difference =
-      quantile_percent_expression_difference_param,
-    ...
+      quantile_percent_expression_difference_param
   )
   out[[name_for_new_annotation]] <- list()
   out[[name_for_new_annotation]][["result"]] <- res
   out[[name_for_new_annotation]][["subclusterings"]] <- list()
   out[[name_for_new_annotation]][["name"]] <- name_for_new_annotation
-
+  
   # annotation next level down
-
+  
   for (i in names(cth)) {
     if (i == "list" || i == name_for_new_annotation || i == "") {
       next
@@ -153,7 +160,7 @@ runInSituTree <- function(
       message(paste0("Warning: No cells found on which 
                      to perform further fitting.  Dropping celltypes: ", i))
     }
-
+    
     if (length(cth[[i]]) > 1 && !celltypes_dropped) {
       message(paste0("Annotating  ", i, " cells..."))
       selected_cells <- match(names(res$clust)[res$clust == i], rownames(x))
@@ -169,14 +176,13 @@ runInSituTree <- function(
           quantile_absolute_expression_difference_param,
         quantile_percent_expression_difference_param =
           quantile_percent_expression_difference_param,
-        return_summary_annotation = FALSE,
-        ...
+        return_summary_annotation = FALSE
       )
       out[[name_for_new_annotation]][["subclusterings"]] <-
         append(out[[name_for_new_annotation]][["subclusterings"]], sub_res)
     }
   }
-
+  
   # return the nested list of insitutype objects
   if (return_summary_annotation) {
     summaryAnnotation <- summarizeInSituTree(out[[1]])
@@ -186,6 +192,6 @@ runInSituTree <- function(
     }
     out$summaryAnnotation <- summaryAnnotation
   }
-
+  
   return(out)
 }

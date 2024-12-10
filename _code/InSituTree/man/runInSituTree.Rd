@@ -14,8 +14,7 @@ runInSituTree(
   excluded_genes = c(),
   quantile_absolute_expression_difference_param = 0.5,
   quantile_percent_expression_difference_param = 0.5,
-  return_summary_annotation = TRUE,
-  ...
+  return_summary_annotation = TRUE
 )
 }
 \arguments{
@@ -43,8 +42,6 @@ Both quantile cutoffs must be passed to retain gene.}
 
 \item{return_summary_annotation}{option to return a summary of celltypes.
 Default is TRUE.}
-
-\item{...}{additional arguments passed on to \code{insitutypeML}}
 }
 \value{
 List of each InSituType result and
@@ -52,6 +49,16 @@ a summary of all cell type annotations.
 }
 \description{
 Tree-style cell typing
+}
+\details{
+Any cells which did not have any counts in the genes used for
+subclustering will not get a cell type assignment; if this happens in the
+first round of annotation, these cells will show 'NA' for all annotation
+levels. If this happens at later rounds of annotation, the last assignment
+will be cascaded right.
+Warnings will be shown if the number of genes chosen is small or if the
+counts per cell are low, as both can reduce confidence in the cell type
+assignments.
 }
 \examples{
 

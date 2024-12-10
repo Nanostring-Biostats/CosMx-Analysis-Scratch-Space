@@ -11,7 +11,6 @@
 #' genes. Default = 0.5. Both quantile cutoffs must be passed to retain gene.
 #' @param excluded_genes Genes to be excluded during fitting with InSituType
 #' @param cohort Vector of cells' cohort membership
-#' @param ... Additional parameters passed on to `insitutypeML`
 #'
 #' @import InSituType
 #'
@@ -26,40 +25,40 @@ supervisedSubcluster <- function(reference_profiles,
                                  quantile_absolute_expression_difference = 0.5,
                                  quantile_percent_expression_difference = 0.5,
                                  excluded_genes = NULL,
-                                 cohort = NULL,
-                                 ...) {
+                                 cohort = NULL
+) {
   nsprofiles <- reference_profiles[intersect(colnames(x),
                                              rownames(reference_profiles)), ]
   # normalize the profiles
   nsprofiles <- apply(nsprofiles, 2, function(x) x / sum(x) * 100)
-
+  
   ## Determine which genes have significant differences
   # Absolute difference
   diffs <- sapply(rownames(nsprofiles), function(gene) {
     diff(range(nsprofiles[gene, ]))
   })
-
+  
   # Percentage difference
   percs <- sapply(rownames(nsprofiles), function(gene) {
     diff(range(nsprofiles[gene, ])) / max(nsprofiles[gene, ])
   })
-
+  
   # Isolate genes with high absolute and percentage differences
   use_genes <- names(diffs)[diffs >
                               quantile(diffs,
                                        quantile_absolute_expression_difference,
                                        na.rm = TRUE) &
                               percs >
-                                quantile(percs,
-                                         quantile_percent_expression_difference,
-                                         na.rm = TRUE)]
-
+                              quantile(percs,
+                                       quantile_percent_expression_difference,
+                                       na.rm = TRUE)]
+  
   # Remove genes that should not be considered.
   use_genes <- use_genes[!use_genes %in% excluded_genes]
   message("These are the selected ", length(use_genes),
           " genes for subclustering:")
   dput(use_genes)
-
+  
   # Warn if number of genes is low
   if (length(use_genes) < 300) {
     warning(paste0(
@@ -68,29 +67,28 @@ supervisedSubcluster <- function(reference_profiles,
       ". These annotations may be unstable."
     ))
   }
-
+  
   # verify that all cells have at least 1 count with gene subset
   nonZeroCount_idx <- Matrix::rowSums(x[, use_genes]) >= 1
   if (!all(nonZeroCount_idx)) warning(paste0(sum(!nonZeroCount_idx),
                                              " cells have 0 counts 
                                              in the subclustering gene panel."))
-
+  
   # Convert counts to dgCMatrix
   if (!is(x, "dgCMatrix")) {
     x <- convertToDgCMatrix(x)
   }
-
+  
   # Run supervised InSituType on cell and gene subet
   sup_res <- insitutypeML(x[nonZeroCount_idx, use_genes],
-    neg = neg[nonZeroCount_idx],
-    reference_profiles = nsprofiles,
-    cohort = cohort[nonZeroCount_idx],
-    ...
+                          neg = neg[nonZeroCount_idx],
+                          reference_profiles = nsprofiles,
+                          cohort = cohort[nonZeroCount_idx]
   )
-
+  
   # Add counts per cell with the reduced panel
   sup_res[["ctsPerCell"]] <- rowSums(x[, use_genes])
   names(sup_res$ctsPerCell) <- row.names(x)
-
+  
   return(sup_res)
 }
