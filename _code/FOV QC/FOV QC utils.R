@@ -157,11 +157,11 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reporterc
          main = paste0(colnames(res$resid)[i], ": log2(fold-change)\nfrom comparable regions elsewhere"))
     for (f in unique(res$fov)) {
       inds <- res$fov == f
-      rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), border = "black")
+      rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), border = "black")
     }
     for (f in rownames(res$fovstats$flag)[res$fovstats$flag[, i] > 0]) {
       inds <- res$fov == f
-      rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), lwd = 2, border = "yellow")
+      rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), lwd = 2, border = "yellow")
     }
     legend("right", pch = 16,
            col = rev(c("darkblue", "blue", "grey80", "red", "darkred")),
@@ -200,13 +200,13 @@ FOVSignalLossSpatialPlot <- function(res, shownames = TRUE, outdir = NULL, plotw
        main = "Log2 fold-change in total counts compared to similar regions")
   for (f in unique(res$fov)) {
     inds <- res$fov == f
-    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), border = "black")
+    rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), border = "black")
   }
   for (f in res$flaggedfovs_fortotalcounts) {
     inds <- res$fov == f
-    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), border = "yellow", lwd = 2)
+    rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), border = "yellow", lwd = 2)
     if (shownames) {
-      text(median(range(xy[inds, 1])), median(range(xy[inds, 2])), f, col = "green")
+      text(median(range(res$xy[inds, 1])), median(range(res$xy[inds, 2])), f, col = "green")
     }
   }
   legend("right", pch = 16,
@@ -243,13 +243,13 @@ mapFlaggedFOVs <- function(res, shownames = TRUE, outdir = NULL, plotwidth = NUL
        main = "Flagged FOVs")
   for (f in unique(res$fov)) {
     inds <- res$fov == f
-    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), col = scales::alpha("dodgerblue2", 0.5))
+    rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), col = scales::alpha("dodgerblue2", 0.5))
   }
   for (f in res$flaggedfovs) {
     inds <- res$fov == f
-    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), col = scales::alpha("red", 0.5))
+    rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), col = scales::alpha("red", 0.5))
     if (shownames) {
-      text(median(range(xy[inds, 1])), median(range(xy[inds, 2])), f, col = "green")
+      text(median(range(res$xy[inds, 1])), median(range(res$xy[inds, 2])), f, col = "green")
     }
   }
   if (!is.null(outdir)) {
