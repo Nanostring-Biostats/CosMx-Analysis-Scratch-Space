@@ -157,10 +157,21 @@ can be useful for plotting.
  
 # Batch effects: well-considered workflows 
 
-*Short summary to expand on:*
-- Supervised: run insituitype with the rescale=TRUE option separately for each tissue
-- Unsup: batch-adjust (harmony etc) then run leiden. (batch correction not really suited to IST, since it expects raw data)
-- Semi-sup: difficult. Cell type one or a couple samples carefully, then apply their profiles to others using supervised IST and rescale=TRUE
+InSituType is quite, but not completely, robust to batch effects. 
+Leiden clustering and other methods relying on principal components of the data 
+can be highly sensitive to them. 
+If you see evidence of batch effects in your data, for example strong batch dependence 
+in your cell typing results or your UMAP projection, consider the below strategies. 
+
+- Unsupervised clustering: InSituType will generally work even in the presence of batch effects.
+To run Leiden clustering, just begin by using any standard batch-correction method, e.g. Harmony (Korsunsky et al, 2019). Batch corrected data isn't well-suited InSituType, which ingests raw data. 
+- Supervised cell typing with InSituType: run InSituType separately on each tissue/batch, using the rescale=TRUE option. This will perform a batch adjustment from the reference to each new tissue. We used this approach 
+successfully in a study of lupus nephritis (Danaher et al., 2024). You can see the code
+we used [here](https://github.com/Nanostring-Biostats/childhood-onset-lupus-nephritis-analyses/blob/main/3.%20cell%20typing%20by%20batch.R){target="_blank"}.
+- Semi-supervised cell typing with InSituType: initially analyze a single batch of data.
+Once you're satisfied that you've captured all the unknown and reference cell types in that batch,
+use it to derive a new reference matrix (use InSituStep::getRNAprofiles). 
+Then apply the above supervised cell typing strategy using this reference matrix.
 
 
 # Failure to find anchor cells
@@ -179,6 +190,8 @@ can be useful for plotting.
 
 # References
 
+- Danaher P, Hasle N, Nguyen ED, Roberts JE, Rosenwasser N, Rickert C, Hsieh EW, Hayward K, Okamura DM, Alpers CE, Reed RC. Childhood-onset lupus nephritis is characterized by complex interactions between kidney stroma and infiltrating immune cells. Science Translational Medicine. 2024 Nov 27;16(775):eadl1666.
+- Korsunsky I, Millard N, Fan J, Slowikowski K, Zhang F, Wei K, Baglaenko Y, Brenner M, Loh PR, Raychaudhuri S. Fast, sensitive and accurate integration of single-cell data with Harmony. Nature methods. 2019 Dec;16(12):1289-96.
 - Huang M, Wang J, Torre E, Dueck H, Shaffer S, Bonasio R, Murray JI, Raj A, Li M, Zhang NR. SAVER: gene expression recovery for single-cell RNA sequencing. Nature methods. 2018 Jul;15(7):539-42.
 - Li WV, Li JJ. An accurate and robust imputation method scImpute for single-cell RNA-seq data. Nature communications. 2018 Mar 8;9(1):997.
 - Andrews TS, Hemberg M. False signals induced by single-cell imputation. F1000Research. 2019 Mar 5;7:1740.
