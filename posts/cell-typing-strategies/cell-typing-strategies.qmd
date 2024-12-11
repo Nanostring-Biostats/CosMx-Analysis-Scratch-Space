@@ -176,16 +176,34 @@ Then apply the above supervised cell typing strategy using this reference matrix
 
 # Failure to find anchor cells
 
-*Short summary to expand on:*
-- high-plex in particular: lower values for anchor selection thresholds
-- if you only find anchors for a few cell types: use rescale = TRUE, refit = FALSE
-- if you have a whole ref dataset, not just profiles, then try seurat's label transfer or maxflow. 
--- then using InSituType::spatialUpdate usually improves these further
+InSituType has the option of using anchor cells to calibrate reference profiles
+for CosMx data. This calibration is generally helpful for supervised cell typing
+and usualyl essential for semi-supervised cell typing, at least if the reference 
+came from scRNA-seq data. 
+(For details on this calibration, see the "Updating reference profiles" section of the [InSituType FAQs](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md){target="_blank"}.)
+
+Sometimes, InSituType will fail to discover enough "anchor cells" to perform this calibration.
+In this case, there are several simple next steps.
+
+- Lower the thresholds for anchor selection (\code{min_anchor_cosine} and \code{min_anchor_llr}). 
+This is often needed in high-plex studies - the defaults were optimized for 1000-plex data.
+- If you only find anchors for a few cell types: use rescale = TRUE, refit = FALSE. This
+performs a softer calibration: it rescales each row/gene of the reference matrix, but doesn't fully
+refit each profile. This operation can be powered using only a few cell types. 
+- If you have a whole single cell reference dataset, not just profiles, then try
+ a label transfer algorithm, e.g. Seurat's or MaxFuse (Chen et al 2023). 
+ If you do cell type with label transfer, then using InSituType::spatialUpdate 
+ can further improve these initial results. 
 
 # Reference cell types claiming the wrong cells
 
-*Short summary to expand on:*
-- Just use refineClusters
+InSituType will occasionally assign a cell type to the wrong reference profile, 
+e.g. we've seen some cancer cells get assigned to the "NK cells" profiles. 
+Fortunately, this kind of event is easy to detect with even cursory QC of your cell type results,
+and easy to fix: just use \code{InSituTYpe::refineClusters}. 
+Correcting this kind of error should be thought of as a part of routine  human-guided cell typing,
+an operation to perform alongside all the other renaming, merging, and subclustering operations
+performed with \code{refineClusters}.
 
 
 # References
@@ -195,3 +213,4 @@ Then apply the above supervised cell typing strategy using this reference matrix
 - Huang M, Wang J, Torre E, Dueck H, Shaffer S, Bonasio R, Murray JI, Raj A, Li M, Zhang NR. SAVER: gene expression recovery for single-cell RNA sequencing. Nature methods. 2018 Jul;15(7):539-42.
 - Li WV, Li JJ. An accurate and robust imputation method scImpute for single-cell RNA-seq data. Nature communications. 2018 Mar 8;9(1):997.
 - Andrews TS, Hemberg M. False signals induced by single-cell imputation. F1000Research. 2019 Mar 5;7:1740.
+- Chen S, Zhu B, Huang S, Hickey JW, Lin KZ, Snyder M, Greenleaf WJ, Nolan GP, Zhang NR, Ma Z. Integration of spatial and single-cell data across modalities with weakly linked features. Nature Biotechnology. 2024 Jul;42(7):1096-106.
