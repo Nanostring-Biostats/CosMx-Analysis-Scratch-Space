@@ -9,22 +9,17 @@
 
 
 #' Identify genes useful for supervised classification of closely-related cell types 
-#' @param mat Expression matrix from just the cell type in question, cells in rows and genes in columns.
 #' @param ref Reference matrix for the cell types in question
-#' @param ratiothresh Only keep genes with at least this much of a ratio between the max and min cell types
-#' @param expressionthresh Only keep genes with average raw counts above this level in your cell type of interest. 
+#' @param ratiothresh Only keep genes with at least this much of a ratio between the max and min cell types.
+#' @param minquantilethresh Only keep genes above this quantile of the reference profile for at least one cell type. 
 #' @return A vector of gene name for use in supervised cell subtyping
-getSubtypingGenes <- function(mat, ref, ratiothresh = 2, expressionthresh = 0.2) {
+getSubtypingGenes <- function(ref, ratiothresh = 2, minquantilethresh = 0.5) {
   
   ## checks
   if (is.null(rownames(ref))) {
     stop("the reference profiles matrix (ref) needs row names")
   }
-  missingfromref <- setdiff(colnames(mat), rownames(ref)) 
-  if (length(missingfromref) > 0) {
-    message("mat has ", length(missingfromref), " genes missing from ref.")
-  }
-
+  
   ## identify hvgs in the ref profiles:
   mins <- apply(ref, 1, min)
   mins <- pmax(mins, min(mins[mins > 0], na.rm = TRUE))
@@ -32,15 +27,13 @@ getSubtypingGenes <- function(mat, ref, ratiothresh = 2, expressionthresh = 0.2)
   maxes <- pmax(maxes, min(mins))
   bigratios <- names(which((maxes / mins) > ratiothresh) )
   
-  ## identify genes with decent expression in your data:
-  means <- Matrix::colMeans(mat)
-  decentexpressers <- names(which(means > expressionthresh))
-    
+  ## identify genes with decent expression in at least one of the refprofiles
+  q <- sweep(ref, 2, apply(ref, 2, quantile, minquantilethresh), ">")
+  decentexpressers <- rownames(q)[rowSums(q) > 0]
+  
   keepgenes <- intersect(bigratios, decentexpressers)
   return(keepgenes)
 } 
-
-
 
 
 
