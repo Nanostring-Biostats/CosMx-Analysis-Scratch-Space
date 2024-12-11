@@ -18,22 +18,23 @@ image: figures/celltyping-tile.png
 Cell typing is always critical and occasionally difficult. 
 Here we'll discuss what to do when straightforward approaches fail.
 
-Before exploring the options here, you should confirm:
+Before exploring the options here, you should:
 
-1. [The standard approaches](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/){target="_blank"} - InSituType, Leiden clustering and label transfer - have failed or are unsuitable to your data.
-2. If you're using InSituType, the workflows described in the 
+1. Attempt [the standard approaches](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/){target="_blank"} - InSituType, Leiden clustering and label transfer.
+2. If you're using InSituType, attempt the workflows described in the 
 [InSituType FAQS](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md){target="_blank"}.
 This last document provides detailed guidance on using InSituType's many options, 
 and its contents should be enough to guide you through most cell typing exercises.
-3. Your cell segmentation was successful. Use AtoMx or your favorite viewer to confirm that 
+3. Confirm your cell segmentation was successful. Use AtoMx or your favorite viewer to confirm that 
  segmentation errors aren't widespread. 
 
-We'll address four common difficulties:
+In this document, we'll address four common difficulties:
 
 1. Fine subtyping, especially for immune cells
-2. Studies with batch effects
-3. Failure to find anchor cells / difficulties mapping reference profiles
-4. Reference cell types claiming the wrong cells
+2. Cell typing based on marker genes
+3. Studies with batch effects
+4. Failure to find anchor cells / difficulties mapping reference profiles
+5. Reference cell types claiming the wrong cells
 
 # Fine subtyping: take a hierarchical approach and rely on gene selection
 
@@ -130,11 +131,29 @@ res <- insitutype(
 clust[sub] <- paste0("T-cell cluster ", res$clust)
 ```
 
-We advise against [relying on raw marker gene expression] (https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/){target="_blank"}
-for cell typing.
-However, [using smoothing/imputation to get cleaner marker gene expression values](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/){target="_blank"}
- can enable a marker-driven approach. 
+# Cell typing based on marker genes
 
+We generally advise against [relying on raw marker gene expression] (https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/){target="_blank"}
+for cell typing. 
+However, a marker-centered view can occasionally be appropriate. For example, you might insist on
+only restricting your analysis to Treg's to cells that are demonstrably FOXP3+. 
+If you do want to base your cell typing on a marker gene, we recommend using 
+smoothing/imputation to get cleaner marker gene expression values. The idea is to 
+obtain more accurate expression values for a marker gene by borrowing information from
+other genes in its profile. 
+This intuition is simple: if you see FOXP3 expression in all the cells with 
+highly similar expression profiles to a cell in question, then the cell in question 
+is very probably FOXP3+ itself, whether or not you observed any FOXP3 counts in it. 
+Or, more formally, this approach negotiates a favorable variance-bias tradeoff: 
+in this example, we bias cells' FOXP3 expression values to resemble their nearest neighbors
+in expression space, while greatly reducing sampling variability compared to that of a single gene's count value. 
+
+We demonstrate a smoothing/imputation approach to marker genes 
+[here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/){target="_blank"}.
+You can also use SAVER (Huang et al, 2018) or scImpute (Li & Li, 2018) or any of the many other published single cell imputation methods. Do note that performing deeper analyses of imputed expression values,
+e.g. differential expression testing, is hazardous (Andrews & Hemberg, 2019), though imputed counts 
+can be useful for plotting. 
+ 
  
 # Batch effects: well-considered workflows 
 
@@ -158,6 +177,8 @@ However, [using smoothing/imputation to get cleaner marker gene expression value
 - Just use refineClusters
 
 
-# Resources
+# References
 
-- [Our very succinct preprint](https://www.biorxiv.org/content/10.1101/2023.09.19.558514v1){target="_blank"}
+- Huang M, Wang J, Torre E, Dueck H, Shaffer S, Bonasio R, Murray JI, Raj A, Li M, Zhang NR. SAVER: gene expression recovery for single-cell RNA sequencing. Nature methods. 2018 Jul;15(7):539-42.
+- Li WV, Li JJ. An accurate and robust imputation method scImpute for single-cell RNA-seq data. Nature communications. 2018 Mar 8;9(1):997.
+- Andrews TS, Hemberg M. False signals induced by single-cell imputation. F1000Research. 2019 Mar 5;7:1740.
