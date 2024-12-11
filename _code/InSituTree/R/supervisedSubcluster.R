@@ -80,9 +80,9 @@ supervisedSubcluster <- function(reference_profiles,
   }
   
   # Run supervised InSituType on cell and gene subet
-  sup_res <- insitutypeML(x[nonZeroCount_idx, use_genes],
+  sup_res <- insitutypeML(x[nonZeroCount_idx, ],
                           neg = neg[nonZeroCount_idx],
-                          reference_profiles = nsprofiles,
+                          reference_profiles = nsprofiles[use_genes, ],
                           cohort = cohort[nonZeroCount_idx]
   )
   
