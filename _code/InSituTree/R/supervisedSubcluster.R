@@ -3,6 +3,7 @@
 #' @param reference_profiles Matrix of expression profiles, genes x cell types
 #' @param x Counts matrix, cells x genes
 #' @param neg Vector of mean negative controls for each cell
+#' @param bg Expected background
 #' @param quantile_absolute_expression_difference Minimum absolute expression
 #' difference within reference_profiles in terms of quantile level among all
 #' genes. Default = 0.5. Both quantile cutoffs must be passed to retain gene.
@@ -22,6 +23,7 @@
 supervisedSubcluster <- function(reference_profiles,
                                  x,
                                  neg,
+                                 bg,
                                  quantile_absolute_expression_difference = 0.5,
                                  quantile_percent_expression_difference = 0.5,
                                  excluded_genes = NULL,
@@ -79,10 +81,11 @@ supervisedSubcluster <- function(reference_profiles,
     x <- convertToDgCMatrix(x)
   }
   
-  # Run supervised InSituType on cell and gene subet
-  sup_res <- insitutypeML(x[nonZeroCount_idx, ],
+  # Run supervised InSituType on cell and gene subset
+  sup_res <- insitutypeML(x[nonZeroCount_idx, use_genes],
                           neg = neg[nonZeroCount_idx],
-                          reference_profiles = nsprofiles[use_genes, ],
+                          bg = bg[nonZeroCount_idx],
+                          reference_profiles = nsprofiles,
                           cohort = cohort[nonZeroCount_idx]
   )
   

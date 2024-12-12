@@ -5,6 +5,7 @@
 #' @param cth Cell type hierarchy, as a nested list
 #' @param x Counts matrix, cells x genes
 #' @param neg Vector of mean negative controls for each cell
+#' @param bg Expected background, optional
 #' @param name_for_new_annotation Used in recursive calls, recommended to leave
 #' at default of 'topLevel'.
 #' @param cohort Vector of cells' cohort membership
@@ -68,7 +69,8 @@
 #'
 runInSituTree <- function(
     x,
-    neg,
+    neg = NULL,
+    bg = NULL,
     full_profiles,
     cth,
     name_for_new_annotation = "topLevel",
@@ -79,9 +81,13 @@ runInSituTree <- function(
     return_summary_annotation = TRUE
 ) {
   # Argument checks
-  if (missing(full_profiles) || missing(cth) || missing(x) || missing(neg)) {
-    stop("Error: All required arguments (full_profiles, cth, x, neg)
+  if (missing(full_profiles) || missing(cth) || missing(x)) {
+    stop("Error: All required arguments (full_profiles, cth, x)
          must be provided.")
+  }
+  
+  if (is.null(neg) && is.null(bg)){
+    stop("Error: neg and bg cannot both be null.")
   }
   
   if (!is.matrix(full_profiles)) {
@@ -93,7 +99,7 @@ runInSituTree <- function(
     stop("Error: cth must be a list or vector of cell types.")
   }
   
-  if (!is.numeric(neg)) {
+  if (!is.null(neg) && !is.numeric(neg)) {
     stop("Error: neg must be a numeric vector.")
   }
   
@@ -126,6 +132,11 @@ runInSituTree <- function(
   
   out <- list()
   
+  # Estimate background from full dataset
+  if(is.null(bg)){
+    bg <- InSituType::estimateBackground(counts = x, neg = neg)
+  }
+  
   # Make combined profile
   prof <- collapseProfiles(cth = cth, full_profiles = full_profiles)
   
@@ -134,6 +145,7 @@ runInSituTree <- function(
     reference_profiles = prof,
     x = x,
     neg = neg,
+    bg = bg,
     cohort = cohort,
     excluded_genes = excluded_genes,
     quantile_absolute_expression_difference =
@@ -169,6 +181,7 @@ runInSituTree <- function(
         cth = cth[[i]],
         x = x[selected_cells, ],
         neg = neg[selected_cells],
+        bg = bg[selected_cells],
         name_for_new_annotation = i,
         cohort = cohort[selected_cells],
         excluded_genes = excluded_genes,

@@ -6,7 +6,8 @@
 \usage{
 runInSituTree(
   x,
-  neg,
+  neg = NULL,
+  bg = NULL,
   full_profiles,
   cth,
   name_for_new_annotation = "topLevel",
@@ -21,6 +22,8 @@ runInSituTree(
 \item{x}{Counts matrix, cells x genes}
 
 \item{neg}{Vector of mean negative controls for each cell}
+
+\item{bg}{Expected background, optional}
 
 \item{full_profiles}{Cell profile matrix, genes x cell types,
 for all end point cell types}

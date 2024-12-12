@@ -136,7 +136,18 @@ annotation_names <- "topLevel"
 The remaining inputs to `InSituTree` are optional, with some having default
 values.
 
-6. `cohort`: A vector of cohorts provides a grouping of cells based on
+6. `bg`: Expected background, optional. Can be a value for each cell or one
+value for all cells. Typically expected to be left `NULL` to be automatically
+derived from the `neg` vector. Can be derived with the `estimateBackground`
+function from the `InSituType` package.
+```{r strbg}
+background <- NULL
+
+## Not used, for demonstration
+#bg_example <- c("c_3_18_2" = 0.00278, "c_3_18_3" = 0.00437", "c_3_18_4" = 0.01431 . . . )
+```
+
+7. `cohort`: A vector of cohorts provides a grouping of cells based on
 alternative, non-RNA, data types, such as immunofluorescent staining, cell
 shape metrics, tissue structures, etc. 
 One way to generate these cohorts is to use the `fastCohorting()` function in the
@@ -157,7 +168,7 @@ set.seed(2024)
 example_cohorts <- sample(1:30, size = ncol(counts), replace = TRUE)
 ```
 
-7. `excluded_genes`: A character vector of genes to exclude from the cell
+8. `excluded_genes`: A character vector of genes to exclude from the cell
 typing. For example, these may be genes with a strong platform effect between
 the query dataset and reference profiles. Default is `NULL`.
 
@@ -165,7 +176,7 @@ the query dataset and reference profiles. Default is `NULL`.
 genes_to_exclude <- c("MALAT1")
 ```
 
-8. `quantile_absolute_expression_difference_param`: A lower quantile limit for
+9. `quantile_absolute_expression_difference_param`: A lower quantile limit for
 gene selection based on absolute difference in expression between the cell type
 with the highest expression and that with the lowest expression among all cell
 types considered for a given branch. Value should be between 0 and 1; default
@@ -191,7 +202,7 @@ quantile(diffs, 0.5)
 names(diffs)[diffs > quantile(diffs, quantile_abs_difference, na.rm = TRUE)]
 ```
 
-9. `quantile_percent_expression_difference_param`: A lower quantile limit for
+10. `quantile_percent_expression_difference_param`: A lower quantile limit for
 gene selection based on percentage difference in expression between the cell
 type with the highest expression and that with the lowest expression among all
 cell types considered for a given branch. Value should be between 0 and 1;
@@ -235,7 +246,7 @@ at the given granularity level. Note that when fewer cell types or subtypes are
 considered simultaneously, we expect to see more variability in the `diffs` and
 `percs`.
 
-10. `return_summary_annotation`: A logical value indicating whether to return
+11. `return_summary_annotation`: A logical value indicating whether to return
 the final summary annotation.
 This data frame shows the annotation that has been made for each cell at each
 level of the annotation tree. Recommendation is to keep this at its default
@@ -261,6 +272,7 @@ relationships that we'd expect, we can run supervised nested cell typing.
 res <- runInSituTree(
   x = counts,
   neg = negmean,
+  bg = background,
   full_profiles = ioprofiles,
   cth = celltype_hierarchy_list,
   name_for_new_annotation = annotation_names,

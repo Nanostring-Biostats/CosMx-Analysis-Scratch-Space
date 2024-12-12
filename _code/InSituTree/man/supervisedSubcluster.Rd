@@ -8,6 +8,7 @@ supervisedSubcluster(
   reference_profiles,
   x,
   neg,
+  bg,
   quantile_absolute_expression_difference = 0.5,
   quantile_percent_expression_difference = 0.5,
   excluded_genes = NULL,
@@ -20,6 +21,8 @@ supervisedSubcluster(
 \item{x}{Counts matrix, cells x genes}
 
 \item{neg}{Vector of mean negative controls for each cell}
+
+\item{bg}{Expected background}
 
 \item{quantile_absolute_expression_difference}{Minimum absolute expression
 difference within reference_profiles in terms of quantile level among all
