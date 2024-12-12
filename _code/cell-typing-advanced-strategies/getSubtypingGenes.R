@@ -1,11 +1,7 @@
-# dev notes:
-# - contam filter needs ALL data; hvg filter needs just the selected cell type
-# - implement both separately, w/o a wrapper. ppl can call both independently.
-# - contam ratio function: 
-# -- get neighbors
-# -- redact neighbors of same cell type
-# -- get env expression matrix
-# -- get colMeans in self, in neighbors, take same ratio
+message("Key functions:\n
+        getSubtypingGenes: identify which genes in a reference matrix are informative\n
+        getSubclusteringGenes: identify highly variable genes in a counts matrix, for use in clustering\n
+        findSafeGenes: identify genes safe from excessive bias from segmentation errors.")
 
 
 #' Identify genes useful for supervised classification of closely-related cell types 
@@ -70,6 +66,13 @@ getSubclusteringGenes <- function(mat, loess.span = 0.3, varratiothresh = 1, exp
 #' @param xy Spatial coordinates of cells 
 #' @param ismycelltype Logical vector, for whether cells belong to your cell type of interest
 #' @param tissue Optional vector of cells' tissue IDs, used in case tissues overlap in xy space
+#' @return A list with two elements:
+#' \itemize{
+#'  \item self2neighborratio: A vector of genes' ratios between the cell type in 
+#'  question and neighborhoods of the cell type in question. High values indicate
+#'   lower risk of bias from segmentation errors
+#'  \item safegenes: A vector of gene names passing the filter
+#' }
 findSafeGenes <- function(counts, xy, ismycelltype, tissue = NULL, Nneighbors = 50) {
   
   # get spatial neighbors:
@@ -145,7 +148,6 @@ nearestNeighborGraph <- function(x, y, N, subset=1) {
 #' @importFrom Matrix rowSums
 #' @export
 neighbor_sum <- function(x, neighbors) {
-  #Matrix::rowSums(t(t(neighbors != 0) * x))
   Matrix::rowSums(Matrix::t(Matrix::t(1*(neighbors != 0)) * x))
 }
 
