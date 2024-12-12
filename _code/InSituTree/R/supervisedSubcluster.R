@@ -3,7 +3,7 @@
 #' @param reference_profiles Matrix of expression profiles, genes x cell types
 #' @param x Counts matrix, cells x genes
 #' @param neg Vector of mean negative controls for each cell
-#' @param bg Expected background
+#' @param bg Vector of expected background for each cell after background estimation
 #' @param quantile_absolute_expression_difference Minimum absolute expression
 #' difference within reference_profiles in terms of quantile level among all
 #' genes. Default = 0.5. Both quantile cutoffs must be passed to retain gene.

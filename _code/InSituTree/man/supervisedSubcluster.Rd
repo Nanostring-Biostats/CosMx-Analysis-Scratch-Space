@@ -22,7 +22,7 @@ supervisedSubcluster(
 
 \item{neg}{Vector of mean negative controls for each cell}
 
-\item{bg}{Expected background}
+\item{bg}{Vector of expected background for each cell after background estimation}
 
 \item{quantile_absolute_expression_difference}{Minimum absolute expression
 difference within reference_profiles in terms of quantile level among all
