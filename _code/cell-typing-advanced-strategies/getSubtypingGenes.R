@@ -40,8 +40,9 @@ getSubtypingGenes <- function(ref, ratiothresh = 2, minquantilethresh = 0.5) {
 #' @param xy Spatial coordinates of cells 
 #' @param varratiothresh Genes with observed variance / predicted variance above this threshold will be called HVGs. Higher = a more stringent filter.
 #' @param expressionthresh Only keep genes with average raw counts above this level in your cell type of interest. 
+#' @param loess.span Parameter guiding loess fit used in hvg search.
 #' @return A vector of gene named for use in unsupervised subclustering
-getSubclusteringGenes <- function(mat, loess.span = 0.3, varratiothresh = 1, expressionthresh = 0.2) {
+getSubclusteringGenes <- function(mat, varratiothresh = 1, expressionthresh = 0.2, loess.span = 0.3) {
   
   ## identify hvgs in the counts matrix:
   RawTargetVar <- apply(mat, 2, var)

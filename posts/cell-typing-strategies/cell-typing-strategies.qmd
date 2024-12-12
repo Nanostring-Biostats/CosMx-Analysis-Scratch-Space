@@ -84,11 +84,9 @@ safegenes <- findSafeGenes(
 
 sub <- clust == "T-cell"                        # which cells are T-cells
 Tcellgenes <- getSubtypingGenes(
-  mat = counts[sub, ],                          # expression from just T-cells
   ref = refprofiles[, c("CD4", "CD8", "Treg")], # T-cell subtype profiles
-  xy = xy[sub, ],                               # spatial positions of T-cells
-  ratiothresh = 2,                              # thresh for max/min in ref
-  expressionthresh = 0.2)                       # thresh for mean counts in mat
+  ratiothresh = 1.5,                            # thresh for max/min in ref
+  minquantilethresh = 0.5)                      # thresh for mean counts in mat
 
 ## use genes meeting both requirements above:
 Tcellgenes <- intersect(Tcellgenes, safegenes)
@@ -118,7 +116,6 @@ subsetHVGs <- getSubclusteringGenes(
   mat = counts[sub, ],     # raw counts from only the cell type of interest
   varratiothresh = 1,      # how much var beyond what mean expression predicts
   expressionthresh = 0.2)  # min expression level
-
 
 ## keep genes meeting both the above criteria:
 usegenes <- intersect(subsetHVGs, safegenes)
