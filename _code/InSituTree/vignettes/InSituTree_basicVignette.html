@@ -12,7 +12,7 @@
 
 <meta name="author" content="Claire Williams" />
 
-<meta name="date" content="2024-12-11" />
+<meta name="date" content="2024-12-12" />
 
 <title>InSituTree hierarchical cell typing</title>
 
@@ -340,7 +340,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <h1 class="title toc-ignore">InSituTree hierarchical cell typing</h1>
 <h4 class="author">Claire Williams</h4>
-<h4 class="date">2024-12-11</h4>
+<h4 class="date">2024-12-12</h4>
 
 
 
@@ -368,34 +368,36 @@ small CosMx®
 <p>SMI dataset of non small cell lung cancer (nsclc) that is included
 with the <code>InSituType</code> package.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(InSituType)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">library</span>(InSituTree)</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># Basic dataset</span></span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">data</span>(mini_nsclc)</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">str</span>(mini_nsclc)</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; List of 5</span></span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&gt;  $ counts: num [1:2198, 1:960] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:960] &quot;AATK&quot; &quot;ABL1&quot; &quot;ABL2&quot; &quot;ACE&quot; ...</span></span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co">#&gt;  $ neg   : num [1:2198, 1:20] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:20] &quot;NegPrb3&quot; &quot;NegPrb6&quot; &quot;NegPrb15&quot; &quot;NegPrb18&quot; ...</span></span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co">#&gt;  $ x     : num [1:2198] 7.34 7.4 7.42 7.46 7.53 ...</span></span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co">#&gt;  $ y     : num [1:2198] -6.5 -6.5 -6.5 -6.5 -6.5 ...</span></span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="co">#&gt;  $ umap  : num [1:2198, 1:2] 1.489 -0.774 -1.915 1.927 1.135 ...</span></span>
-<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
-<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : NULL</span></span>
-<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a></span>
-<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="co"># Cell type reference profile</span></span>
-<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a><span class="fu">data</span>(ioprofiles)</span>
-<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a><span class="fu">str</span>(ioprofiles)</span>
-<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a><span class="co">#&gt;  num [1:27161, 1:16] 2.10e+01 4.59e-04 2.13e-02 4.59e-04 4.15e-03 ...</span></span>
-<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a><span class="co">#&gt;  - attr(*, &quot;dimnames&quot;)=List of 2</span></span>
-<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a><span class="co">#&gt;   ..$ : chr [1:27161] &quot;FAM138A&quot; &quot;OR4F5&quot; &quot;RNU6-1100P&quot; &quot;AC114498.1&quot; ...</span></span>
-<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a><span class="co">#&gt;   ..$ : chr [1:16] &quot;B-cell&quot; &quot;endothelial&quot; &quot;fibroblast&quot; &quot;macrophage&quot; ...</span></span></code></pre></div>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="co">#&gt; Warning: package &#39;InSituType&#39; was built under R version 4.3.3</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">library</span>(InSituTree)</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co">#&gt; Warning: package &#39;InSituTree&#39; was built under R version 4.3.3</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co"># Basic dataset</span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">data</span>(mini_nsclc)</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="fu">str</span>(mini_nsclc)</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt; List of 5</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt;  $ counts: num [1:2198, 1:960] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:960] &quot;AATK&quot; &quot;ABL1&quot; &quot;ABL2&quot; &quot;ACE&quot; ...</span></span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="co">#&gt;  $ neg   : num [1:2198, 1:20] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:20] &quot;NegPrb3&quot; &quot;NegPrb6&quot; &quot;NegPrb15&quot; &quot;NegPrb18&quot; ...</span></span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="co">#&gt;  $ x     : num [1:2198] 7.34 7.4 7.42 7.46 7.53 ...</span></span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="co">#&gt;  $ y     : num [1:2198] -6.5 -6.5 -6.5 -6.5 -6.5 ...</span></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a><span class="co">#&gt;  $ umap  : num [1:2198, 1:2] 1.489 -0.774 -1.915 1.927 1.135 ...</span></span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:2198] &quot;c_3_18_2&quot; &quot;c_3_18_3&quot; &quot;c_3_18_4&quot; &quot;c_3_18_5&quot; ...</span></span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : NULL</span></span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a></span>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a><span class="co"># Cell type reference profile</span></span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a><span class="fu">data</span>(ioprofiles)</span>
+<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a><span class="fu">str</span>(ioprofiles)</span>
+<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a><span class="co">#&gt;  num [1:27161, 1:16] 2.10e+01 4.59e-04 2.13e-02 4.59e-04 4.15e-03 ...</span></span>
+<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a><span class="co">#&gt;  - attr(*, &quot;dimnames&quot;)=List of 2</span></span>
+<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a><span class="co">#&gt;   ..$ : chr [1:27161] &quot;FAM138A&quot; &quot;OR4F5&quot; &quot;RNU6-1100P&quot; &quot;AC114498.1&quot; ...</span></span>
+<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a><span class="co">#&gt;   ..$ : chr [1:16] &quot;B-cell&quot; &quot;endothelial&quot; &quot;fibroblast&quot; &quot;macrophage&quot; ...</span></span></code></pre></div>
 </div>
 <div id="necessary-inputs" class="section level2">
 <h2>Necessary inputs</h2>
@@ -1233,7 +1235,7 @@ these major types.</p>
 <span id="cb16-194"><a href="#cb16-194" tabindex="-1"></a>  <span class="at">insitutype_result =</span></span>
 <span id="cb16-195"><a href="#cb16-195" tabindex="-1"></a>    res[[<span class="st">&quot;topLevel&quot;</span>]]<span class="sc">$</span>subclusterings[[<span class="st">&quot;structural&quot;</span>]]<span class="sc">$</span>result)</span>
 <span id="cb16-196"><a href="#cb16-196" tabindex="-1"></a><span class="co">#&gt; Warning: constructing layout for a very small input dataset</span></span>
-<span id="cb16-197"><a href="#cb16-197" tabindex="-1"></a><span class="co">#&gt; Saving flightpath_plot to: ./NBClust-Plots/2024-12-11_19-49-23-UTC-flightpath_plot.png</span></span></code></pre></div>
+<span id="cb16-197"><a href="#cb16-197" tabindex="-1"></a><span class="co">#&gt; Saving flightpath_plot to: ./NBClust-Plots/2024-12-12_20-56-24-UTC-flightpath_plot.png</span></span></code></pre></div>
 <p><img src="data:image/png;base64,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" /><!-- --></p>
 <p>The summary annotation data frame shows the cell type assigned at
 each level of annotation, as well as the posterior probability for each
@@ -1268,9 +1270,9 @@ is shown in the results below</p>
 <span id="cb17-17"><a href="#cb17-17" tabindex="-1"></a><span class="co">#&gt; c_3_18_6  endothelial          1.0000000  endothelial          1.0000000</span></span>
 <span id="cb17-18"><a href="#cb17-18" tabindex="-1"></a><span class="co">#&gt; NA               &lt;NA&gt;                 NA         &lt;NA&gt;                 NA</span></span></code></pre></div>
 <div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="co">#&gt; R version 4.3.3 (2024-02-29)</span></span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="co">#&gt; R version 4.3.2 (2023-10-31)</span></span>
 <span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a><span class="co">#&gt; Platform: x86_64-pc-linux-gnu (64-bit)</span></span>
-<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co">#&gt; Running under: Ubuntu 22.04.4 LTS</span></span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co">#&gt; Running under: Ubuntu 22.04.3 LTS</span></span>
 <span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="co">#&gt; </span></span>
 <span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a><span class="co">#&gt; Matrix products: default</span></span>
 <span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a><span class="co">#&gt; BLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 </span></span>
@@ -1297,15 +1299,15 @@ is shown in the results below</p>
 <span id="cb18-28"><a href="#cb18-28" tabindex="-1"></a><span class="co">#&gt;  [1] SummarizedExperiment_1.32.0 gtable_0.3.6               </span></span>
 <span id="cb18-29"><a href="#cb18-29" tabindex="-1"></a><span class="co">#&gt;  [3] xfun_0.49                   bslib_0.8.0                </span></span>
 <span id="cb18-30"><a href="#cb18-30" tabindex="-1"></a><span class="co">#&gt;  [5] ggplot2_3.5.1               Biobase_2.62.0             </span></span>
-<span id="cb18-31"><a href="#cb18-31" tabindex="-1"></a><span class="co">#&gt;  [7] lattice_0.22-5              vctrs_0.6.5                </span></span>
-<span id="cb18-32"><a href="#cb18-32" tabindex="-1"></a><span class="co">#&gt;  [9] tools_4.3.3                 spatstat.utils_3.1-1       </span></span>
+<span id="cb18-31"><a href="#cb18-31" tabindex="-1"></a><span class="co">#&gt;  [7] lattice_0.21-9              vctrs_0.6.5                </span></span>
+<span id="cb18-32"><a href="#cb18-32" tabindex="-1"></a><span class="co">#&gt;  [9] tools_4.3.2                 spatstat.utils_3.1-1       </span></span>
 <span id="cb18-33"><a href="#cb18-33" tabindex="-1"></a><span class="co">#&gt; [11] bitops_1.0-9                generics_0.1.3             </span></span>
-<span id="cb18-34"><a href="#cb18-34" tabindex="-1"></a><span class="co">#&gt; [13] stats4_4.3.3                tibble_3.2.1               </span></span>
+<span id="cb18-34"><a href="#cb18-34" tabindex="-1"></a><span class="co">#&gt; [13] stats4_4.3.2                tibble_3.2.1               </span></span>
 <span id="cb18-35"><a href="#cb18-35" tabindex="-1"></a><span class="co">#&gt; [15] fansi_1.0.6                 pkgconfig_2.0.3            </span></span>
-<span id="cb18-36"><a href="#cb18-36" tabindex="-1"></a><span class="co">#&gt; [17] Matrix_1.6-5                data.table_1.16.2          </span></span>
+<span id="cb18-36"><a href="#cb18-36" tabindex="-1"></a><span class="co">#&gt; [17] Matrix_1.6-1.1              data.table_1.16.2          </span></span>
 <span id="cb18-37"><a href="#cb18-37" tabindex="-1"></a><span class="co">#&gt; [19] S4Vectors_0.40.2            lifecycle_1.0.4            </span></span>
 <span id="cb18-38"><a href="#cb18-38" tabindex="-1"></a><span class="co">#&gt; [21] GenomeInfoDbData_1.2.11     farver_2.1.2               </span></span>
-<span id="cb18-39"><a href="#cb18-39" tabindex="-1"></a><span class="co">#&gt; [23] deldir_2.0-4                compiler_4.3.3             </span></span>
+<span id="cb18-39"><a href="#cb18-39" tabindex="-1"></a><span class="co">#&gt; [23] deldir_2.0-4                compiler_4.3.2             </span></span>
 <span id="cb18-40"><a href="#cb18-40" tabindex="-1"></a><span class="co">#&gt; [25] textshaping_0.4.0           munsell_0.5.1              </span></span>
 <span id="cb18-41"><a href="#cb18-41" tabindex="-1"></a><span class="co">#&gt; [27] lsa_0.73.3                  GenomeInfoDb_1.38.8        </span></span>
 <span id="cb18-42"><a href="#cb18-42" tabindex="-1"></a><span class="co">#&gt; [29] htmltools_0.5.8.1           SnowballC_0.7.1            </span></span>
@@ -1320,7 +1322,7 @@ is shown in the results below</p>
 <span id="cb18-51"><a href="#cb18-51" tabindex="-1"></a><span class="co">#&gt; [47] tidyselect_1.2.1            digest_0.6.37              </span></span>
 <span id="cb18-52"><a href="#cb18-52" tabindex="-1"></a><span class="co">#&gt; [49] dplyr_1.1.4                 labeling_0.4.3             </span></span>
 <span id="cb18-53"><a href="#cb18-53" tabindex="-1"></a><span class="co">#&gt; [51] polyclip_1.10-7             fastmap_1.2.0              </span></span>
-<span id="cb18-54"><a href="#cb18-54" tabindex="-1"></a><span class="co">#&gt; [53] grid_4.3.3                  colorspace_2.1-1           </span></span>
+<span id="cb18-54"><a href="#cb18-54" tabindex="-1"></a><span class="co">#&gt; [53] grid_4.3.2                  colorspace_2.1-1           </span></span>
 <span id="cb18-55"><a href="#cb18-55" tabindex="-1"></a><span class="co">#&gt; [55] cli_3.6.3                   SparseArray_1.2.4          </span></span>
 <span id="cb18-56"><a href="#cb18-56" tabindex="-1"></a><span class="co">#&gt; [57] magrittr_2.0.3              S4Arrays_1.2.1             </span></span>
 <span id="cb18-57"><a href="#cb18-57" tabindex="-1"></a><span class="co">#&gt; [59] utf8_1.2.4                  spatstat.data_3.1-4        </span></span>

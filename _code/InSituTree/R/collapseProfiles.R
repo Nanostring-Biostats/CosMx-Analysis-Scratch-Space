@@ -57,7 +57,7 @@ collapseProfiles <- function(cth, full_profiles, verbose = FALSE,
   }
 
   # check if there is a list or just the bottom level of the list
-  if (!inherits(celltypes, "list")) {
+  if (!inherits(cth, "list")) {
     return(full_profiles[, cth, drop = FALSE])
   } else {
     if (print_tree) {
