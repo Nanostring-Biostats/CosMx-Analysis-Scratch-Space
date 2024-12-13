@@ -453,31 +453,29 @@ Writing targets to ...</code></pre>
 <section id="sec-launching-napari-cosmx-from-python" class="level2" data-number="2.1">
 <h2 data-number="2.1" class="anchored" data-anchor-id="sec-launching-napari-cosmx-from-python"><span class="header-section-number">2.1</span> Viewing the results</h2>
 <p>As mentioned in the <a href="../../posts/napari-cosmx-basics/using-napari-cosmx.html">second napari series post</a>, one can use python directly to view CosMx SMI data. We can also launch napari from python directly. In the code below, I instantiated a <code>Gemini</code> class object, turned off the segmentation and FOV labels layers, added the PanCK and DNA channels and manually adjusted the contrast of PanCK. Finally, I launched the widget for further exploration.</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: view one slide</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> importlib.metadata <span class="im">import</span> metadata</span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy</span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> napari_cosmx.gemini <span class="im">import</span> Gemini</span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> imageio</span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>napari_files_path <span class="op">=</span> SlideOutputDir <span class="co"># i.e., 'your/SlideOutputDir/from/above'</span></span>
-<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>gem <span class="op">=</span> Gemini(napari_files_path)</span>
-<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Segmentation'</span>].visible <span class="op">=</span> <span class="va">False</span></span>
-<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'FOV labels'</span>].visible <span class="op">=</span> <span class="va">False</span></span>
-<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>gem.add_channel(<span class="st">'PanCK'</span>, colormap <span class="op">=</span> <span class="st">'green'</span>)</span>
-<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>panck <span class="op">=</span> gem.viewer.layers[<span class="st">'PanCK'</span>]</span>
-<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>panck.contrast_limits <span class="op">=</span> [<span class="fl">116.0</span>, <span class="fl">5903.646408839779</span>]</span>
-<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>gem.add_channel(<span class="st">'DNA'</span>, colormap <span class="op">=</span> <span class="st">'bop blue'</span>)</span>
-<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>gem.show_widget()</span>
-<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>fig_path <span class="op">=</span> napari_files_path <span class="op">+</span> <span class="st">"/fig-stitch-single-slide.png"</span></span>
-<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> imageio.get_writer(fig_path, dpi<span class="op">=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) <span class="im">as</span> writer:</span>
-<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="op">=</span> gem.viewer.screenshot(canvas_only<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>        writer.append_data(screenshot)</span>
-<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>        </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> importlib.metadata <span class="im">import</span> metadata</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> napari_cosmx.gemini <span class="im">import</span> Gemini</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> imageio</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>napari_files_path <span class="op">=</span> SlideOutputDir <span class="co"># i.e., 'your/SlideOutputDir/from/above'</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>gem <span class="op">=</span> Gemini(napari_files_path)</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'Segmentation'</span>].visible <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>gem.viewer.layers[<span class="st">'FOV labels'</span>].visible <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>gem.add_channel(<span class="st">'PanCK'</span>, colormap <span class="op">=</span> <span class="st">'green'</span>)</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>panck <span class="op">=</span> gem.viewer.layers[<span class="st">'PanCK'</span>]</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>panck.contrast_limits <span class="op">=</span> [<span class="fl">116.0</span>, <span class="fl">5903.646408839779</span>]</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>gem.add_channel(<span class="st">'DNA'</span>, colormap <span class="op">=</span> <span class="st">'bop blue'</span>)</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>gem.show_widget()</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>fig_path <span class="op">=</span> napari_files_path <span class="op">+</span> <span class="st">"/fig-stitch-single-slide.png"</span></span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> imageio.get_writer(fig_path, dpi<span class="op">=</span>(<span class="dv">800</span>, <span class="dv">800</span>)) <span class="im">as</span> writer:</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>        screenshot <span class="op">=</span> gem.viewer.screenshot(canvas_only<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>        writer.append_data(screenshot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -496,7 +494,7 @@ Note
 <div id="fig-stitch-single-slide" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-stitch-single-slide-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="./figures/fig-stitch-single-slide.png" class="img-fluid figure-img">
+<img src="./figures/fig-stitch-single-slide.png" class="img-fluid figure-img" width="600">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-stitch-single-slide-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: The output from a single slide stitching. This image represent an 8-by-8 FOV grid. PanCK and DNA are shown in green and blue, respectively.
@@ -530,89 +528,87 @@ Figure&nbsp;1: The output from a single slide stitching. This image represent an
 <span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a><span class="ex">│&nbsp;&nbsp;</span> ├── ./AUG29_6K_BRST_PS_S5/Logs</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>In the python script below, we point <code>BatchFolder</code> to the location that contains these slide folders. We also define <code>OutputFolder</code> to store the napari folders (one for each slide). The script then searches through those folders and stitches the slides.</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: stitch multiple slides</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> os <span class="im">import</span> listdir</span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> glob <span class="im">import</span> iglob</span>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> os <span class="im">import</span> listdir</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> glob <span class="im">import</span> iglob</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Directory containing multiple slides</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>BatchFolder <span class="op">=</span> <span class="st">'/directory/containing/multiple/slides'</span></span>
 <span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Directory containing multiple slides</span></span>
-<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>BatchFolder <span class="op">=</span> <span class="st">'/directory/containing/multiple/slides'</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Output path</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>OutputFolder <span class="op">=</span> <span class="st">'/path/to/output/directory'</span></span>
 <span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Output path</span></span>
-<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>OutputFolder <span class="op">=</span> <span class="st">'/path/to/output/directory'</span></span>
-<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a><span class="co">### Functions</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="co">### Functions</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> check_folder(path: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">bool</span>:</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">""" Checks if a selected folder is a valid slide.</span></span>
 <span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> check_folder(path: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">bool</span>:</span>
-<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">""" Checks if a selected folder is a valid slide.</span></span>
-<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a><span class="co">      Description: </span></span>
-<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a><span class="co">          A folder is a valid slide if it has the following folders:</span></span>
-<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a><span class="co">          CellStatsDir, AnalysisResults/*, and RunSummary</span></span>
-<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a><span class="co">        </span></span>
-<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a><span class="co">      Returns:</span></span>
-<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a><span class="co">          bool: True if valid, False if not valid</span></span>
-<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a><span class="co">  """</span></span>
-<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>  isValid <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="kw">not</span> os.path.isdir(path <span class="op">+</span> <span class="st">'/CellStatsDir'</span>):</span>
-<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"No valid CellStatsDir"</span>)</span>
-<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>    isValid <span class="op">=</span> <span class="va">False</span></span>
-<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="kw">not</span> os.path.isdir(path <span class="op">+</span> <span class="st">'/RunSummary'</span>):</span>
-<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"No valid RunSummary"</span>)</span>
-<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a>    isValid <span class="op">=</span> <span class="va">False</span> </span>
-<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="kw">not</span> os.path.isdir(path <span class="op">+</span> <span class="st">'/AnalysisResults'</span>):</span>
-<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"No valid AnalysisResults Parent folder"</span>)</span>
-<span id="cb13-37"><a href="#cb13-37" aria-hidden="true" tabindex="-1"></a>    isValid <span class="op">=</span> <span class="va">False</span></span>
-<span id="cb13-38"><a href="#cb13-38" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span>: </span>
-<span id="cb13-39"><a href="#cb13-39" aria-hidden="true" tabindex="-1"></a>      <span class="co"># check if /AnalysisResults/&lt;random_subfolder_name&gt; exists</span></span>
-<span id="cb13-40"><a href="#cb13-40" aria-hidden="true" tabindex="-1"></a>      analysis_sub_dir <span class="op">=</span> [i <span class="cf">for</span> i <span class="kw">in</span> listdir(path <span class="op">+</span> <span class="st">'/AnalysisResults'</span>) <span class="cf">if</span> <span class="kw">not</span> i.startswith(<span class="st">'.'</span>)]</span>
-<span id="cb13-41"><a href="#cb13-41" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span>(<span class="bu">len</span>(analysis_sub_dir)<span class="op">!=</span><span class="dv">1</span>):</span>
-<span id="cb13-42"><a href="#cb13-42" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"No valid AnalysisResults subfolder"</span>)</span>
-<span id="cb13-43"><a href="#cb13-43" aria-hidden="true" tabindex="-1"></a>        isValid <span class="op">=</span> <span class="va">False</span></span>
-<span id="cb13-44"><a href="#cb13-44" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> isValid</span>
-<span id="cb13-45"><a href="#cb13-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-46"><a href="#cb13-46" aria-hidden="true" tabindex="-1"></a><span class="co">### Processing</span></span>
-<span id="cb13-47"><a href="#cb13-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-48"><a href="#cb13-48" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> <span class="bu">dir</span> <span class="kw">in</span> listdir(BatchFolder):</span>
-<span id="cb13-49"><a href="#cb13-49" aria-hidden="true" tabindex="-1"></a>  ParentFolder <span class="op">=</span> os.path.join(BatchFolder, <span class="bu">dir</span>)</span>
-<span id="cb13-50"><a href="#cb13-50" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> os.path.isfile(ParentFolder):</span>
-<span id="cb13-51"><a href="#cb13-51" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Skipping file "</span> <span class="op">+</span> <span class="bu">dir</span>)</span>
-<span id="cb13-52"><a href="#cb13-52" aria-hidden="true" tabindex="-1"></a>    <span class="cf">continue</span></span>
-<span id="cb13-53"><a href="#cb13-53" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span>: </span>
-<span id="cb13-54"><a href="#cb13-54" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'Processing Parent Folder: '</span> <span class="op">+</span> <span class="bu">dir</span>)</span>
-<span id="cb13-55"><a href="#cb13-55" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Process slides within the Parent folder</span></span>
-<span id="cb13-56"><a href="#cb13-56" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> SlideDir <span class="kw">in</span> listdir(ParentFolder):</span>
-<span id="cb13-57"><a href="#cb13-57" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> os.path.isfile(os.path.join(ParentFolder, SlideDir)):</span>
-<span id="cb13-58"><a href="#cb13-58" aria-hidden="true" tabindex="-1"></a>          <span class="bu">print</span>(<span class="st">"Skipping file "</span> <span class="op">+</span> SlideDir)</span>
-<span id="cb13-59"><a href="#cb13-59" aria-hidden="true" tabindex="-1"></a>          <span class="cf">continue</span></span>
-<span id="cb13-60"><a href="#cb13-60" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb13-61"><a href="#cb13-61" aria-hidden="true" tabindex="-1"></a>          <span class="co"># check that it is a valid slide</span></span>
-<span id="cb13-62"><a href="#cb13-62" aria-hidden="true" tabindex="-1"></a>          <span class="cf">if</span> <span class="kw">not</span> check_folder(os.path.join(ParentFolder, SlideDir)):</span>
-<span id="cb13-63"><a href="#cb13-63" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="st">"Skipping folder "</span> <span class="op">+</span> SlideDir)</span>
-<span id="cb13-64"><a href="#cb13-64" aria-hidden="true" tabindex="-1"></a>          <span class="cf">else</span>:</span>
-<span id="cb13-65"><a href="#cb13-65" aria-hidden="true" tabindex="-1"></a>            SlideOutputDir <span class="op">=</span> os.path.join(OutputFolder, <span class="bu">dir</span>)</span>
-<span id="cb13-66"><a href="#cb13-66" aria-hidden="true" tabindex="-1"></a>            CellStatsDir <span class="op">=</span> os.path.join(ParentFolder, SlideDir, <span class="st">"CellStatsDir"</span>)</span>
-<span id="cb13-67"><a href="#cb13-67" aria-hidden="true" tabindex="-1"></a>            RunSummaryDir <span class="op">=</span> os.path.join(ParentFolder, SlideDir, <span class="st">"RunSummary"</span>)</span>
-<span id="cb13-68"><a href="#cb13-68" aria-hidden="true" tabindex="-1"></a>            AnalysisDirParent <span class="op">=</span> os.path.join(ParentFolder, SlideDir, <span class="st">'AnalysisResults'</span>)</span>
-<span id="cb13-69"><a href="#cb13-69" aria-hidden="true" tabindex="-1"></a>            AnalysisDirSubBasename <span class="op">=</span> [i <span class="cf">for</span> i <span class="kw">in</span> listdir(AnalysisDirParent) <span class="cf">if</span> <span class="kw">not</span> i.startswith(<span class="st">'.'</span>)]</span>
-<span id="cb13-70"><a href="#cb13-70" aria-hidden="true" tabindex="-1"></a>            AnalysisDir <span class="op">=</span> os.path.join(AnalysisDirParent, AnalysisDirSubBasename[<span class="dv">0</span>])</span>
-<span id="cb13-71"><a href="#cb13-71" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> os.path.exists(SlideOutputDir):</span>
-<span id="cb13-72"><a href="#cb13-72" aria-hidden="true" tabindex="-1"></a>              <span class="bu">print</span>(<span class="st">"Skipping output "</span> <span class="op">+</span> SlideOutputDir <span class="op">+</span> <span class="st">". Folder exists already"</span>)</span>
-<span id="cb13-73"><a href="#cb13-73" aria-hidden="true" tabindex="-1"></a>              <span class="cf">continue</span></span>
-<span id="cb13-74"><a href="#cb13-74" aria-hidden="true" tabindex="-1"></a>            <span class="cf">else</span>:</span>
-<span id="cb13-75"><a href="#cb13-75" aria-hidden="true" tabindex="-1"></a>              os.makedirs(SlideOutputDir)</span>
-<span id="cb13-76"><a href="#cb13-76" aria-hidden="true" tabindex="-1"></a>              cmd_stitch <span class="op">=</span> <span class="st">'stitch-images -i "'</span> <span class="op">+</span> CellStatsDir <span class="op">+</span> <span class="st">'" -f "'</span> <span class="op">+</span> RunSummaryDir <span class="op">+</span> <span class="st">'" -o '</span> <span class="op">+</span> SlideOutputDir</span>
-<span id="cb13-77"><a href="#cb13-77" aria-hidden="true" tabindex="-1"></a>              <span class="bu">print</span>(cmd_stitch)</span>
-<span id="cb13-78"><a href="#cb13-78" aria-hidden="true" tabindex="-1"></a>              <span class="op">!</span>{cmd_stitch}</span>
-<span id="cb13-79"><a href="#cb13-79" aria-hidden="true" tabindex="-1"></a>              cmd_read_targets <span class="op">=</span> <span class="st">'read-targets "'</span> <span class="op">+</span> AnalysisDir <span class="op">+</span> <span class="st">'"'</span> <span class="op">+</span> <span class="st">' -o '</span> <span class="op">+</span> SlideOutputDir</span>
-<span id="cb13-80"><a href="#cb13-80" aria-hidden="true" tabindex="-1"></a>              <span class="bu">print</span>(cmd_read_targets)</span>
-<span id="cb13-81"><a href="#cb13-81" aria-hidden="true" tabindex="-1"></a>              <span class="op">!</span>{cmd_read_targets}</span>
-<span id="cb13-82"><a href="#cb13-82" aria-hidden="true" tabindex="-1"></a>              <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)</span>
-<span id="cb13-83"><a href="#cb13-83" aria-hidden="true" tabindex="-1"></a></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="co">      Description: </span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a><span class="co">          A folder is a valid slide if it has the following folders:</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a><span class="co">          CellStatsDir, AnalysisResults/*, and RunSummary</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a><span class="co">        </span></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a><span class="co">      Returns:</span></span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a><span class="co">          bool: True if valid, False if not valid</span></span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a><span class="co">  """</span></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>  isValid <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="kw">not</span> os.path.isdir(path <span class="op">+</span> <span class="st">'/CellStatsDir'</span>):</span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"No valid CellStatsDir"</span>)</span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>    isValid <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="kw">not</span> os.path.isdir(path <span class="op">+</span> <span class="st">'/RunSummary'</span>):</span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"No valid RunSummary"</span>)</span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>    isValid <span class="op">=</span> <span class="va">False</span> </span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="kw">not</span> os.path.isdir(path <span class="op">+</span> <span class="st">'/AnalysisResults'</span>):</span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"No valid AnalysisResults Parent folder"</span>)</span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a>    isValid <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span>: </span>
+<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a>      <span class="co"># check if /AnalysisResults/&lt;random_subfolder_name&gt; exists</span></span>
+<span id="cb13-37"><a href="#cb13-37" aria-hidden="true" tabindex="-1"></a>      analysis_sub_dir <span class="op">=</span> [i <span class="cf">for</span> i <span class="kw">in</span> listdir(path <span class="op">+</span> <span class="st">'/AnalysisResults'</span>) <span class="cf">if</span> <span class="kw">not</span> i.startswith(<span class="st">'.'</span>)]</span>
+<span id="cb13-38"><a href="#cb13-38" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span>(<span class="bu">len</span>(analysis_sub_dir)<span class="op">!=</span><span class="dv">1</span>):</span>
+<span id="cb13-39"><a href="#cb13-39" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"No valid AnalysisResults subfolder"</span>)</span>
+<span id="cb13-40"><a href="#cb13-40" aria-hidden="true" tabindex="-1"></a>        isValid <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb13-41"><a href="#cb13-41" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> isValid</span>
+<span id="cb13-42"><a href="#cb13-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-43"><a href="#cb13-43" aria-hidden="true" tabindex="-1"></a><span class="co">### Processing</span></span>
+<span id="cb13-44"><a href="#cb13-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-45"><a href="#cb13-45" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> <span class="bu">dir</span> <span class="kw">in</span> listdir(BatchFolder):</span>
+<span id="cb13-46"><a href="#cb13-46" aria-hidden="true" tabindex="-1"></a>  ParentFolder <span class="op">=</span> os.path.join(BatchFolder, <span class="bu">dir</span>)</span>
+<span id="cb13-47"><a href="#cb13-47" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> os.path.isfile(ParentFolder):</span>
+<span id="cb13-48"><a href="#cb13-48" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Skipping file "</span> <span class="op">+</span> <span class="bu">dir</span>)</span>
+<span id="cb13-49"><a href="#cb13-49" aria-hidden="true" tabindex="-1"></a>    <span class="cf">continue</span></span>
+<span id="cb13-50"><a href="#cb13-50" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span>: </span>
+<span id="cb13-51"><a href="#cb13-51" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'Processing Parent Folder: '</span> <span class="op">+</span> <span class="bu">dir</span>)</span>
+<span id="cb13-52"><a href="#cb13-52" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Process slides within the Parent folder</span></span>
+<span id="cb13-53"><a href="#cb13-53" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> SlideDir <span class="kw">in</span> listdir(ParentFolder):</span>
+<span id="cb13-54"><a href="#cb13-54" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> os.path.isfile(os.path.join(ParentFolder, SlideDir)):</span>
+<span id="cb13-55"><a href="#cb13-55" aria-hidden="true" tabindex="-1"></a>          <span class="bu">print</span>(<span class="st">"Skipping file "</span> <span class="op">+</span> SlideDir)</span>
+<span id="cb13-56"><a href="#cb13-56" aria-hidden="true" tabindex="-1"></a>          <span class="cf">continue</span></span>
+<span id="cb13-57"><a href="#cb13-57" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb13-58"><a href="#cb13-58" aria-hidden="true" tabindex="-1"></a>          <span class="co"># check that it is a valid slide</span></span>
+<span id="cb13-59"><a href="#cb13-59" aria-hidden="true" tabindex="-1"></a>          <span class="cf">if</span> <span class="kw">not</span> check_folder(os.path.join(ParentFolder, SlideDir)):</span>
+<span id="cb13-60"><a href="#cb13-60" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="st">"Skipping folder "</span> <span class="op">+</span> SlideDir)</span>
+<span id="cb13-61"><a href="#cb13-61" aria-hidden="true" tabindex="-1"></a>          <span class="cf">else</span>:</span>
+<span id="cb13-62"><a href="#cb13-62" aria-hidden="true" tabindex="-1"></a>            SlideOutputDir <span class="op">=</span> os.path.join(OutputFolder, <span class="bu">dir</span>)</span>
+<span id="cb13-63"><a href="#cb13-63" aria-hidden="true" tabindex="-1"></a>            CellStatsDir <span class="op">=</span> os.path.join(ParentFolder, SlideDir, <span class="st">"CellStatsDir"</span>)</span>
+<span id="cb13-64"><a href="#cb13-64" aria-hidden="true" tabindex="-1"></a>            RunSummaryDir <span class="op">=</span> os.path.join(ParentFolder, SlideDir, <span class="st">"RunSummary"</span>)</span>
+<span id="cb13-65"><a href="#cb13-65" aria-hidden="true" tabindex="-1"></a>            AnalysisDirParent <span class="op">=</span> os.path.join(ParentFolder, SlideDir, <span class="st">'AnalysisResults'</span>)</span>
+<span id="cb13-66"><a href="#cb13-66" aria-hidden="true" tabindex="-1"></a>            AnalysisDirSubBasename <span class="op">=</span> [i <span class="cf">for</span> i <span class="kw">in</span> listdir(AnalysisDirParent) <span class="cf">if</span> <span class="kw">not</span> i.startswith(<span class="st">'.'</span>)]</span>
+<span id="cb13-67"><a href="#cb13-67" aria-hidden="true" tabindex="-1"></a>            AnalysisDir <span class="op">=</span> os.path.join(AnalysisDirParent, AnalysisDirSubBasename[<span class="dv">0</span>])</span>
+<span id="cb13-68"><a href="#cb13-68" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> os.path.exists(SlideOutputDir):</span>
+<span id="cb13-69"><a href="#cb13-69" aria-hidden="true" tabindex="-1"></a>              <span class="bu">print</span>(<span class="st">"Skipping output "</span> <span class="op">+</span> SlideOutputDir <span class="op">+</span> <span class="st">". Folder exists already"</span>)</span>
+<span id="cb13-70"><a href="#cb13-70" aria-hidden="true" tabindex="-1"></a>              <span class="cf">continue</span></span>
+<span id="cb13-71"><a href="#cb13-71" aria-hidden="true" tabindex="-1"></a>            <span class="cf">else</span>:</span>
+<span id="cb13-72"><a href="#cb13-72" aria-hidden="true" tabindex="-1"></a>              os.makedirs(SlideOutputDir)</span>
+<span id="cb13-73"><a href="#cb13-73" aria-hidden="true" tabindex="-1"></a>              cmd_stitch <span class="op">=</span> <span class="st">'stitch-images -i "'</span> <span class="op">+</span> CellStatsDir <span class="op">+</span> <span class="st">'" -f "'</span> <span class="op">+</span> RunSummaryDir <span class="op">+</span> <span class="st">'" -o '</span> <span class="op">+</span> SlideOutputDir</span>
+<span id="cb13-74"><a href="#cb13-74" aria-hidden="true" tabindex="-1"></a>              <span class="bu">print</span>(cmd_stitch)</span>
+<span id="cb13-75"><a href="#cb13-75" aria-hidden="true" tabindex="-1"></a>              <span class="op">!</span>{cmd_stitch}</span>
+<span id="cb13-76"><a href="#cb13-76" aria-hidden="true" tabindex="-1"></a>              cmd_read_targets <span class="op">=</span> <span class="st">'read-targets "'</span> <span class="op">+</span> AnalysisDir <span class="op">+</span> <span class="st">'"'</span> <span class="op">+</span> <span class="st">' -o '</span> <span class="op">+</span> SlideOutputDir</span>
+<span id="cb13-77"><a href="#cb13-77" aria-hidden="true" tabindex="-1"></a>              <span class="bu">print</span>(cmd_read_targets)</span>
+<span id="cb13-78"><a href="#cb13-78" aria-hidden="true" tabindex="-1"></a>              <span class="op">!</span>{cmd_read_targets}</span>
+<span id="cb13-79"><a href="#cb13-79" aria-hidden="true" tabindex="-1"></a>              <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 <section id="conclusion" class="level2" data-number="3.1">
 <h2 data-number="3.1" class="anchored" data-anchor-id="conclusion"><span class="header-section-number">3.1</span> Conclusion</h2>
 <p>In this post, I showed how to prepare napari-cosmx files folders from raw data programmatically. To do this, we used a virtual environment to install our plugin and created a script to install a single slide followed by a script to install multiple slides. I also showed how we can open a slide with <code>napari-cosmx</code> directly from python.</p>
