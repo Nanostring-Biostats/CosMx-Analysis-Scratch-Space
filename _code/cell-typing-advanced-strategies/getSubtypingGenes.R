@@ -1,37 +1,6 @@
-message("Key functions:\n
-        getSubtypingGenes: identify which genes in a reference matrix are informative\n
-        getSubclusteringGenes: identify highly variable genes in a counts matrix, for use in clustering\n
-        findSafeGenes: identify genes safe from excessive bias from segmentation errors.")
-
-
-#' Identify genes useful for supervised classification of closely-related cell types 
-#' @param ref Reference matrix for the cell types in question
-#' @param ratiothresh Only keep genes with at least this much of a ratio between the max and min cell types.
-#' @param minquantilethresh Only keep genes above this quantile of the reference profile for at least one cell type. 
-#' @return A vector of gene name for use in supervised cell subtyping
-getSubtypingGenes <- function(ref, ratiothresh = 2, minquantilethresh = 0.5) {
-  
-  ## checks
-  if (is.null(rownames(ref))) {
-    stop("the reference profiles matrix (ref) needs row names")
-  }
-  
-  ## identify hvgs in the ref profiles:
-  mins <- apply(ref, 1, min)
-  mins <- pmax(mins, min(mins[mins > 0], na.rm = TRUE))
-  maxes <- apply(ref, 1, max)
-  maxes <- pmax(maxes, min(mins))
-  bigratios <- names(which((maxes / mins) > ratiothresh) )
-  
-  ## identify genes with decent expression in at least one of the refprofiles
-  q <- sweep(ref, 2, apply(ref, 2, quantile, minquantilethresh), ">")
-  decentexpressers <- rownames(q)[rowSums(q) > 0]
-  
-  keepgenes <- intersect(bigratios, decentexpressers)
-  return(keepgenes)
-} 
-
-
+message("Key functions:
+      - findSafeGenes: identify genes safe from excessive bias from segmentation errors.
+      - getSubclusteringGenes: identify highly variable genes in a counts matrix, for use in clustering.")
 
 
 #' Identify genes useful for unsupervised clustering of closely-related cell types 
@@ -45,7 +14,7 @@ getSubtypingGenes <- function(ref, ratiothresh = 2, minquantilethresh = 0.5) {
 getSubclusteringGenes <- function(mat, varratiothresh = 1, expressionthresh = 0.2, loess.span = 0.3) {
   
   ## identify hvgs in the counts matrix:
-  RawTargetVar <- apply(mat, 2, var)
+  RawTargetVar <- colvars(mat)^2
   RawTargetMean <- Matrix::colMeans(mat)
   use <- RawTargetVar > 0
   loessfit <- loess(log10(RawTargetVar[use]) ~ log10(RawTargetMean[use]),
@@ -74,7 +43,7 @@ getSubclusteringGenes <- function(mat, varratiothresh = 1, expressionthresh = 0.
 #'   lower risk of bias from segmentation errors
 #'  \item safegenes: A vector of gene names passing the filter
 #' }
-findSafeGenes <- function(counts, xy, ismycelltype, tissue = NULL, Nneighbors = 50) {
+findSafeGenes <- function(counts, xy, ismycelltype, tissue = NULL, Nneighbors = 50, self_vs_neighbor_threshold = 1.75) {
   
   # get spatial neighbors:
   if (is.null(tissue)) {
@@ -95,7 +64,7 @@ findSafeGenes <- function(counts, xy, ismycelltype, tissue = NULL, Nneighbors = 
   meanself <- Matrix::colMeans(counts[ismycelltype, ])
   
   out <- list(self2neighborratio = meanself / meanenv,
-              safegenes = names(which((meanself / meanenv) > 1)))
+              safegenes = names(which((meanself / meanenv) > self_vs_neighbor_threshold)))
   return(out)
   
 }
@@ -163,5 +132,34 @@ neighbor_colSums <- function(x, neighbors) {
   out <- neighbors %*% x
   return(out)
 }
+
+
+#' Calculate column standard deviations without converting to dense matrix.
+#' @param x A sparse dgCMatrix
+#' @examples 
+#'  
+#' set.seed(30)
+#' sm <- Matrix::sparseMatrix(i=sample(1:30,450,replace=TRUE),
+#'                            j=sample(1:20,450,replace=TRUE),x=runif(450))
+#' all.equal(colSDs(sm), apply(sm, 2, sd))
+#' 
+#' @export
+colvars <- function(x){
+  
+  ## std = \sqrt((\sum x_i^2 - n \bar{x}^2)/(n-1))
+  if(inherits(x, "sparseMatrix")){
+    x2 <- x
+    x2@x <- x2@x^2
+    x2.sums <- Matrix::colSums(x2)
+    x.means <- Matrix::colMeans(x)
+    num <- pmax((x2.sums - nrow(x)*x.means^2 ),0)  ## floating point error can cause this to be negative i.e, -4e-11, when sd is 0.
+    colvars <- (num / (nrow(x) - 1))
+  } else {
+    colvars <- apply(x, 2, var)
+  }
+  
+  return(colvars) 
+}
+  
 
 

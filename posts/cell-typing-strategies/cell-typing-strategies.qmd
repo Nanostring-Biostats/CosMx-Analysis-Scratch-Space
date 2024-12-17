@@ -56,7 +56,8 @@ Defining the "useful subset of genes" is straightforward: we want genes that dif
 between our closely-related cell types, and we want to avoid genes at risk of contamination from segmentation errors. 
 We advise using a generous gene list: including at least 1/3-1/2 of the genes in the 1k and 6k panels seems to work well. 
 
-The below code shows how this approach would work:
+The below code shows how this approach would work for supervised cell typing.
+Here, we'll perform just one filter, removing genes at risk of bias from cell segmentation errors:
 
 ```{r hierarchical, eval=FALSE, echo=TRUE}
 #### assumed data ---------------------------------------
@@ -66,7 +67,7 @@ The below code shows how this approach would work:
 # counts: counts matrix, cells * genes.
 # clust: vector of broad cell type assignments.
 
-#### source functions for gene selection ---------------------------------------
+#### source functions for gene selection --------------------------------------- 
 
 source(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cell-typing-advanced-strategies/getSubtypingGenes.R"))
 
@@ -77,19 +78,11 @@ safegenes <- findSafeGenes(
   counts = counts,                    # note we're entering info for all cells           
   xy = xy,                            # again entering info for all cells
   ismycelltype = (clust == "T-cell"), # logical indicating the cells to subtype
-  tissue = NULL)$safegenes            # specify if tissues have xy overlap
+  tissue = NULL,                      # specify if tissues have xy overlap
+  self_vs_neighbor_threshold = 1.75   # min ratio of expression in the cell type vs. in its neighbors
+  )$safegenes            
 
-
-## Get useful genes for supervised subtyping:
-
-sub <- clust == "T-cell"                        # which cells are T-cells
-Tcellgenes <- getSubtypingGenes(
-  ref = refprofiles[, c("CD4", "CD8", "Treg")], # T-cell subtype profiles
-  ratiothresh = 1.5,                            # thresh for max/min in ref
-  minquantilethresh = 0.5)                      # thresh for mean counts in mat
-
-## use genes meeting both requirements above:
-Tcellgenes <- intersect(Tcellgenes, safegenes)
+message(print0(length(safegenes), " genes kept from a panel of ", ncol(counts), ". Try to use at least 1/3 the panel."))
 
 ## supervised subtyping of T-cells:
 res <- insitutype(
@@ -99,7 +92,24 @@ res <- insitutype(
 
 ## update the cluster assignments:
 clust[sub] <- res$clust
+```
 
+And for unsupervised clustering, we'll filter on both risk of segmentation errors and 
+for informativeness in our data. 
+For "informativeness", we'll search for highly variable genes, as described
+by Stuart et al. (2019), and implemented in `Seurat::FindVariableFeatures`.
+
+```{r unsup, eval=FALSE, echo=TRUE}
+#### assumed data ---------------------------------------
+# xy: 2-column matrix of cells' xy positions
+# refprofiles: matrix of expected expression in genes * cells types, as 
+#   is expected by InSituType.
+# counts: counts matrix, cells * genes.
+# clust: vector of broad cell type assignments.
+
+#### source functions for gene selection --------------------------------------- 
+
+source(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cell-typing-advanced-strategies/getSubtypingGenes.R"))
 
 #### unsupervised subclustering workflow ---------------------------------------
 
@@ -108,7 +118,9 @@ safegenes <- findSafeGenes(
   counts = counts,                    # note we're entering info for all cells           
   xy = xy,                            # again entering info for all cells
   ismycelltype = (clust == "T-cell"), # logical indicating the cells to subtype
-  tissue = NULL)$safegenes            # specify if tissues have xy overlap
+  tissue = NULL,                      # specify if tissues have xy overlap
+  self_vs_neighbor_threshold = 1.75   # min ratio of expression in the cell type vs. in its neighbors
+  )$safegenes           
 
 ## Get highly variable genes in your subset:
 sub <- clust == "T-cell"                                 
@@ -119,18 +131,20 @@ subsetHVGs <- getSubclusteringGenes(
 
 ## keep genes meeting both the above criteria:
 usegenes <- intersect(subsetHVGs, safegenes)
+message(print0(length(usegenes), " genes kept from a panel of ", ncol(counts), ". Try to use at least 1/3 the panel."))
 
 ## supervised subtyping of T-cells:
 res <- insitutype(
   x = counts[sub, usegenes],
   n_clusts = 4)
+
 ## update the cluster assignments:
 clust[sub] <- paste0("T-cell cluster ", res$clust)
 ```
 
 # Cell typing based on marker genes
 
-We generally advise against [relying on raw marker gene expression] (https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/){target="_blank"}
+We generally advise against [relying on raw marker gene expression](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/){target="_blank"}
 for cell typing. 
 However, a marker-centered view can occasionally be appropriate. For example, you might insist on
 only restricting your analysis to Treg's to cells that are demonstrably FOXP3+. 
@@ -161,13 +175,15 @@ If you see evidence of batch effects in your data, for example strong batch depe
 in your cell typing results or your UMAP projection, consider the below strategies. 
 
 - Unsupervised clustering: InSituType will generally work even in the presence of batch effects.
-To run Leiden clustering, just begin by using any standard batch-correction method, e.g. Harmony (Korsunsky et al, 2019). Batch corrected data isn't well-suited InSituType, which ingests raw data. 
+To run Leiden clustering, just begin by using any standard batch-correction method, e.g. Harmony (Korsunsky et al, 2019).
+[Seurat's label transfer functions](https://satijalab.org/seurat/archive/v3.0/integration.html){target="_blank"} offer another approach.
+Batch corrected data isn't well-suited InSituType, which ingests raw data. 
 - Supervised cell typing with InSituType: run InSituType separately on each tissue/batch, using the rescale=TRUE option. This will perform a batch adjustment from the reference to each new tissue. We used this approach 
 successfully in a study of lupus nephritis (Danaher et al., 2024). You can see the code
 we used [here](https://github.com/Nanostring-Biostats/childhood-onset-lupus-nephritis-analyses/blob/main/3.%20cell%20typing%20by%20batch.R){target="_blank"}.
 - Semi-supervised cell typing with InSituType: initially analyze a single batch of data.
 Once you're satisfied that you've captured all the unknown and reference cell types in that batch,
-use it to derive a new reference matrix (use InSituStep::getRNAprofiles). 
+use it to derive a new reference matrix (use `InSituType::getRNAprofiles`). 
 Then apply the above supervised cell typing strategy using this reference matrix.
 
 
@@ -175,14 +191,14 @@ Then apply the above supervised cell typing strategy using this reference matrix
 
 InSituType has the option of using anchor cells to calibrate reference profiles
 for CosMx data. This calibration is generally helpful for supervised cell typing
-and usualyl essential for semi-supervised cell typing, at least if the reference 
+and usually essential for semi-supervised cell typing, at least if the reference 
 came from scRNA-seq data. 
 (For details on this calibration, see the "Updating reference profiles" section of the [InSituType FAQs](https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md){target="_blank"}.)
 
 Sometimes, InSituType will fail to discover enough "anchor cells" to perform this calibration.
 In this case, there are several simple next steps.
 
-- Lower the thresholds for anchor selection (\code{min_anchor_cosine} and \code{min_anchor_llr}). 
+- Lower the thresholds for anchor selection (`min_anchor_cosine` and `min_anchor_llr`). 
 This is often needed in high-plex studies - the defaults were optimized for 1000-plex data.
 - If you only find anchors for a few cell types: use rescale = TRUE, refit = FALSE. This
 performs a softer calibration: it rescales each row/gene of the reference matrix, but doesn't fully
@@ -197,14 +213,15 @@ refit each profile. This operation can be powered using only a few cell types.
 InSituType will occasionally assign a cell type to the wrong reference profile, 
 e.g. we've seen some cancer cells get assigned to the "NK cells" profiles. 
 Fortunately, this kind of event is easy to detect with even cursory QC of your cell type results,
-and easy to fix: just use \code{InSituTYpe::refineClusters}. 
+and easy to fix: just use `InSituType::refineClusters`. 
 Correcting this kind of error should be thought of as a part of routine  human-guided cell typing,
 an operation to perform alongside all the other renaming, merging, and subclustering operations
-performed with \code{refineClusters}.
+performed with `refineClusters`.
 
 
 # References
 
+- Stuart T, Butler A, Hoffman P, Hafemeister C, Papalexi E, Mauck WM, Hao Y, Stoeckius M, Smibert P, Satija R. Comprehensive integration of single-cell data. cell. 2019 Jun 13;177(7):1888-902.
 - Danaher P, Hasle N, Nguyen ED, Roberts JE, Rosenwasser N, Rickert C, Hsieh EW, Hayward K, Okamura DM, Alpers CE, Reed RC. Childhood-onset lupus nephritis is characterized by complex interactions between kidney stroma and infiltrating immune cells. Science Translational Medicine. 2024 Nov 27;16(775):eadl1666.
 - Korsunsky I, Millard N, Fan J, Slowikowski K, Zhang F, Wei K, Baglaenko Y, Brenner M, Loh PR, Raychaudhuri S. Fast, sensitive and accurate integration of single-cell data with Harmony. Nature methods. 2019 Dec;16(12):1289-96.
 - Huang M, Wang J, Torre E, Dueck H, Shaffer S, Bonasio R, Murray JI, Raj A, Li M, Zhang NR. SAVER: gene expression recovery for single-cell RNA sequencing. Nature methods. 2018 Jul;15(7):539-42.
