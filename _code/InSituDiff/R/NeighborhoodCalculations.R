@@ -26,7 +26,8 @@ getNeighborhoodExpression <- function(x, neighbors, makedense = TRUE) {
 #' @param verbose TRUE to get more messages
 #' @return sparse matrix holding neighbor assignments
 #' @export
-getNeighbors <- function(xy, neighbors, tissue, k, radius, verbose) {
+getNeighbors <- function(xy, neighbors = NULL, tissue = NULL, k = NULL, radius = NULL, verbose = FALSE) {
+
   # need xy or neighbors:
   if (is.null(xy) && is.null(neighbors)) {
     stop("need to provide either xy coords or a neighbors network")
@@ -49,6 +50,10 @@ getNeighbors <- function(xy, neighbors, tissue, k, radius, verbose) {
   }
   # if calculating neighbors, then need k or radius, and not both
   if (!is.null(xy)) {
+    # format xy as matrix:
+    if (!is.matrix(xy)) {
+      xy <- as.matrix(xy)
+    }
     if (is.null(k) && is.null(radius)) {
       stop("must provide either k or radius for neighbors to be calculated")
     }
