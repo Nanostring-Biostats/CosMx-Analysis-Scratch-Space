@@ -10,7 +10,397 @@
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
 <generator>quarto-1.6.30</generator>
-<lastBuildDate>Thu, 12 Dec 2024 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Wed, 18 Dec 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Cell typing: advanced strategies</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-strategies/cell-typing-strategies.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="background" class="level1">
+<h1>Background</h1>
+<p>Cell typing is always critical and occasionally difficult. Here we’ll discuss what to do when straightforward approaches fail.</p>
+<p>Before exploring the options here, you should:</p>
+<ol type="1">
+<li>Attempt <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/" target="_blank">the standard approaches</a> - InSituType, Leiden clustering and label transfer.</li>
+<li>If you’re using InSituType, attempt the workflows described in the <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">InSituType FAQS</a>. This last document provides detailed guidance on using InSituType’s many options, and its contents should be enough to guide you through most cell typing exercises.</li>
+<li>Confirm your cell segmentation was successful. Use AtoMx or your favorite viewer to confirm that segmentation errors aren’t widespread.</li>
+</ol>
+<p>In this document, we’ll address four common difficulties:</p>
+<ol type="1">
+<li>Fine subtyping, especially for immune cells</li>
+<li>Cell typing based on marker genes</li>
+<li>Studies with batch effects</li>
+<li>Failure to find anchor cells / difficulties mapping reference profiles</li>
+<li>Reference cell types claiming the wrong cells</li>
+</ol>
+</section>
+<section id="fine-subtyping-take-a-hierarchical-approach-and-rely-on-gene-selection" class="level1">
+<h1>Fine subtyping: take a hierarchical approach and rely on gene selection</h1>
+<p>Broad cell typing, e.g.&nbsp;discerning cancer cells vs.&nbsp;fibroblasts vs.&nbsp;immune cells, does best using a large number of genes - the whole panel for 1k data, and at least half the 6k panel. But when we turn to fine subtyping, e.g.&nbsp;discerning CD4 T-cells vs.&nbsp;Tregs, a much smaller gene set is relevant. If we use a complete high-plex panel for this problem, we’ll rely on potentially thousands of unhelpful genes: genes that are mainly in the background for our cell types of interest, genes for which cell segmentation errors have introduced high levels of contaminating signal into our cell types of interest, and genes with minimal variability among our cell types of interest. These genes make fine cell typing harder by introducing noise, or, in the case of segmentation errors, bias. You may find your subclusters to be driven by sample ID or by spatial context.</p>
+<p>The solution is simple: after establishing your broad cell types, perform fine cell typing among related cell types using a useful subset of genes. Hierarchical approaches like this are common in the single cell world. Defining the “useful subset of genes” is straightforward: we want genes that differ meaningfully between our closely-related cell types, and we want to avoid genes at risk of contamination from segmentation errors. We advise using a generous gene list: including at least 1/3-1/2 of the genes in the 1k and 6k panels seems to work well.</p>
+<p>The below code shows how this approach would work for supervised cell typing. Here, we’ll perform just one filter, removing genes at risk of bias from cell segmentation errors:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">#### assumed data ---------------------------------------</span></span>
+<span id="cb1-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># xy: 2-column matrix of cells' xy positions</span></span>
+<span id="cb1-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># refprofiles: matrix of expected expression in genes * cells types, as </span></span>
+<span id="cb1-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#   is expected by InSituType.</span></span>
+<span id="cb1-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># counts: counts matrix, cells * genes.</span></span>
+<span id="cb1-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># clust: vector of broad cell type assignments.</span></span>
+<span id="cb1-7"></span>
+<span id="cb1-8"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">#### source functions for gene selection --------------------------------------- </span></span>
+<span id="cb1-9"></span>
+<span id="cb1-10"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">source</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">url</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cell-typing-advanced-strategies/getSubtypingGenes.R"</span>))</span>
+<span id="cb1-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># (if the above doesn't work, just download the file at that url then source it locally)</span></span>
+<span id="cb1-12"></span>
+<span id="cb1-13"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">#### supervised subtyping workflow ---------------------------------------</span></span>
+<span id="cb1-14"></span>
+<span id="cb1-15"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## get genes safe from contamination:</span></span>
+<span id="cb1-16">safegenes <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">findSafeGenes</span>(</span>
+<span id="cb1-17">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">counts =</span> counts,                    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># note we're entering info for all cells           </span></span>
+<span id="cb1-18">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">xy =</span> xy,                            <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># again entering info for all cells</span></span>
+<span id="cb1-19">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">ismycelltype =</span> (clust <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"T-cell"</span>), <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># logical indicating the cells to subtype</span></span>
+<span id="cb1-20">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">tissue =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,                      <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># specify if tissues have xy overlap</span></span>
+<span id="cb1-21">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">self_vs_neighbor_threshold =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.75</span>   <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># min ratio of expression in the cell type vs. in its neighbors</span></span>
+<span id="cb1-22">  )<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>safegenes            </span>
+<span id="cb1-23"></span>
+<span id="cb1-24"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">message</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">print0</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">length</span>(safegenes), <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">" genes kept from a panel of "</span>, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ncol</span>(counts), <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">". Try to use at least 1/3 the panel."</span>))</span>
+<span id="cb1-25"></span>
+<span id="cb1-26"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## supervised subtyping of T-cells:</span></span>
+<span id="cb1-27">res <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">insitutype</span>(</span>
+<span id="cb1-28">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> counts[sub, ],</span>
+<span id="cb1-29">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">reference_profiles =</span> refprofiles[Tcellgenes, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CD4"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CD8"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Treg"</span>)],</span>
+<span id="cb1-30">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">n_clusts =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb1-31"></span>
+<span id="cb1-32"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## update the cluster assignments:</span></span>
+<span id="cb1-33">clust[sub] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> res<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>clust</span></code></pre></div>
+</div>
+<p>And for unsupervised clustering, we’ll filter on both risk of segmentation errors and for informativeness in our data. For “informativeness”, we’ll search for highly variable genes, as described by Stuart et al.&nbsp;(2019), and implemented in <code>Seurat::FindVariableFeatures</code>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">#### assumed data ---------------------------------------</span></span>
+<span id="cb2-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># xy: 2-column matrix of cells' xy positions</span></span>
+<span id="cb2-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># refprofiles: matrix of expected expression in genes * cells types, as </span></span>
+<span id="cb2-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#   is expected by InSituType.</span></span>
+<span id="cb2-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># counts: counts matrix, cells * genes.</span></span>
+<span id="cb2-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># clust: vector of broad cell type assignments.</span></span>
+<span id="cb2-7"></span>
+<span id="cb2-8"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">#### source functions for gene selection --------------------------------------- </span></span>
+<span id="cb2-9"></span>
+<span id="cb2-10"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">source</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">url</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cell-typing-advanced-strategies/getSubtypingGenes.R"</span>))</span>
+<span id="cb2-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># (if the above doesn't work, just download the file at that url then source it locally)</span></span>
+<span id="cb2-12"></span>
+<span id="cb2-13"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">#### unsupervised subclustering workflow ---------------------------------------</span></span>
+<span id="cb2-14"></span>
+<span id="cb2-15"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## get genes safe from contamination:</span></span>
+<span id="cb2-16">safegenes <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">findSafeGenes</span>(</span>
+<span id="cb2-17">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">counts =</span> counts,                    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># note we're entering info for all cells           </span></span>
+<span id="cb2-18">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">xy =</span> xy,                            <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># again entering info for all cells</span></span>
+<span id="cb2-19">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">ismycelltype =</span> (clust <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"T-cell"</span>), <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># logical indicating the cells to subtype</span></span>
+<span id="cb2-20">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">tissue =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,                      <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># specify if tissues have xy overlap</span></span>
+<span id="cb2-21">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">self_vs_neighbor_threshold =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.75</span>   <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># min ratio of expression in the cell type vs. in its neighbors</span></span>
+<span id="cb2-22">  )<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>safegenes           </span>
+<span id="cb2-23"></span>
+<span id="cb2-24"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## Get highly variable genes in your subset:</span></span>
+<span id="cb2-25">sub <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> clust <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"T-cell"</span>                                 </span>
+<span id="cb2-26">subsetHVGs <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">getSubclusteringGenes</span>(</span>
+<span id="cb2-27">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">mat =</span> counts[sub, ],     <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># raw counts from only the cell type of interest</span></span>
+<span id="cb2-28">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">varratiothresh =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,      <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># how much var beyond what mean expression predicts</span></span>
+<span id="cb2-29">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">expressionthresh =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span>)  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># min expression level</span></span>
+<span id="cb2-30"></span>
+<span id="cb2-31"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## keep genes meeting both the above criteria:</span></span>
+<span id="cb2-32">usegenes <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">intersect</span>(subsetHVGs, safegenes)</span>
+<span id="cb2-33"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">message</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">print0</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">length</span>(usegenes), <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">" genes kept from a panel of "</span>, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ncol</span>(counts), <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">". Try to use at least 1/3 the panel."</span>))</span>
+<span id="cb2-34"></span>
+<span id="cb2-35"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## supervised subtyping of T-cells:</span></span>
+<span id="cb2-36">res <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">insitutype</span>(</span>
+<span id="cb2-37">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> counts[sub, usegenes],</span>
+<span id="cb2-38">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">n_clusts =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span>
+<span id="cb2-39"></span>
+<span id="cb2-40"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## update the cluster assignments:</span></span>
+<span id="cb2-41">clust[sub] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">paste0</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"T-cell cluster "</span>, res<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>clust)</span></code></pre></div>
+</div>
+</section>
+<section id="cell-typing-based-on-marker-genes" class="level1">
+<h1>Cell typing based on marker genes</h1>
+<p>We generally advise against <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/" target="_blank">relying on raw marker gene expression</a> for cell typing. However, a marker-centered view can occasionally be appropriate. For example, you might insist on only restricting your analysis to Treg’s to cells that are demonstrably FOXP3+. If you do want to base your cell typing on a marker gene, we recommend using smoothing/imputation to get cleaner marker gene expression values. The idea is to obtain more accurate expression values for a marker gene by borrowing information from other genes in its profile. This intuition is simple: if you see FOXP3 expression in all the cells with highly similar expression profiles to a cell in question, then the cell in question is very probably FOXP3+ itself, whether or not you observed any FOXP3 counts in it. Or, more formally, this approach negotiates a favorable variance-bias tradeoff: in this example, we bias cells’ FOXP3 expression values to resemble their nearest neighbors in expression space, while greatly reducing sampling variability compared to that of a single gene’s count value.</p>
+<p>We demonstrate a smoothing/imputation approach to marker genes <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/" target="_blank">here</a>. You can also use SAVER (Huang et al, 2018) or scImpute (Li &amp; Li, 2018) or any of the many other published single cell imputation methods. Do note that performing deeper analyses of imputed expression values, e.g.&nbsp;differential expression testing, is hazardous (Andrews &amp; Hemberg, 2019), though imputed counts can be useful for plotting.</p>
+</section>
+<section id="batch-effects-well-considered-workflows" class="level1">
+<h1>Batch effects: well-considered workflows</h1>
+<p>InSituType is quite, but not completely, robust to batch effects. Leiden clustering and other methods relying on principal components of the data can be highly sensitive to them. If you see evidence of batch effects in your data, for example strong batch dependence in your cell typing results or your UMAP projection, consider the below strategies.</p>
+<ul>
+<li>Unsupervised clustering: InSituType will generally work even in the presence of batch effects. To run Leiden clustering, just begin by using any standard batch-correction method, e.g.&nbsp;Harmony (Korsunsky et al, 2019). <a href="https://satijalab.org/seurat/archive/v3.0/integration.html" target="_blank">Seurat’s label transfer functions</a> offer another approach. Batch corrected data isn’t well-suited InSituType, which ingests raw data.</li>
+<li>Supervised cell typing with InSituType: run InSituType separately on each tissue/batch, using the rescale=TRUE option. This will perform a batch adjustment from the reference to each new tissue. We used this approach successfully in a study of lupus nephritis (Danaher et al., 2024). You can see the code we used <a href="https://github.com/Nanostring-Biostats/childhood-onset-lupus-nephritis-analyses/blob/main/3.%20cell%20typing%20by%20batch.R" target="_blank">here</a>.</li>
+<li>Semi-supervised cell typing with InSituType: initially analyze a single batch of data. Once you’re satisfied that you’ve captured all the unknown and reference cell types in that batch, use it to derive a new reference matrix (use <code>InSituType::getRNAprofiles</code>). Then apply the above supervised cell typing strategy using this reference matrix.</li>
+</ul>
+</section>
+<section id="failure-to-find-anchor-cells" class="level1">
+<h1>Failure to find anchor cells</h1>
+<p>InSituType has the option of using anchor cells to calibrate reference profiles for CosMx data. This calibration is generally helpful for supervised cell typing and usually essential for semi-supervised cell typing, at least if the reference came from scRNA-seq data. (For details on this calibration, see the “Updating reference profiles” section of the <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">InSituType FAQs</a>.)</p>
+<p>Sometimes, InSituType will fail to discover enough “anchor cells” to perform this calibration. In this case, there are several simple next steps.</p>
+<ul>
+<li>Lower the thresholds for anchor selection (<code>min_anchor_cosine</code> and <code>min_anchor_llr</code>). This is often needed in high-plex studies - the defaults were optimized for 1000-plex data.</li>
+<li>If you only find anchors for a few cell types: use rescale = TRUE, refit = FALSE. This performs a softer calibration: it rescales each row/gene of the reference matrix, but doesn’t fully refit each profile. This operation can be powered using only a few cell types.</li>
+<li>If you have a whole single cell reference dataset, not just profiles, then try a label transfer algorithm, e.g.&nbsp;Seurat’s or MaxFuse (Chen et al 2023). If you do cell type with label transfer, then using InSituType::spatialUpdate can further improve these initial results.</li>
+</ul>
+</section>
+<section id="reference-cell-types-claiming-the-wrong-cells" class="level1">
+<h1>Reference cell types claiming the wrong cells</h1>
+<p>InSituType will occasionally assign a cell type to the wrong reference profile, e.g.&nbsp;we’ve seen some cancer cells get assigned to the “NK cells” profiles. Fortunately, this kind of event is easy to detect with even cursory QC of your cell type results, and easy to fix: just use <code>InSituType::refineClusters</code>. Correcting this kind of error should be thought of as a part of routine human-guided cell typing, an operation to perform alongside all the other renaming, merging, and subclustering operations performed with <code>refineClusters</code>.</p>
+</section>
+<section id="references" class="level1">
+<h1>References</h1>
+<ul>
+<li>Stuart T, Butler A, Hoffman P, Hafemeister C, Papalexi E, Mauck WM, Hao Y, Stoeckius M, Smibert P, Satija R. Comprehensive integration of single-cell data. cell. 2019 Jun 13;177(7):1888-902.</li>
+<li>Danaher P, Hasle N, Nguyen ED, Roberts JE, Rosenwasser N, Rickert C, Hsieh EW, Hayward K, Okamura DM, Alpers CE, Reed RC. Childhood-onset lupus nephritis is characterized by complex interactions between kidney stroma and infiltrating immune cells. Science Translational Medicine. 2024 Nov 27;16(775):eadl1666.</li>
+<li>Korsunsky I, Millard N, Fan J, Slowikowski K, Zhang F, Wei K, Baglaenko Y, Brenner M, Loh PR, Raychaudhuri S. Fast, sensitive and accurate integration of single-cell data with Harmony. Nature methods. 2019 Dec;16(12):1289-96.</li>
+<li>Huang M, Wang J, Torre E, Dueck H, Shaffer S, Bonasio R, Murray JI, Raj A, Li M, Zhang NR. SAVER: gene expression recovery for single-cell RNA sequencing. Nature methods. 2018 Jul;15(7):539-42.</li>
+<li>Li WV, Li JJ. An accurate and robust imputation method scImpute for single-cell RNA-seq data. Nature communications. 2018 Mar 8;9(1):997.</li>
+<li>Andrews TS, Hemberg M. False signals induced by single-cell imputation. F1000Research. 2019 Mar 5;7:1740.</li>
+<li>Chen S, Zhu B, Huang S, Hickey JW, Lin KZ, Snyder M, Greenleaf WJ, Nolan GP, Zhang NR, Ma Z. Integration of spatial and single-cell data across modalities with weakly linked features. Nature Biotechnology. 2024 Jul;42(7):1096-106.</li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>cell typing</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-strategies/cell-typing-strategies.html</guid>
+  <pubDate>Wed, 18 Dec 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-strategies/figures/celltyping-tile.png" medium="image" type="image/png" height="130" width="144"/>
+</item>
 <item>
   <title>Using a tree-based approach to cell type CosMx® datasets</title>
   <dc:creator>Claire Williams</dc:creator>
@@ -1633,390 +2023,6 @@ Name: cell_ID, dtype: object
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-rois/cosmx-rois.html</guid>
   <pubDate>Thu, 21 Nov 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-rois/figures/fig-initial.png" medium="image" type="image/png" height="137" width="144"/>
-</item>
-<item>
-  <title>Cell typing: advanced strategies</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-strategies/cell-typing-strategies.html</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="background" class="level1">
-<h1>Background</h1>
-<p>Cell typing is always critical and occasionally difficult. Here we’ll discuss what to do when straightforward approaches fail.</p>
-<p>Before exploring the options here, you should:</p>
-<ol type="1">
-<li>Attempt <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/" target="_blank">the standard approaches</a> - InSituType, Leiden clustering and label transfer.</li>
-<li>If you’re using InSituType, attempt the workflows described in the <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">InSituType FAQS</a>. This last document provides detailed guidance on using InSituType’s many options, and its contents should be enough to guide you through most cell typing exercises.</li>
-<li>Confirm your cell segmentation was successful. Use AtoMx or your favorite viewer to confirm that segmentation errors aren’t widespread.</li>
-</ol>
-<p>In this document, we’ll address four common difficulties:</p>
-<ol type="1">
-<li>Fine subtyping, especially for immune cells</li>
-<li>Cell typing based on marker genes</li>
-<li>Studies with batch effects</li>
-<li>Failure to find anchor cells / difficulties mapping reference profiles</li>
-<li>Reference cell types claiming the wrong cells</li>
-</ol>
-</section>
-<section id="fine-subtyping-take-a-hierarchical-approach-and-rely-on-gene-selection" class="level1">
-<h1>Fine subtyping: take a hierarchical approach and rely on gene selection</h1>
-<p>Broad cell typing, e.g.&nbsp;discerning cancer cells vs.&nbsp;fibroblasts vs.&nbsp;immune cells, does best using a large number of genes - the whole panel for 1k data, and at least half the 6k panel. But when we turn to fine subtyping, e.g.&nbsp;discerning CD4 T-cells vs.&nbsp;Tregs, a much smaller gene set is relevant. If we use a complete high-plex panel for this problem, we’ll rely on potentially thousands of unhelpful genes: genes that are mainly in the background for our cell types of interest, genes for which cell segmentation errors have introduced high levels of contaminating signal into our cell types of interest, and genes with minimal variability among our cell types of interest. These genes make fine cell typing harder by introducing noise, or, in the case of segmentation errors, bias. You may find your subclusters to be driven by sample ID or by spatial context.</p>
-<p>The solution is simple: after establishing your broad cell types, perform fine cell typing among related cell types using a useful subset of genes. Hierarchical approaches like this are common in the single cell world. Defining the “useful subset of genes” is straightforward: we want genes that differ meaningfully between our closely-related cell types, and we want to avoid genes at risk of contamination from segmentation errors. We advise using a generous gene list: including at least 1/3-1/2 of the genes in the 1k and 6k panels seems to work well.</p>
-<p>The below code shows how this approach would work for supervised cell typing. Here, we’ll perform just one filter, removing genes at risk of bias from cell segmentation errors:</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">#### assumed data ---------------------------------------</span></span>
-<span id="cb1-2"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># xy: 2-column matrix of cells' xy positions</span></span>
-<span id="cb1-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># refprofiles: matrix of expected expression in genes * cells types, as </span></span>
-<span id="cb1-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">#   is expected by InSituType.</span></span>
-<span id="cb1-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># counts: counts matrix, cells * genes.</span></span>
-<span id="cb1-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># clust: vector of broad cell type assignments.</span></span>
-<span id="cb1-7"></span>
-<span id="cb1-8"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">#### source functions for gene selection --------------------------------------- </span></span>
-<span id="cb1-9"></span>
-<span id="cb1-10"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">source</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">url</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cell-typing-advanced-strategies/getSubtypingGenes.R"</span>))</span>
-<span id="cb1-11"></span>
-<span id="cb1-12"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">#### supervised subtyping workflow ---------------------------------------</span></span>
-<span id="cb1-13"></span>
-<span id="cb1-14"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">## get genes safe from contamination:</span></span>
-<span id="cb1-15">safegenes <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">findSafeGenes</span>(</span>
-<span id="cb1-16">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">counts =</span> counts,                    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># note we're entering info for all cells           </span></span>
-<span id="cb1-17">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">xy =</span> xy,                            <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># again entering info for all cells</span></span>
-<span id="cb1-18">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">ismycelltype =</span> (clust <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"T-cell"</span>), <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># logical indicating the cells to subtype</span></span>
-<span id="cb1-19">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">tissue =</span> <span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">NULL</span>,                      <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># specify if tissues have xy overlap</span></span>
-<span id="cb1-20">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">self_vs_neighbor_threshold =</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1.75</span>   <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># min ratio of expression in the cell type vs. in its neighbors</span></span>
-<span id="cb1-21">  )<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">$</span>safegenes            </span>
-<span id="cb1-22"></span>
-<span id="cb1-23"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">message</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">print0</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">length</span>(safegenes), <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">" genes kept from a panel of "</span>, <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">ncol</span>(counts), <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">". Try to use at least 1/3 the panel."</span>))</span>
-<span id="cb1-24"></span>
-<span id="cb1-25"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">## supervised subtyping of T-cells:</span></span>
-<span id="cb1-26">res <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">insitutype</span>(</span>
-<span id="cb1-27">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">x =</span> counts[sub, ],</span>
-<span id="cb1-28">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">reference_profiles =</span> refprofiles[Tcellgenes, <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CD4"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CD8"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Treg"</span>)],</span>
-<span id="cb1-29">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">n_clusts =</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>)</span>
-<span id="cb1-30"></span>
-<span id="cb1-31"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">## update the cluster assignments:</span></span>
-<span id="cb1-32">clust[sub] <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> res<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">$</span>clust</span></code></pre></div>
-</div>
-<p>And for unsupervised clustering, we’ll filter on both risk of segmentation errors and for informativeness in our data. For “informativeness”, we’ll search for highly variable genes, as described by Stuart et al.&nbsp;(2019), and implemented in <code>Seurat::FindVariableFeatures</code>.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">#### assumed data ---------------------------------------</span></span>
-<span id="cb2-2"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># xy: 2-column matrix of cells' xy positions</span></span>
-<span id="cb2-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># refprofiles: matrix of expected expression in genes * cells types, as </span></span>
-<span id="cb2-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">#   is expected by InSituType.</span></span>
-<span id="cb2-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># counts: counts matrix, cells * genes.</span></span>
-<span id="cb2-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># clust: vector of broad cell type assignments.</span></span>
-<span id="cb2-7"></span>
-<span id="cb2-8"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">#### source functions for gene selection --------------------------------------- </span></span>
-<span id="cb2-9"></span>
-<span id="cb2-10"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">source</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">url</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/cell-typing-advanced-strategies/getSubtypingGenes.R"</span>))</span>
-<span id="cb2-11"></span>
-<span id="cb2-12"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">#### unsupervised subclustering workflow ---------------------------------------</span></span>
-<span id="cb2-13"></span>
-<span id="cb2-14"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">## get genes safe from contamination:</span></span>
-<span id="cb2-15">safegenes <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">findSafeGenes</span>(</span>
-<span id="cb2-16">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">counts =</span> counts,                    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># note we're entering info for all cells           </span></span>
-<span id="cb2-17">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">xy =</span> xy,                            <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># again entering info for all cells</span></span>
-<span id="cb2-18">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">ismycelltype =</span> (clust <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"T-cell"</span>), <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># logical indicating the cells to subtype</span></span>
-<span id="cb2-19">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">tissue =</span> <span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">NULL</span>,                      <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># specify if tissues have xy overlap</span></span>
-<span id="cb2-20">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">self_vs_neighbor_threshold =</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1.75</span>   <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># min ratio of expression in the cell type vs. in its neighbors</span></span>
-<span id="cb2-21">  )<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">$</span>safegenes           </span>
-<span id="cb2-22"></span>
-<span id="cb2-23"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">## Get highly variable genes in your subset:</span></span>
-<span id="cb2-24">sub <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> clust <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"T-cell"</span>                                 </span>
-<span id="cb2-25">subsetHVGs <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">getSubclusteringGenes</span>(</span>
-<span id="cb2-26">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">mat =</span> counts[sub, ],     <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># raw counts from only the cell type of interest</span></span>
-<span id="cb2-27">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">varratiothresh =</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>,      <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># how much var beyond what mean expression predicts</span></span>
-<span id="cb2-28">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">expressionthresh =</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.2</span>)  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># min expression level</span></span>
-<span id="cb2-29"></span>
-<span id="cb2-30"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">## keep genes meeting both the above criteria:</span></span>
-<span id="cb2-31">usegenes <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">intersect</span>(subsetHVGs, safegenes)</span>
-<span id="cb2-32"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">message</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">print0</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">length</span>(usegenes), <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">" genes kept from a panel of "</span>, <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">ncol</span>(counts), <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">". Try to use at least 1/3 the panel."</span>))</span>
-<span id="cb2-33"></span>
-<span id="cb2-34"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">## supervised subtyping of T-cells:</span></span>
-<span id="cb2-35">res <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">insitutype</span>(</span>
-<span id="cb2-36">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">x =</span> counts[sub, usegenes],</span>
-<span id="cb2-37">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">n_clusts =</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>)</span>
-<span id="cb2-38"></span>
-<span id="cb2-39"><span class="do" style="color: #5E5E5E;
-background-color: null;
-font-style: italic;">## update the cluster assignments:</span></span>
-<span id="cb2-40">clust[sub] <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">paste0</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"T-cell cluster "</span>, res<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">$</span>clust)</span></code></pre></div>
-</div>
-</section>
-<section id="cell-typing-based-on-marker-genes" class="level1">
-<h1>Cell typing based on marker genes</h1>
-<p>We generally advise against <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/on-cell-typing-with-marker-genes/" target="_blank">relying on raw marker gene expression</a> for cell typing. However, a marker-centered view can occasionally be appropriate. For example, you might insist on only restricting your analysis to Treg’s to cells that are demonstrably FOXP3+. If you do want to base your cell typing on a marker gene, we recommend using smoothing/imputation to get cleaner marker gene expression values. The idea is to obtain more accurate expression values for a marker gene by borrowing information from other genes in its profile. This intuition is simple: if you see FOXP3 expression in all the cells with highly similar expression profiles to a cell in question, then the cell in question is very probably FOXP3+ itself, whether or not you observed any FOXP3 counts in it. Or, more formally, this approach negotiates a favorable variance-bias tradeoff: in this example, we bias cells’ FOXP3 expression values to resemble their nearest neighbors in expression space, while greatly reducing sampling variability compared to that of a single gene’s count value.</p>
-<p>We demonstrate a smoothing/imputation approach to marker genes <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/" target="_blank">here</a>. You can also use SAVER (Huang et al, 2018) or scImpute (Li &amp; Li, 2018) or any of the many other published single cell imputation methods. Do note that performing deeper analyses of imputed expression values, e.g.&nbsp;differential expression testing, is hazardous (Andrews &amp; Hemberg, 2019), though imputed counts can be useful for plotting.</p>
-</section>
-<section id="batch-effects-well-considered-workflows" class="level1">
-<h1>Batch effects: well-considered workflows</h1>
-<p>InSituType is quite, but not completely, robust to batch effects. Leiden clustering and other methods relying on principal components of the data can be highly sensitive to them. If you see evidence of batch effects in your data, for example strong batch dependence in your cell typing results or your UMAP projection, consider the below strategies.</p>
-<ul>
-<li>Unsupervised clustering: InSituType will generally work even in the presence of batch effects. To run Leiden clustering, just begin by using any standard batch-correction method, e.g.&nbsp;Harmony (Korsunsky et al, 2019). <a href="https://satijalab.org/seurat/archive/v3.0/integration.html" target="_blank">Seurat’s label transfer functions</a> offer another approach. Batch corrected data isn’t well-suited InSituType, which ingests raw data.</li>
-<li>Supervised cell typing with InSituType: run InSituType separately on each tissue/batch, using the rescale=TRUE option. This will perform a batch adjustment from the reference to each new tissue. We used this approach successfully in a study of lupus nephritis (Danaher et al., 2024). You can see the code we used <a href="https://github.com/Nanostring-Biostats/childhood-onset-lupus-nephritis-analyses/blob/main/3.%20cell%20typing%20by%20batch.R" target="_blank">here</a>.</li>
-<li>Semi-supervised cell typing with InSituType: initially analyze a single batch of data. Once you’re satisfied that you’ve captured all the unknown and reference cell types in that batch, use it to derive a new reference matrix (use <code>InSituType::getRNAprofiles</code>). Then apply the above supervised cell typing strategy using this reference matrix.</li>
-</ul>
-</section>
-<section id="failure-to-find-anchor-cells" class="level1">
-<h1>Failure to find anchor cells</h1>
-<p>InSituType has the option of using anchor cells to calibrate reference profiles for CosMx data. This calibration is generally helpful for supervised cell typing and usually essential for semi-supervised cell typing, at least if the reference came from scRNA-seq data. (For details on this calibration, see the “Updating reference profiles” section of the <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">InSituType FAQs</a>.)</p>
-<p>Sometimes, InSituType will fail to discover enough “anchor cells” to perform this calibration. In this case, there are several simple next steps.</p>
-<ul>
-<li>Lower the thresholds for anchor selection (<code>min_anchor_cosine</code> and <code>min_anchor_llr</code>). This is often needed in high-plex studies - the defaults were optimized for 1000-plex data.</li>
-<li>If you only find anchors for a few cell types: use rescale = TRUE, refit = FALSE. This performs a softer calibration: it rescales each row/gene of the reference matrix, but doesn’t fully refit each profile. This operation can be powered using only a few cell types.</li>
-<li>If you have a whole single cell reference dataset, not just profiles, then try a label transfer algorithm, e.g.&nbsp;Seurat’s or MaxFuse (Chen et al 2023). If you do cell type with label transfer, then using InSituType::spatialUpdate can further improve these initial results.</li>
-</ul>
-</section>
-<section id="reference-cell-types-claiming-the-wrong-cells" class="level1">
-<h1>Reference cell types claiming the wrong cells</h1>
-<p>InSituType will occasionally assign a cell type to the wrong reference profile, e.g.&nbsp;we’ve seen some cancer cells get assigned to the “NK cells” profiles. Fortunately, this kind of event is easy to detect with even cursory QC of your cell type results, and easy to fix: just use <code>InSituType::refineClusters</code>. Correcting this kind of error should be thought of as a part of routine human-guided cell typing, an operation to perform alongside all the other renaming, merging, and subclustering operations performed with <code>refineClusters</code>.</p>
-</section>
-<section id="references" class="level1">
-<h1>References</h1>
-<ul>
-<li>Stuart T, Butler A, Hoffman P, Hafemeister C, Papalexi E, Mauck WM, Hao Y, Stoeckius M, Smibert P, Satija R. Comprehensive integration of single-cell data. cell. 2019 Jun 13;177(7):1888-902.</li>
-<li>Danaher P, Hasle N, Nguyen ED, Roberts JE, Rosenwasser N, Rickert C, Hsieh EW, Hayward K, Okamura DM, Alpers CE, Reed RC. Childhood-onset lupus nephritis is characterized by complex interactions between kidney stroma and infiltrating immune cells. Science Translational Medicine. 2024 Nov 27;16(775):eadl1666.</li>
-<li>Korsunsky I, Millard N, Fan J, Slowikowski K, Zhang F, Wei K, Baglaenko Y, Brenner M, Loh PR, Raychaudhuri S. Fast, sensitive and accurate integration of single-cell data with Harmony. Nature methods. 2019 Dec;16(12):1289-96.</li>
-<li>Huang M, Wang J, Torre E, Dueck H, Shaffer S, Bonasio R, Murray JI, Raj A, Li M, Zhang NR. SAVER: gene expression recovery for single-cell RNA sequencing. Nature methods. 2018 Jul;15(7):539-42.</li>
-<li>Li WV, Li JJ. An accurate and robust imputation method scImpute for single-cell RNA-seq data. Nature communications. 2018 Mar 8;9(1):997.</li>
-<li>Andrews TS, Hemberg M. False signals induced by single-cell imputation. F1000Research. 2019 Mar 5;7:1740.</li>
-<li>Chen S, Zhu B, Huang S, Hickey JW, Lin KZ, Snyder M, Greenleaf WJ, Nolan GP, Zhang NR, Ma Z. Integration of spatial and single-cell data across modalities with weakly linked features. Nature Biotechnology. 2024 Jul;42(7):1096-106.</li>
-</ul>
-
-
-</section>
-
- ]]></description>
-  <category>cell typing</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-strategies/cell-typing-strategies.html</guid>
-  <pubDate>Wed, 06 Nov 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-strategies/figures/celltyping-tile.png" medium="image" type="image/png" height="130" width="144"/>
 </item>
 <item>
   <title>Cellular neighborhoods: a useful, simple and flexible analysis framework</title>
