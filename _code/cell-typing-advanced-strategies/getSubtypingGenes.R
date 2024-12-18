@@ -14,7 +14,7 @@ message("Key functions:
 getSubclusteringGenes <- function(mat, varratiothresh = 1, expressionthresh = 0.2, loess.span = 0.3) {
   
   ## identify hvgs in the counts matrix:
-  RawTargetVar <- colvars(mat)^2
+  RawTargetVar <- colvars(mat)
   RawTargetMean <- Matrix::colMeans(mat)
   use <- RawTargetVar > 0
   loessfit <- loess(log10(RawTargetVar[use]) ~ log10(RawTargetMean[use]),
