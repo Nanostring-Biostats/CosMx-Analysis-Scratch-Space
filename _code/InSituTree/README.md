@@ -10,7 +10,7 @@ being assessed.
 ## Installation
 
 ```
-devtools::install_github("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space", 
+devtools::install_github("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
     subdir="_code/InSituTree")
 ```
 
