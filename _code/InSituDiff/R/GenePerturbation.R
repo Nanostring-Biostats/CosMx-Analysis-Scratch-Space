@@ -32,7 +32,7 @@ summarizeGenePerturbation <- function(x, obj, cells = NULL, residtype = "log2rat
   if (is.null(cells)) {
     sub <- InSituDiff:::pseudoRandomSample(vec = seq_len(nrow(x)), n = subsetsize) 
   } else {
-    sub <- InSituDiff:::pseudoRandomSample(vec = is.element(rownames(obs$neighbors), cells) | obj$iscontrol, n = subsetsize) 
+    sub <- InSituDiff:::pseudoRandomSample(vec = is.element(rownames(obj$neighbors), cells) | obj$iscontrol, n = subsetsize) 
   }  
   ## calculate perturbation scores:
   mat <- getPerturbations(x = x, obj = obj, cells = sub, genes = NULL, residtype = residtype, eps = eps)
