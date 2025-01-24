@@ -6,11 +6,10 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Lidan Wu">
-<meta name="dcterms.date" content="2024-06-12">
-<meta name="description" content="This post introduces a pipeline for automatic generating GeoMx® Digital Spatial Profiler (DSP)-ready binary masks in batch for marker-based single-cell application. Given the query marker protein of interest, the pipeline would take morphology images and generate binary masks for negative-stained cells and cells connecting to positive-stained regions, respectively. The pipeline runs as a command line and this post would serve as a guide to how it works and how to use it.">
+<meta name="author" content="Megan Vandenberg">
+<meta name="dcterms.date" content="2025-01-23">
 
-<title>GeoMx® mask generation for marker-based single-cell application – Blog</title>
+<title>Cell typing with CosMx® SMI Cell Profiles – Blog</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -23,41 +22,27 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
 }
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
 }
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
 }
-</style>
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
 
 
 <script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
@@ -199,17 +184,9 @@ cookieconsent.run({
 <header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">GeoMx® mask generation for marker-based single-cell application</h1>
-                  <div>
-        <div class="description">
-          This post introduces a pipeline for automatic generating GeoMx® Digital Spatial Profiler (DSP)-ready binary masks in batch for marker-based single-cell application. Given the query marker protein of interest, the pipeline would take morphology images and generate binary masks for negative-stained cells and cells connecting to positive-stained regions, respectively. The pipeline runs as a command line and this post would serve as a guide to how it works and how to use it.
-        </div>
-      </div>
-                          <div class="quarto-categories">
-                <div class="quarto-category">GeoMx</div>
-                <div class="quarto-category">how-tos</div>
-                <div class="quarto-category">image processing</div>
-                <div class="quarto-category">python</div>
+      <h1 class="title">Cell typing with CosMx<sup>®</sup> SMI Cell Profiles</h1>
+                                <div class="quarto-categories">
+                <div class="quarto-category">cell typing</div>
               </div>
                   </div>
   </div>
@@ -219,14 +196,14 @@ cookieconsent.run({
     <div class="quarto-title-meta-heading">Affiliations</div>
     
       <div class="quarto-title-meta-contents">
-      <p class="author">Lidan Wu <a href="https://orcid.org/0000-0003-3150-6170" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+      <p class="author">Megan Vandenberg <a href="https://orcid.org/0000-0001-7704-2100" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
     </div>
     <div class="quarto-title-meta-contents">
           <p class="affiliation">
               Bruker Spatial Biology
             </p>
           <p class="affiliation">
-              Github: <a href="https://github.com/lidanwu" target="_blank">lidanwu</a>
+              Github: <a href="https://github.com/mgrout81" target="_blank">mgrout81</a>
             </p>
         </div>
     </div>
@@ -237,16 +214,10 @@ cookieconsent.run({
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">June 12, 2024</p>
+        <p class="date">January 23, 2025</p>
       </div>
     </div>
     
-      <div>
-      <div class="quarto-title-meta-heading">Modified</div>
-      <div class="quarto-title-meta-contents">
-        <p class="date-modified">January 24, 2025</p>
-      </div>
-    </div>
       
     </div>
     
@@ -258,14 +229,21 @@ cookieconsent.run({
     <h2 id="toc-title">Contents</h2>
    
   <ul>
-  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
-  <li><a href="#workflow-description" id="toc-workflow-description" class="nav-link" data-scroll-target="#workflow-description"><span class="header-section-number">2</span> Workflow Description</a></li>
-  <li><a href="#setup-environment" id="toc-setup-environment" class="nav-link" data-scroll-target="#setup-environment"><span class="header-section-number">3</span> Setup Environment</a></li>
-  <li><a href="#command-line-usage" id="toc-command-line-usage" class="nav-link" data-scroll-target="#command-line-usage"><span class="header-section-number">4</span> Command Line Usage</a>
+  <li><a href="#cosmx-smi-cell-profiles" id="toc-cosmx-smi-cell-profiles" class="nav-link active" data-scroll-target="#cosmx-smi-cell-profiles">CosMx SMI Cell Profiles</a>
   <ul class="collapse">
-  <li><a href="#input-image-arguments" id="toc-input-image-arguments" class="nav-link" data-scroll-target="#input-image-arguments"><span class="header-section-number">4.1</span> Input Image Arguments:</a></li>
-  <li><a href="#cell-segmentation-model-arguments" id="toc-cell-segmentation-model-arguments" class="nav-link" data-scroll-target="#cell-segmentation-model-arguments"><span class="header-section-number">4.2</span> Cell Segmentation Model Arguments:</a></li>
-  <li><a href="#positive-stained-cell-arguments" id="toc-positive-stained-cell-arguments" class="nav-link" data-scroll-target="#positive-stained-cell-arguments"><span class="header-section-number">4.3</span> Positive-stained cell Arguments:</a></li>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#overview" id="toc-overview" class="nav-link" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#file-types" id="toc-file-types" class="nav-link" data-scroll-target="#file-types">File Types</a>
+  <ul class="collapse">
+  <li><a href="#cell-profiles-matrix" id="toc-cell-profiles-matrix" class="nav-link" data-scroll-target="#cell-profiles-matrix">Cell Profiles Matrix</a></li>
+  <li><a href="#cell-type-annotations" id="toc-cell-type-annotations" class="nav-link" data-scroll-target="#cell-type-annotations">Cell Type Annotations</a></li>
+  <li><a href="#basic-statistics" id="toc-basic-statistics" class="nav-link" data-scroll-target="#basic-statistics">Basic Statistics</a></li>
+  <li><a href="#target-statistics" id="toc-target-statistics" class="nav-link" data-scroll-target="#target-statistics">Target Statistics</a></li>
+  <li><a href="#metadata" id="toc-metadata" class="nav-link" data-scroll-target="#metadata">Metadata</a></li>
+  </ul></li>
+  <li><a href="#usage" id="toc-usage" class="nav-link" data-scroll-target="#usage">Usage</a></li>
+  <li><a href="#methodology" id="toc-methodology" class="nav-link" data-scroll-target="#methodology">Methodology</a></li>
+  <li><a href="#contribution" id="toc-contribution" class="nav-link" data-scroll-target="#contribution">Contribution</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -281,202 +259,188 @@ cookieconsent.run({
 
 
 
-<section id="introduction" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
-<p>The ability to separate cells based on their relationship to nearby marker protein staining is a desired feature in many biological studies. One such use case would be to study the difference between neurons immediately next to neurofibrillary tangles and neurons that are a little further away. Another example would be to study the immune cells that are at different stages of engulfing microbes. This post introduces a pipeline for automatically generating <a href="https://nanostring.com/products/geomx-digital-spatial-profiler/geomx-dsp-overview/" target="_blank">GeoMx® Digital Spatial Profiler (DSP)</a>-ready binary masks in batch for marker-based single-cell application.</p>
-<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
-</section>
-<section id="workflow-description" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Workflow Description</h1>
-<p>The pipeline is a python script <code>Generate_scMask_given_query.py</code> that runs as a command line and you can downloaded from <code>_code/GeoMx-scMask-generation</code> <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/GeoMx-scMask-generation" target="_blank">folder</a> in this repository. By passing the file path to image folder to the script, the pipeline would take GeoMx® morphology images and generate binary masks for negative-stained cells and cells connecting to positive-stained regions, respectively.</p>
-<div id="fig-workflow" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="figures/workflow_GeoMx_scMask_given_query.png" class="img-fluid figure-img">
+<div class="cell">
+<style type="text/css">
+.center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 50%;
+}
+
+</style>
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: <strong>Workflow schematic</strong>. In neuropathology study, it’s sometimes desired to separate between neurons (stained in red channel) touching the neurofibrillary tangles (stained in green channel) and those that are a little further away. The pipeline described here fullfills the need of separating cells based on additional morphology marker of interest (aka “query channel”) and could also be applied to other single-cell applications like separating immune cells based on their contact with nearby pathogen.
-</figcaption>
+<section id="cosmx-smi-cell-profiles" class="level1">
+<h1>CosMx SMI Cell Profiles</h1>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Cell typing CosMx Spatial Molecular Imager (SMI) data can be done in <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-basics/" target="_blank">several ways</a>. One of these is to employ a reference matrix of known cell type profiles using our <code>Insitutype</code> package (<a href="https://www.biorxiv.org/content/10.1101/2022.10.19.512902v1" target="_blank">manuscript</a>, <a href="https://github.com/Nanostring-Biostats/insitutype" target="_blank">GitHub repository</a>, and <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">GitHub FAQ</a>). While spatially-naive scRNAseq-derived profiles work well (e.g., <a href="https://github.com/Nanostring-Biostats/CellProfileLibrary" target="_blank">Cell Profile Library</a>), platform differences can extend the iterative process of celltyping <span class="citation" data-cites="Danaher2022">(<a href="#ref-Danaher2022" role="doc-biblioref">Danaher et al. 2022</a>)</span>. To that end, we present CosMx SMI-derived cell profiles, available on the GitHub repository <a href="https://github.com/Nanostring-Biostats/CosMx-Cell-Profiles" target="_blank">CosMx-Cell-Profiles</a>.</p>
+</section>
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">Overview</h2>
+<p>The <a href="https://github.com/Nanostring-Biostats/CosMx-Cell-Profiles" target="_blank">CosMx-Cell-Profiles</a> repository contains a library of cell profile matrices with accompanying statistics and metadata. For each featured tissue, the profiles matrix gives the average expression of a variety of relevant cell types. Each matrix in the library was derived from one or more CosMx SMI experiments of a mix of panels. There are profiles from healthy and cancerous adult human samples as well as mouse brain.</p>
+<p>Each profile contains the following components:</p>
+<ol type="1">
+<li>Cell profiles matrix</li>
+<li>Cell type annotations</li>
+<li>Basic statistics</li>
+<li>Target statistics</li>
+<li>Metadata</li>
+</ol>
+</section>
+<section id="file-types" class="level2">
+<h2 class="anchored" data-anchor-id="file-types">File Types</h2>
+<section id="cell-profiles-matrix" class="level3">
+<h3 class="anchored" data-anchor-id="cell-profiles-matrix">Cell Profiles Matrix</h3>
+<p>Each cell profiles matrix is a CSV file of targets by cell types. Each cell type’s profile is a unique column. Each target is a unique row. Where multiple experiments were combined, only the intersection of targets was used. The profiles were generated using <code>InSituType::Estep()</code>, which removes background readout (negative probes) when calculating the net expression profile for each cell type. For details, refer to the <a href="https://github.com/Nanostring-Biostats/InSituType">InSituType manual</a>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/cell_profiles.png" class="img-fluid figure-img" width="600"></p>
+<figcaption>Snippet of a cell profiles matrix.</figcaption>
 </figure>
 </div>
-<ol type="1">
-<li>The process starts with color-channel reordering of morphology images that user downloads from <a href="https://nanostring.com/products/geomx-digital-spatial-profiler/geomx-dsp-overview/" target="_blank">GeoMx® DSP</a> instrument for the region of interest (ROI). The pipeline script would take those images and rearrange the channel order to have cytoplasm stain as 1st channel, query marker stain as 2nd channel, and optionally nuclear stain as 3rd channel.
-<ul>
-<li>The rearranged images would be saved in <code>2chan_res</code> (or <code>3chan_res</code> if including nuclear stain as 3rd channel) sub folder of the user-designated output root folder.</li>
-</ul></li>
-<li>After rearrangement, the pipeline script would perform cell segmentation using cytoplasm stain and optionally nuclear stain as well.
-<ul>
-<li>The resulting cell label images with pixel value indicates cell ID would be saved under <code>cellLabels</code> sub folder within the step (1) result folder.</li>
-</ul></li>
-<li>The pipeline script also takes the query marker stain of each image and performs auto-threshold to identify individual objects with positive stain and <strong>bigger</strong> than user-defined size cutoff, <code>min_positive_area</code>.
-<ul>
-<li>You can adjust the size cutoff based on your particular application to get a cleaner isolation of objects of interest. For example, if you are only interested in mature tangles, you can use higher size cutoff to select only the query-positive objects of big size.</li>
-</ul></li>
-<li>With label images from both cell segmentation and query-stained object segmentation, the pipeline script would then perform connectivity analysis between the 2 sets of label images and output 2 sets of binary masks in separate folders under user-designated output root folder.
-<ol type="i">
-<li><code>negative_cell_masks</code>: binary masks for cells that do <strong>NOT</strong> have valid overlapping with any of positive-stained object.
-<ul>
-<li>A valid overlapping is defined by whether the intersected area between cell and positive-stained object is <strong>bigger</strong> than user-defined size cutoff, <code>min_intersect_area</code>.</li>
-<li>The ability to define valid overlapping based on area cutoff could help to separate between barely touching events and more significant overlapping events. This could be useful if you want to separate between immune cells just contacting a microbe stained in query channel and immune cells that have engulfed an invading microbe.</li>
-</ul></li>
-<li><code>positive_ROI_masks</code>: binary masks for cells with valid overlapping event <strong>AND</strong> their connected positive-stained objects.</li>
-</ol></li>
-</ol>
-<p>Once complete, user can upload these binary masks back to GeoMx® DSP instrument for the corresponding ROI selection and initiate the sample collection.</p>
-<div class="callout callout-style-default callout-tip callout-titled" title="Use manually modified cell label images">
+</div>
+</div>
+</section>
+<section id="cell-type-annotations" class="level3">
+<h3 class="anchored" data-anchor-id="cell-type-annotations">Cell Type Annotations</h3>
+<p>To put cell types in context, we offer both cell type hierarchies and ontology terms.</p>
+<p>R file defining a nested list object so users can group cell type categories. Human-readable ensures non-R users (e.g., Python) can parse and use.</p>
+<div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Use manually modified cell label images
+Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>You can use <a href="https://imagej.net/" target="_blank">ImageJ</a> or similar viewer to inspect and modify the outcomes of both cell segmentation and binary mask generation. We recommend <code>cellpose</code> <a href="https://cellpose.readthedocs.io/en/latest/gui.html" target="_blank">GUI</a> for visualization and modification on cell segmentation outcomes.</p>
-<p>To use the modified cell label images which must be under <strong>same</strong> names and folder structure as original outputs, simply <strong>rerunning</strong> the pipeline script with same configuration would skip the step (1) and (2) above but instead perform identification of positive-stained objects and binary mask generation using the modified cell label images.</p>
+<p>Note that some inner nodes on the hierarchies are both lower-granularity categorizations as well as a final cell type included in the profiles themselves.</p>
 </div>
 </div>
-</section>
-<section id="setup-environment" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Setup Environment</h1>
-<p>The pipeline script uses <a href="https://cellpose.readthedocs.io/en/latest/index.html" target="_blank">cellpose</a> python package for cell segmentation. Please refer to <code>cellpose</code> guide on <a href="https://github.com/MouseLand/cellpose/tree/main?tab=readme-ov-file#installation" target="_blank">installation instruction</a> for best usage, especially if you want to enable GPU for faster processing.</p>
-<p>In addition, you would also need the following python packages in your environment. Below shows how to install them in terminal via <code>pip</code>.</p>
 <div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/cell_type_hierarchy.png" class="img-fluid figure-img" width="400"></p>
+<figcaption>Snippet of a cell type hierarchy.</figcaption>
+</figure>
 </div>
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>pip install numpy scipy opencv-python scikit-image</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p><a href="https://obofoundry.org/ontology/cl.html">Cell Ontology</a> annotations are also provided for all nodes on the hierarchies. Where applicable, the identified match and/or parent (more general) matches are provided. For other cell types, where no node or parent node matches are found, we instead provide the closest term. Finally, the column <code>in_profiles</code> indicates whether the table row corresponds to a cell type present in the profiles (independent of whether it is an internal or terminal node within the hierarchies).</p>
+</section>
+<section id="basic-statistics" class="level3">
+<h3 class="anchored" data-anchor-id="basic-statistics">Basic Statistics</h3>
+<p>CSV files of basic statistics on the profiles: number of input cells of each type per profile, standard deviation for each target, etc.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/basic_stats.png" class="img-fluid figure-img" width="400"></p>
+<figcaption>Snippet of basic statistics for a set of profiles.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/cell_counts.png" class="img-fluid figure-img" width="400"></p>
+<figcaption>Snippet of input cell counts of each cell type for a set of profiles.</figcaption>
+</figure>
+</div>
 </div>
 </div>
 </section>
-<section id="command-line-usage" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> Command Line Usage</h1>
-<p>The pipeline script in use, <code>Generate_scMask_given_query.py</code>, assumes you have multi-channel single-slice images in one folder. Those images should be downloaded for the ROIs you choose in GeoMx® study. The required inputs for the pipeline include:</p>
+<section id="target-statistics" class="level3">
+<h3 class="anchored" data-anchor-id="target-statistics">Target Statistics</h3>
+<p>CSV files of average and standard deviation of targets in profiles so that users may remove targets as desired. Unlike the cell profiles, the average values by cell type and target here are simple means that do not use the negative probe values.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/cell_stdevs.png" class="img-fluid figure-img" width="600"></p>
+<figcaption>Snippet of input cell standard deviations matrix of each cell type for a set of profiles.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="metadata" class="level3">
+<h3 class="anchored" data-anchor-id="metadata">Metadata</h3>
+<p>JSON file on experimental design and attribution, including collaborators (if applicable), species, tissue type/substructure, CosMx SMI instrument version, input panel, etc.</p>
+<div class="callout callout-style-default callout-caution callout-titled" title="Important note">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you use the cell profiles in your work, please include citations applicable for the relevant tissue(s).</p>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/metadata.png" class="img-fluid figure-img" width="600"></p>
+<figcaption>Snippet of input metadata for a set of cell profiles.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="usage" class="level2">
+<h2 class="anchored" data-anchor-id="usage">Usage</h2>
+<div class="callout callout-style-default callout-caution callout-titled" title="Important note">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you use the cell profiles in your work, please include citations applicable for the relevant tissue(s). See the Metadata file for more information.</p>
+</div>
+</div>
+<p>These matrices can be downloaded directly and loaded into environments for analysis with Insitutype.</p>
+<p>Caution:</p>
 <ul>
-<li><code>in_dir</code>: the <strong>absolute</strong> path to your GeoMx® DSP morphology image folder.</li>
-<li><code>cyto_chan</code>, <code>query_chan</code>, <code>nuc_chan</code>: channel index for cytoplasm, query marker and nucleus stain, respectively.
-<ul>
-<li>The channel index should start from 1, so if your cytoplasm stain is at 4th channel, you use <code>--cyto_chan 4</code> with the script.</li>
-<li>By default, <code>nuc_chan</code> is set to <code>0</code> such that it would not be included in cell segmentation downstream. But if you would like to use stains for both cytoplasm and nucleus for cell segmentation, you can pass the corresponding channel index of nucleus stain to the script.</li>
-</ul></li>
-<li><code>cell_diameter</code>: median cell diameter in pixel unit within your images, default to <code>30</code>. For best cell segmentation results, it’s recommended to set this parameter based on your sample.</li>
+<li>We do not recommend combining CosMx SMI-derived cell type profiles with scRNA-seq derived profiles in cell typing. For example, we advise against combining the CosMx SMI IO profiles with scRNA-seq profiles for the tissue type.</li>
+<li>Note that some inner nodes on the hierarchies are both lower-granularity categorizations as well as a final cell type included in the profiles themselves.</li>
+<li>If you choose to combine multiple CosMX SMI-derived profiles into a single hybrid reference, please see our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/" target="_blank">Scratch Space post here</a> for guidance.</li>
 </ul>
-<p>To use the pipeline, run <code>python Generate_scMask_given_query.py</code> and specify parameters as desired.</p>
-<p>For instance to run on a folder with images where the 4th and 3rd channels of each image are cytoplasm and query marker stain, respectively while defining positive-stained objects (in query marker channel) to have at least 500 squared pixel area (using default values for all other parameters):</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Command Line Interface (CLI) example to run in Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>python Generate_scMask_given_query.py --in_dir imageFolder --cyto_chan 4 --query_chan 3 --out_dir outputFolder --min_positive_area 500</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-</div>
-<p>The resulting output folder structure looks like this:</p>
-<pre><code>outputFolder 
-├── 20240612_pipeline_run_log.txt
-│
-├── 2chan_res 
-│  ├── 001.tiff 
-│  ├── 002.tiff 
-│  └──cellLabels
-│     ├── 001_cp_masks.tif 
-│     └── 002_cp_masks.tif 
-│
-├── negative_cell_masks 
-│     ├── 001_neg_2.tif
-│     └── 002_neg_2.tif 
-│
-└── positive_ROI_masks 
-      ├── 001_pos_1.tif
-      └── 002_pos_1.tif</code></pre>
-<p>There are other additional arguments providing fine control of different steps of the pipeline. Please use <code>-h</code> argument to see a full list of options allowed by the pipeline script.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Command Line Parameters</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>usage: Generate_scMask_given_query.py [-h] [--in_dir IN_DIR] [--out_dir OUT_DIR] [--cyto_chan CYTO_CHAN]</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                                      [--query_chan QUERY_CHAN] [--nuc_chan NUC_CHAN]</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>                                      [--cell_seg_model CELL_SEG_MODEL] [--cell_diameter CELL_DIAMETER]</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                                      [--min_cell_area MIN_CELL_AREA] [--thresh_method THRESH_METHOD]</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>                                      [--fill_holes] [--min_positive_area MIN_POSITIVE_AREA]</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>                                      [--min_intersect_area MIN_INTERSECT_AREA] [--clean_export]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-</div>
-<section id="input-image-arguments" class="level2" data-number="4.1">
-<h2 data-number="4.1" class="anchored" data-anchor-id="input-image-arguments"><span class="header-section-number">4.1</span> Input Image Arguments:</h2>
-<dl>
-<dt>in_dir</dt>
-<dd>
-absolute path to folder containing multi-channel images to evaluate
-</dd>
-<dt>out_dir</dt>
-<dd>
-output parent folder for intermediate results and final masks. (default to use input image folder)
-</dd>
-<dt>cyto_chan</dt>
-<dd>
-input channel index for cytoplasm or membrane stain of cells (starting from 1); Default: 1
-</dd>
-<dt>query_chan</dt>
-<dd>
-input channel index for the stain in query to define positive vs.&nbsp;negative staining (starting from 1); Default: 2
-</dd>
-<dt>nuc_chan</dt>
-<dd>
-input channel index for nuclear stain of cells (starting from 1); default to 0 to exclude nuclear stain from cell segmentation; Default: 0
-</dd>
-</dl>
 </section>
-<section id="cell-segmentation-model-arguments" class="level2" data-number="4.2">
-<h2 data-number="4.2" class="anchored" data-anchor-id="cell-segmentation-model-arguments"><span class="header-section-number">4.2</span> Cell Segmentation Model Arguments:</h2>
-<dl>
-<dt>cell_seg_model</dt>
-<dd>
-cell segmentation model in use, ok to pass a file path of custom model; Default: <code>cyto3</code>
-</dd>
-<dt>cell_diameter</dt>
-<dd>
-median cell diameter of input images, in pixel unit; Default: 30
-</dd>
-<dt>min_cell_area</dt>
-<dd>
-minimal area of a valid cell, in squared pixel unit; can turn off with -1; Default: 15
-</dd>
-</dl>
+<section id="methodology" class="level2">
+<h2 class="anchored" data-anchor-id="methodology">Methodology</h2>
+<p>All profiles were derived from CosMx SMI experiments. Projects with high-confidence cell typing were identified and permission obtained from collaborators/customers where necessary. Cell type names were corrected for consistent style. Where necessary, poor-confidence typed cells as well as genes with high discordance between CosMx SMI-derived and scRNA-seq derived profiles were removed. In profiles built from multiple experiments, only the intersection of targets was used. <code>InSituType::Estep()</code> was run to generate mean expression profiles from the raw counts of cells x targets, negative probe counts, and given cell types.</p>
+<p>Please note the profiles, while derived from CosMx SMI experiments, may not contain the exact suite of targets of current CosMx SMI panel products.</p>
 </section>
-<section id="positive-stained-cell-arguments" class="level2" data-number="4.3">
-<h2 data-number="4.3" class="anchored" data-anchor-id="positive-stained-cell-arguments"><span class="header-section-number">4.3</span> Positive-stained cell Arguments:</h2>
-<dl>
-<dt>thresh_method</dt>
-<dd>
-auto-threshold method to define positive-stained object in query channel, use either <code>triangle</code> or <code>otsu</code>; Default: <code>triangle</code>
-</dd>
-<dt>fill_holes</dt>
-<dd>
-fill holes in positive-stained object before area filtering; if <code>True</code>, use 0.1x of input cell diameter as kernel size and output roundish borders; Default: <code>False</code>
-</dd>
-<dt>min_positive_area</dt>
-<dd>
-minimal area of a positive-stained object in query channel, in squared pixel unit; recommend to be 0.5x of expected cell area; Default: 50
-</dd>
-<dt>min_intersect_area</dt>
-<dd>
-minimal intersection area between a positive-stained cell with nearest positive-stained object in query channel, in squared pixel unit; recommend to be 0.1x of expected cell area; Default: 500
-</dd>
-<dt>clean_export</dt>
-<dd>
-export masks into file only when there are cells selected in either case; Default: <code>False</code>
-</dd>
-</dl>
+<section id="contribution" class="level2">
+<h2 class="anchored" data-anchor-id="contribution">Contribution</h2>
+<p>If you would like to contribute to the <code>CosMx Cell Profiles</code> repository with data from your experiments, please contact us at support.spatial@bruker.com. Broadly speaking, the process involves a license agreement, finalized cell typing, and generation of the standardized file types of the repository as outlined above.</p>
+
 
 
 </section>
 </section>
 
-</main> <!-- /main -->
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-Danaher2022" class="csl-entry" role="listitem">
+Danaher, Patrick, Edward Zhao, Zhi Yang, David Ross, Mark Gregory, Zach Reitz, Tae K. Kim, et al. 2022. <span>“Insitutype: Likelihood-Based Cell Typing for Single Cell Spatial Transcriptomics.”</span> <em>bioRxiv</em>. <a href="https://doi.org/10.1101/2022.10.19.512902">https://doi.org/10.1101/2022.10.19.512902</a>.
+</div>
+</div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {
