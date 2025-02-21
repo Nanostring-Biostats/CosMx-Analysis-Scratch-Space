@@ -10,7 +10,419 @@
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
 <generator>quarto-1.6.30</generator>
-<lastBuildDate>Thu, 23 Jan 2025 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Fri, 21 Feb 2025 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Programmatic stitching of protein images with napari-cosmx</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/napari-cosmx-protein-stitching.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-example" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-example-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/figures/fig-protein-example.png" class="img-fluid figure-img" width="749">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-example-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: A small section of CosMx SMI data showing DNA (blue), PanCK (green) and the CD3 protein (yellow).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>The <code>napari-cosmx</code> plugin can be used to view CosMx<sup>®</sup> Spatial Molecular Imager (SMI) RNA and protein data. In a <a href="../../posts/napari-stitching/napari-cosmx-stitching.html">previous post</a>, I showed users how to programmatically stitch RNA exports from AtoMx<sup>®</sup> Spatial Informatics Platform (SIP). The process used to stitch protein is similar to RNA with some adjustments that are found below.</p>
+<p>This tutorial uses version 0.4.17.3 of the <code>napari-cosmx</code> plugin. This version is available as a <code>whl</code> file in the assets folder of the <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/assets/napari-cosmx%20releases/napari_CosMx-0.4.17.3-py3-none-any.whl">Scratch Space repository</a>. The tutorial below also builds upon the RNA-based post that more broadly covers how to create the napari environment, installing the plugin, and running scripts.</p>
+<p>When <code>napari-cosmx</code> is installed, we get a few package scripts that can be called directly. The ones needed to stitch protein are:</p>
+<ul>
+<li><code>stitch-images</code>, which builds the IF zarr stores</li>
+<li><code>stitch-expression</code>, which creates the zarr stores for each protein</li>
+</ul>
+<section id="exporting-protein-data" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Exporting protein data</h1>
+<p>When exporting data from AtoMx SIP, be sure to select “Raw Files” and include Morphology2D, Miscellaneous, and ProteinDir (Figure&nbsp;2).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-export-options" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-export-options-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/figures/fig-export-options.png" class="img-fluid figure-img" width="548">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export-options-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Export these components to stitch protein.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="stitching-immunofluorescence-images" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Stitching immunofluorescence images</h1>
+<p>This step is identical for RNA and protein.</p>
+<div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">stitch-images</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--help</span></span></code></pre></div>
+<pre><code>usage: stitch-images [-h] [-i INPUTDIR] [--imagesdir IMAGESDIR] [-o OUTPUTDIR] [-f OFFSETSDIR] [-l] [-u UMPERPX] [-z ZSLICE] [--dotzarr]
+
+Tile CellLabels and morphology TIFFs.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUTDIR, --inputdir INPUTDIR
+                        Required: Path to CellLabels and morphology images.
+  --imagesdir IMAGESDIR
+                        Optional: Path to morphology images, if different than inputdir.
+  -o OUTPUTDIR, --outputdir OUTPUTDIR
+                        Required: Where to create zarr output.
+  -f OFFSETSDIR, --offsetsdir OFFSETSDIR
+                        Required: Path to directory location containing a file ending in FOV_Locations.csv or legacy format latest.fovs.csv.
+  -l, --labels          
+                        Optional: Only stitch labels.
+  -u UMPERPX, --umperpx UMPERPX
+                        Optional: Override image scale in um per pixel.
+                        Instrument-specific values to use:
+                        -&gt; beta04 = 0.1228
+  -z ZSLICE, --zslice ZSLICE
+                        Optional: Z slice to stitch.
+  --dotzarr             
+                        Optional: Add .zarr extension on multiscale pyramids.</code></pre>
+<p>Example:</p>
+<div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">stitch-images</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-i</span> path/to/CellStatsDir <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-o</span> path/to/napari_zarr <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-f</span> /path/to/RunSummary</span></code></pre></div>
+</section>
+<section id="stitch-protein-images" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Stitch Protein Images</h1>
+<p>RNA uses <code>read-targets</code> to create a file that stores the spatial location of RNA transcripts. In contrast, Protein SMI data are more similar to IF TIFF files and so we use the <code>stitch-expression</code> package script to stitch together individual protein files. When complete, protein data will be found in the <code>images/protein</code> subfolder.</p>
+<div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">stitch-expression</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--help</span></span></code></pre></div>
+<pre><code>usage: stitch-expression [-h] [-i INPUTDIR] [-o OUTPUTDIR] [-t TAG] [-u UMPERPX] [-s SCALE] [-c CYCLE] [--dotzarr]
+
+Tile protein expression images
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUTDIR, --inputdir INPUTDIR
+                        Required: Path to parent directory containing CellStatsDir, RunSummary, AnalysisResults, and ProteinDir.
+  -o OUTPUTDIR, --outputdir OUTPUTDIR
+                        Required: Where to create zarr output.
+  -t TAG, --tag TAG     
+                        Optional: Tag to append to end of protein names.
+  -u UMPERPX, --umperpx UMPERPX
+                        Optional: Override image scale in um per pixel.
+                        Instrument-specific values to use:
+                        -&gt; beta04 = 0.1228
+  -s SCALE, --scale SCALE
+                        Optional: Scale of expression images relative to raw,
+                          use if decoded images are binned.
+  -c CYCLE, --cycle CYCLE
+                        Optional: Cycle to use, default is 1.
+  --dotzarr             
+                        Optional: Add .zarr extension on multiscale pyramids.</code></pre>
+<p>Example:</p>
+<div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">stitch-expression</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-i</span> path/to/parent/slide_folder <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-o</span> path/to/napari_zarr</span></code></pre></div>
+
+
+</section>
+
+ ]]></description>
+  <category>napari</category>
+  <category>how-tos</category>
+  <category>python</category>
+  <category>protein</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/napari-cosmx-protein-stitching.html</guid>
+  <pubDate>Fri, 21 Feb 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/figures/fig-protein-example.png" medium="image" type="image/png" height="140" width="144"/>
+</item>
+<item>
+  <title>Exporting napari-cosmx Zarr stores to OME-TIFF</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-ome-tiff/cosmx-ome-tiff.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-gc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-gc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-ome-tiff/figures/fig-gc.png" class="img-fluid figure-img" width="769">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-gc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: A regressed germinal center within a lymph node sample visualized with the <code>napari-cosmx</code> plugin. Membrane = Grey; DAPI = blue, cell segementation = cyan.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Immunofluorescence (IF) and protein data exported from AtoMx<sup>®</sup> Spatial Informatics Platform (SIP) are provided as multi-channel TIFF files, where each field of view (FOV) is contained in a separate file. Our <code>napari-cosmx</code> plugin offers one method to stitch these individual TIFF files, organizing them according to their spatial location. This stitching process within <code>napari-cosmx</code> generates a Zarr store for each IF or protein image. For visualization of tissue microscopy data, <a href="https://docs.openmicroscopy.org/ome-model/5.6.3/ome-tiff/">OME-TIFF</a> is a widely used format. The Zarr stores generated with <code>napari-cosmx</code> can be converted to OME-TIFF for viewing in other applications and this short blog post demonstrates how to perform this conversion.</p>
+<p>This blog post is the fifth in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/#category=napari"><code>napari series</code></a>. For details on generating these napari Zarr stores, refer to either the GUI-based <a href="../../posts/napari-cosmx-intro/index.html">napari-cosmx plugin introduction</a> or the command-line tutorial on <a href="../../posts/napari-stitching/napari-cosmx-stitching.html">stitching</a>.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>While Napari and <code>napari-cosmx</code> can be installed on many systems, CosMx SMI data can be quite large. A slide with numerous FOVs may exceed the capabilities of a standard laptop.</p>
+<p><code>napari-cosmx</code> is actively and continuously under development in the RnD groups at Bruker Spatial Biology. We do not (yet) have the source code for <code>napari-cosmx</code> opened-source. Please be aware that there may be bugs and that it has not gone through the regular level of quality and testing. Our goal here is to bring the capabilities of napari to CosMx SMI users as fast as possible.</p>
+</div>
+</div>
+</section>
+<section id="installation" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Installation</h1>
+<p>This tutorial uses version 0.4.17.3 of the <code>napari-cosmx</code> plugin. This version is available as a <code>whl</code> file in the assets folder of the <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/assets/napari-cosmx%20releases/napari_CosMx-0.4.17.3-py3-none-any.whl">Scratch Space repository</a>.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>It is encouraged to use a virtual environment for these steps as there can be conflicting package and Python versions and this script has not been installed nor tested on all configurations. The example below used Python 3.9.13 within <code>pyenv</code>. In general, it is recommended to use Python &gt; 3.8 and Python &lt; 3.11 for the <code>napari-cosmx</code> plugin as newer versions of napari are not yet integrated into the plugin.</p>
+</div>
+</div>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true">MacOS/Unix Install</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">Windows</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
+<p>Assuming you have a <code>pyenv</code> virtual environment named napari_env:</p>
+<div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># terminal</span></span>
+<span id="cb1-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pyenv</span> activate napari_env</span>
+<span id="cb1-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"napari[all]"</span></span>
+<span id="cb1-4"></span>
+<span id="cb1-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Optional use wget to download whl file directly.</span></span>
+<span id="cb1-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># wget https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/refs/heads/Main/assets/napari-cosmx%20releases/napari_CosMx-0.4.17.3-py3-none-any.whl</span></span>
+<span id="cb1-7"></span>
+<span id="cb1-8"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install /path/to/your/whl/file</span></code></pre></div>
+<p>You can confirm that the install worked with <code>pip freeze</code> or by directly accessing the package script:</p>
+<div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">which</span> export-tiff</span></code></pre></div>
+<p>which should return the path to <code>export-tiff</code>.</p>
+</div>
+<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
+<p>For windows, <a href="https://github.com/pyenv-win/pyenv-win"><code>pyenv-win</code></a> and <a href="https://github.com/pyenv-win/pyenv-win-venv"><code>pyenv-win-venv</code></a> may be a good option but this has not been extensively tested.</p>
+<p>Assuming you have a <code>pyenv-venv</code> virtual environment named napari_env:</p>
+<div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># terminal</span></span>
+<span id="cb3-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pyenv-venv</span> activate napari_env</span>
+<span id="cb3-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"napari[all]"</span></span>
+<span id="cb3-4"></span>
+<span id="cb3-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install /path/to/your/whl/file</span></code></pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="usage" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Usage</h1>
+<p>For help, type <code>export-tiff --help</code> in your terminal (unix/macOS) or PowerShell (Windows).</p>
+<div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">export-tiff</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--help</span></span></code></pre></div>
+<pre><code>usage: export-tiff [-h] [-i INPUTDIR] [-o OUTPUTDIR] [--filename FILENAME] [--compression COMPRESSION] [-b BATCHSIZE]
+                   [-s] [-c [CHANNELS ...]] [-p [PROTEINS ...]] [--levels LEVELS] [-v] [--libvips]
+                   [--vipshome VIPSHOME] [--vipsconcurrency VIPSCONCURRENCY]
+
+Export stitched Zarr to OME-TIFF
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUTDIR, --inputdir INPUTDIR
+                        Required: Path to existing stitched output.
+  -o OUTPUTDIR, --outputdir OUTPUTDIR
+                        Required: Path to write OME-TIFF file.
+  --filename FILENAME   Name for OME-TIFF file, use ome.tif extension.
+  --compression COMPRESSION
+                        Passed to TiffWriter, default is 'zlib'. Other options include 'lzma' (smallest), 'lzw', and
+                        'none'
+  -b BATCHSIZE, --batchsize BATCHSIZE
+                        Required: the number of elements to put into each ome-tiff file. Recommended = 5 or fewer.
+  -s, --segmentation    Optional: Create TIFF for segmentation mask.
+  -c [CHANNELS ...], --channels [CHANNELS ...]
+                        Optional: Output only specific morphology channels
+  -p [PROTEINS ...], --proteins [PROTEINS ...]
+                        Optional: Output only specific proteins
+  --levels LEVELS       Optional: Specify number of pyramid levels.
+  -v, --verbose         Print verbose output?
+  --libvips             Optional: Use libvips to create pyramidal image, will be slower but more memory-efficient.
+  --vipshome VIPSHOME   Optional: Path to vips binaries. Required in Windows if vips and associated DLLs are not in
+                        PATH
+  --vipsconcurrency VIPSCONCURRENCY
+                        Optional: Specify number of threads for vips.</code></pre>
+<p>Since CosMx SMI data with hundreds of FOVs can be large (<em>e.g.</em>, &gt;50 GBs for RNA and larger still for protein data), the <code>--batchsize</code> flag can be used to create batches of smaller OME-TIFF files. The <code>--batchsize</code> flag specifies the upper limit of the number of channels/proteins that are included in a given OME-TIFF. For example, if <code>--batchsize</code> was set to <code>5</code>, and <code>-c</code> (channels) was also selected, the OME-TIFF file would include all five IF channels.</p>
+<p>Note that the segmentation (<code>-s</code>) layer does not count toward the batch size. In other words, if selecting <code>-b 5 -c -s</code>, the resulting OME-TIFF file will include the cell borders and the five channels.</p>
+<p>If you would like to generate an OME-TIFF file with only DNA, GFAP, and proteins Amyloid-Beta-1-40 and Phospho-Tau-S199, with cell borders:</p>
+<div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">export-tiff</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-i</span> /path/to/images/folder <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-o</span> /path/to/output/folder <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-s</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-c</span> DNA,GFAP <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-p</span> Amyloid-Beta-1-40,Phospho-Tau-S199</span></code></pre></div>
+</section>
+<section id="human-6k-lymph-node-example" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Human 6K Lymph Node Example</h1>
+<p>Let’s test this script with an example. Here I used the Human Lymph Node FFPE dataset napari files that are <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-human-lymph-node-ffpe-dataset/">publicly available</a>. This dataset has a scan area of 104 <img src="https://latex.codecogs.com/png.latex?mm%5E2">, 400 FOVs, and ~1.8M cells. I am using an AWS r5b.8xlarge EC2 instance (32 vCPUs, 256 GB RAM) running Linux (Amazon Linux 2).</p>
+<p>Navigate to the location of <code>napari.zip</code> and unzip it.</p>
+<div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Terminal</span></span>
+<span id="cb7-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">unzip</span> napari.zip</span></code></pre></div>
+<p>To convert all the channels and the cell segmentation boundaries:</p>
+<div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Terminal</span></span>
+<span id="cb8-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># TIME="%e %U %S" time export-tiff -i ./napari -o output -s -c -b 5</span></span>
+<span id="cb8-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">export-tiff</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-i</span> ./napari <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-o</span> output <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-s</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-c</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-b</span> 5</span></code></pre></div>
+<blockquote class="blockquote">
+<p>5352.18 50467.38 11061.83 10366568</p>
+</blockquote>
+<p>This script converted a single OME-TIFF file in just under 1.5 hours (5352/3600 = 1.49).</p>
+<p>The size of the OME-TIFF file, which contains five IF channels plus the segmentation layer, is 54 GBs (<em>i.e.</em>, about 91% of the size of the Zarr stores).</p>
+<p>The default method to convert Zarr to OME-TIFF can require more memory than your system has. If you run into memory issues, you can try the secondary method that uses <code>pyvips</code> (see Appendix).</p>
+</section>
+<section id="appendix" class="level1 unnumbered">
+<h1 class="unnumbered">Appendix</h1>
+<p>The <code>export-tiff</code> utility script runs in two different modes. The first one (default) is generally the quicker of the two. However, if you are running into memory issues, you can try the second option that is memory-optimized but runs slower and requires more disk space.</p>
+<section id="installing-optional-dependency" class="level2 unnumbered">
+<h2 class="unnumbered anchored" data-anchor-id="installing-optional-dependency">Installing optional dependency</h2>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" aria-controls="tabset-2-1" aria-selected="true">MacOS/Unix Install</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" aria-controls="tabset-2-2" aria-selected="false">Windows</a></li></ul>
+<div class="tab-content">
+<div id="tabset-2-1" class="tab-pane active" aria-labelledby="tabset-2-1-tab">
+<p>For macOS, I have had success with using brew following libvips’ <a href="https://www.libvips.org/install.html">recommendation</a>.</p>
+<p>For Linux, be sure that the appropriate libraries are installed for your distribution. Check out libvips’ <a href="https://github.com/libvips/libvips/wiki/#building-and-installing">github wiki</a> for more tips.</p>
+</div>
+<div id="tabset-2-2" class="tab-pane" aria-labelledby="tabset-2-2-tab">
+<p>Download and install <code>vips-dev-w64-all-8.16.0.zip</code> from <a href="https://github.com/libvips/build-win64-mxe/releases/">here</a></p>
+<p>Unzip it and move its contents to your desired location. Add the folder to a convenient location and add the location of the binaries (<em>e.g.</em>, <code>C:\vips-dev-8.16.0\bin</code>) to your Path. Restart your computer.</p>
+<p>When using the <code>--libvips</code> flag within the <code>export-tiff</code> package script, python will look for these binaries.</p>
+</div>
+</div>
+</div>
+<section id="running-with---libvips" class="level3 unnumbered">
+<h3 class="unnumbered anchored" data-anchor-id="running-with---libvips">Running with <code>--libvips</code></h3>
+<p>Rerunning the previous Lymph Node example with <code>--libvips</code>:</p>
+<div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Terminal</span></span>
+<span id="cb9-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># TIME="%e %U %S" time export-tiff -i ./napari -o output -s -c -b 5</span></span>
+<span id="cb9-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">export-tiff</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-i</span> ./napari <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-o</span> output <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-s</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-c</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-b</span> 5 <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--libvips</span></span></code></pre></div>
+<blockquote class="blockquote">
+<p>16894.29 16987.47 438.18 16905396</p>
+</blockquote>
+<p>or about 4.6 hours.</p>
+
+
+</section>
+</section>
+</section>
+
+ ]]></description>
+  <category>napari</category>
+  <category>how-tos</category>
+  <category>python</category>
+  <category>OME-TIFF</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-ome-tiff/cosmx-ome-tiff.html</guid>
+  <pubDate>Fri, 21 Feb 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-ome-tiff/figures/fig-gc.png" medium="image" type="image/png" height="135" width="144"/>
+</item>
 <item>
   <title>Cell typing with CosMx® SMI Cell Profiles</title>
   <dc:creator>Megan Vandenberg</dc:creator>
@@ -3590,6 +4002,33 @@ font-style: inherit;">"</span>)</span></code></pre></div>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-stitching/figures/fig-stitch-single-slide.png" medium="image" type="image/png" height="77" width="144"/>
 </item>
 <item>
+  <title>New Features of AtoMx™ SIP v1.3.2</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/nanoU/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<p>Cross posting for our colleagues at <a href="https://university.nanostring.com/">NanoU</a>.</p>
+<p>Course links to AtoMx™ SIP v.1.3.2 release notes and a video discussing and demoing new features covering:</p>
+<ul>
+<li>Image Viewer and Data Plotting Improvements</li>
+<li>Data Pipeline Orchestrator Improvements</li>
+<li>Protein Cell Segmentation</li>
+</ul>
+<p>can be found here: <a href="https://university.nanostring.com/new-features-of-atomxtm-v132">https://university.nanostring.com/new-features-of-atomxtm-v132</a>.</p>
+
+
+
+ ]]></description>
+  <category>nanoU</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/nanoU/</guid>
+  <pubDate>Thu, 17 Oct 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://cc.sj-cdn.net/instructor/j3v0702q7qcg-nanostring-university/courses/3ppjfhs3ah3wf/promo-image.1728930731.png" medium="image" type="image/png"/>
+</item>
+<item>
   <title>Stay up-to-date with our blog using your favorite RSS reader</title>
   <dc:creator>Evelyn Metzger</dc:creator>
   <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/</link>
@@ -3631,31 +4070,182 @@ font-style: inherit;">"</span>)</span></code></pre></div>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/figures/rss-thumbnail.jpeg" medium="image" type="image/jpeg"/>
 </item>
 <item>
-  <title>New Features of AtoMx™ SIP v1.3.2</title>
-  <dc:creator>Evelyn Metzger</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/nanoU/</link>
+  <title>Creating reference profiles for InSituType</title>
+  <dc:creator>Patrick Danaher</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/</link>
   <description><![CDATA[ 
 
 
 
 
 
-<p>Cross posting for our colleagues at <a href="https://university.nanostring.com/">NanoU</a>.</p>
-<p>Course links to AtoMx™ SIP v.1.3.2 release notes and a video discussing and demoing new features covering:</p>
+<section id="background" class="level2">
+<h2 class="anchored" data-anchor-id="background">Background</h2>
+<p>The <a href="https://github.com/Nanostring-Biostats/InSituType" target="_blank">InSituType cell typing algorithm</a> relies on a “reference matrix” to perform supervised or semi-supervised cell typing. A reference matrix gives the expected gene expression profile of each cell type in a tissue; these are usually derived from previous scRNA-seq or spatial transcriptomics experiments.</p>
+</section>
+<section id="deriving-reference-profiles" class="level2">
+<h2 class="anchored" data-anchor-id="deriving-reference-profiles">Deriving reference profiles:</h2>
+<p>To create reference profiles from a previous dataset, you can use <code>InSituType::getRNAprofiles</code>. When using this function, keep the following in mind:</p>
+<ol type="1">
+<li>Ensure that your dataset is linear-scale (no log-transformations)</li>
+<li>Raw data is preferred, though normalized will work just fine</li>
+<li>If you input data is scRNA-seq, which has essentially no background, just enter the negative control argument as <code>neg = rep(0, length(clust))</code> (where <code>clust</code> is the vector you pass to the clust argument).</li>
+</ol>
+</section>
+<section id="creating-hybrid-reference-profiles" class="level2">
+<h2 class="anchored" data-anchor-id="creating-hybrid-reference-profiles">Creating hybrid reference profiles:</h2>
+<p>Fairly often, it’s convenient to create a hybrid reference matrix from two studies. In a typical example, you may want to cell type a solid tissue with autoimmune disease. There is likely a good scRNA-seq dataset available for the healthy cell types in your tissue, but this dataset probably has poor coverage of immune cells, as immune cells are rare in non-inflamed tissues, and most single cell datasets only sample some tens of thousands of cells.</p>
+<section id="example" class="level3">
+<h3 class="anchored" data-anchor-id="example">Example</h3>
+<p>Here’s an example workflow for merging the HCA colon cell profiles (Kinchen et al 2018, original data <a href="https://data.humancellatlas.org/explore/projects/f8aa201c-4ff1-45a4-890e-840d63459ca2%20https://www.sciencedirect.com/science/article/pii/S0092867418311681?via%3Dihub" target="_blank">here</a>) with the InSituType immune cell profiles. The key steps are:</p>
 <ul>
-<li>Image Viewer and Data Plotting Improvements</li>
-<li>Data Pipeline Orchestrator Improvements</li>
-<li>Protein Cell Segmentation</li>
+<li>Aligning by shared genes</li>
+<li>Rescaling (InSituType doesn’t care about the scaling of the columns in a reference matrix, but it’s convenient for descriptive analyses if they’re all comparably scaled.)</li>
+<li>Removing redundant cell types</li>
 </ul>
-<p>can be found here: <a href="https://university.nanostring.com/new-features-of-atomxtm-v132">https://university.nanostring.com/new-features-of-atomxtm-v132</a>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># get immune cell profiles included in the InSituType library:</span></span>
+<span id="cb1-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(InSituType)</span>
+<span id="cb1-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ioprofiles"</span>)</span>
+<span id="cb1-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">head</span>(ioprofiles)</span>
+<span id="cb1-5"></span>
+<span id="cb1-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># load HCA profiles for colon:</span></span>
+<span id="cb1-7"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">load</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">url</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://github.com/Nanostring-Biostats/CellProfileLibrary/raw/master/Human/Adult/Colon_HCA.RData"</span>))</span>
+<span id="cb1-8">colonprofiles <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.matrix</span>(profile_matrix)</span>
+<span id="cb1-9"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">head</span>(colonprofiles)</span>
+<span id="cb1-10"></span>
+<span id="cb1-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># align genes:</span></span>
+<span id="cb1-12">sharedgenes <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">intersect</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(ioprofiles), <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(colonprofiles))</span>
+<span id="cb1-13">ioprofiles <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> ioprofiles[sharedgenes, ]</span>
+<span id="cb1-14">colonprofiles <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> colonprofiles[sharedgenes, ]</span>
+<span id="cb1-15"></span>
+<span id="cb1-16"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># put on appproximately the same scale:</span></span>
+<span id="cb1-17">ioprofiles <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> ioprofiles <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">quantile</span>(ioprofiles, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.99</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span></span>
+<span id="cb1-18">colonprofiles <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> colonprofiles <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">quantile</span>(colonprofiles, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.99</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span></span>
+<span id="cb1-19"></span>
+<span id="cb1-20"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># omit immune cells from colon profiles:</span></span>
+<span id="cb1-21"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(ioprofiles)</span>
+<span id="cb1-22"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(colonprofiles)</span>
+<span id="cb1-23">omit_from_colon <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"plasma.cell"</span>)</span>
+<span id="cb1-24">omit_from_io <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"fibroblast"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"endothelial"</span>)</span>
+<span id="cb1-25"></span>
+<span id="cb1-26"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># merge:</span></span>
+<span id="cb1-27">ref <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">cbind</span>(ioprofiles[, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">setdiff</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(ioprofiles), omit_from_io)], </span>
+<span id="cb1-28">             colonprofiles[, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">setdiff</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(colonprofiles), omit_from_colon)])</span>
+<span id="cb1-29"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">head</span>(ref)</span></code></pre></div>
+</div>
+<p>Once you obtain this merged reference profile, you can use it for cell typing with InSituType as you would any other reference matrix.</p>
+<p>For deep-dives on other cell typing topics, see the <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">InSituType FAQS</a>.</p>
 
 
+</section>
+</section>
 
  ]]></description>
-  <category>nanoU</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/nanoU/</guid>
-  <pubDate>Thu, 17 Oct 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://cc.sj-cdn.net/instructor/j3v0702q7qcg-nanostring-university/courses/3ppjfhs3ah3wf/promo-image.1728930731.png" medium="image" type="image/png"/>
+  <category>cell typing</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/</guid>
+  <pubDate>Wed, 21 Aug 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/figures/heatmap_tile.png" medium="image" type="image/png" height="126" width="144"/>
 </item>
 <item>
   <title>How does background impact CosMx data, and when does it matter?</title>
@@ -3880,184 +4470,6 @@ font-style: inherit;">"</span>)</span></code></pre></div>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/</guid>
   <pubDate>Wed, 21 Aug 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/background_tile.png" medium="image" type="image/png" height="146" width="144"/>
-</item>
-<item>
-  <title>Creating reference profiles for InSituType</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="background" class="level2">
-<h2 class="anchored" data-anchor-id="background">Background</h2>
-<p>The <a href="https://github.com/Nanostring-Biostats/InSituType" target="_blank">InSituType cell typing algorithm</a> relies on a “reference matrix” to perform supervised or semi-supervised cell typing. A reference matrix gives the expected gene expression profile of each cell type in a tissue; these are usually derived from previous scRNA-seq or spatial transcriptomics experiments.</p>
-</section>
-<section id="deriving-reference-profiles" class="level2">
-<h2 class="anchored" data-anchor-id="deriving-reference-profiles">Deriving reference profiles:</h2>
-<p>To create reference profiles from a previous dataset, you can use <code>InSituType::getRNAprofiles</code>. When using this function, keep the following in mind:</p>
-<ol type="1">
-<li>Ensure that your dataset is linear-scale (no log-transformations)</li>
-<li>Raw data is preferred, though normalized will work just fine</li>
-<li>If you input data is scRNA-seq, which has essentially no background, just enter the negative control argument as <code>neg = rep(0, length(clust))</code> (where <code>clust</code> is the vector you pass to the clust argument).</li>
-</ol>
-</section>
-<section id="creating-hybrid-reference-profiles" class="level2">
-<h2 class="anchored" data-anchor-id="creating-hybrid-reference-profiles">Creating hybrid reference profiles:</h2>
-<p>Fairly often, it’s convenient to create a hybrid reference matrix from two studies. In a typical example, you may want to cell type a solid tissue with autoimmune disease. There is likely a good scRNA-seq dataset available for the healthy cell types in your tissue, but this dataset probably has poor coverage of immune cells, as immune cells are rare in non-inflamed tissues, and most single cell datasets only sample some tens of thousands of cells.</p>
-<section id="example" class="level3">
-<h3 class="anchored" data-anchor-id="example">Example</h3>
-<p>Here’s an example workflow for merging the HCA colon cell profiles (Kinchen et al 2018, original data <a href="https://data.humancellatlas.org/explore/projects/f8aa201c-4ff1-45a4-890e-840d63459ca2%20https://www.sciencedirect.com/science/article/pii/S0092867418311681?via%3Dihub" target="_blank">here</a>) with the InSituType immune cell profiles. The key steps are:</p>
-<ul>
-<li>Aligning by shared genes</li>
-<li>Rescaling (InSituType doesn’t care about the scaling of the columns in a reference matrix, but it’s convenient for descriptive analyses if they’re all comparably scaled.)</li>
-<li>Removing redundant cell types</li>
-</ul>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># get immune cell profiles included in the InSituType library:</span></span>
-<span id="cb1-2"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">library</span>(InSituType)</span>
-<span id="cb1-3"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">data</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"ioprofiles"</span>)</span>
-<span id="cb1-4"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">head</span>(ioprofiles)</span>
-<span id="cb1-5"></span>
-<span id="cb1-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># load HCA profiles for colon:</span></span>
-<span id="cb1-7"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">load</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">url</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"https://github.com/Nanostring-Biostats/CellProfileLibrary/raw/master/Human/Adult/Colon_HCA.RData"</span>))</span>
-<span id="cb1-8">colonprofiles <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">as.matrix</span>(profile_matrix)</span>
-<span id="cb1-9"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">head</span>(colonprofiles)</span>
-<span id="cb1-10"></span>
-<span id="cb1-11"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># align genes:</span></span>
-<span id="cb1-12">sharedgenes <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">intersect</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">rownames</span>(ioprofiles), <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">rownames</span>(colonprofiles))</span>
-<span id="cb1-13">ioprofiles <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> ioprofiles[sharedgenes, ]</span>
-<span id="cb1-14">colonprofiles <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> colonprofiles[sharedgenes, ]</span>
-<span id="cb1-15"></span>
-<span id="cb1-16"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># put on appproximately the same scale:</span></span>
-<span id="cb1-17">ioprofiles <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> ioprofiles <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">quantile</span>(ioprofiles, <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.99</span>) <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span></span>
-<span id="cb1-18">colonprofiles <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> colonprofiles <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">quantile</span>(colonprofiles, <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.99</span>) <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span></span>
-<span id="cb1-19"></span>
-<span id="cb1-20"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># omit immune cells from colon profiles:</span></span>
-<span id="cb1-21"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">colnames</span>(ioprofiles)</span>
-<span id="cb1-22"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">colnames</span>(colonprofiles)</span>
-<span id="cb1-23">omit_from_colon <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"plasma.cell"</span>)</span>
-<span id="cb1-24">omit_from_io <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"fibroblast"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"endothelial"</span>)</span>
-<span id="cb1-25"></span>
-<span id="cb1-26"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># merge:</span></span>
-<span id="cb1-27">ref <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">cbind</span>(ioprofiles[, <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">setdiff</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">colnames</span>(ioprofiles), omit_from_io)], </span>
-<span id="cb1-28">             colonprofiles[, <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">setdiff</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">colnames</span>(colonprofiles), omit_from_colon)])</span>
-<span id="cb1-29"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">head</span>(ref)</span></code></pre></div>
-</div>
-<p>Once you obtain this merged reference profile, you can use it for cell typing with InSituType as you would any other reference matrix.</p>
-<p>For deep-dives on other cell typing topics, see the <a href="https://github.com/Nanostring-Biostats/InSituType/blob/main/FAQs.md" target="_blank">InSituType FAQS</a>.</p>
-
-
-</section>
-</section>
-
- ]]></description>
-  <category>cell typing</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/</guid>
-  <pubDate>Wed, 21 Aug 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/figures/heatmap_tile.png" medium="image" type="image/png" height="126" width="144"/>
 </item>
 <item>
   <title>InSituCor: an open-source package and AtoMx custom module for exploratory data analysis</title>
@@ -11268,1753 +11680,6 @@ font-style: inherit;">1</span></span></code></pre></div>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/making-composite-images.html</guid>
   <pubDate>Wed, 12 Jun 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig1.png" medium="image" type="image/png" height="144" width="144"/>
-</item>
-<item>
-  <title>Creating an anndata object from AtoMx™ exported results for interactive viewer and python-based analysis</title>
-  <dc:creator>Lidan Wu</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="introduction" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
-<p>Annotated Data, <a href="https://anndata.readthedocs.io/en/latest/" target="_blank">AnnData</a>, is a popular data structure for exploring and analyzing high-plex single-cell data, including spatial transcription data. There are quite a few open-sourced single-cell analysis tools in <code>python</code>, e.g.&nbsp;<a href="https://scanpy.readthedocs.io/en/stable/" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank"><code>squidpy</code></a>, as well as interactive viewers, e.g.&nbsp;<a href="https://cirrocumulus.readthedocs.io/en/latest/" target="_blank">Cirrocumulus</a> and <a href="https://github.com/chanzuckerberg/cellxgene" target="_blank">CELLxGENE</a> viewers, using this data structure. Converting CosMx<sup>®</sup> spatial data sets into <code>anndata</code> data structure allows non-coders to easily share the light-weighted data object, visualize and explore the processed data in an interactive way.</p>
-<p>This post describes how to create <code>anndata</code> object (<code>.h5ad</code>) from either a post-analysis <code>Seurat</code> object or basic data files exported from AtoMx™ Spatial Informatics Portal (SIP). We hope this post would facilitate seamless integration of CosMx<sup>®</sup> spatial data sets into Python-based single-cell analysis workflows.</p>
-<ul>
-<li>Section&nbsp;2 Creating an <code>anndata</code> object in <code>.h5ad</code> format from post-analysis <code>Seurat</code> object exported by AtoMx™ SIP</li>
-<li>Section&nbsp;3 Visualize the post-analysis <code>.h5ad</code> object in an interactive viewer</li>
-<li>Section&nbsp;4 Creating per-sample <code>anndata</code> object from basic data files in <code>Python</code> for python-based single-cell analysis</li>
-</ul>
-<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
-</section>
-<section id="sec-convert-seurat" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Creating an <code>anndata</code> object from post-analysis <code>Seurat</code> object exported by AtoMx™ SIP</h1>
-<p>AtoMx™ SIP can export a CosMx<sup>®</sup> Spatial Molecular Imager (SMI) study into <code>Seurat</code> data objects for direct usage in <code>R</code>. Here we first work in <code>R</code> to open, visualize, and make minor adjustments to the object. We then export it into a <code>.h5ad</code> file for usage in <code>Python</code> tools.</p>
-<p>The <code>Seurat</code> object used in this section is made from the CosMx<sup>®</sup> mouse brain public data set and assembled in the structure used by the Technology Access Program (<a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/technology-access-program/" target="_blank">TAP</a>); similar outputs are available from the AtoMx™ SIP. To download raw data for this dataset, go <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="_blank">here</a>. For more details on its data structure, please refer to earlier post on <a href="../../posts/seurat-cosmx-basics/#sec-data-structure" target="_blank">Visualizing spatial data with Seurat</a>.</p>
-<div class="callout callout-style-default callout-important callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Important
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>All the code in this section&nbsp;2 is in <code>R</code>.</p>
-</div>
-</div>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Many of the below functions require that you are working with <a href="https://satijalab.org/seurat/" target="_blank">Seurat v5</a> and may not work in earlier versions. Additionally, if you are exporting a <code>Seurat</code> object from AtoMx (v1.3+), be sure to export the <code>Seurat</code> object with polygon coordinates and transcripts included to access all of the functionality below.</p>
-</div>
-</div>
-<section id="explore-post-analysis-seurat-object-and-add-in-custom-cell-meta-data" class="level2" data-number="2.1">
-<h2 data-number="2.1" class="anchored" data-anchor-id="explore-post-analysis-seurat-object-and-add-in-custom-cell-meta-data"><span class="header-section-number">2.1</span> Explore post-analysis <code>Seurat</code> object and add in custom cell meta data</h2>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Setup R</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">library</span>(Seurat)</span>
-<span id="cb1-2"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">library</span>(SeuratObject)</span>
-<span id="cb1-3"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">library</span>(SeuratDisk)</span>
-<span id="cb1-4"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">library</span>(ggplot2)</span>
-<span id="cb1-5"></span>
-<span id="cb1-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># load existing seurat object</span></span>
-<span id="cb1-7">seu.obj <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">readRDS</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"seurat_object.Rds"</span>)</span></code></pre></div>
-</div>
-</div>
-<p>The post-analysis <code>Seurat</code> object exported from AtoMx™ SIP should contain</p>
-<ul>
-<li>expression matrices for various feature types, like <code>RNA</code>, <code>RNA_normalized</code>, <code>negprobes</code> and <code>falsecodes</code>;</li>
-<li>dimension reduction results, like <code>pca</code> and <code>umap</code>;</li>
-<li>results for graphs, like <code>snn</code> and <code>nn</code>.</li>
-</ul>
-<p>You can visualize which results are included by running <code>names(seu.obj)</code>. The exact names of the results stored in your post-analysis <code>Seurat</code> object might be slightly different from what are included in the particular example here. Please adjust the code accordingly.</p>
-<p>You can also add in any new cell metadata if desired. For illustration, the code below adds a new column with unique ID for each FOV.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># add a new column for unique ID of each FOV</span></span>
-<span id="cb2-2">fovNames <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> seu.obj<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">@</span>meta.data[, <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'slide_ID_numeric'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'fov'</span>)]</span>
-<span id="cb2-3">fovNames[[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'fov_names'</span>]] <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">paste0</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'fov_'</span>, fovNames[[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'slide_ID_numeric'</span>]], </span>
-<span id="cb2-4">                            <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'_'</span>, fovNames[[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'fov'</span>]])</span>
-<span id="cb2-5">fovNames <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">setNames</span>(fovNames[[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'fov_names'</span>]], </span>
-<span id="cb2-6">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">nm =</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">rownames</span>(fovNames))</span>
-<span id="cb2-7"></span>
-<span id="cb2-8">seu.obj <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">AddMetaData</span>(seu.obj, </span>
-<span id="cb2-9">                               <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">metadata =</span> fovNames, </span>
-<span id="cb2-10">                               <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">col.name =</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"fov_names"</span>)</span></code></pre></div>
-</div>
-</section>
-<section id="prepare-spatial-coordinates-and-visualize" class="level2" data-number="2.2">
-<h2 data-number="2.2" class="anchored" data-anchor-id="prepare-spatial-coordinates-and-visualize"><span class="header-section-number">2.2</span> Prepare spatial coordinates and visualize</h2>
-<p>AtoMx™ SIP stores the per-slide cell segmentation information as separate <code>SeuratObject::FOV</code> objects in the <code>images</code> slot. You can get the slide names by running <code>names(seu.obj@images)</code> in <code>R</code>.</p>
-<p>The example dataset used in this section has <strong>two</strong> tissue slides in one study and each slide is in its own spatial coordinate space and thus may have xy overlapping between the slides.</p>
-<section id="sec-perSlide" class="level3" data-number="2.2.1">
-<h3 data-number="2.2.1" class="anchored" data-anchor-id="sec-perSlide"><span class="header-section-number">2.2.1</span> Case 1: 1 slide per <code>anndata</code> object</h3>
-<p>When a per-slide <code>anndata</code> object is preferred, one should split the <code>Seurat</code> object by the slide name first before cleaning it up in section&nbsp;2.3. The code below is for generating one <code>anndata</code> object per tissue slide and the resulting data is used in later sections.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># extract the segmentation to separate variable</span></span>
-<span id="cb3-2">imgList <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> seu.obj<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">@</span>images</span>
-<span id="cb3-3"></span>
-<span id="cb3-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># remove segmentation in current seurat object before split</span></span>
-<span id="cb3-5"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> (slideName <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">names</span>(imgList)){</span>
-<span id="cb3-6">  seu.obj[[slideName]] <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">NULL</span></span>
-<span id="cb3-7">}</span>
-<span id="cb3-8"></span>
-<span id="cb3-9"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># split Seurat object by slide name which is stored under "Run_Tissue_name" column of cell meta.data. </span></span>
-<span id="cb3-10">objList <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">SplitObject</span>(seu.obj, <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">split.by =</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Run_Tissue_name"</span>)</span>
-<span id="cb3-11"></span>
-<span id="cb3-12"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># You can add the segmentation back for each per-slide object </span></span>
-<span id="cb3-13"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> (eachSlide <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">names</span>(objList)){</span>
-<span id="cb3-14">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># standard names used in `images` slot</span></span>
-<span id="cb3-15">  slideName <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">gsub</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\\</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">W|_"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"."</span>, eachSlide)</span>
-<span id="cb3-16">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># add the `SeuratObject::FOV` object for current slide alone</span></span>
-<span id="cb3-17">  objList[[eachSlide]][[slideName]] <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> imgList[[slideName]]</span>
-<span id="cb3-18">}</span></code></pre></div>
-</div>
-<p>We would focus on the first slide for this section.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># keep data for only the 1st section for analysis in later section</span></span>
-<span id="cb4-2">eachSlide <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">names</span>(objList)[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>]</span>
-<span id="cb4-3">slideName <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">gsub</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\\</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">W|_"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"."</span>, eachSlide)</span>
-<span id="cb4-4">seu.obj1 <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> objList[[eachSlide]]</span>
-<span id="cb4-5"></span>
-<span id="cb4-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># extract spatial coordinates of each cell for the chosen slide</span></span>
-<span id="cb4-7">spatial_coords <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> seu.obj1[[slideName]]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">$</span>centroids<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">@</span>coords</span>
-<span id="cb4-8"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">rownames</span>(spatial_coords) <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> seu.obj1[[slideName]]<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">$</span>centroids<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">@</span>cells</span></code></pre></div>
-</div>
-<p>Let’s visualize the current cell segmentation colored by cell types and the molecular positions of a few selected genes. For more visualization tricks using <code>Seurat</code>, please refer to <a href="../../posts/seurat-cosmx-basics/index.html" target="_blank">earlier post</a> and <a href="https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2" target="_blank">Seurat’s vignette</a> on image-based spatial data analysis.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># specify to show cell boundary </span></span>
-<span id="cb5-2">SeuratObject<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">DefaultBoundary</span>(seu.obj1[[slideName]]) <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"segmentation"</span></span>
-<span id="cb5-3"></span>
-<span id="cb5-4">Seurat<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">ImageDimPlot</span>(<span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">object =</span> seu.obj1, </span>
-<span id="cb5-5">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">fov =</span> slideName, </span>
-<span id="cb5-6">                     </span>
-<span id="cb5-7">                     <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># column name of cell type in meta.data</span></span>
-<span id="cb5-8">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">group.by =</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"nb_clus_final"</span>, </span>
-<span id="cb5-9">                     </span>
-<span id="cb5-10">                     <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># specify which molecules to plot</span></span>
-<span id="cb5-11">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">molecules =</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Slc17a7"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Gad1"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Plp1"</span>), </span>
-<span id="cb5-12">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">mols.size =</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1.5</span>, </span>
-<span id="cb5-13">                     </span>
-<span id="cb5-14">                     <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># fixed aspect ratio and flip xy in plotting</span></span>
-<span id="cb5-15">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">coord.fixed =</span> <span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">TRUE</span>, <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">flip_xy =</span> <span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">TRUE</span>)</span></code></pre></div>
-</div>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-mBrain-S1-cellType-segmentation.png" class="img-fluid"></p>
-<p>You can zoom in to view a subset of cells by specifying which cells to plots.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># change idents to "fov" for cell selection</span></span>
-<span id="cb6-2"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># note: "fov" here is a column in cell meta.data instead of the `SeuratObject::FOV` object. </span></span>
-<span id="cb6-3">SeuratObject<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">Idents</span>(seu.obj1) <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"fov"</span></span>
-<span id="cb6-4"></span>
-<span id="cb6-5">Seurat<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">ImageDimPlot</span>(<span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">object =</span> seu.obj1, </span>
-<span id="cb6-6">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">fov =</span> slideName, </span>
-<span id="cb6-7">                     </span>
-<span id="cb6-8">                     <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># column name of cell type in meta.data</span></span>
-<span id="cb6-9">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">group.by =</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"nb_clus_final"</span>, </span>
-<span id="cb6-10">                     </span>
-<span id="cb6-11">                     <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># a vector of chosen cells, plot cells in chosen fovs</span></span>
-<span id="cb6-12">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">cells =</span> SeuratObject<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">WhichCells</span>(</span>
-<span id="cb6-13">                       seu.obj1, <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">idents =</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">72</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">74</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">90</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">92</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">97</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">99</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">114</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">116</span>)), </span>
-<span id="cb6-14">                     </span>
-<span id="cb6-15">                     <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># crop the plots to area with cells only</span></span>
-<span id="cb6-16">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">crop =</span> <span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">TRUE</span>, </span>
-<span id="cb6-17">                     </span>
-<span id="cb6-18">                     <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># fixed aspect ratio and flip xy in plotting</span></span>
-<span id="cb6-19">                     <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">coord.fixed =</span> <span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">TRUE</span>, <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">flip_xy =</span> <span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">TRUE</span>)</span></code></pre></div>
-</div>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-mBrain-S1-cellType-fovZoomed.png" class="img-fluid"></p>
-</section>
-<section id="sec-perStudy" class="level3" data-number="2.2.2">
-<h3 data-number="2.2.2" class="anchored" data-anchor-id="sec-perStudy"><span class="header-section-number">2.2.2</span> Case 2: multi-slide per <code>anndata</code> object</h3>
-<p>Since AtoMx™ SIP keeps the spatial coordinates of each slide in their own spatial coordinate space, one would need to arrange the spatial coordinates of multiple sample sections to avoid overlap in XY space when exporting multiple slides in same study-level <code>anndata</code> object. The example code below would arrange all slides along Y axis with some spacing between the slides.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># extract the segmentation to separate variable</span></span>
-<span id="cb7-2">imgList <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> seu.obj<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">@</span>images</span>
-<span id="cb7-3"></span>
-<span id="cb7-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># arrange slides along Y axis, add in spacer which is 0.2x of previous slide's coordinate span in Y direction</span></span>
-<span id="cb7-5">spacerFactor <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.2</span></span>
-<span id="cb7-6">global_y_offset <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span> </span>
-<span id="cb7-7"></span>
-<span id="cb7-8">spatial_coords <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">lapply</span>(imgList, <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">function</span>(img){</span>
-<span id="cb7-9">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># coordinates of query slide</span></span>
-<span id="cb7-10">  eachCoord <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> img<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">$</span>centroids<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">@</span>coords</span>
-<span id="cb7-11">  <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">rownames</span>(eachCoord) <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> img<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">$</span>centroids<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">@</span>cells</span>
-<span id="cb7-12">  </span>
-<span id="cb7-13">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># align to lower left corner</span></span>
-<span id="cb7-14">  ori_offsets <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">apply</span>(eachCoord, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, min)</span>
-<span id="cb7-15">  eachCoord <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">sweep</span>(eachCoord, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, ori_offsets, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"-"</span>)</span>
-<span id="cb7-16">  </span>
-<span id="cb7-17">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># span in y direction</span></span>
-<span id="cb7-18">  y_span <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">diff</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">range</span>(eachCoord[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>]))</span>
-<span id="cb7-19"></span>
-<span id="cb7-20">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># add spacer in y direction </span></span>
-<span id="cb7-21">  eachCoord[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>] <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> eachCoord[, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>] <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> global_y_offset</span>
-<span id="cb7-22">  </span>
-<span id="cb7-23">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># update global offset for next slide</span></span>
-<span id="cb7-24">  global_y_offset <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;&lt;-</span> global_y_offset <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span> y_span<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span>spacerFactor)</span>
-<span id="cb7-25">  </span>
-<span id="cb7-26">  <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">return</span>(eachCoord)</span>
-<span id="cb7-27">})</span>
-<span id="cb7-28">spatial_coords <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">do.call</span>(rbind, spatial_coords)  </span>
-<span id="cb7-29"></span>
-<span id="cb7-30"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># use the study-level Seurat object for downstream</span></span>
-<span id="cb7-31">seu.obj1 <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> seu.obj</span>
-<span id="cb7-32"></span>
-<span id="cb7-33"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># prefix for file name</span></span>
-<span id="cb7-34">slideName <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"StudyLevel"</span> </span></code></pre></div>
-</div>
-<p>Let’s visualize the coordinates of all cells after slide arrangement.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># add in cell type for color</span></span>
-<span id="cb8-2">plotData <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">cbind</span>(seu.obj1[[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"nb_clus_final"</span>]], </span>
-<span id="cb8-3">                  spatial_coords[<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">colnames</span>(seu.obj1), ])</span>
-<span id="cb8-4"></span>
-<span id="cb8-5">ggplot2<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">ggplot</span>(plotData, </span>
-<span id="cb8-6">                <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># flip xy to be consistent with earlier plots</span></span>
-<span id="cb8-7">                ggplot2<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">x =</span> y, <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">y =</span> x, <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">color =</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">as.factor</span>(nb_clus_final))) <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span></span>
-<span id="cb8-8">  ggplot2<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">geom_point</span>(<span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">size =</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span>)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span></span>
-<span id="cb8-9">  ggplot2<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">coord_fixed</span>()<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span></span>
-<span id="cb8-10">  Seurat<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">NoLegend</span>()<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span></span>
-<span id="cb8-11">  Seurat<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">DarkTheme</span>()</span></code></pre></div>
-</div>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-mBrain-S1S2-cellType-slidesArranged.png" class="img-fluid"></p>
-</section>
-</section>
-<section id="sec-cleanUp" class="level2" data-number="2.3">
-<h2 data-number="2.3" class="anchored" data-anchor-id="sec-cleanUp"><span class="header-section-number">2.3</span> Clean up to keep only necessary data</h2>
-<p>Next, we would further clean up the <code>Seurat</code> object (single-slide object from Case 1 in section&nbsp;2.2.1 or full-study-level object from Case 2 in section&nbsp;2.2.2) by trimming it down to contain only the data of interested.</p>
-<p>Typically, one would keep the raw data counts from <code>RNA</code> assay (this example dataset uses <code>Nanostring</code> as assay name for <code>RNA</code>), cell embedding for <code>umap</code> (standard AtoMx exported object uses <code>approximateumap</code> as name for <code>umap</code>). We would also store the spatial coordinates of each cell as the cell embedding in a dimension reduction object called <code>spatial</code>.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># clean up seurat object to only necessary data </span></span>
-<span id="cb9-2">seu.obj2 <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">DietSeurat</span>(</span>
-<span id="cb9-3">  seu.obj1, </span>
-<span id="cb9-4">  </span>
-<span id="cb9-5">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># subset of assays to keep, standard AtoMx object uses "RNA" assay</span></span>
-<span id="cb9-6">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># of note, AtoMx stores normalized RNA counts in separate "RNA_normalized" assay</span></span>
-<span id="cb9-7">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">assays =</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Nanostring"</span>,</span>
-<span id="cb9-8">  </span>
-<span id="cb9-9">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># keep raw counts stored in "counts" layer</span></span>
-<span id="cb9-10">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># use "data" or "scale.data" if prefer to keep normalized counts before or after scaling</span></span>
-<span id="cb9-11">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">layers =</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"counts"</span>, </span>
-<span id="cb9-12">  </span>
-<span id="cb9-13">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># dimension reduction to keep, standard AtoMx object uses "approximateumap"</span></span>
-<span id="cb9-14">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">dimreducs =</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"umap"</span>)</span>
-<span id="cb9-15"></span>
-<span id="cb9-16"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># clear the `images` slot</span></span>
-<span id="cb9-17">allImgs <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">names</span>(seu.obj1<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">@</span>images)</span>
-<span id="cb9-18"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> (img <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> allImgs){</span>
-<span id="cb9-19">  seu.obj2[[img]] <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="cn" style="color: #8f5902;
-background-color: null;
-font-style: inherit;">NULL</span></span>
-<span id="cb9-20">}</span>
-<span id="cb9-21"></span>
-<span id="cb9-22"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># add in spatial coordinates for current slide or study as a new dimension reduction</span></span>
-<span id="cb9-23"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">colnames</span>(spatial_coords) <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">paste0</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"SPATIAL_"</span>, <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">seq_len</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">ncol</span>(spatial_coords)))</span>
-<span id="cb9-24">seu.obj2[[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"spatial"</span>]] <span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">CreateDimReducObject</span>(</span>
-<span id="cb9-25">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">embeddings =</span> spatial_coords, </span>
-<span id="cb9-26">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">key =</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"SPATIAL_"</span>, </span>
-<span id="cb9-27">  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># standard AtoMx object use "RNA" assay</span></span>
-<span id="cb9-28">  <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">assay =</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Nanostring"</span>)</span></code></pre></div>
-</div>
-</section>
-<section id="converting-to-h5ad-format-via-h5seurat" class="level2" data-number="2.4">
-<h2 data-number="2.4" class="anchored" data-anchor-id="converting-to-h5ad-format-via-h5seurat"><span class="header-section-number">2.4</span> Converting to <code>h5ad</code> format via <code>h5Seurat</code></h2>
-<p>Lastly, we would export the cleaned <code>Seurat</code> object into <code>h5Seurat</code> format and then further convert it into <code>h5ad</code> format using <code>SeuratDisk::Convert</code> function.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># export as "h5Seurat" object in your current working directory</span></span>
-<span id="cb10-2">SeuratDisk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">SaveH5Seurat</span>(seu.obj2, </span>
-<span id="cb10-3">                         <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">filename =</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">paste0</span>(slideName, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_subset.h5Seurat"</span>))</span></code></pre></div>
-</div>
-<p><code><span style="color: red;"> Creating h5Seurat file for version 3.1.5.9900<br> Adding counts for Nanostring<br> Adding data for Nanostring<br> No variable features found for Nanostring<br> No feature-level metadata found for Nanostring<br> Adding cell embeddings for umap<br> No loadings for umap<br> No projected loadings for umap<br> No standard deviations for umap<br> No JackStraw data for umap<br> Adding cell embeddings for spatial<br> No loadings for spatial<br> No projected loadings for spatial<br> No standard deviations for spatial<br> No JackStraw data for spatial</span></code></p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># convert to h5ad format</span></span>
-<span id="cb11-2">SeuratDisk<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">Convert</span>(<span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">paste0</span>(slideName, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_subset.h5Seurat"</span>), </span>
-<span id="cb11-3">                    <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">dest =</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"h5ad"</span>)</span></code></pre></div>
-</div>
-<p><code><span style="color: red;"> Validating h5Seurat file<br> Adding data from Nanostring as X<br> Adding counts from Nanostring as raw<br> Transfering meta.data to obs<br> Adding dimensional reduction information for spatial<br> Adding dimensional reduction information for umap</span></code></p>
-</section>
-</section>
-<section id="sec-interactive-viewer" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Visualize the post-analysis <code>.h5ad</code> object in an interactive viewer</h1>
-<p>The resulting <code>anndata</code> object in <code>.h5ad</code> format could be visualized by various open-sourced interactive viewers. One such viewer would be <a href="https://cirrocumulus.readthedocs.io/en/latest/" target="_blank">Cirrocumulus viewer</a>.</p>
-<p>For a quick start, one can install the viewer in terminal via <code>pip</code>.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb12-1">pip install cirrocumulus</span></code></pre></div>
-</div>
-</div>
-<div class="callout callout-style-default callout-tip callout-titled" title="Create virtual environment for viewer">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Create virtual environment for viewer
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>It’s recommended to create separate virtual environment for viewer. The current released version of <code>cirrocumulus</code> viewer is in version <code>1.1.57</code> and has package dependencies as listed below.</p>
-<ul>
-<li>Python &gt;= 3.9.7 and Python &lt;= 3.9.18</li>
-<li>pandas &gt;= 1.3.4 and pandas &lt;= 2.1.0</li>
-<li>anndata &gt;= 0.9.1 and &lt;= 0.10.2</li>
-</ul>
-<p>One can create a new environment with specific version of packages for this viewer using various package managers in terminal. One of such managers that people often use is <a href="https://docs.anaconda.com/free/miniconda/miniconda-install/" target="_blank">conda</a> and below is an example code.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb13-1">conda create --name myenv python==3.9.18 pandas==2.1.0 anndata==0.10.2</span></code></pre></div>
-</div>
-</div>
-<p>To activate an existing environment, one should pass the name of environment to <code>conda activate</code> function.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb14-1">conda activate myenv</span></code></pre></div>
-</div>
-</div>
-</div>
-</div>
-<p>To launch the viewer for the <code>.h5ad</code> object of interest, one can simply run</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb15-1">cirro launch &lt;path_to_dataset_file.h5ad&gt;</span></code></pre></div>
-</div>
-</div>
-<p>The cirrocumulus viewer allows user to</p>
-<ul>
-<li><p>view multiple cell embeddings (<code>umap</code> and <code>spatial</code>) side-by-side for both cell metadata and gene expression (Figure&nbsp;1, Dual Embedding View);</p></li>
-<li><p>use lasso tool to subset cells of interest in the embedding space (Figure&nbsp;2, Lasso-in-Space);</p></li>
-<li><p>explore how the gene expression changes between different selections (Figure&nbsp;3, Marker Heatmap for all cells vs. Figure&nbsp;4, Dot Plots for Subsets).</p></li>
-</ul>
-<p>For more information, please refer to the <a href="https://cirrocumulus.readthedocs.io/en/latest/documentation.html" target="_blank">documentation</a> of <code>cirrocumulus</code> package</p>
-<div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true">Dual Embedding View</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">Lasso-in-Space</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" aria-controls="tabset-1-3" aria-selected="false">Marker Heatmap</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-4" aria-controls="tabset-1-4" aria-selected="false">Dot Plots for Subsets</a></li></ul>
-<div class="tab-content">
-<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-full-embedding" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-full-embedding-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-mBrain-S1-cirroViewer-screenshot.png" class="img-fluid figure-img" width="776">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-full-embedding-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: The dual-embedding views of <code>umap</code> and <code>spatial</code> for chosen cell meta data and gene expression level.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</div>
-<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-chosen" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-chosen-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-mBrain-S1-lasso.png" class="img-fluid figure-img" width="760">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-chosen-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Use lasso tool to select cells in <code>spatial</code> embedding. Chosen cells are shown in solid colors.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</div>
-<div id="tabset-1-3" class="tab-pane" aria-labelledby="tabset-1-3-tab">
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-marker-heatmap" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-marker-heatmap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-mBrain-S1-cirroViewer-markerHeatmap.png" class="img-fluid figure-img" width="760">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-marker-heatmap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;3: Heatmap of selected gene expression across ‘leiden_clus’ of all cells.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</div>
-<div id="tabset-1-4" class="tab-pane" aria-labelledby="tabset-1-4-tab">
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-dot-plots" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-dot-plots-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-mBrain-S1-cirroViewer-dotPlot-selection-vs-all.png" class="img-fluid figure-img" width="760">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-dot-plots-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;4: Dot plots of chosen gene expression for all cells (top) vs.&nbsp;cells within lasso selection (bottom) in Figure&nbsp;2 tab.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</section>
-<section id="sec-create-from-flatFiles" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> Creating per-sample <code>anndata</code> object from basic data files in <code>Python</code> for python-based single-cell analysis</h1>
-<p>For python lovers, it may be desired to create <code>anndata</code> object from scratch and then feed it into python-based single-cell analysis tools, like <a href="https://scanpy.readthedocs.io/en/stable/" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank"><code>squidpy</code></a>.</p>
-<p>In this section, we start from the basic data files (in <code>.csv</code> format) exported from AtoMx™ SIP. For an example public dataset that you can download, go <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-human-pancreas-ffpe-dataset/" target="_blank">here</a>.</p>
-<p>AtoMx™ SIP splits and organizes the basic data files by tissue slides during export. Thus, unlike the <code>Seurat</code> object of the mouse brain dataset used in earlier section&nbsp;2, the basic data files used for this section&nbsp;4 contain information for one <strong>single</strong> slide of pancreas sample. The <a href="../../assets/Pancreas-CosMx-ReadMe.html" target="_blank">ReadMe</a> associated with this example data set on pancreas shows the data structures of each file used in this section.</p>
-<div class="callout callout-style-default callout-important callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Important
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>All the code in this section&nbsp;4 is in <code>Python</code>.</p>
-</div>
-</div>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Setup Python</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> os</span>
-<span id="cb16-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> re</span>
-<span id="cb16-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> numpy <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> np</span>
-<span id="cb16-4"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> pandas <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> pd</span>
-<span id="cb16-5"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> anndata <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> ad</span>
-<span id="cb16-6"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> scipy.sparse <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> csr_matrix</span>
-<span id="cb16-7"></span>
-<span id="cb16-8"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># path to folder of downloaded basic data files</span></span>
-<span id="cb16-9">dataDir <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Pancreas-CosMx-WTx-FlatFiles"</span></span></code></pre></div>
-</div>
-</div>
-<p>Firstly, we would load the raw expression matrix and assign row names for <code>cell</code> in same naming pattern as the ones in cell meta data file. For demonstration purpose, we would focus on just the <code>RNA</code> probes and remove all the control probes.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># read in cell expression file</span></span>
-<span id="cb17-2">df <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> pd.read_csv(os.path.join(dataDir, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Pancreas_exprMat_file.csv'</span>))</span>
-<span id="cb17-3"></span>
-<span id="cb17-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># create row names for "cell" in same format as what's used in cell metadata file</span></span>
-<span id="cb17-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># the new cell_ID has pattern as 'c_[slideID]_[cell_ID]', where slideID = 1 in this example dataset</span></span>
-<span id="cb17-6">df[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"new_cell_ID"</span>] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>  df.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">apply</span>(<span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">lambda</span> row: <span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"c_1_</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>row<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>fov<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">_</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>row<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>cell_ID<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>, axis <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>)</span>
-<span id="cb17-7">df.set_index(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"new_cell_ID"</span>, inplace<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb17-8"></span>
-<span id="cb17-9"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># drop annotation columns</span></span>
-<span id="cb17-10">df.drop(columns<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"fov"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"cell_ID"</span>], inplace<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb17-11"></span>
-<span id="cb17-12"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># focus on RNA probes while drop control probes</span></span>
-<span id="cb17-13">dummy<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>re.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">compile</span>(<span class="vs" style="color: #20794D;
-background-color: null;
-font-style: inherit;">r'Negative|SystemControl'</span>, flags<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>re.IGNORECASE)</span>
-<span id="cb17-14">chosen_probes <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [col <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> col <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(df.columns) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">not</span> dummy.search(col)]</span>
-<span id="cb17-15"></span>
-<span id="cb17-16"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># "cell" names for ordering downstream</span></span>
-<span id="cb17-17">chosen_cells <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> df.index</span>
-<span id="cb17-18"></span>
-<span id="cb17-19"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># convert to a sparse matrix</span></span>
-<span id="cb17-20">raw <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> csr_matrix(df[chosen_probes].astype(pd.SparseDtype(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"float64"</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>)).sparse.to_coo())</span>
-<span id="cb17-21"></span>
-<span id="cb17-22"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># delete unused variable to free up memory</span></span>
-<span id="cb17-23"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">del</span> df</span></code></pre></div>
-</div>
-<p>Next, we would read in the cell meta data and extract the spatial coordinates of each cell. Based on the <a href="../../assets/Pancreas-CosMx-ReadMe.html" target="_blank">ReadMe</a> of these data files, we can know this data set has pixel size of 0.12028 µm per pixel. For illustration, we also convert the pixel coordinates to µm here.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># read in cell meta data file</span></span>
-<span id="cb18-2">cell_meta <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> pd.read_csv(os.path.join(dataDir, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'Pancreas_metadata_file.csv'</span>))</span>
-<span id="cb18-3"></span>
-<span id="cb18-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># use "cell" column as row names to match with raw expression matrix</span></span>
-<span id="cb18-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># for convenience, the "cell" column is kept with the meta data</span></span>
-<span id="cb18-6">cell_meta.set_index(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"cell"</span>, inplace<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>, drop <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>)</span>
-<span id="cb18-7"></span>
-<span id="cb18-8"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># extract spatial coordinates of cells, use the global coordinates</span></span>
-<span id="cb18-9">coords <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> cell_meta[[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CenterX_global_px"</span>,<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CenterY_global_px"</span>]]</span>
-<span id="cb18-10"></span>
-<span id="cb18-11"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># use "x" and "y" as column names</span></span>
-<span id="cb18-12">coords <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> coords.rename(columns<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>{<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CenterX_global_px"</span>:<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"x"</span>, </span>
-<span id="cb18-13">                                <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CenterY_global_px"</span>: <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"y"</span>})</span>
-<span id="cb18-14"></span>
-<span id="cb18-15"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># reorder cells to be in same row order as raw expression matrix</span></span>
-<span id="cb18-16">coords <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> coords.reindex(index <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> chosen_cells)</span>
-<span id="cb18-17"></span>
-<span id="cb18-18"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># convert px coordinates to micrometer </span></span>
-<span id="cb18-19">pixel_size <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.12028</span></span>
-<span id="cb18-20">coords <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> coords.mul(pixel_size)</span></code></pre></div>
-</div>
-<p>Now, we are ready to create the <code>anndata</code> object using <code>anndata.AnnData()</code> python function. We would add the spatial coordinates as an annotation array stored in <code>obsm</code> slot.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1">adata <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> ad.AnnData(</span>
-<span id="cb19-2">    X <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> raw, </span>
-<span id="cb19-3">    obs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> cell_meta, </span>
-<span id="cb19-4">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># row names should be the same as gene names</span></span>
-<span id="cb19-5">    var <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> pd.DataFrame(</span>
-<span id="cb19-6">        <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>(chosen_probes), </span>
-<span id="cb19-7">        columns <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"gene"</span>],</span>
-<span id="cb19-8">        index <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> chosen_probes))</span>
-<span id="cb19-9">                   </span>
-<span id="cb19-10"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># add spatial coordinates </span></span>
-<span id="cb19-11">adata.obsm[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'spatial'</span>] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> coords.to_numpy()</span>
-<span id="cb19-12"></span>
-<span id="cb19-13"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># you can add name of slide or original file as one of unstructured annotation</span></span>
-<span id="cb19-14">adata.uns[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'name'</span>] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Pancreas"</span></span>
-<span id="cb19-15"></span>
-<span id="cb19-16"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># convert string columns to categorical data in `obs`</span></span>
-<span id="cb19-17">adata.strings_to_categoricals()</span></code></pre></div>
-</div>
-<div class="callout callout-style-default callout-tip callout-titled" title="Add additional embedding">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Add additional embedding
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>You can add additional embedding if exists. The code below assumes you have a new embedding for <code>umap</code> stored in <code>umap.csv</code> file as a data frame with rows in same order as the cell expression file.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1">adata.obsm[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'umap'</span>] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> pd.read_csv(os.path.join(dataDir, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'umap.csv'</span>)).to_numpy()</span></code></pre></div>
-</div>
-</div>
-</div>
-<p>In some case, one may want to convert a meta data column with numeric values (like numeric ID for cell clusters) to categorical data, you can do this as shown below.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># for illustration, we would convert the "fov" column here</span></span>
-<span id="cb21-2">columnName <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"fov"</span></span>
-<span id="cb21-3">adata.obs[columnName] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> pd.Categorical(adata.obs[columnName].astype(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>))</span></code></pre></div>
-</div>
-<p>You can also specific color for each categorical value via a dictionary. Most viewers based on <code>anndata</code> data structure would be able to recognize the color information stored under <code>[cell_meta_name]_colors</code> when displaying the corresponding categorical cell meta data.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># use random colors for illustration here</span></span>
-<span id="cb22-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> random</span>
-<span id="cb22-3"></span>
-<span id="cb22-4">colors_dict <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {}</span>
-<span id="cb22-5"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> catVal <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> adata.obs[columnName].cat.categories:</span>
-<span id="cb22-6">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># random RGB value</span></span>
-<span id="cb22-7">    [r, g, b] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [random.randint(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">255</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> _ <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>)]</span>
-<span id="cb22-8">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># convert to hex format</span></span>
-<span id="cb22-9">    colors_dict[catVal] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"#</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{:02x}{:02x}{:02x}</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">format</span>(r, g, b)</span>
-<span id="cb22-10"></span>
-<span id="cb22-11"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># add to `uns` slot</span></span>
-<span id="cb22-12">colorName <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_"</span>.join((columnName, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"colors"</span>))</span>
-<span id="cb22-13">adata.uns[colorName] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [colors_dict[k] <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> k <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> adata.obs[columnName].cat.categories]</span></code></pre></div>
-</div>
-<p>At this point, we have a <code>anndata</code> object that could be exported to <code>.h5ad</code> file format and pass to other python-based single-cell analysis tools, like <a href="https://scanpy.readthedocs.io/en/stable/" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank"><code>squidpy</code></a>.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Export as .h5ad file</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1">adata.write(os.path.join(dataDir, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Pancreas_basic.h5ad"</span>), compression<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"gzip"</span>)</span></code></pre></div>
-</div>
-</div>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Load existing .h5ad file</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> scanpy <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> sc</span>
-<span id="cb24-2">adata <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> sc.read(os.path.join(dataDir, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Pancreas_basic.h5ad"</span>))</span></code></pre></div>
-</div>
-</div>
-<p>Let’s visualize the distribution of some cell meta data saved in this <code>anndata</code> object.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> matplotlib.pyplot <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> plt</span>
-<span id="cb25-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> seaborn <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> sns</span>
-<span id="cb25-3"></span>
-<span id="cb25-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># plot transcripts distribution</span></span>
-<span id="cb25-5">fig, axs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> plt.subplots(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>, figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">15</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>))</span>
-<span id="cb25-6"></span>
-<span id="cb25-7">axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>].set_title(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Total RNA transcripts per cell"</span>)</span>
-<span id="cb25-8">sns.histplot(</span>
-<span id="cb25-9">    adata.obs[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"nCount_RNA"</span>],</span>
-<span id="cb25-10">    kde<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>,</span>
-<span id="cb25-11">    ax<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>],</span>
-<span id="cb25-12">)</span>
-<span id="cb25-13"></span>
-<span id="cb25-14">axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>].set_title(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Unique RNA transcripts per cell"</span>)</span>
-<span id="cb25-15">sns.histplot(</span>
-<span id="cb25-16">    adata.obs[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"nFeature_RNA"</span>],</span>
-<span id="cb25-17">    kde<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>,</span>
-<span id="cb25-18">    ax<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>],</span>
-<span id="cb25-19">)</span>
-<span id="cb25-20"></span>
-<span id="cb25-21">axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>].set_title(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Transcripts per FOV"</span>)</span>
-<span id="cb25-22">sns.histplot(</span>
-<span id="cb25-23">    adata.obs.groupby(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"fov"</span>).<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sum</span>()[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"nCount_RNA"</span>],</span>
-<span id="cb25-24">    kde<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>,</span>
-<span id="cb25-25">    ax<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>],</span>
-<span id="cb25-26">)</span></code></pre></div>
-</div>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-Pancreas-RNA-distribution.png" class="img-fluid"></p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb26" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># plot immune intensity distribution</span></span>
-<span id="cb26-2">fig, axs <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> plt.subplots(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>, figsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">15</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span>))</span>
-<span id="cb26-3"></span>
-<span id="cb26-4">axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>].set_title(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"PanCK"</span>)</span>
-<span id="cb26-5">sns.histplot(</span>
-<span id="cb26-6">    adata.obs[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Mean.PanCK"</span>],</span>
-<span id="cb26-7">    kde<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>,</span>
-<span id="cb26-8">    ax<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>],</span>
-<span id="cb26-9">)</span>
-<span id="cb26-10"></span>
-<span id="cb26-11">axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>].set_title(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CD68 &amp; CK8/18"</span>)</span>
-<span id="cb26-12">sns.histplot(</span>
-<span id="cb26-13">    adata.obs[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Mean.CD68_CK8_18"</span>],</span>
-<span id="cb26-14">    kde<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>,</span>
-<span id="cb26-15">    ax<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span>],</span>
-<span id="cb26-16">)</span>
-<span id="cb26-17"></span>
-<span id="cb26-18">axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>].set_title(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CD298 &amp; B2M"</span>)</span>
-<span id="cb26-19">sns.histplot(</span>
-<span id="cb26-20">    adata.obs[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Mean.CD298_B2M"</span>],</span>
-<span id="cb26-21">    kde<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>,</span>
-<span id="cb26-22">    ax<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>],</span>
-<span id="cb26-23">)</span>
-<span id="cb26-24"></span>
-<span id="cb26-25">axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>].set_title(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"CD45"</span>)</span>
-<span id="cb26-26">sns.histplot(</span>
-<span id="cb26-27">    adata.obs[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Mean.CD45"</span>],</span>
-<span id="cb26-28">    kde<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">False</span>,</span>
-<span id="cb26-29">    ax<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>axs[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span>],</span>
-<span id="cb26-30">)</span></code></pre></div>
-</div>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-Pancreas-Membrane-Intensity-distribution.png" class="img-fluid"> For more details on how to analyze spatial data sets using python tools, please refer to the tutorials provided by <a href="https://scanpy.readthedocs.io/en/stable/tutorials/index.html" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/index.html" target="_blank"><code>squidpy</code></a> packages.</p>
-</section>
-<section id="sec-conclusions" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Conclusions</h1>
-<p>In summary, <code>anndata</code> serves as a versatile data structure in Python-based single-cell analysis. This post outlines how to create <code>anndata</code> object in <code>.h5ad</code> file format from AtoMx™ SIP exported results, which are either a post-analysis <code>Seurat</code> object or basic data files in <code>.csv</code> format. The conversion of AtoMx™ SIP exported results into <code>.h5ad</code> file would facilitate seamless integration into Python-based single-cell analysis workflows. Leveraging Python libraries like <a href="https://scanpy.readthedocs.io/en/stable/" target="_blank"><code>scanpy</code></a> and <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank"><code>squidpy</code></a>, as well as interactive viewers such as <a href="https://cirrocumulus.readthedocs.io/en/latest/" target="_blank">Cirrocumulus</a> and <a href="https://github.com/chanzuckerberg/cellxgene" target="_blank">CELLxGENE</a> viewers, researchers can share the lightweight data objects, visualize processed data, and explore them in more avenues.</p>
-
-
-</section>
-
- ]]></description>
-  <category>how-tos</category>
-  <category>visualization</category>
-  <category>Seurat</category>
-  <category>AnnData</category>
-  <category>python</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/</guid>
-  <pubDate>Wed, 05 Jun 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/figures/Fig-mBrain-S1-cirroViewer-screenshot.png" medium="image" type="image/png" height="94" width="144"/>
-</item>
-<item>
-  <title>Vignette: Basics of CosMx Analysis in R</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="basic-cosmx-analysis-workflow" class="level1">
-<h1>Basic CosMx analysis workflow</h1>
-<section id="introduction" class="level2">
-<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>A complete demo analysis of a CosMx dataset can be found at workflow section in this post and the correspond scripts are stored under <code>_code/vignette</code> <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/vignette" target="_blank">folder</a> in this repository. It’s intended to be used as a template for other analyses to follow.</p>
-<p>We’ll be analyzing a 1000-plex dataset from melanoma samples. We begin with the files written by the AtoMx flat file export module. The full dataset we’ve used is too big to be saved on Github. To follow along, we recommend using your own data, also as output by the AtoMx flat file export module.</p>
-</section>
-<section id="file-structure" class="level2">
-<h2 class="anchored" data-anchor-id="file-structure">File structure</h2>
-<p>We’ll organize the data for this analysis as follows:</p>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/figures/folders.png" class="img-fluid"></p>
-<ul>
-<li>The “data” folder holds the exports from AtoMx</li>
-<li>“processed_data” holds data objects generated during analysis, meant to be used by later analyses.</li>
-<li>“results” holds results intended for human consumption.</li>
-</ul>
-<p>Inside the “data” folder, we’ll place a folder names “flat_files”, containing the AtoMx exports:</p>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/figures/folders2.png" class="img-fluid"></p>
-<p>And we’ll organize code as follows:</p>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/figures/folders3.png" class="img-fluid"></p>
-<ul>
-<li>Analysis scripts are numbered by the order in which they should be run. Each creates data used by the downstream scripts.</li>
-<li>Scripts are meant to be run in the directory where they lie.</li>
-<li>“utils” holds R scripts containing functions used by analyses.</li>
-</ul>
-</section>
-<section id="data-structure" class="level2">
-<h2 class="anchored" data-anchor-id="data-structure">Data structure</h2>
-<p>Our flat file exports contain the following data types:</p>
-<ul>
-<li>Raw counts</li>
-<li>Cell metadata: other attributes of cells, e.g.&nbsp;size, immunofluorescence values, tissue and FOV IDs,…</li>
-<li>Spatial locations: xy locations given in mm. <strong>Warning</strong>: studies containing multiple slides may initially have overlapping xy locations.</li>
-<li>Transcript data: for all RNA transcripts detected, location, gene ID, and cell ID. Most analyses use cell-level data, not this transcript-level data, but it can make compelling plots.</li>
-<li>Tissue images. Not used by most analyses, but useful for Figures.</li>
-</ul>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/figures/data_before.png" class="img-fluid"></p>
-<p>Our analyses will append lots of new information to this starting point, ending here:</p>
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/figures/data_after.png" class="img-fluid"></p>
-<p>New data types include:</p>
-<ul>
-<li>UMAP coordinates</li>
-<li>Data acting as new metadata columns, e.g.&nbsp;cell type assignment and spatial cluster</li>
-<li>Special results objects from analyses: cell typing, differential expression, InSituCor, …</li>
-</ul>
-</section>
-<section id="sec-workflow" class="level2">
-<h2 class="anchored" data-anchor-id="sec-workflow">Workflow</h2>
-<p>Our workflow performs the below steps:</p>
-<p>First, the fundamentals:</p>
-<ul>
-<li><a href="./assets/0.-loading-flat-files.html" target="_blank">Parse and format data export by AtoMx</a></li>
-<li><a href="./assets/1.-finessing-tissues-spatial-arrangement.html" target="_blank">Custom arranging of tissues and FOVs in space</a></li>
-<li><a href="./assets/2.-QC-and-normalization.html" target="_blank">QC and normalization</a></li>
-<li><a href="./assets/3.-dimension-reduction.html" target="_blank">Dimension reduction (PCA and UMAP)</a></li>
-<li><a href="./assets/4.-cell-typing.html" target="_blank">Cell typing</a></li>
-</ul>
-<p>Then, we go after biology:</p>
-<ul>
-<li><a href="./assets/5.-define-spatial-context.html" target="_blank">Defining cells’ spatial context</a></li>
-<li>Hypothesis-driven analyses, i.e.&nbsp;differential expression: how do cells change behavior based on their spatial context? (coming summer 2024)</li>
-<li><a href="../../posts/insitucor/index.html">Hypothesis-generating analyses: identifying spatially correlated genes with InSituCor</a></li>
-</ul>
-</section>
-<section id="general-analysis-advice" class="level2">
-<h2 class="anchored" data-anchor-id="general-analysis-advice">General analysis advice</h2>
-<ul>
-<li>For large experiments, <a href="../../posts/big-data/index.html" target="_blank">more advanced workflows</a> may be needed to avoid overwhelming your compute and/or memory.</li>
-<li>For studies across multiple flow cells, batch correction should be considered.</li>
-</ul>
-
-
-</section>
-</section>
-
- ]]></description>
-  <category>recommended</category>
-  <category>overview</category>
-  <category>quality control</category>
-  <category>normalization</category>
-  <category>cell typing</category>
-  <category>pre-processing</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/</guid>
-  <pubDate>Fri, 24 May 2024 00:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
