@@ -1,5 +1,11 @@
 # Napari-CosMx plugin change log
 
+## 0.4.17.3
+
+- Released Feb. 21st, 2025
+- Updated export-tiff package script
+- Updated protein stitch-expression package script to fit updated AtoMx SIP export format
+
 ## 0.4.17.1
 
 - Released Nov. 8th, 2024
