@@ -1,0 +1,318 @@
+---
+title: "Cell typing using metagenes and smoothing"
+author:
+  - name: Dan McGuire
+    orcid: 0009-0006-0286-9625
+    affiliations:
+      - ref: nstg
+      - ref: dan11mcguire
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+number-sections: true
+number-depth: 4
+date: "2024-06-19"
+categories:
+  - visualization
+  - cell typing
+image: figures/smooth_foxp3_thumbnail.png
+description: "immune cell typing, metagenes , smoothing, marker genes"
+draft: false
+format:
+  html: 
+    code-tools: true
+---
+
+# Introduction 
+
+
+0. Identify a set of genes expected to be expressed in the celltypes you wish to identify (i.e., based on the literature), and an 'index' gene, typically a canonical marker relatively specific to the celltype. 
+  Example:
+  
+1. Construct a 'metagene score' for each cell type by regressing the index gene against all other genes, generating a 'predicted index gene'.  
+We may define a full regression model as
+
+
+2.  
+
+1. Improving power of 'smoothing' by expanding smoothing over
+  * similar cells 
+  * correlated genes 
+  * correlated genes in similar cells
+  
+2. Predicted or posterior mean scores are clustered using a gaussian mixture model, fit to single-positive cells.
+
+  
+Marker genes are genes that are expressed primarily within a single cell type, and are often used to delineate and label clusters during cell typing in a scRNAseq analysis.
+
+With spatially-resolved transcriptomics (SRT) data, a number of factors can contribute to challenges in a cell typing analysis, as well as hinder our ability to visualize our favorite marker genes. For example, these factors may include lower sensitivity compared to scRNAseq data, background due to autoflourescence, and segmentation error.
+
+A common feedback for new SRT analysts when dealing with SRT data may be along the lines of "Why don't I see gene 'X' in a majority of cells for cell type 'Y'?".  
+
+In this post we'll discuss:
+
+
+1. Define for each cell type a list of genes that we might expect to be upregulated.
+ - These can be curated and defined by the user based on prior knowledge, literature, or external datasets.  
+ 
+ This framework is more flexible than usign a reference profile in terms of 
+ robust to platform effects or deviations in a reference profile.
+ By defining multiple upregulated genes and restricting the direction of their regression coefficients, we've implicitly imposed an assumption of positive covariance between these markers within the corresponding celltype class.
+ 
+  
+
+- Why counts of a single marker gene are not definitive of cell type
+- How to derive more useful / less noisy / "smoothed" expression of marker genes
+- How to perform fine-grained subtyping using smoothed marker genes, with T-cell subtyping as motivation
+
+# A motivating example: Noisy T-cell typing in non-small cell lung cancer tissue
+
+For example, here is a data set below consisting of non-small cell lung cancer tissues.
+Let's load it in, run some quick unrefined-cell typing using [InSituType](https://github.com/Nanostring-Biostats/InSituType?tab=readme-ov-file){target="_blank"} [@Danaher2022], and take a look at the initial results.
+
+```{r load_libraries, message=FALSE, eval = FALSE}
+library(ggplot2)
+library(ggrepel)
+library(RColorBrewer)
+library(data.table)
+
+sem <- readRDS("~/data/dan/imputation_smoothing/colondata/semsub.rds")
+
+```
+
+Have the unsupervised clusters, and just want
+```{r, eval=FALSE}
+fctbl_unsup <- 
+smiSmooth::clusterwise_foldchange_metrics(counts  = sem[["RNA"]]@counts
+                   ,metadata = sem@meta.data
+                   ,clustercol = "clusters_unsup")
+
+hm_unsup <- marker_heatmap(fctbl_unsup, extras = c("CD3D", "CD4", "FOXP3", "CD8B", "CD8A"))
+print(hm_unsup)
+
+```
+
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/hm_unsup.png")
+```
+
+
+# Example 1: Subclustering T-cells starting from unsupervised louvain
+
+Suppose we do some initial unsupervised clustering analysis that we're mostly happy with, except that some key immune cell types lack the level of resolution we want. 
+For example, here I've generated .
+
+
+# Example 2: Full, hierarchical Stagewise cell typing 
+
+
+```{r, eval=TRUE}
+tcell_markerlist <- 
+smiSmooth::make_markerslist(index_marker = list(cd4t = "CD4"
+                                                ,cd8t = "CD8B"
+                                                ,treg = "FOXP3"
+                                                )
+                            ,predictors = list(
+                              cd4t = c('CD4','CD40LG','IL2','CCR7','CXCR3','CXCR4','SELL'
+                                       ,'IL7R','CD28','STAT5B','STAT3','IKZF1','GATA3'
+                                       ,'RUNX3','FOXP1')
+                              ,cd8t = c('CD8A','CD8B','PRF1','GZMB','GZMA','GZMH','GNLY'
+                                        ,'IFNG','CCR7','SELL','CD44'
+                                        ,'LAG3','KLRD1','CXCR3','ITGA1','RUNX3')
+                              ,treg =c('FOXP3','IL2RA','CTLA4','TIGIT','LAG3','IKZF2'
+                                       ,'CCR4','CCL22','CD44','IL10','TGFB1','PDCD1'
+                                       ,'BATF','STAT3','STAT1','CD274','PDCD1LG2'
+                                       ,'EOMES','CXCR3','CXCR5','BCL6','HLA-DRA'
+                                       ,'IRF4','TOX','SELL','CD69','ITGAE','KLRG1'
+                                       ,'CD38','TNFRSF9','TNFRSF18','LRRC32','ICOS'
+                                       ,'IL1R2','IL10RA','CCR6','AHR','NRP1','MKI67'
+                                       ,'FAS','ENTPD1','TNFRSF25','ADORA2A','CD4' 
+                              )
+                            )
+                            ,use_offclass_markers_as_negative_predictors = TRUE
+                            )
+```
+
+
+The object looks like this, which is just a 
+
+```{r, eval=FALSE}
+
+
+```
+
+To facilitate easy use, this tcell_markerslist is included as a package dataset.  But don't forget that it is easy to create/modify your own lists from the literature. 
+
+The next step is to fit a model predicting the 'index marker'. We assume that our 'predictors' we specified for each celltype must have positive regression coefficients.  By specifying "use_offclass_markers_as_negative_predictors = TRUE", we further assume that predictors for **other celltypes** that we haven't listed can be used as negative predictors of our index gene.
+For example, genes like like "GZMA" and "GZMB", which are markers associated with "cd8t", will be assumed to be **negative** predictors of the other classes (cd4t and treg) where they are not listed. 
+
+We fit our models for each celltype class using the `fit_metagene_scores` function.
+This function uses 'smoothing', as well as our prior biology / assumptions about which markers are associated with each celltype to predict.
+
+The default regression model setup looks like this:
+$$Y = WY\eta  + WX\beta + X\gamma + \epsilon $$
+where
+$Y:=$ pearson residuals of the index marker (our response variable)
+$X:=$ (totalcount-normalized) matrix of predictor genes
+$W:=$ a cells $\times$ cells neighborhood matrix, denoting cells with similar expression profiles. 
+
+$\eta$, $\beta$, and $\gamma$ are the regression coefficients associated with the 'neighbor-averaged' index gene, 'neighbor-averaged' predictor genes, and predictor genes within the cell respectively. 
+
+Non-negative least squares is used estimate these models, and enforce regression coefficents to be either positive or negative depending on our assumptions we encoded in our `markerslist` object.
+
+Here I call the `fit_metagene_scores` function to estimate these models for cells corresponding to the unsupervised cluster I've identified to be 'tcells'.  
+For the cells $\times$ cells matrix, I've used the nearest neighbor matrix in my Seurat object.  This is the same graph that was used to generate my UMAP and my unsupervised louvain clusters.
+```{r, eval=FALSE}
+
+tcell_ids <- sem@meta.data[sem@meta.data$clusters_unsup==6,"cell_ID"]
+metagenes_t <- 
+  fit_metagene_scores(markerslist = tcell_markerlist
+                      ,counts_matrix = Matrix::t(sem[["RNA"]]@counts[,tcell_ids])
+                      ,adjacency_matrix = as(sem@graphs$umapgrph, "CsparseMatrix")[tcell_ids,tcell_ids]
+  )
+```
+
+We can get a better understanding of the model output by looking at a few diagnostics plots.  In the below, we see that 
+
+```{r, eval=FALSE}
+
+coefplots <- metagene_coefficients_plot(metagenes_t)
+coefplots <- lapply(coefplots, function(x){x +   theme(text=element_text(face='bold',size=18))
+  })
+cowplot::plot_grid(plotlist = coefplots, nrow = 1)
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/coefplots_tcells.png")
+```
+A pairsplot can show us how well the metagene scores we've created are distinct from each other.  Ideally, if our cell type classes are mutually exclusive, we'd want to not see too many cells which are 'positive' for multiple cell types at the same time.
+
+```{r, eval=FALSE}
+metagene_pairsplot(metagenes_t, var= "ypost")
+
+```
+
+
+Finally, we will cluster these scores to infer the tcell types.
+The function below runs a gaussian mixture model to cluster the metagene scores.
+Each metagene corresponds to one celltype component, and we expect the scores to be **positive** for cells corresponding to that celltype, and lower (in general) for other celltypes.
+
+
+There's a bit of magic here which allows us to impose these constraints while fitting our mixture model and ensure that these mixture model components maintain separation.
+The defaults should generally work well
+
+```{r, eval=FALSE}
+
+
+model_t <- 
+cluster_metagenes(metagenes = metagenes_t
+                  ,to_model = "ypost"
+                  )
+```
+
+I have 
+```{r,eval=FALSE}
+model_t$post_probs[,celltype:=best_class]
+model_t$post_probs[best_score < 0.5,celltype:="tcell"]
+
+```
+Now, I'll take a look at the marker genes for these cells
+
+
+
+This resulting `metagenes_t` object contains model-based predictions and posterior averages for our index genes.
+
+We can take a look at the regression coefficients that were estimated in the models for each metagene.
+
+
+```{r, eval=FALSE}
+
+fc_t <- 
+clusterwise_fc_ovr(normed = Matrix::t(normed)
+                   ,metainfo = model_t$post_probs
+                   ,clustercol = "celltype"
+                   )
+
+met <- 
+merge(data.table(sem@meta.data), model_t$post_probs[,.(cell_ID, celltype, best_score)]
+      ,by="cell_ID", all.x=TRUE)
+met[is.na(celltype),celltype:=clusters_unsup]
+
+
+fc_l1 <- 
+clusterwise_fc_ovr(normed = Matrix::t(normed)
+                   ,metainfo = met
+                   ,clustercol = "celltype"
+                   )
+
+hm_l1 <- marker_hm(fc_l1, extras = c("CD3D", "CD4", "FOXP3", "CD8A", "CD8B"))
+
+fc_t[cluster_pct > 0.05][order(-fc),head(.SD, 1),by=.(cluster)]
+
+metagene_pairsplot(metagenes_t, var= "ypost")
+
+
+fclist_thresh <- 
+  lapply(c(0.5, 0.7, 0.8, 0.9, 0.95, 0.99, 0.999), function(thresh){
+    incl_cells_thresh <- met[(best_score > thresh) | is.na(best_score)][["cell_ID"]]
+    fctbl_thresh <- 
+      clusterwise_fc_ovr(normed = Matrix::t(normed[incl_cells_thresh,unique(
+        c("CD3D", "CD3E", "CD4", tcell_markerlist$cd4t$predictors)
+      )
+      ])
+      ,metainfo = met[cell_ID %in% incl_cells_thresh]
+      ,clustercol = "celltype"
+      )[,thresh:=thresh]
+    return(fct = fctbl_thresh)
+  })
+
+fcthresh <- rbindlist(fclist_thresh, use.names=TRUE,fill=TRUE)
+#fca[,scaled_fc:=NULL]
+
+nthresh <- fcthresh[,uniqueN(thresh)]
+threshcls <- (colorRampPalette(brewer.pal(9, "Reds"))(nthresh))
+names(threshcls) <- fcthresh[,sort(unique(thresh))]
+
+fcthresh[,thresh:=factor(thresh, levels=sort(unique(thresh)))]
+ggplot(fcthresh[grep("CD3[DE]|CD8|FOXP3|CCL5|GZMA|GNLY|TIGIT|TNFRSF18", gene)][grep("t",cluster)]
+       ,aes(y = gene, fill=thresh, x = cluster_pct)) + 
+  theme_bw() + 
+  scale_fill_manual(values = threshcls, guide=guide_legend(reverse=TRUE)) + 
+  scale_x_continuous(n.breaks = 14) + 
+  geom_bar(stat='identity', position=position_dodge2(),color='black',lwd=0.1) + 
+  facet_wrap(~cluster)
+pairsplot <- metagene_pairsplot(metagenes_t, var= "ypost", colorvar = "celltype", obs = met[,.(cell_ID, celltype)])
+print(pairsplot)
+
+
+
+
+```
+
+
+
+
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/umap_clust_imm.png")
+```
+
+
+# Conclusion
+
+In this vignette, I discussed a method that can be used to get an **expected** expression of a marker gene in a cell, given that cell's nearest neighbors in UMAP space, along with potential applications to 
+visualization and cell type refinement.  
+
+
