@@ -41,7 +41,7 @@ We'll use a 6k-plex colon cancer dataset to work through two common cell typing 
 
 To set the stage, we can describe the basic framework we'll use for both scenarios in a few basic steps (we'll describe each of these steps in more detail throughout our examples.)
 
-1. First, for each cell type, we define a set of genes we expect might to be 'marker genes' or highly expressed based on prior data or biology (either the literature, a reference dataset, or some combination of both).
+1. First, for each cell type, we define a set of genes we expect may be 'marker genes' or highly expressed based on prior data or biology (either the literature, a reference dataset, or some combination of both).
 2. Next, we construct metagene scores from our data for each cell type based on the genes specified in (1).
 3. Finally, we model the metagene scores, where the model estimates a posterior probability that each cell belongs to any of the possible cell types.
 
@@ -869,7 +869,7 @@ model_l2_v2 <-
 
 
 This ends up looking a lot better, both visually in terms of the marker heatmap, as well as the actual percentages and fold change of CD3 expression in `mast` and `tcell`.
-```{r}
+```{r,eval=FALSE}
 #| code-fold: true
 
 
@@ -973,55 +973,20 @@ knitr::include_graphics("./figures/xyplot_celltypes.png")
 
 
 
-
 # Conclusion
 
-The basic framework we'll used for both scenarios can be described in a few basic steps (we can mention these now, and discuss more throughout our examples.)
+We've discussed a method for cell typing that uses predefined sets of marker genes to build cell type specific metagene scores, which are probabilistically clustered into cell types.
 
-1. Defining sets of genes we expect might be expressed for each cell type based on prior data or biology (literature or a reference dataset).
-  * Can be defined based on a reference dataset, or literature.  
-  * Expect that some  (but not all) 
-2. Constructing metagene scores for that celltype based on the genes specified in (1).
-3. Clustering metagene scores from step into and classifying cells.
+Using a predefined set of marker genes has several advantages.  For one, this allows users to prespecify the network of genes which are expected to have positive covariance within the cell type, and restricts any undesired influence of non-informative or noisy genes.  Because no assumption is made regarding the average expression or level of covariance between any pair of genes, we suspect that in some cases this approach may be more flexible and robust in the presence of batch effects or platform effects compared to using pre-trained models, data transfer, or reference profiles which may have been trained using different sample conditions or technologies.
 
+The NNLS regression framework for estimating celltype metagenes allows for improved prediction power by incorporating information from similar cells through an adjacency network. By restricting the direction of the regression coefficients, we've implicitly imposed an assumption of positive covariance between these markers within the corresponding cell type class.  Sign constraints have been shown to be as effective in some cases as explicit regularization.  
 
+We use a mixture of overfitted multivariate gaussian mixture models for probabilistic cell type classification.  This approach is effectively a non-parametric mixture model, where we assume that the distribution of metagene scores for each cell type can be a approximated by a 'large-enough' mixture of multivariate gaussians. The simple selection of anchor cells based on score positivity, and ability to fine tune cell typing by controlling behavior of double positivity should allow for easy user control and flexibility. 
 
+There are several future improvements for this method we hope to work on.
+For example, allowing the use of multiple 'index genes' for each cell type; in this case the cell type metagene score is a composite score of multiple imputed 'index genes'.  
+Simultaneous estimation of metagene scores and clustering (perhaps through a regression-based mixture model) might enhance the power of metagene scores and classification by optimizing the cell allocations to the correct cluster simultaneously during model-fitting.  Exploring other framworks outside of NNLS regression could potentially capture more flexible model structures with interaction and non-linearity.  
+Extension to a semi-supervised framework where cell types where marker genes are unknown a priori would also be useful.
 
-1. Ability to flexibly encode our assumptions based on prior knowledge of the biology and the literature.
-2. Make cell type classification robust to common challenges faced with SRT data.
-  -- variables producing metagene scores act as 'instruments'.  In general uncorrelated with segmentation error in a particular marker gene
-  -- flexibly model cells which are double-positive for multiple categories and re-assign them 
-
-
-
-
-
-
-1. Ability to flexibly encode our assumptions based on prior knowledge of the biology and the literature.
-2. Make cell type classification robust to common challenges faced with SRT data.
-  -- variables producing metagene scores act as 'instruments'.  In general uncorrelated with segmentation error in a particular marker gene
-  -- flexibly model cells which are double-positive for multiple categories and re-assign them 
-
-
-0. Identify a set of genes expected to be expressed in the celltypes you wish to identify (i.e., based on the literature), and an 'index' gene, typically a canonical marker relatively specific to the celltype. 
-  Example:
-  
-1. Construct a 'metagene score' for each cell type by regressing the index gene against all other genes, generating a 'predicted index gene'.  
-We may define a full regression model as
-
-
-  
-Marker genes are genes that are expressed primarily within a single cell type, and are often used to delineate and label clusters during cell typing in a scRNAseq analysis.
-
-
-
-
-1. Define for each cell type a list of genes that we might expect to be upregulated.
- - These can be curated and defined by the user based on prior knowledge, literature, or external datasets.  
- 
- This framework is more flexible than usign a reference profile in terms of 
- robust to platform effects or deviations in a reference profile.
- By defining multiple upregulated genes and restricting the direction of their regression coefficients, we've implicitly imposed an assumption of positive covariance between these markers within the corresponding celltype class.
- 
-  
+We've implemented the tools presented here in the R package [XX](link).
 
