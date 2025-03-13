@@ -57,7 +57,7 @@ library(ggplot2)
 library(ggrepel)
 library(RColorBrewer)
 library(data.table)
-devtools::load_all("~/data/dan/imputation_smoothing/smiSmooth")
+library(smiSmooth)
 ```
 ```{r , message=FALSE, eval = FALSE}
 sem <- readRDS("colon_seurat.rds")
@@ -1047,9 +1047,9 @@ We've discussed a method for cell typing that uses predefined sets of marker gen
 
 Using a predefined set of marker genes has several advantages.  For one, this allows users to prespecify the network of genes which are expected to have positive covariance within the cell type, and restricts any undesired influence of non-informative or noisy genes.  Because no assumption is made regarding the average expression or level of covariance between any pair of genes, we suspect that in some cases this approach may be more flexible and robust in the presence of batch effects or platform effects compared to using pre-trained models, data transfer, or reference profiles which may have been trained using different sample conditions or technologies.
 
-The NNLS regression framework for estimating celltype metagenes allows for improved prediction power by incorporating information from similar cells through an adjacency network. By restricting the direction of the regression coefficients, we've implicitly imposed an assumption of positive covariance between these markers within the corresponding cell type class.  Sign constraints have been shown to be as effective in some cases as explicit regularization.  
+The NNLS regression framework for estimating celltype metagenes allows for improved prediction power by incorporating information from similar cells through an adjacency network. By restricting the direction of the regression coefficients, we've implicitly imposed an assumption of positive covariance between these markers within the corresponding cell type class.  Sign constraints have been shown to be as effective in some cases as explicit regularization [@nnlsref].  
 
-We use a mixture of overfitted multivariate gaussian mixture models for probabilistic cell type classification.  This approach is effectively a non-parametric mixture model, where we assume that the distribution of metagene scores for each cell type can be a approximated by a 'large-enough' mixture of multivariate gaussians. The simple selection of anchor cells based on score positivity, and ability to fine tune cell typing by controlling behavior of double positivity should allow for easy user control and flexibility. 
+We use a mixture of overfitted multivariate gaussian mixture models for probabilistic cell type classification.  This approach is effectively a non-parametric mixture model, where we assume that the distribution of metagene scores for each cell type can be a approximated by a 'large-enough' mixture of multivariate gaussians [@aragam2020identifiability]. The simple selection of anchor cells based on score positivity, and ability to fine tune cell typing by controlling behavior of double positivity should allow for easy user control and flexibility. 
 
 There are several future improvements for this method we hope to work on.
 For example, allowing the use of multiple 'index genes' for each cell type; in this case the cell type metagene score is a composite score of multiple imputed 'index genes'.  
