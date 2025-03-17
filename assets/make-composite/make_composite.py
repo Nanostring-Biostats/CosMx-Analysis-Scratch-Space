@@ -5,29 +5,29 @@
 """
 Application: make_composite.py
 Author: Vikram Kohli, PSS
-Version: 1.2.2
+Updater: Jacob Hanimann
+Version: 1.2.4
 
 Description:
-The script creates composite images from the layered morphology 2D images.
-Layered images are extracted from the 2D morphology tif files and written in a file format selected by the user.
-The extracted images are converted to 8bit, and composite images are written from these 8bit images.
+This script creates composite images from layered morphology 2D images.
+It extracts layers from TIFF files, converts them to 8-bit (and autocontrasts them),
+and generates screen composite images.
+The output folders include the chosen file format as a suffix so that processing can be
+stopped and later resumed; existing (and valid) files are skipped.
 
-User inputs: 
-clipping - Histogram clipping percentage. This value is the percentage of the histogram to clip on the left
-and right side. The effect changes the contrast of the image. Higher % produces more contrast.
-
-user_format - File format to be written. Options are jpg, png, and tif.
+User inputs:
+    clipping    - Histogram clipping percentage (adjusts image contrast).
+    user_format - Output image format (allowed: jpg, png, tif).
 
 Output:
-raw_folder - Extracted images from the layered 2D morphology images
-bit_reduced_folder - The images in the raw_folder are converted to 8bit
-bit_reduced_autocontrast - Imanges in the bit_reduced_folder are autocontrasted based on clipping parameter.
-composite_folder - Composite image from the files in the bit_reduced_folder. The composite is a screen composite.
-composite_autocontrast_folder - Composite images autocontrasted based on the clipping parameter.
-
-
+    raw_<format>                   - Extracted images from the TIFF files.
+    8bit_<format>                  - 8-bit converted images.
+    8bit_autocontrast_<format>     - Autocontrasted 8-bit images.
+    composite_<format>             - Composite images.
+    composite_autocontrast_<format> - Autocontrasted composite images.
 """
-#Loading required libraries
+
+# Loading required libraries
 from PIL import Image, ImageSequence, ImageOps, ImageChops
 import numpy as np
 import glob
@@ -35,233 +35,251 @@ import os
 import sys
 import re
 import shutil
-from os import name
 from time import perf_counter
+import concurrent.futures
 
-#Allowed image formats
-image_formats = ['jpg', 'png', 'tif']
-
-#The list of ouptut folders
-raw_folder = 'raw'
-bit_reduced_folder = '8bit'
-bit_reduced_autocontrast_folder = '8bit_autocontrast'
-composite_autocontrast_folder = 'composite_autocontrast'
-composite_folder = 'composite'
-
-#Composite color scheme. Color are listed in order of channel number, from channel 0 to channel 4.
-colors = ['cyan', 'red','yellow', 'blue', 'magenta']
-#colors = ['green', 'yellow', 'gray', 'red', 'blue']
-
-#Morphology 2D images have a particular naming format. A regex pattern match is performed to select only those
-#images that match the format. 
-pattern = r"([\w]+_[\w]+_[\w]+_[\w]+_[\w]+_[\w]+_[F]+[\d]*)"
-regex = re.compile(pattern, flags = re.IGNORECASE)
-
-#Lossless file compression value. Higher values produce smaller files at the expensive of increased script
-#execution time. The set value is a compromise between file size and execution time. 
-compress_value = 3
+# Allowed image formats and constants
+IMAGE_FORMATS = ['jpg', 'png', 'tif']
+FOLDER_NAMES = {
+    "raw": "raw",
+    "8bit": "8bit",
+    "8bit_autocontrast": "8bit_autocontrast",
+    "composite": "composite",
+    "composite_autocontrast": "composite_autocontrast"
+}
+COLORS = ['cyan', 'red','yellow', 'blue', 'magenta'] # Composite color scheme (channel order)
+# COLORS = ['green', 'yellow', 'gray', 'red', 'blue'] 
+PATTERN = r"([\w]+_[\w]+_[\w]+_[\w]+_[\w]+_[\w]+_[F]+[\d]*)"
+REGEX = re.compile(PATTERN, flags=re.IGNORECASE)
+COMPRESS_VALUE = 3  # Lossless file compression value
 
 class ArgumentException(Exception):
-    
-    '''Exception class for handling argument errors. The exception is raised when invalid argument types
-       are found. '''
-       
-    def __init__(self, message):
-        self.message = message
-        super().__init__(message)
+    """Exception class for handling argument errors."""
+    pass
 
-class FolderException(Exception):
-    
-    '''Exception class for handling folder exceptions. The exception is raised when folders are already present.'''
-    
-    def __init__(self, message):
-        self.message = message
-        super().__init__(message)
-        
-def check_arguments(image_formats):
-    
-    '''Checks user input values. ValueError is raised if clipping_input is not of int or float type.
-       Argument excpetion raised if the user_format is not of jpg, png, or tif type. The script terminates
-       on ValueError or raised argument exception'''
-       
-    clipping_input = input('\nPlease specify a clipping percentage as an integer or float: ').strip()
-    
+def check_arguments():
+    """Prompt the user for clipping percentage and output format."""
+    clipping_input = input('Please specify a clipping percentage (integer or float): ').strip()
     try:
-        clipping_input = float(clipping_input)
+        clipping = float(clipping_input)
     except ValueError:
-        print('Value Error: clipping value must be of type integer or float and not null...Exiting')
+        print('Error: Clipping value must be a number. Exiting.')
         sys.exit(1)
     
-    user_format = input('\nPlease specify one of the allowed image format types [jpg, png, tif]:  ' ).lower().strip()
-       
-    if user_format not in image_formats:
-        message = '\n\nImage format type error - Allowed formats include: jpg, png, tif...Exiting'
-        raise ArgumentException(message)
-        sys.exit(1)    
+    user_format = input('Please specify one of the allowed image format types [jpg, png, tif]: ').lower().strip()
+    if user_format not in IMAGE_FORMATS:
+        raise ArgumentException('Error: Allowed formats include: jpg, png, tif. Exiting.')
     
-    return (clipping_input, user_format)
+    return clipping, user_format
 
-def FoldersCheckAndCreate():
+def create_folders(base_dir, user_format):
+    """
+    Create the necessary output folders with the file format as a suffix.
+    For example, if user_format is 'jpg', folders will be 'raw_jpg', '8bit_jpg', etc.
+    """
+    updated_folder_names = { key: f"{folder}_{user_format}" for key, folder in FOLDER_NAMES.items() }
+    paths = {key: os.path.join(base_dir, folder) for key, folder in updated_folder_names.items()}
+    for path in paths.values():
+        os.makedirs(path, exist_ok=True)
+    print("Folders are ready:", ", ".join(paths.values()))
+    return paths
+
+def check_tif_integrity(filepath):
+    """Verify the integrity of a TIFF file by iterating through its frames."""
+    try:
+        with Image.open(filepath) as img:
+            for _ in ImageSequence.Iterator(img):
+                pass
+        return True
+    except Exception as e:
+        print(f"WARNING: Corrupted TIFF detected: {filepath}: {e}")
+        return False
+
+def check_image_integrity(filepath):
+    """Verify the integrity of an image file by attempting to open it."""
+    try:
+        with Image.open(filepath) as img:
+            img.verify()
+        return True
+    except Exception as e:
+        print(f"WARNING: Corrupted image detected: {filepath}: {e}")
+        return False
+
+def file_exists_and_valid(path):
+    """Return True if file exists and is not corrupted."""
+    return os.path.exists(path) and check_image_integrity(path)
+
+def process_tiff_file(image_file, raw_folder, user_format):
+    """
+    Extract image layers from a TIFF file if its filename matches the expected pattern.
+    For each channel, skip processing if the expected output file already exists and is valid.
+    """
+    base_name = os.path.splitext(os.path.basename(image_file))[0]
+    if not REGEX.match(base_name):
+        return 0  # Skip file if filename does not match the pattern
     
-    ''' Function creates the output folders. If the folders already exist an exception is raised. 
-        OSError is raised if the folders cannot be created. The script terminates on raised exceptions.'''
-    
-    if os.path.exists(raw_folder):
-        message = '\nRaw folder already exists...Exiting'
-        raise FolderException(message)
-        sys.exit(1)
-    elif os.path.exists(bit_reduced_folder):
-        message = '\n8bit folder already exits...Exiting'
-        raise FolderException(message)
-        sys.exit(1)
-    elif os.path.exists(bit_reduced_autocontrast_folder):
-        message = '\n8bit autocontrast folder already exists...Exiting'
-        sys.exit(1)
-    elif os.path.exists(composite_autocontrast_folder):
-        message = '\nComposite autocontrast folder already exitst...Exiting'
-        raise FolderException(message)
-        sys.exit(1)
-    elif os.path.exists(composite_folder):
-        message = '\nComposite folder already exitst'
-        raise FolderException(message)
-        sys.exit(1)
+    if not check_tif_integrity(image_file):
+        print(f"Skipping corrupted TIFF file: {image_file}")
+        return 1  # Count as corrupted
+
+    fov_num = base_name.split('_')[-1]
+    try:
+        with Image.open(image_file) as image:
+            for channel, layer in enumerate(ImageSequence.Iterator(image)):
+                output_filename = f"{fov_num}_ch{channel}_raw.{user_format}"
+                output_path = os.path.join(raw_folder, output_filename)
+                if file_exists_and_valid(output_path):
+                    continue  # Skip if already processed and valid
+                if user_format == 'jpg':
+                    layer.point(lambda value: value * (1. / 256)).convert('L').save(output_path, compress_type=COMPRESS_VALUE)
+                else:
+                    layer.save(output_path, compress_type=COMPRESS_VALUE)
+    except Exception as e:
+        print(f"Error processing file {image_file}: {e}")
+    return 0
+
+def force_8bit(image_obj):
+    """Convert an image to 8-bit using numpy for fast vectorized operations."""
+    array = np.array(image_obj)
+    max_val = array.max()
+    if max_val == 0:
+        reduced_bit = array * 255.0
     else:
-        folder_list = ['raw', '8bit', '8bit_autocontrast', 'composite_autocontrast', 'composite']
-        try:
-            for folder in folder_list:
-                os.mkdir(folder)
-            print('Folders successfully created!')
-        except OSError:
-            print('Issues creating one or more folders...Exiting')
-            sys.exit(1)
-                      
+        reduced_bit = (array / max_val) * 255.0
+    return Image.fromarray(reduced_bit.astype('uint8'))
+
+def convert_8bit_worker(raw_image_file, user_format, clipping, paths):
+    """
+    Convert a raw extracted image to 8-bit and generate an autocontrasted version.
+    Skip conversion if output files exist and are valid.
+    """
+    try:
+        base_name = os.path.basename(raw_image_file)
+        name_8bit = base_name.replace('_raw', '_8bit')
+        name_autocontrast = base_name.replace('_raw', '_8bit_autocontrast')
+        bit_path = os.path.join(paths['8bit'], name_8bit)
+        auto_path = os.path.join(paths['8bit_autocontrast'], name_autocontrast)
         
-def layer_extraction(image, fov_num, current_dir, raw_folder, user_format):
-    
-    '''Function extracts the layers from the 2D morphology tif files and writes the files to the raw folder.
-       If the user_fomrat is jpg, the extracted layers are converted to 8bit before saving.'''
-    
-    os.chdir(raw_folder)
-  
-    if user_format == 'jpg':       
-        for channel, layer in enumerate(ImageSequence.Iterator(image)):           
-            layer.point(lambda value: value*(1./256)).convert('L').save(f'{fov_num}_ch{channel}_raw.{user_format}', compress_type = compress_value)
-        os.chdir(current_dir)
-    else:    
-        for channel, layer in enumerate(ImageSequence.Iterator(image)):
-            layer.save(f'{fov_num}_ch{channel}_raw.{user_format}', compress_type = compress_value)
-        os.chdir(current_dir)
-
-
-def force_8bit(image_file):
-    
-    '''The function converts the iamge file to 8bit. If the user_format is jpg, this function is skipped.
-       Numpy is used for fast vectorization. '''
-       
-    array = np.array(image_file)
-    if array.max() == 0:
-        reduced_bit = (array / 1.0)*255
-    else:
-        reduced_bit = (array / array.max())*255
+        if file_exists_and_valid(bit_path) and file_exists_and_valid(auto_path):
+            return
         
-    img = Image.fromarray(reduced_bit.astype('int8'))
-    return img
+        if user_format == 'jpg':
+            shutil.copy2(raw_image_file, bit_path)
+            with Image.open(raw_image_file) as image:
+                autocontrasted = ImageOps.autocontrast(image, cutoff=clipping)
+                autocontrasted.save(auto_path, compress_type=COMPRESS_VALUE)
+        else:
+            with Image.open(raw_image_file) as image:
+                img8 = force_8bit(image).convert('L')
+                img8.save(bit_path, compress_type=COMPRESS_VALUE)
+                autocontrasted = ImageOps.autocontrast(img8, cutoff=clipping)
+                autocontrasted.save(auto_path, compress_type=COMPRESS_VALUE)
+    except Exception as e:
+        print(f"Error converting {raw_image_file}: {e}")
 
+def write_composite(image_files, colors):
+    """
+    Create a screen composite image from a list of image files using colorization.
+    Colors are applied in reverse order.
+    """
+    try:
+        out = Image.open(image_files[-1])
+        out = ImageOps.colorize(out, black='black', white=colors[-1])
+        for image_file, color in zip(image_files[::-1][1:], colors[::-1][1:]):
+            img = Image.open(image_file)
+            img = ImageOps.colorize(img, black='black', white=color)
+            out = ImageChops.screen(out, img)
+        return out
+    except Exception as e:
+        print(f"Error creating composite: {e}")
+        return None
 
-def write_composite(image_files, colors):   
-    
-    '''Fucntion creates a screen composite image with colors specified by the colors list variable.'''
-    
-    out = image_files[-1]
-    out = Image.open(out)
-    img_color = colors[-1]
-    out = ImageOps.colorize(out, black = 'black', white = img_color)
-    for image_file, color in zip(image_files[::-1][1:], colors[::-1][1:]):
-        img = Image.open(image_file)
-        img = ImageOps.colorize(img, black = 'black', white = color)
-        out = ImageChops.screen(out, img)
-    return out
+def extract_channel(filename):
+    """
+    Extract the channel number from a filename.
+    Assumes filenames like "F123_ch0_8bit.jpg".
+    Returns an integer channel number or -1 if not found.
+    """
+    match = re.search(r'_ch(\d+)_', filename)
+    return int(match.group(1)) if match else -1
 
-
-
-if __name__ == '__main__':
-    
-    if name == 'nt':
-        os.system('cls') #Windows only
-    else:
-        os.system('clear') #Posix only
+def composite_worker(fov, user_format, paths, colors, clipping):
+    """
+    Generate composite images for a given field-of-view (fov) by processing the 8-bit images.
+    Skip composite generation if output files already exist and are valid.
+    """
+    try:
+        comp_filename = f"{fov}_composite.{user_format}"
+        auto_comp_filename = f"{fov}_composite_autocontrast.{user_format}"
+        comp_path = os.path.join(paths['composite'], comp_filename)
+        auto_comp_path = os.path.join(paths['composite_autocontrast'], auto_comp_filename)
         
-    current_dir = os.getcwd()
+        if file_exists_and_valid(comp_path) and file_exists_and_valid(auto_comp_path):
+            return
+        
+        search_pattern = os.path.join(paths['8bit'], f"{fov}_*.{user_format}")
+        # Sort the image files based on the channel number extracted from the filename.
+        image_files = sorted(glob.glob(search_pattern), key=extract_channel)
+        if not image_files:
+            return
+        composite_img = write_composite(image_files, colors)
+        if composite_img is None:
+            return
+        composite_img.save(comp_path, compress_type=COMPRESS_VALUE)
+        auto_comp = ImageOps.autocontrast(composite_img, cutoff=clipping)
+        auto_comp.save(auto_comp_path, compress_type=COMPRESS_VALUE)
+    except Exception as e:
+        print(f"Error in composite_worker for {fov}: {e}")
+
+def main():
+    # Clear the screen (optional)
+    os.system('cls' if os.name == 'nt' else 'clear')
     
+    base_dir = os.getcwd()
     print('********************************')
     print('   Composite script started     ')
     print('********************************\n')
-    clipping, user_format = check_arguments(image_formats) #Request the clipping and file format from the user
-    print(f'\nSetting the clipping value for autocontrast to {clipping}% and the export format to {user_format}')
-    print('\nChecking for existing folders and creating the necessary folders..')
     
-    FoldersCheckAndCreate()    #Check if the image folders exist. If not create the folders.
-         
-    start = perf_counter() #Used in calaculating the script exectution time. 
+    try:
+        clipping, user_format = check_arguments()
+    except ArgumentException as e:
+        print(e)
+        sys.exit(1)
     
+    print(f'\nClipping value: {clipping}% and export format: {user_format}')
+    print('\nPreparing necessary folders...')
+    paths = create_folders(base_dir, user_format)
     
-    print(f'\nPlease wait: Processing the files in {current_dir}')
+    start_time = perf_counter()
+    print(f'\nProcessing TIFF files in {base_dir}...')
     
-    #Loop through all images that match the regex mattern and extract images from the layered 2D morphology files
-    print(f'\n...Extracting {user_format} files (raw) from layered 2D morphology image files')   
-    for image_file in glob.glob('*.tif') + glob.glob('*.TIF'):
-        if regex.match(image_file):
-            fov_num = image_file.split('_')[-1].replace('.TIF','')
-            image = Image.open(image_file)
-            layer_extraction(image, fov_num, current_dir, raw_folder, user_format) #Calls the function to extract the layered images from the 2D morphology tif files.
-         
-    #Convert images to 8bit. If the user_format is jpg, conversion is skipped and the files are copied to the 8bit folder        
-    print(f'\n...Converting raw files to 8bit of type {user_format} and creating 8bit autocontrast files')  
-    if user_format == 'jpg':      
-        print(f'** {user_format.title()} files already in 8bit format...copying files to 8bit folder **')
-        os.chdir(raw_folder)
-        jpg_files = [files for files in glob.glob('*.' + user_format)]
-        
-        #Copy jpg files in raw_folder to the bit_reduced folder
-        for jpg in jpg_files:
-            shutil.copy2(os.path.join(os.getcwd(),jpg), os.path.join(current_dir, bit_reduced_folder))
-        os.chdir(os.path.join(current_dir, bit_reduced_folder))
-        
-        #Write autocontrasted 8bit image files
-        for image_file in glob.glob('*.' + user_format):
-             image = Image.open(image_file)
-             os.chdir(os.path.join(current_dir, bit_reduced_autocontrast_folder))
-             ImageOps.autocontrast(image, cutoff = clipping, ignore = None, preserve_tone = False).save(f"{image_file.replace('_raw', '_8bit_autocontrast')}", compress_type = compress_value)
-             os.chdir(os.path.join(current_dir, raw_folder))            
-        os.chdir(current_dir)
+    tif_files = glob.glob('*.tif') + glob.glob('*.TIF')
+    corrupted_total = 0
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(process_tiff_file, tif, paths['raw'], user_format)
+                   for tif in tif_files]
+        for future in concurrent.futures.as_completed(futures):
+            corrupted_total += future.result()
+    if corrupted_total > 0:
+        print(f"\nTotal corrupted TIFF files skipped: {corrupted_total}")
     
-    else:    #If user_format is not jpg, convert the images to 8bit and write autocontrast 8bit files.
-        os.chdir(raw_folder)
-        for image_file in glob.glob('*.' + user_format):
-            img = Image.open(image_file)
-            img = force_8bit(img).convert('L') #Calls the function to convert images to 8bit.
-            os.chdir(os.path.join(current_dir, bit_reduced_folder))
-            img.save(f"{image_file.replace('_raw', '_8bit')}", compress_type = compress_value)          
-            os.chdir(os.path.join(current_dir, bit_reduced_autocontrast_folder))
-            ImageOps.autocontrast(img, cutoff = clipping, ignore = None, preserve_tone = False).save(f"{image_file.replace('_raw', '_8bit_autocontrast')}", compress_type = compress_value)           
-            os.chdir(os.path.join(current_dir, raw_folder))
-        os.chdir(current_dir)
+    print('\nConverting raw files to 8-bit and creating autocontrasted images...')
+    raw_files = glob.glob(os.path.join(paths['raw'], f"*_raw.{user_format}"))
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(convert_8bit_worker, raw_file, user_format, clipping, paths)
+                   for raw_file in raw_files]
+        concurrent.futures.wait(futures)
     
-    #Write the composite and autocontrast composite images.
-    print(f'\n...Writing composite and composite autocontrast images as {user_format}')           
-    os.chdir(bit_reduced_folder)
-    fov_num = [fov.split('_')[0] for fov in glob.glob('*.' + user_format)]
-    fov_num = list(set(fov_num))
-    for fov in fov_num:
-        image_files = [image_file for image_file in glob.glob(fov + '*')]
-        composite_image = write_composite(image_files, colors) #Calls the function to create composite images.
-        os.chdir(os.path.join(current_dir, composite_folder))
-        composite_image.save(f'{fov}_composite.' + user_format, compress_type = compress_value)
-        os.chdir(os.path.join(current_dir, composite_autocontrast_folder))
-        ImageOps.autocontrast(composite_image, cutoff = clipping, ignore = None, preserve_tone = False ).save(f'{fov}_composite_autocontrast.' + user_format, compress_type = compress_value)
-        os.chdir(os.path.join(current_dir, bit_reduced_folder))
-               
-    end = perf_counter() #Used in calcualting script execution time.
-       
-    print(f'\nFinished. Total run time = {int(end - start)} sec')
+    print('\nCreating composite images...')
+    bit_files = glob.glob(os.path.join(paths['8bit'], f"*.{user_format}"))
+    fov_set = {os.path.basename(bf).split('_')[0] for bf in bit_files}
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(composite_worker, fov, user_format, paths, COLORS, clipping)
+                   for fov in fov_set]
+        concurrent.futures.wait(futures)
+    
+    end_time = perf_counter()
+    print(f'\nFinished. Total run time: {int(end_time - start_time)} sec')
 
+if __name__ == '__main__':
+    main()
