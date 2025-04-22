@@ -81,7 +81,7 @@ sem <- Seurat::SetAssayData(sem, layer = "data", new.data = Matrix::t(normed))
 ```
 
 ```{r}
-#| eval: true
+#| eval: false
 #| echo: false
 
 devtools::load_all("~/data/dan/imputation_smoothing/smiSmooth", export_all = FALSE)
@@ -938,28 +938,6 @@ knitr::include_graphics("./figures/xyplot_celltypes.png")
 
 
 
-
-```{r}
-#| eval: false
-#| echo: false
-
-
-sem <- Seurat::AddMetaData(sem, metadata = data.frame(immune_typing$post_probs$l1[,.(celltype_granular)], row.names = immune_typing$post_probs$l1$cell_ID))
-umapf("umap", "celltype_granular", semuse = sem, alpha = 0.5)
-umapf("umap", "clusters_unsup", semuse = sem, alpha = 0.5)
-comp <- 
-merge(
-  fc_l1[gene %in% c("CD3D", "CD3E", "CD3G","IL7R","MS4A1")][cluster %in% c("cd4t", "cd8t")][
-    ,.(ncells=sum(ncells),cluster_expr = sum(cluster_expr*ncells)/sum(ncells)),by=.(gene)]
-  ,fc_l1[gene %in% c("CD3D", "CD3E", "CD3G","IL7R","MS4A1")][!cluster %in% c("cd4t", "cd8t")][
-    ,.(ncells_prime=sum(ncells),cluster_expr_prime = sum(cluster_expr*ncells)/sum(ncells)),by=.(gene)]
-  ,by="gene")[,fold_change:=cluster_expr / cluster_expr_prime]
-
-fctbl_unsup[gene %in% c("CD3D","CD3G", "CD3E", "IL7R","MS4A1")][cluster==6]
-fc_l1[gene %in% c(smiSmooth::markerslist_immunemajor$bcell$index_marker)][cluster %in% c("bcell")][
-  order(-fold_change)]
-
-```
 
 # Conclusion
 
