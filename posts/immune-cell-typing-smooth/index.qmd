@@ -25,16 +25,29 @@ format:
     code-tools: true
 ---
 
+# Abstract
+
+This post showcases a cell typing method optimized for detection and sub-clustering of immune cells.
+We use a 6k colon-cancer dataset to demonstrate two common use cases for the method:
+
+1. Subtyping T cells
+2. Broad immune cell typing.
+
+Code for the method and utility functions used in this post can be found in the R package [smiSmooth](link). 
+
+# Quick links to the code
+
+For those in a hurry to 'just see the code', they can jump ahead to the "'Just The Code'" sections for [Example 1](#tldr), or [Example 2](#tldr2).
 
 # Introduction 
 
-This post demonstrates a cell typing method optimized for detection and sub-clustering of immune cells.  Often (particularly with immune cells), we may want our cell type calls to be guided by specific sets of marker genes.  
-In some spatially-resolved transcriptomics (SRT) datasets, directly using marker gene expression for determining cell type may be a challenge due to lower sensitivity compared to scRNAseq data, background due to autoflourescence, or segmentation ambiguity.
+Often (particularly with immune cells), we may want our cell type calls to be guided by specific sets of marker genes.  
+In some spatially-resolved transcriptomics (SRT) datasets, directly using marker gene expression for determining cell type may be a challenge due to data sparsity, background due to autoflourescence, or segmentation ambiguity.
 
-The cell typing method we describe here is designed to make it easy to enforce prior biological assumptions about the marker genes and expression profiles we expect to see in our cell types, while being robust to platform or batch effects that may otherwise challenge the transfer of those assumptions from pre-trained models or reference datasets.  
+The cell typing method we describe here is designed to make it easy to enforce prior biological assumptions about the marker genes and expression profiles we expect to see in our cell types, 
+while being robust to platform or batch effects that may otherwise challenge the transfer of those assumptions from pre-trained models or reference datasets.  
 
-The tools we discuss throughout this post are available in the R package [XX](link);
-the basic framework for the method can be described in a few basic steps (we'll describe each of these steps in more detail throughout our examples.)
+The basic framework for the method can be described in a few basic steps (we'll describe each of these steps in more detail throughout our examples.)
 
 1. First, for each cell type, we define a set of genes we expect may be 'marker genes' or highly expressed based on prior data or biology (either the literature, a reference dataset, or some combination of both).
 2. Next, we construct metagene scores from our data for each cell type based on the genes specified in (1).
@@ -46,31 +59,52 @@ We'll use a 6k-plex colon cancer dataset to work through two common cell typing 
   * In this first case, we'll assume we've already done some basic clustering, but don't quite have the level of cell type granularity we'd like.  We'll take a 'T cell' cluster and sub-classify those cells into CD8-T, CD4-T, and T-reg cell categories.
 
 2. Top down hierarchical cell typing with focus on immune cells: 
-
   * Here we'll start from scratch; first assigning cells into major categories and identifying immune cells, then classifying those immune cells into various sub classifications of myeloid and lymphocyte cell types.
-
-
-# Quick links to the code
-
-For anyone in a hurry to 'just see the code', they can jump ahead to the "TL;DR 'just the code'" sections for [Example 1](#tldr), or [Example 2](#tldr2).
 
 
 # Initial look at our dataset
 
 Let's start by taking an initial look at our data, then walk through some cell typing scenarios.  First, we can load in our data and take a look at some unsupervised leiden clustering we've already performed.
 
-```{r load_libraries, message=FALSE, eval = TRUE}
+```{r load_libraries, message=FALSE, eval = FALSE}
 library(ggplot2)
 library(ggrepel)
-library(RColorBrewer)
 library(data.table)
 library(smiSmooth)
 ```
+
+
 ```{r , message=FALSE, eval = FALSE}
 sem <- readRDS("colon_seurat.rds")
 normed <- smiSmooth::totalcount_norm(Matrix::t(sem[["RNA"]]@counts))
 sem <- Seurat::SetAssayData(sem, layer = "data", new.data = Matrix::t(normed))
 ```
+
+```{r}
+#| eval: true
+#| echo: false
+
+devtools::load_all("~/data/dan/imputation_smoothing/smiSmooth", export_all = FALSE)
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+
+library(ggplot2)
+library(ggrepel)
+library(RColorBrewer)
+library(data.table)
+
+#sem <- readRDS("colon_seurat.rds")
+sem <- readRDS("~/data/dan/imputation_smoothing/colondata/semsub.rds")
+normed <- smiSmooth::totalcount_norm(Matrix::t(sem[["RNA"]]@counts))
+sem <- Seurat::SetAssayData(sem, layer = "data", new.data = Matrix::t(normed))
+
+```
+
+
 
 #### Spatial plot of initial clusters
 
@@ -109,7 +143,7 @@ knitr::include_graphics("./figures/xyp_unsup.png")
 #### Heatmap of initial clusters
 
 We can make a marker gene heatmap to identify some of the top marker genes for each cluster and see if we recognize any of the celltypes represented by the unsupervised clusters.
-Here we can use a couple of convenience functions provided in the R package XX.
+Here we can use a couple of convenience functions provided in the R package `smiSmooth`.
 
 ```{r, eval=FALSE}
 #| code-fold: true
@@ -117,7 +151,7 @@ Here we can use a couple of convenience functions provided in the R package XX.
 fctbl_unsup <- 
 smiSmooth::clusterwise_foldchange_metrics(normed  = sem[["RNA"]]@data
                                           ,metadata = sem@meta.data
-                                          ,clustercol = "clusters_unsup"
+                                          ,cluster_column = "clusters_unsup"
                                           )
 
 hm_unsup <- smiSmooth::marker_heatmap(fctbl_unsup
@@ -140,7 +174,7 @@ print(hm_unsup)
 #| fig.show: "hold"
 #| out-width: "6000px"
 
-knitr::include_graphics("./figures/hm_unsup.png")
+knitr::include_graphics("./figures/hm_unsup_annotated.PNG")
 ```
 Let's suppose for sake of demonstration that I recognize (and am comfortable enough) to label these clusters with cell type names based on the marker genes shown in the heatmap.  
 
@@ -151,104 +185,130 @@ I'd like to split these cells further into at least a few meaningful T-cell subt
 
 # Example case 1: Subclustering T cells {#ex1}
 
-## TL;DR 'just the code' {#tldr}
+## 'Just The Code' {#tldr}
 
-Here's the code for classifying leiden cluster '6' into `cd8t`, `cd4t`, and `treg` cell types using the R package XXX.
+Here's the code for classifying leiden cluster '6' into `cd8t` and `cd4t` cell types , followed by more granular T cell subtyping.  We use the R package `smiSmooth` with a prespecified `tcell_pipeline`, and corresponding lists of marker genes included as package datasets.
 
 ```{r, eval=TRUE}
-### List of genes used to estimate a celltype-metagene score for each cell
-data("markerslist_tcellmajor")
-str(markerslist_tcellmajor)
+
+data("pipeline_tcell")
+str(pipeline_tcell, max.level = 2)
 ```
 
 ```{r, eval=FALSE}
 ### these are cells I want to subcluster
 tcell_ids <- sem@meta.data[sem@meta.data$clusters_unsup==6,"cell_ID"]
 
-### Fit the metagene score, using the counts matrix and a 
-### neighborhood 'adjacency' matrix indicating cells with similar expression profiles
-metagenes_t <- 
-  smiSmooth::fit_metagene_scores(
-    markerslist = markerslist_tcellmajor
-    ,counts_matrix = Matrix::t(sem[["RNA"]]@counts[,tcell_ids])
-    ,adjacency_matrix = as(sem@graphs$umapgrph
-                           ,"CsparseMatrix")[tcell_ids,tcell_ids]
-  )
+### Run a 'tcell'-typing pipeline, which 
+### first classifies into T8/T4 categories (using the `tmajor` markerslist), 
+### then runs subclassification for T4 and T8 using the t4minor and t8minor markerslists.
+tcell_typing <- 
+run_pipeline(pipeline = pipeline_tcell
+             ,counts_matrix = Matrix::t(sem[["RNA"]]@counts[,tcell_ids])
+             ,adjacency_matrix = as(sem@graphs$umapgrph
+                                    ,"CsparseMatrix")[tcell_ids,tcell_ids]
+             ,celltype_call_threshold = 0.5
+             )
 
-### Fit a model clustering these metagene scores and 
-### predicting posterior probabilities each cell belongs 
-### to 'cd8t', 'cd4t', or 'treg'
-model_t <- 
-smiSmooth::cluster_metagenes(metagenes = metagenes_t)
+```
 
+
+```{r}
+#| eval: false
+#| echo: false
+saveRDS(tcell_typing, "figures/tcell_typing.rds")
 ```
 
 ```{r}
 #| eval: true
 #| echo: false
- 
-metagenes_t <- readRDS("./figures/metagenes_t.rds")
-model_t <- readRDS("./figures/model_t.rds")
-model_t$post_probs[,celltype:=NULL]
+tcell_typing <- readRDS("figures/tcell_typing.rds")
+```
+The data table `post_probs` in our model object `model_t` holds the high-level cell typing result; showing a posterior probability that each of our cells belongs to either `cd8t`, or `cd4t` categories, along with a 'best_class' label depending on which of these scores is highest for each cell.
+
+
+```{r, eval=FALSE}
+str(tcell_typing, max.level = 2)
+tcell_typing$post_probs$tmajor[1:10][]
+```
+
+```{r, eval=TRUE}
+### List of genes used to estimate a celltype-metagene score for each cell
+data("markerslist_tcellmajor")
+str(markerslist_tcellmajor)
+```
+```{r,eval=FALSE}
+
+tpipeline <- 
+  make_pipeline(markerslists = list("tmajor" = smiSmooth::markerslist_tcellmajor
+                    ,"t4minor" = smiSmooth::markerslist_cd4tminor
+                    ,"t8minor" = smiSmooth::markerslist_cd8tminor
+                    )
+                 ,priors = list("t4minor" = "tmajor"
+                               ,"t8minor" = "tmajor")
+                 ,priors_category = list("t4minor" = "cd4t"
+                                         ,"t8minor" = "cd8t"
+                                         )
+    )
+
 
 ```
 
-The data table `post_probs` in our model object `model_t` gives the cell typing result; showing a posterior probability that each of our cells belongs to either `cd8t`, `cd4t`, or `treg` categories, along with a 'best_class' label dependending on which of these scores is highest for each cell.
 
-```{r}
-model_t$post_probs[1:10][]
-```
+
+
+
+We then used the posterior probabilities from our high-level T cell model to predict more granular classifications of `cd8t` and `cd4t`, including memory, naive, helper, and exhausted subtypes using corresponding marker gene sets.
+The results from `model_t4` and `model_t8` can be combined into a table `probs`, showing the best classification for cd4t or cd8t subtype.
+
 
 Now lets take a closer look at the details and describe the methodology for each step.
+
 
 ## Detailed walkthrough
 ###  Part 1: Specifying genes associated with my cell types based on prior biology
 
+We'll describe the first level of cell type classification from our example above to illustrate the method, where we suppose we want to classify `cd4t` vs. `cd8t`.
 Creating a marker list, by specifying genes I expect **might** be associated with my cell types is the first step of this algorithm.
-For each of my cell types, `cd4t`, `cd8t`, and `treg`, I specify 
+For each of my cell types, `cd4t` and `cd8t`, I specify 
 
-* a primary marker or "index gene"  
-* a set of other marker genes which I expect could be expressed as "predictors"
+* a set of primary defining markers or "index genes" (these are genes that should be fairly exclusive to the cell type if possible)
+* a set of other marker genes which I expect could be expressed as "predictors"  
 
-In this case, we'll use CD4, CD8B, and FOXP3 as "index genes" for `cd4t`, `cd8t`, and `treg` respectively.
-The other genes we'll specify as predictors are based on the literature.  For example, IL2RA is often associated with Treg cells, so we include it as a predictor here.
+In this case, we'll use [CD4], and [CD8A, CD8B], as "index genes" for `cd4t` and `cd8t` respectively.
+The other genes we'll specify as predictors are based on the literature.  For example, FOXP3 is often associated with cd4t 'Treg' cells, so we include it as a predictor here for `cd4t`. 
 
 It's okay to include markers in multiple cell types if that fits our mental model.
-For example, `treg` cells are actually a subcategory of `cd4t`, so I've included 'CD4' as a predictor for `treg` and also as the index gene for `cd4t`.  Similarly, 'CCR7' is used as a predictor in both `cd8t` and `cd4t` cell types, and 'CXCR3' is used as a predictor for all three cell types.
+For example, CD3D, CD3E, and CD3G are general T cell markers, and so are included as predictors for both subtypes, as are other genes like IL7R, CD27, SELL which could be seen in either `cd4t` or `cd8t` cells.
 
 We can create our marker list manually like this:
 ```{r, eval=TRUE}
-tcell_markerslist <- 
-smiSmooth::make_markerslist(index_marker = list(cd4t = "CD4"
-                                                ,cd8t = "CD8B"
-                                                ,treg = "FOXP3"
-                                                )
-                            ,predictors = list(
-                              cd4t = c('CD4','CD40LG','IL2','CCR7','CXCR3','CXCR4','SELL'
-                                       ,'IL7R','CD28','STAT5B','STAT3','IKZF1','GATA3'
-                                       ,'RUNX3','FOXP1')
-                              ,cd8t = c('CD8A','CD8B','PRF1','GZMB','GZMA','GZMH','GNLY'
-                                        ,'IFNG','CCR7','SELL','CD44'
-                                        ,'LAG3','KLRD1','CXCR3','ITGA1','RUNX3')
-                              ,treg =c('FOXP3','IL2RA','CTLA4','TIGIT','LAG3','IKZF2'
-                                       ,'CCR4','CCL22','CD44','IL10','TGFB1','PDCD1'
-                                       ,'BATF','STAT3','STAT1','CD274','PDCD1LG2'
-                                       ,'EOMES','CXCR3','CXCR5','BCL6','HLA-DRA'
-                                       ,'IRF4','TOX','SELL','CD69','ITGAE','KLRG1'
-                                       ,'CD38','TNFRSF9','TNFRSF18','LRRC32','ICOS'
-                                       ,'IL1R2','IL10RA','CCR6','AHR','NRP1','MKI67'
-                                       ,'FAS','ENTPD1','TNFRSF25','ADORA2A','CD4' 
-                              )
-                            )
-                            ,use_offclass_markers_as_negative_predictors = TRUE
-                            )
+markerslist_tcellmajor <- 
+smiSmooth::make_markerslist(
+  index_marker = list(
+    "cd8t" = c("CD8B", "CD8A")
+    ,"cd4t" = c("CD4")
+  )
+  ,predictors = list(
+    "cd8t" =  c("CD3D", "CD3E", "CD3G", "CD8A", "CD8B", "IL7R", "CD27", "SELL", "CCR7", "TCF7", "LEF1", 
+                    "FOXP1", "BACH2", "KLF2", "CD28", "ICOS", "STAT3", "STAT5", "RUNX3", "BATF", "EOMES", 
+                    "TBX21", "PRDM1", "PDCD1", "LAG3", "TIGIT", "HAVCR2", "GZMK", "GZMA", "GZMB", "PRF1", 
+                    "GNLY", "KLRG1", "KLRD1", "IFNG", "CCL5", "CX3CR1", "NKG7", "FAS", "FASLG", "IL2", "CD244", 
+                    "CXCR3", "KLRB1", "TOX", "NR4A2", "BCL6", "CXCL13")
+    ,"cd4t" = c("CD3D", "CD3E", "CD3G", "CD4", "IL7R", "CD27", "SELL", "CCR7", "TCF7", "LEF1", "FOXP1", 
+                     "BACH2", "KLF2", "CD28", "ICOS", "CD40LG", "STAT3", "STAT5", "RUNX1", "RUNX3", "BATF", 
+                     "GATA3", "TBX21", "RORC", "FOXP3", "IL2RA", "CTLA4", "PDCD1", "LAG3", "TIGIT", "HAVCR2", 
+                     "IL2", "IFNG", "IL4", "IL5", "IL13", "IL17A", "IL17F", "IL10", "CCL5", "CXCR3", "CCR6", 
+                     "CXCR5", "PRDM1", "BCL6", "EOMES", "CXCL13", "TOX")
+  )
+)
 ```
 
 
 The object created looks like this below
 
 ```{r, eval=TRUE}
-str(tcell_markerslist)
+str(markerslist_tcellmajor)
 ```
 
 In practice, we can save and reuse our marker lists for different cell types.
@@ -286,7 +346,7 @@ We use a non-negative least squares [@nnlsref] (NNLS) regression to estimate our
 
 
 By specifying `use_offclass_markers_as_negative_predictors = TRUE` in the section above, we further assume that predictors for *other celltypes* that we haven't listed can be used as *negative* predictors of our index gene.
-For example, genes like like "GZMA" and "GZMB", which are markers associated with `cd8t`, will be assumed to be *negative* predictors of the other classes (`cd4t` and `treg`) where they are not listed. 
+For example, genes like like "GZMA" and "GZMB", which are markers associated with `cd8t`, will be assumed to be *negative* predictors of the other classes (`cd4t`) where they are not listed. 
 
 Estimating this model from the dataset at hand rather than using a reference model could make this framework more robust to platform effects or batch effects compared to pre-trained models or reference profiles which used different technology or data with slightly different biology.
 
@@ -301,40 +361,65 @@ After fitting our regression models for each cell type, we'll use the predicted 
 tcell_ids <- sem@meta.data[sem@meta.data$clusters_unsup==6,"cell_ID"]
 metagenes_t <- 
   fit_metagene_scores(
-    markerslist = tcell_markerlist
+    markerslist = markerslist_tcellmajor
     ,counts_matrix = Matrix::t(sem[["RNA"]]@counts[,tcell_ids])
     ,adjacency_matrix = as(sem@graphs$umapgrph
                            ,"CsparseMatrix")[tcell_ids,tcell_ids]
   )
 ```
 
-The `metagenes_t` object we've created has an element for each celltype, including the regression coefficients (`bhat`), and predicted values we'll use for clustering (`yhat`) for each cell and each cell type.
+
+```{r}
+#| eval: false
+#| echo: false
+saveRDS(metagenes_t, "figures/metagenes_t.rds")
+```
+
+```{r}
+#| eval: true
+#| echo: false
+metagenes_t <- readRDS("figures/metagenes_t.rds")
+```
+
+The `metagenes_t` object we've created has an element for each celltype, including the regression coefficients (`bhat`), and predicted values we'll use for clustering (`yhat`) for each index marker gene for cell type.
+
 
 ```{r}
 str(metagenes_t,max.level = 2)
 ```
 
+For cell types using multiple 'index marker genes', like `cd8t` here (using CD8A and CD8B), metagene scores are combined together using non-negative sparse pca (implemented in the `nsprcomp` R package) [@nonnegpca].  This allows for summarizing an overall cell type metagene score, using a constrained non-negative combination of individual index-gene scores that explains maximal variation across individual index gene scores. 
+Below, we see the PCA rotation representing the individual weights given to CD8A and CD8B metagene scores.
+```{r}
+metagenes_t$cd8t$nnpcfit
 
-We can get a better understanding of the model output by looking at a few diagnostics plots.  In the below, we plot the regression coefficients for each model, ordering them on the x-axis by their ranking.
+```
+
+
+We can get a better understanding of the metagene model outputs by looking at a few diagnostics plots.  In the below, we plot the regression coefficients for each model, ordering them on the x-axis by their ranking.
 For each cell type, the positive $\hat{\beta}$ correspond to genes we specified as predictors, and negative $\hat{\beta}$ were predictors for either of the other two cell types.  
 A lot of the covariates which have the largest magnitudes have "*lag.*" in their name indicating they correspond to a smoothed (or neighbor-averaged) covariate for that gene.
 
-For `cd4t`, we see that smoothed CD4 (indicated by '*lag.y*' in the plot) is the strongest predictor of observed 'CD4'.  For `cd8t` and `treg` categories, '*lag.y*' (indicating smoothed CD8B and FOXP3) are also among the strongest predictors, but not first in rank.
-
+For `cd4t`, we see that smoothed CD4 (indicated by '*lag.y.CD4*' in the plot) is the strongest predictor of observed 'CD4'.  For `cd8t`, '*lag.y.CD8A*' and '*lag.y.CD8B*' (indicating smoothed CD8A and CD8B) are also among the strongest predictors, but not first in rank.
 
 
 ```{r, eval=FALSE}
+#| code-fold: true
 
 coefplots <- metagene_coefficients_plot(metagenes_t)
 coefplots <- lapply(coefplots, function(x){x +   theme(text=element_text(face='bold',size=18))
   }) ## just make the text bigger and bold
 cowplot::plot_grid(plotlist = coefplots, nrow = 1)
-
 ```
-
 <div class="wider-image">
   <img src="./figures/coefplots_tcells.png" alt="Wide Image">
 </div>
+
+```{r}
+#| eval: false
+#| echo: false
+ggsave("figures/coefplots_tcells.png", width = 1904*sqrt(50), height = 671*sqrt(50), units = "px", dpi = 500)
+```
 
 ```{r}
 #| eval: false
@@ -345,12 +430,21 @@ knitr::include_graphics("./figures/coefplots_tcells.png")
 
 A pairsplot can show us how well the metagene scores we've created are distinct from each other.  Ideally, if our cell type classes are mutually exclusive, we'd want to not see too many cells which are 'positive' for multiple cell types at the same time.
 
-Here, we see that `cd4t` and `treg` scores are positively correlated.  This isn't too surprising, because T-reg cells are actually a subtype of CD4+ T cells.
-`cd8t` is somewhat negatively correlated with both `treg` and `cd4t`, which is good to see.
+Here, we see that `cd4t` and `cd8t` metagene scores are negatively correlated with each other, which is good to see.
 
 ```{r, eval=FALSE}
+#| code-fold: true
+
 metagene_pairsplot(metagenes_t, var= "yhat")
 ```
+
+```{r}
+#| eval: false
+#| echo: false
+ggsave("figures/yhatpairs_tcells.png", width = 858*sqrt(20), height = 634*sqrt(20), units = "px", dpi = 500)
+```
+
+
 
 ```{r}
 #| eval: true
@@ -364,7 +458,29 @@ knitr::include_graphics("./figures/yhatpairs_tcells.png")
 Now, we estimate the multivariate distribution of metagene scores that characterize each cell type.  This allows us to compute the likelihoods for a cell belonging to any of these types, and infer a posterior probability of T cell subtype for each cell.
 The `cluster_metagenes` function we run below estimates a mixture of overfitted multivariate gaussian mixture models [@aragam2020identifiability] to estimate the distribution of metagene scores.
 
-First, we identify all cells with positive metagene scores for a particular cell type. We might loosely interpret these cells as 'anchor cells'.
+```{r}
+#| eval: false
+#| echo: true
+
+model_t <- 
+smiSmooth::cluster_metagenes(metagenes = metagenes_t)
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+saveRDS(model_t, "figures/model_t.rds")
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+model_t <- readRDS("figures/model_t.rds")
+```
+
+At a high level, the `cluster_metagenes()` function first identifies all cells with positive metagene scores for a particular cell type. We might loosely interpret these cells as 'anchor cells'.
 The data may look like this for example, where here I have subset my original data to cells which have positive scores for my celltype `cd8t`.
 
 ```{r}
@@ -373,13 +489,12 @@ yh[yh[,"cd8t"] > 0,][1:10,]
 
 ```
 
-
-Then, a mixture model is fit to these (3-dimensional) scores, by default using 6 components.
+Then, a mixture model is fit to these (2-dimensional) scores, by default using 6 components.
 The estimates corresponding to the individual mixture models for each cell type are found in the `models` list, with the means (`mu_hat`), covariance matrices (`sigma_hat`), and prior probability (`pihat`) corresponding to each mixture component. 
 ```{r}
 str(model_t$models, max.level = 2)
 ```
-Typically we don't need to interact with this part of the output.  After the mixture models for each cell type are fitted, we can score all cells, and get an overall posterior probability that a cell belongs to any of the three major classes using Bayes rule.
+Typically we shouldn't need to interact with this part of the output.  After the mixture models for each cell type are fitted, we can score all cells, and get an overall posterior probability that a cell belongs to any of the two major classes using Bayes rule.
 
 Let $y_c$ be the cell type category for cell $c$, $scores_c$ the corresponding metagene scores, and $t$ denoting a possible cell 'type' or category (for $t = 1,...,T$).
 
@@ -392,31 +507,121 @@ $$P(scores_c | y_c = t) = \sum_{j=1}^K P(scores_c | k=j, y_c = t) P(k=j | y_c = 
 
 The prior probability for a particular cell type class $t$ can be estimated by counting the number of cells used to estimate the mixture model in each cell type, and computing a proportion amongst all possible cell type classes, i.e.,
 $$P(y_c = t) = \frac{\sum_{c=1}^C I(scores_{c,t} > 0)}{\sum_{l=1}^T \sum_{c=1}^C I(scores_{c,l} > 0)}$$
+These probabilities are in the `post_probs` data.table object of the model.
+```{r}
+model_t$post_probs[1:10][]
 
-#### Advanced control: setting preferences for behavior of multi-positive cells
+```
 
-While we expect metagene scores to be **positive** for cells in the corresponding cell type, and lower (in general) for other celltypes, there could be exceptions.  For instance, in this example, we might expect that 
-Treg cells have both high `treg` metagene scores AND high `cd4t` scores due to Treg being a subtype of CD4+ T cell.
+### Granular hierarchical subtyping and using a `pipeline`
 
-On the other hand, we might not want to label a cell with the `cd4t` type if it has a high `treg` score (because in that case we'd prefer to call it a `treg`).
+These posterior-probability scores can be passed directly to subtyping models for `cd4t` and `cd8t`, via the `prior_level_weights` arguments.
+For example, if I wanted to go ahead and cluster the `cd4t` cells into subtypes, I could follow the same process, passing in the prior probability of the cell being `cd4t` as a weight.
 
-The way we implement this in XXX package is through the `discourage_double_positive` argument in  the `cluster_metagenes` function.  Using this argument below, we provide a list of cell types and the corresponding categories in which we want to discourage double positivity.  With the default argument provided below, cells with positive `cd4t` metagene scores are first identified to fit the `cd4t` mixture model.
-Then, cells which also have positive posterior-scores for `treg` would be excluded from this training set. 
+Below is an example of this syntax using the `cd4t` subtypes in the package dataset "markerslist_cd4tminor".
 
-Ultimately this has the effect of preferentially assigning cells which are positive for both `cd4t` and `treg` to the `treg` cell type class.
-
-These particular settings for `discourage_double_positive` are provided as a default, so the model here is identical to the one we showed in the [previous section](#tldr).
+```{r, eval=TRUE}
+str(smiSmooth::markerslist_cd4tminor, max.level=2)
+```
 
 ```{r, eval=FALSE}
+#### Classify cd4t subtypes
+metagenes_t4 <-
+  smiSmooth::fit_metagene_scores(
+    markerslist = smiSmooth::markerslist_cd4tminor
+    ,counts_matrix = Matrix::t(sem[["RNA"]]@counts[,tcell_ids])
+    ,adjacency_matrix = as(sem@graphs$umapgrph
+                           ,"CsparseMatrix")[tcell_ids,tcell_ids]
+    ,prior_level_weights = model_t$post_probs$cd4t ## prior probability of cd4t
+  )
+model_t4 <- 
+smiSmooth::cluster_metagenes(metagenes = metagenes_t4, prior_prob_level = model_t$post_probs$cd4t)
 
-model_t <- 
-smiSmooth::cluster_metagenes(metagenes = metagenes_t
-                  ,to_model = "yhat" ## default - use modeled scores for clustering
-                  ,discourage_double_positive = list("cd4t" = c("treg")) ## also a provided default.  
-#                                                                         ## Discourage assignment of cells to 'cd4t' if they are also high in 'treg'.  
-#                                                                         ## Assigning cells to 'treg' which are high in 'cd4t' is **not** discouraged. 
-                  )
 ```
+
+A convenient way to simplify this process with minimal code is to use a `pipeline` object.
+A custom hierarchical cell typing pipeline could be created like this below, where
+
+* `markerslists` is a named list, with a `markerslist` for each stage of cell typing. "tmajor" will classify `cd8t` vs. `cd4t`, while "t8minor" and "t4minor" will subclassify those cell types respectively.
+* `priors`, a list specifying 'parent' celltyping stage. Here , `t4minor` and `t8minor` both need to run after "tmajor", as they will use the estimated probabilities of "`cd4t`" and "`cd8t`" as inputs.  
+       "tmajor" runs first, and does not have prior probability inputs.
+* `priors_category`, a list specifying 'parent' /  major categories of each celltype. Here , `t4minor` is a subset of `"cd4t"`.  "tmajor" runs first, and does not have a prior.
+
+```{r}
+pipeline_tcell <- 
+  make_pipeline(markerslists = list("tmajor" = smiSmooth::markerslist_tcellmajor
+                    ,"t4minor" = smiSmooth::markerslist_cd4tminor
+                    ,"t8minor" = smiSmooth::markerslist_cd8tminor
+                    )
+                 ,priors = list("t4minor" = "tmajor"
+                               ,"t8minor" = "tmajor")
+                 ,priors_category = list("t4minor" = "cd4t"
+                                         ,"t8minor" = "cd8t"
+                                         )
+    )
+
+class(pipeline_tcell)
+```
+
+This particular pipeline is also saved as a package dataset.
+```{r}
+str(smiSmooth::pipeline_tcell, max.level=2)
+```
+
+
+
+
+The code to run the pipeline looks like below:
+```{r}
+#| eval: false
+#| echo: false
+
+### Run a 'tcell'-typing pipeline, which 
+### first classifies into T8/T4 categories (using the `tmajor` markerslist), 
+### then runs subclassification for T4 and T8 using the t4minor and t8minor markerslists.
+tcell_typing <- 
+run_pipeline(pipeline = tpipeline
+    ,counts_matrix = Matrix::t(sem[["RNA"]]@counts[,tcell_ids])
+    ,adjacency_matrix = as(sem@graphs$umapgrph
+                           ,"CsparseMatrix")[tcell_ids,tcell_ids]
+    ,celltype_call_threshold = 0.5
+    )
+
+```
+
+We could take a look at individual `models` and `metagenes` objects if needed within our `tcell_typing` result.
+Below, we show that the outputted objects are the same in the pipeline format, as if we had ran them individually like in the method demonstration.
+
+```{r}
+all.equal(model_t, tcell_typing$models$tmajor)
+all.equal(metagenes_t, tcell_typing$metagene_scores$tmajor)
+
+```
+
+By default, two possible cell type classifications are returned in the overall `post_probs` data.table object from our pipeline.
+Below, `celltype_granular` shows the most granular classification for each cell, carrying the 'best possible' classification at each stage of the pipeline.
+For example, the first cell below was first identified as `cd8t` being the best category.  The best subcategory of `cd8t` was `cd8_exhausted`, and the posterior probability score for `cd8t_exhausted` was ~0.47.
+
+We set the the cutoff `celltype_call_threshold=0.5` when we ran the pipeline, so that the `celltype_thresh` classification shows the most granular cell type with probability scores *at least* this threshold.
+The first cell below has `cd8_exhausted` score ~0.47 (less than 0.5), and so takes the higher level category of `cd8t`, which is above the threshold at ~0.99999.
+
+```{r}
+tcell_typing$post_probs[["tmajor"]][1:10]
+```
+
+We can remake this table with a different cutoff in mind as needed, depending on how conservative / aggressive we are comfortable being with the cell type call, using the 
+`combine_postprob_tables` function.
+
+As demonstration, we can look at the output if we were to raise our threshold from 0.5 to 0.8.  
+We can "`return_all_columns`" to show a more verbose result, with individual columns showing the joint probability scores for all possible cell type categories in each cell.
+```{r}
+smiSmooth::combine_postprob_tables(pipeline = pipeline_tcell
+                                   ,models = tcell_typing$models
+                                   ,celltype_call_threshold = 0.8
+                                   ,return_all_columns = TRUE)[["tmajor"]][1:10]
+```
+
+
 
 
 ### Examining and validating clustering results
@@ -424,79 +629,142 @@ smiSmooth::cluster_metagenes(metagenes = metagenes_t
 Now we can evaluate the cell typing performance.
 In particular, we want to check that the genes we specified as the index marker and predictors are in fact marker genes in the corresponding cell types.
 
-Here we can attach our T-cell annotations back onto our metadata, and remake our marker heatmap.
-We see that the primary marker genes have highest expression in the expected cell types.  For example, CD8A and CD8B are highest in `cd8t`, FOXP3 is highest in `treg`, and CD4 is high in both `cd4t` and `treg`.
-Several other genes we've chosen to associate with these celltypes based on our `tcell_markerslist` object are also highest in the expected cell type (i.e., CTLA4 in `treg` cells, IL7R in `cd4t`).
+First, we can look at a marker gene heatmap made with just the t-cells, and show the genes we specified as the most important 'index genes' for each of the `cd8t` and `cd4t` subtypes.
+Looking closely, we see that CD8A and CD8B are much higher in `cd8_` compared to `cd4_` types.
+Similarly, CD4 is higher expressed in `cd4_` subtypes compared to `cd8_` subtypes.
+Looking at the specific index markers for each subtype, we see good agreement between marker gene specified for each subtype reflected in our heatmap. 
 
 ```{r,eval=FALSE}
 
-met <- 
-merge(data.table(sem@meta.data), model_t$post_probs[,.(cell_ID, celltype, best_score)]
-      ,by="cell_ID", all.x=TRUE)
-met[is.na(celltype),celltype:=clusters_unsup]
+fct <- clusterwise_foldchange_metrics(counts = sem[["RNA"]]@counts[,tcell_ids]
+                                      ,metadata = tcell_typing$post_probs[["tmajor"]]
+                                      ,cluster_column = "celltype_granular")
+idxs <- unique(unname(c(unlist(lapply(smiSmooth::markerslist_cd4tminor, "[[", "index_marker"))
+               ,unlist(lapply(smiSmooth::markerslist_cd8tminor, "[[", "index_marker")))))
 
-fc_tcell <- 
-smiSmooth::clusterwise_foldchange_metrics(normed = sem[["RNA"]]@data
-                   ,metadata = met
-                   ,clustercol = "celltype"
-                   )
+nms <- c("cd4t", names(smiSmooth::markerslist_cd4tminor), "cd8t", names(smiSmooth::markerslist_cd8tminor))
+hmsubtype <- marker_heatmap(fct, featsuse = c("CD8A", "CD8B", "CD4", idxs), geneorder = c("CD8A", "CD8B", "CD4", idxs), clusterorder = nms, orient_diagonal = TRUE)
+print(hmsubtype)
+```
 
-hm_tcell <- smiSmooth::marker_heatmap(fc_tcell
-                           ,extras = c("CD3D", "CD4", "FOXP3", "CD8A", "CD8B", "GNLY", "GZMA", "IL2RA", "CTLA4", "TIGIT")
-                          )
+```{r}
+#| eval: false
+#| echo: false
 
+ggsave(plot=hmsubtype, filename = "figures/hm_tsubtype.png", width = 1084 * sqrt(20), height = 420 * sqrt(20) , dpi = 450, units = "px")
+fwrite(fct, file="data/fc_t_subtypesonly.csv")
+```
+
+```{r}
+### The key index markers for cd4 subtypes
+lapply(smiSmooth::markerslist_cd4tminor, "[[", "index_marker")
+
+### The key index markers for cd8 subtypes
+lapply(smiSmooth::markerslist_cd8tminor, "[[", "index_marker")
 ```
 
 <div class="wider-image">
-  <img src="./figures/hm_tcells_v1_annotated.png" alt="Wide Image">
+  <img src="./figures/hm_tsubtype.png" alt="Wide Image">
+</div>
+
+
+```{r}
+#| eval: false
+#| echo: false
+
+knitr::include_graphics("./figures/hm_tsubtype.png")
+```
+
+
+Here we can attach our T-cell annotations back onto our metadata, and remake our marker heatmap.
+
+```{r,eval=FALSE}
+met <- 
+merge(data.table(sem@meta.data), tcell_typing$post_probs[["tmajor"]][,.(cell_ID, celltype = celltype_granular, best_score_granular)]
+      ,by="cell_ID", all.x=TRUE)
+met[is.na(celltype),celltype:=clusters_unsup]
+
+fc_t_all <- 
+smiSmooth::clusterwise_foldchange_metrics(normed = sem[["RNA"]]@data
+                   ,metadata = met
+                   ,cluster_column = "celltype"
+                   )
+
+hm_tcell <- smiSmooth::marker_heatmap(fc_t_all
+                           ,extras = c("CD4", "CD8A", "CD8B")
+                          )
+print(hm_tcell)
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+ggsave(plot=hm_tcell, filename = "figures/hm_tcell.png", width = 1716 * sqrt(20), height = 687 * sqrt(20) , dpi = 450, units = "px")
+fwrite(fc_t_all, file="data/fc_tcells_allcells.csv")
+```
+
+
+<div class="wider-image">
+  <img src="./figures/hm_tcell_annotated.png" alt="Wide Image">
 </div>
 ```{r}
 #| eval: false
 #| echo: false
 
-knitr::include_graphics("./figures/hm_tcells_v1_annotated.png")
+knitr::include_graphics("./figures/hm_tcell_annotated.png")
 ```
-
 
 Treating the 'posterior probability' as a confidence that the cell belongs to the corresponding cluster, we can show that 
 the proportion of cells that express the expected marker genes generally increases with higher confidence.
-In the plot below, for example, marker genes GZMA, GNLY, CD8B, CD8A (`cd8t` predictors) increase in `cd8t` cells with higher posterior probability.
-Marker genes TIGIT, CTLA4, IL2RA, and FOXP3 (`treg` predictors) also increase in `treg` cells with higher posterior probability.  
-IL7R and FOXP1 are highest in `cd4t` cells.  CD4 is higher `treg` compared to `cd4t`, which is probably okay because we expect both types to be CD4+.  Both `cd4t` and `treg` have higher observed CD4 relative to `cd8t` class.
+
+In the figure below,  we compare the major `cd4t` and `cd8t` T cell types in terms of some of their marker genes which are specific to each. We see that CD8A and CD8B increase in `cd8t` cells as we gain confidence in the cell type call, along with other `cd8t` specific markers (GZMB, GNLY, PRF1).  
+Similarly, we see that CD4 increases in `cd4t` calls with higher posterior probability scores, along with `cd4t` subtype-specific markers like FOXP3, CTLA4, TIGIT (`cd4_treg` marker genes), IL17A and IL17F (`cd4_th17` markers) and GATA3 (`cd4_th2` marker).
+
 
 ```{r,eval=FALSE}
+
 p <- 
 marker_threshold_plot(normed = sem[["RNA"]]@data
-                      ,metadata = met
-                      ,clusters = c("cd8t","cd4t", "treg")
-                      ,markers = c("CD3D", "CD4", "CCR7","FOXP1", "IL7R", "FOXP3",  "IL2RA", "CTLA4", "TIGIT","CD8A", "CD8B", "GNLY", "GZMA","CCL5")
-                      ,cluster_order = c("cd8t", "treg", "cd4t")
-                      ,thresholds = c(0.5, 0.7, 0.8, 0.9,0.95, 0.99, 0.995)
+                      ,metadata = tcell_typing$models$tmajor$post_probs
+                      ,clusters = c("cd4t", "cd8t")
+                      ,markers = c("CD3D", "CD4", "IL17A", "IL17F", "GATA3", "FOXP3",  "IL2RA", "CTLA4", "TIGIT","CD8A", "CD8B", "GNLY", "GZMB","PRF1")
+                      ,thresholds = c(0.3, 0.5, 0.7, 0.9, 0.99, 0.995)
                       ,score_column = "best_score"
+                      ,cluster_column = "best_class"
                       )
 
 p <- p + theme(text=element_text(size=14,face='bold')) + 
   labs(title = "Proportion of cells expressing marker gene increases with \nposterior probability confidence scores")
 print(p)
+```
 
+```{r}
+#| eval: false
+#| echo: false
+ggsave(plot=p , filename = "figures/markerbarplot_tcells_major.png", width = 1470 * sqrt(40), height = 967 * sqrt(20), units = "px", dpi = 450)
 ```
 
 <div class="wider-image">
-  <img src="./figures/markerbarplot_tcells_v1.png" alt="Wide Image">
+  <img src="./figures/markerbarplot_tcells_major.png" alt="Wide Image">
 </div>
 
 ```{r}
 #| eval: false
 #| echo: false
 
-knitr::include_graphics("./figures/markerbarplot_tcells_v1.png")
+knitr::include_graphics("./figures/markerbarplot_tcells_major.png")
 ```
 
 Here's another look at the pairsplot for our metagene scores,this time coloring the cells based on their classification.  
 ```{r, eval=FALSE}
 metagene_pairsplot(metagenes_t, "yhat", obs = model_t$post_probs[,.(cell_ID, best_class)], colorvar = "best_class")
+```
+```{r}
+#| eval: false
+#| echo: false
 
-
+ggsave(filename = "figures/pairshat_colored.png", width = 1247 * sqrt(20), height = 806 * sqrt(20), units = "px", dpi = 450)
 ```
 
 <div class="wider-image">
@@ -511,531 +779,150 @@ knitr::include_graphics("./figures/pairshat_colored.png")
 ```
 
 
-# Example 2:  Hierarchical cell typing {#ex2}
+# Example 2:  Broad immune cell classification  {#ex2}
 
-For the second example, we wish to ignore the unsupervised clustering and infer all cell types based entirely on the framework motivated here.
+For the second example, we wish to ignore the unsupervised clustering and infer all cell types based entirely on the framework motivated here.  
 
-Using the full dataset, we'll first infer amongst 5 major cell type categories [`immune`, `epithelial`, `endothelial`, `fibroblast`, `plasma`] in a similar fashion as described in our first example.  Then, we'll infer subtypes of the immune cell labels with categories including [`tcell`,`bcell`,`macrophage`,`neutrophil`,`mast`,`monocyte`,`cDC`,`pDC`].
+Using the full dataset, we can create a pipeline to first infer amongst 5 major cell type categories [`immune`, `epithelial`, `endothelial`, `fibroblast`, `plasma`] in a similar fashion as described in our first example.  
+Then, we'll infer subtypes of the immune cell labels with categories including [`tcell`,`bcell`,`macrophage`,`neutrophil`,`mast`,`monocyte`,`cDC`,`pDC`].
+Finally, we'll do some basic subclassification of the `tcells` into [`cd4t`,`cd8t`].
 
+## 'Just The Code' {#tldr2}
 
-## TL;DR 'just the code' {#tldr2}
-
-Here's the code to produce the final set of cell types.
+Here's the code to produce the set of cell types.
 The next section will cover the details and discuss a few choices that were made.
+
+
+```{r}
+### Pipeline, with 
+### level-1 ('l1') being major categorization 
+### level-2 ('l2') being classification of major immune cell categories
+### level-t ('lt') being T8/T4 classification
+
+pipeline_io <- smiSmooth::make_pipeline(
+  markerslists = list("l1" = smiSmooth::markerslist_l1
+                      ,"l2" = smiSmooth::markerslist_immunemajor
+                      ,"lt" = smiSmooth::markerslist_tcellmajor)
+  ,priors = list("lt" = "l2"
+                 ,"l2" = "l1") 
+  ,priors_category = list("lt" = "tcell"
+                          ,"l2" = "immune")
+)
+
+```
+
+
+```{r}
+#| eval: false
+#| echo: true
+
+### run my pipeline (using all cells)
+immune_typing <- 
+run_pipeline(pipeline = pipeline_io
+             ,counts_matrix = Matrix::t(sem[["RNA"]]@counts)
+             ,adjacency_matrix = as(sem@graphs$umapgrph
+                                    ,"CsparseMatrix")
+             ,celltype_call_threshold = 0.5
+             )
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+saveRDS(immune_typing, "data/immune_typing.rds")
+```
 
 ```{r}
 #| eval: true
 #| echo: false
- 
-metagenes_l1 <- readRDS("./figures/metagenes_l1.rds")
-metagenes_l2 <- readRDS("./figures/metagenes_l2.rds")
-model_l1_unrestricted <- readRDS("./figures/model_l1_unrestricted.rds")
-model_l1 <- readRDS("./figures/model_l1.rds")
-model_l2 <- readRDS("./figures/model_l2_v1.rds")
-model_l2_v2 <- readRDS("./figures/model_l2_v2.rds")
 
+#immune_typing <- readRDS("data/immune_typing.rds") ## not needed
 ```
 
-```{r,eval=FALSE}
+## Evaluation
 
-### Level-1
-data("markerslist_l1io")
-metagenes_l1 <-  
-fit_metagene_scores(markerslist_l1io
-                    ,counts_matrix =  Matrix::t(sem[["RNA"]]@counts)
-                    ,adjacency_matrix = as(sem@graphs$umapgrph, "CsparseMatrix")
-)
-
-model_l1 <- 
-  cluster_metagenes(metagenes = metagenes_l1
-                    ,to_model = "yhat"
-                    ,discourage_double_positive = 
-                      list("endothelial" = "immune" ### don't estimate components for 
-                           ,"epithelial" = "immune" ### epithelial / endothelial / plasma / fibroblast 
-                           ,"fibroblast" = "immune" ### using cells which have positive metagene scores for 'immune'  
-                           ,"plasma" = c("immune", "fibroblast", "endothelial", "epithelial"))
-  )
-
-### Level 2
-data("markerslist_l2immune")
-metagenes_l2 <- 
-  fit_metagene_scores(markerslist_l2immune
-                      ,counts_matrix =  Matrix::t(sem[["RNA"]]@counts)
-                      ,adjacency_matrix = as(sem@graphs$umapgrph, "CsparseMatrix")
-                      ,prior_level_weights = model_l1$post_probs$immune ## weight by probability a cell is an immune cell
-  )
-
-model_l2_v2 <- 
-  cluster_metagenes(metagenes = metagenes_l2
-                    ,to_model = "yhat"
-                    ,prior_prob_level = model_l1$post_probs$immune ## weight by probability cell is immune cell based on previous model
-                    ,discourage_double_positive = list("mast" = c("tcell"))
-  )
-
-
-```
-
+Like previously, this `pipeline`, and the corresponding `markerslists` are saved as package datasets.
 ```{r}
-### Final classifications, combining L1 and L2 cell types
-probs <- merge(model_l1$post_probs, model_l2_v2$post_probs, suffixes=c("_l1", "_l2"), by = "cell_ID")
-probs[,`:=`(celltype=best_class_l2, best_score=best_score_l2)]
-probs[best_score_l2 < 0.5,`:=`(celltype=best_class_l1, best_score=best_score_l1)]
-probs[best_class_l1 =="immune",`:=`(celltype=best_class_l2, best_score = best_score_l2)]
-probs[best_score_l1 < 0.5,celltype:="unknown"]
-probs[1:5][] ## peek
-```
-```{r}
-probs[,.N,by=.(celltype)][,prop:=N/sum(N)][order(-N)][] ## proportion of called cells by cell type
-
+str(smiSmooth::pipeline_io,max.level=3)
 ```
 
+We can look at a heatmap showing the marker genes for our cell types to check whether the algorithm produced sensible results.
+Because I have a lot of cell type categories, and some of them are not totally exclusive (for example, macrophage/monocyte are very similar and share many markers), 
+I don't necessarily expect all my cells to have very high confidence scores for every cell type; 
+I'm okay here with taking the most granular cell type calls and running with them.
 
-## Detailed walkthrough
-
-### Level 1: identifying immune cells, and other major celltypes
-
-We'll start with trying to identify major cell types (`endothelial`, `fibroblast`, `plasma`, `immune`, `epithelial`).
-Here we use the markerslist provided in the package, giving genes we believe to be associated with our high-level cell type categories.
-Looking at the `markerslist_l1io` object below, we've specified "PTPRC" (the CD45 gene) as a primary index marker for `immune` cells. One strategic point of note here is that we treat `plasma` as it's own category for the purposes of this algorithm, rather than a subtype of `immune`; this is because plasma cells often lose CD45 as they differentiate and mature in their transition from B cells, and so are easier to identify when kept as a distinct category.
-
-
-
-```{r}
-data("markerslist_l1io")
-str(markerslist_l1io)
-markerslist_l1io$immune$predictors[markerslist_l1io$immune$signs==1] ## immune genes
-markerslist_l1io$endothelial$predictors[markerslist_l1io$endothelial$signs==1] ## endothelial genes
-
-```
-
-Fitting the metagene scores requires the same code syntax we used in the [first example](#ex1).
-```{r, eval=FALSE}
-metagenes_l1 <- 
-fit_metagene_scores(markerslist_l1io
-                    ,counts_matrix =  Matrix::t(sem[["RNA"]]@counts)
-                    ,adjacency_matrix = as(sem@graphs$umapgrph, "CsparseMatrix")
-)
-```
-
-Here's a few plots showing regression coefficeints for `immune` and and `endothelial` metagene scores.
-```{r, eval=FALSE}
-coefplots_l1 <- smiSmooth::metagene_coefficients_plot(metagenes_l1)
-coefplots_l1 <- lapply(coefplots_l1, function(x){x +   theme(text=element_text(face='bold',size=18))
-})
-cp_l1 <- cowplot::plot_grid(plotlist = coefplots_l1[c("immune", "endothelial")])
-print(cp_l1)
-
-```
-
-<div class="wider-image">
-  <img src="./figures/coefplots_l1.png" alt="Wide Image">
-</div>
+These clusters show more granularity in a first pass than my original set of unsupervised clusters.
+The heatmap below also shows very sane-looking results, with marker genes corresponding to many of the genes I specified in `markerslists`. 
 
 ```{r}
 #| eval: false
-#| echo: false
-
-knitr::include_graphics("./figures/coefplots_l1.png")
-```
-
-And here, we can peek at a pairsplot to check whether metagene scores are correlated with each other in a sample of 50k cells.  For the most part, these plots indicate that the major cell type categories here are fairly exclusive.
-There are clear examples, however, of cells which have positive metagene scores for multiple cell type classes; we can visually identify examples in the (endothelial,fibroblast), (immune,endothelial),(immune epithelial),  (fibroblast, plasma) and (immune,plasma) panels in particular.
-
-
-```{r,eval=FALSE}
-pairshat_l1 <- metagene_pairsplot(metagenes_l1, "yhat", nsamples = 5*10**4)
-print(pairshat_l1)
-
-```
-
-<div class="wider-image">
-  <img src="./figures/pairshat_l1.png" alt="Wide Image">
-</div>
-
-```{r}
-#| eval: false
-#| echo: false
-
-  knitr::include_graphics("./figures/pairshat_l1.png")
-```
-
-We probably aren't concerned with this yet.
-We fit a model like in the [previous example](#ex1), clustering scores into our major cell type categories.
-```{r,eval=FALSE}
-
-model_l1_unrestricted <- 
-  cluster_metagenes(metagenes = metagenes_l1
-                    ,to_model = "yhat"
-                    ,discourage_double_positive = list() ## empty: allows double positive cells from other classes to be fit
-                                                         ## ,as long as that cells predicted score is positive 
-                                                         ## Example: a cell positive scores for both "epithelial" AND "immune" 
-                                                         ## would be used to estimate **both** the epithelial distribution and the immune distribution
-  )
-
-model_l1_unrestricted$post_probs[,celltype:=best_class]
-model_l1_unrestricted$post_probs[best_score < 0.5,celltype:="unknown"]
-
-```
-
-Now, I'll check the marker gene heatmap.  While the marker genes make basic sense, I'm not happy with the some of the some `immune` markers like "HLA-DRB" and "HLA-DRA", which are higher expressed than I'd like to see in `fibroblast`, `endothelial`, and `plasma` categories.  
-
-```{r, eval=FALSE}
-#| code-fold: true
-
-fc_l1_unrestricted <- 
-  clusterwise_foldchange_metrics(normed = sem[["RNA"]]@data
-                     ,metadata = model_l1_unrestricted$post_probs
-                     ,cluster_column = "best_class"
-  )
-hm_l1_v1 <- marker_heatmap(fc_l1_unrestricted, extras = c("HLA-DRA", "CD3D", "MS4A1", "HLA-DRB"))
-print(hm_l1_v1)
-
-```
-
-
-<div class="wider-image">
-  <img src="./figures/hm_l1_v1_annotated.PNG" alt="Wide Image">
-</div>
-
-```{r}
-#| eval: false
-#| echo: false
-
-  knitr::include_graphics("./figures/hm_l1_v1_annotated.PNG")
-```
-
-This could be an indication that I've 'lost' some `immune` cells by misclassifying them into other categories.
-Another way I can check this behavior is by looking at the pairsplot again, this time colored by the major cell type classifications.
-
-Cells which are positive for both `immune` + another category tend to be classified to the other category.
-We suspect that a large percentage of these double positive cells are in fact `immune`. 
-Some of the markers for other classes (like immunoglobulin plasma and collagen fibroblast markers) are particularly high expressors that may tend to bleed over cell boundaries, and many of the immune cell related genes are relatively low expressors by comparison.
-
-```{r,eval=FALSE}
-#| code-fold: true
-
-
-pairshat_l1_after_unrestricted <- metagene_pairsplot(metagenes_l1, "yhat"
-                                        ,nsamples = 5*10**4
-                                       ,obs = model_l1_unrestricted$post_probs[,.(cell_ID, celltype)]
-                                       ,colorvar = "celltype"
-                                       )
-
-```
-
-<div class="wider-image">
-  <img src="./figures/yhat_pairs_l1_unrestricted_annotated.PNG" alt="Wide Image">
-</div>
-```{r}
-#| eval: false
-#| echo: false
-
-  knitr::include_graphics("./figures/yhat_pairs_l1_unrestricted_annotated.PNG")
-```
-
-We use the `discourage_double_postive` argument to exclude `immune`-positive cells from the training data for other cell type classes.  This will have the effect of nudging double-positive cells towards the immune category in our model. 
-
-```{r,eval=FALSE}
-
-model_l1 <- 
-  cluster_metagenes(metagenes = metagenes_l1
-                    ,to_model = "yhat"
-                    ,discourage_double_positive = list("endothelial" = "immune" ### don't estimate components for 
-                                                       ,"epithelial" = "immune" ### epithelial / endothelial / plasma / fibroblast using cells with positive immune metagene scores
-                                                       ,"fibroblast" = "immune" ###  
-                                                       ,"plasma" = c("immune", "fibroblast", "endothelial", "epithelial"))
-  )
-model_l1$post_probs[,celltype:=best_class]
-model_l1$post_probs[best_score < 0.5,celltype:="unknown"]
-
-```
-
-We can show that immune cells look objectively better now. The index gene for immune cells, PTPRC (CD45), has gone up in expression for `immune`, and down for all other cell types.  Specificity (measured by fold change) has also increased for `immune`, and decreased for all other cell types.  The number of immune cells we call increases from 17,529 to 25,470.
-
-
-```{r,eval=FALSE}
-#| code-fold: true
-
-comp <- 
-rbindlist(list(fc_l1_unrestricted[gene %in% c("PTPRC")][,typ:="unrestricted"]
-               ,fc_l1[gene %in% c("PTPRC")][,typ:="discouraged_double_pos"]
-))
-barplot_prop <- 
-ggplot(comp, aes(y= gene, fill = typ, x = cluster_prop)) + 
-  geom_bar(stat='identity',position=position_dodge2(width=0.8))  + 
-  facet_wrap(~cluster,labeller=label_both) + 
-  theme_bw() + 
-  theme(text=element_text(face='bold',size=14)) + 
-  geom_text(aes(label=paste0("(",scales::comma(ncells),")"), x = cluster_prop + 0.005),position=position_dodge(width=0.8)) + 
-  scale_fill_manual(values = brewer.pal(3,"Dark2"), guide=guide_legend(reverse = TRUE)) + 
-  labs(x = "Proportion of PTPRC+ cells (# of cells assigned to cluster)"
-       ,title="Before vs. After double+ immune scores")
-
-
-barplot_fc <- 
-ggplot(comp, aes(y= gene, fill = typ, x = fold_change)) + 
-  geom_bar(stat='identity',position=position_dodge2(width=0.8))  + 
-  facet_wrap(~cluster,labeller=label_both) + 
-  theme_bw() + 
-  theme(text=element_text(face='bold',size=14)) + 
-  scale_fill_manual(values = brewer.pal(3,"Dark2"), guide=guide_legend(reverse = TRUE)) + 
-  scale_x_continuous(n.breaks=10) + 
-  labs(x = "Fold Change for PTPRC")
-
-comp_barplots <- 
-cowplot::plot_grid(barplot_prop, barplot_fc, nrow=2) + 
-theme(plot.background = element_rect(fill = 'white',color='white')) + 
-  cowplot::panel_border(remove=TRUE) 
-
-print(comp_barplots)
-```
-
-<div class="wider-image">
-  <img src="./figures/comp_barplots_l1_ptprc.png" alt="Wide Image">
-</div>
-
-```{r}
-#| eval: false
-#| echo: false
-
-  knitr::include_graphics("./figures/comp_barplots_l1_ptprc.png")
-```
-The marker heatmap looks cleaner as well.
-
-```{r,eval=FALSE}
-#| code-fold: true
-
+#| echo: true
 
 fc_l1 <- 
   clusterwise_foldchange_metrics(normed = sem[["RNA"]]@data
-                     ,metadata = model_l1$post_probs
-                     ,clustercol = "best_class"
+                     ,metadata =immune_typing$post_probs[[1]]
+                     ,cluster_column = "celltype_granular"
   )
-hm_l1_v2 <- marker_heatmap(fc_l1
-                           ,featsuse = levels(hm_l1_v1$data$gene)
-                           ,geneorder = levels(hm_l1_v1$data$gene)
-                           ,orient_diagonal = FALSE
-                           )
-print(hm_l1_v2)
+hm_l1 <- marker_heatmap(fc_l1, extras = c("CD3D", "CD4", "CD8A", "CD8B", "FOXP3"))
+print(hm_l1)
+```
 
+
+```{r}
+#| eval: false
+#| echo: false
+
+
+ggsave(plot=hm_l1, filename = "figures/hm_l1.png", width = 1280 * sqrt(20), height = 433 * sqrt(20), units = "px", dpi = 450)
+fwrite(fc_l1, "data/fc_l1.csv")
 ```
 
 <div class="wider-image">
-  <img src="./figures/hm_l1_v2.png" alt="Wide Image">
+  <img src="./figures/hm_l1.png" alt="Wide Image">
 </div>
 
 ```{r}
 #| eval: false
 #| echo: false
 
-knitr::include_graphics("./figures/hm_l1_v2.png")
+knitr::include_graphics("./figures/hm_l1.png")
 
 ```
-
-
-Remaking the pairsplot, we see many of the cells previously highlighted switch to `immune`.
-```{r,eval=FALSE}
-#| code-fold: true
-
-pairshat_l1_after <- metagene_pairsplot(metagenes_l1, "yhat"
-                                        ,nsamples = 5*10**4
-                                       ,obs = model_l1$post_probs[,.(cell_ID, celltype)]
-                                       ,colorvar = "celltype"
-                                       )
-
-
-```
-
-<div class="wider-image">
-  <img src="./figures/pairshat_l1_after.png" alt="Wide Image">
-</div>
 ```{r}
-#| eval: false
-#| echo: false
-
-  knitr::include_graphics("./figures/pairshat_l1_after.png")
-```
-
-
-### Level 2: Immune cell classification
-
-Now let's classify our immune cells.  We hope to find some of these cell types: [`tcell`,`bcell`,`macrophage`,`neutrophil`,`mast`,`monocyte`,`cDC`,`pDC`].
-
-The `markerslist_l2immune` dataset follows the previously discussed format with an index gene and predictors for each cell type.
-
-```{r}
-data("markerslist_l2immune")
-str(markerslist_l2immune)
+lapply(smiSmooth::markerslist_immunemajor, "[[", "index_marker")
 
 ```
-
-We fit the metagene scores and cluster like before, however this time we can pass in the posterior probability from our as a weight using the `prior_level_weights` argument and `prior_prob_level` arguments.  This allows us to use information from all cells, but account for our uncertainty that they belong to any of the immune cell types we wish to identify.
-
-
-```{r,eval=FALSE}
-metagenes_l2 <- 
-  fit_metagene_scores(markerslist_l2immune
-                      ,counts_matrix =  Matrix::t(sem[["RNA"]]@counts)
-                      ,adjacency_matrix = as(sem@graphs$umapgrph, "CsparseMatrix")
-                      ,prior_level_weights = model_l1$post_probs$immune
-  )
-
-model_l2 <- 
-  cluster_metagenes(metagenes = metagenes_l2
-                    ,to_model = "yhat"
-                    ,prior_prob_level = model_l1$post_probs$immune
-  )
-
-
-```
-
-The posterior probabilities from `model_l2$post_probs` already account for the probability a cell is '`immune`'.
-We can join these data together with our first high-level model, and label cells with low probability for any category as "unknown".  Then we'll take a look at the marker heatmap.  I'm pretty happy with this for the most part; the marker genes in the heatmap line up well with the cell types we assigned them to in `markerslist_l2immune`.
-However, I do see that the `mast` cells have some enrichment in `tcell` marker genes (highlighted below in the heatmap). 
-
-```{r, eval=FALSE}
-
-probs <- merge(model_l1$post_probs, model_l2$post_probs, suffixes=c("_l1", "_l2"), by = "cell_ID")
-probs[,`:=`(celltype=best_class_l2, best_score=best_score_l2)]
-probs[best_score_l2 < 0.5,`:=`(celltype=best_class_l1, best_score=best_score_l1)]
-probs[best_class_l1 =="immune",`:=`(celltype=best_class_l2, best_score = best_score_l2)]
-probs[best_score_l1 < 0.5,celltype:="unknown"]
-
-fc_l2 <- 
-  clusterwise_foldchange_metrics(normed = sem[["RNA"]]@data
-                                 ,metadata = probs
-                                 ,clustercol = "celltype"
-  )
-
-hm_l2 <- smiSmooth::marker_heatmap(fc_l2, extras =c("S100A8", "S100A9", "CD68", "LILRA4", "CLEC4C", "CD14", "CLEC9A"))
-
-```
-
-<div class="wider-image">
-  <img src="./figures/hm_l2_annotated.png" alt="Wide Image">
-</div>
-
-```{r}
-#| eval: false
-#| echo: false
-
-  knitr::include_graphics("./figures/hm_l2_annotated.png")
-```
-
-I refit the model again, this time "discouraging double positives" for `tcell` likely cells to be classified as `mast`.
-
-
-```{r, eval=FALSE}
-model_l2_v2 <- 
-  cluster_metagenes(metagenes = metagenes_l2
-                    ,to_model = "yhat"
-                    ,prior_prob_level = model_l1$post_probs$immune
-                    ,discourage_double_positive = list("mast" = c("tcell"))
-  )
-```
-
-
-This ends up looking a lot better, both visually in terms of the marker heatmap, as well as the actual percentages and fold change of CD3 expression in `mast` and `tcell`.
-```{r,eval=FALSE}
-#| code-fold: true
-
-
-probs <- merge(model_l1$post_probs, model_l2_v2$post_probs, suffixes=c("_l1", "_l2"), by = "cell_ID")
-probs[,`:=`(celltype=best_class_l2, best_score=best_score_l2)]
-probs[best_score_l2 < 0.5,`:=`(celltype=best_class_l1, best_score=best_score_l1)]
-probs[best_class_l1 =="immune",`:=`(celltype=best_class_l2, best_score = best_score_l2)]
-probs[best_score_l1 < 0.5,celltype:="unknown"]
-probs[,.N,by=celltype]
-
-fc_l2_v2 <- 
-  clusterwise_foldchange_metrics(normed = sem[["RNA"]]@data
-                                 ,metadata = probs
-                                 ,clustercol = "celltype"
-  )
-
-marker_heatmap(fc_l2_v2)
-
-hm_l2_v2 <- smiSmooth::marker_heatmap(fc_l2_v2, extras =c("S100A8", "S100A9", "CD68", "LILRA4", "CLEC4C", "CD14", "CLEC9A"))
-print(hm_l2_v2)
-```
-
-
-<div class="wider-image">
-  <img src="./figures/hm_l2_v2.png" alt="Wide Image">
-</div>
-
-```{r}
-#| eval: false
-#| echo: false
-  knitr::include_graphics("./figures/hm_l2_v2.png")
-```
-
-```{r, eval=FALSE}
-#| code-fold: true
-comp <- 
-rbindlist(list(fc_l2[gene %in% c("CD3E", "CD3D", "CD3G")][cluster %in% c("tcell", "mast")][,typ:="v1_before"]
-               ,fc_l2_v2[gene %in% c("CD3E", "CD3D", "CD3G")][cluster %in% c("tcell", "mast")][,typ:="v2_after"]
-))
-
-barplot_prop <- 
-ggplot(comp, aes(y= gene, fill = typ, x = cluster_prop)) + 
-  geom_bar(stat='identity',position=position_dodge(width=0.8))  + 
-  facet_wrap(~cluster,labeller=label_both) + 
-  theme_bw() + 
-  theme(text=element_text(face='bold',size=14)) + 
-  geom_text(aes(label=paste0("(",scales::comma(ncells),")"), x = cluster_prop + 0.005),position=position_dodge(width=0.8)) + 
-  scale_fill_manual(values = brewer.pal(3,"Dark2"), guide=guide_legend(reverse = TRUE)) + 
-  labs(x = "Proportion of CD3+ cells (# of cells assigned to cluster)"
-       ,title="Before vs. After refining double+ tcell scores in mast cell model")
-
-
-barplot_fc <- 
-ggplot(comp, aes(y= gene, fill = typ, x = fold_change)) + 
-  geom_bar(stat='identity',position=position_dodge(width=0.8))  + 
-  facet_wrap(~cluster,labeller=label_both) + 
-  theme_bw() + 
-  theme(text=element_text(face='bold',size=14)) + 
-  scale_fill_manual(values = brewer.pal(3,"Dark2"), guide=guide_legend(reverse = TRUE)
-                    ) + 
-  scale_x_continuous(n.breaks=10) + 
-  labs(x = "Fold Change for CD3  (# of cells assigned to cluster)")
-
-comp_barplots <- 
-cowplot::plot_grid(barplot_prop, barplot_fc, nrow=2) + 
-theme(plot.background = element_rect(fill = 'white',color='white')) + 
-  cowplot::panel_border(remove=TRUE) 
-print(comp_barplots)
-```
-
-<div class="wider-image">
-  <img src="./figures/comp_barplots_l1l2.png" alt="Wide Image">
-</div>
-
-```{r}
-#| eval: false
-#| echo: false
-
-  knitr::include_graphics("./figures/comp_barplots_l1l2.png")
-```
-
 
 Here's a spatial plot of the cell types we've called so far.  We could stop here, or continue in the same manner for subclassifying any other cell types.
 ```{r,eval=FALSE}
+#| code-fold: true
 
-
-met <- merge(data.table(sem@meta.data), probs[,.(celltype, cell_ID)])
-colorpal <- c('#F0A0FF','#E0FF66','#C20088','#00998F','#426600','#005C31','#808080','#94FFB5','#003380','#191919','#990000','#0075DC','#FFA405')
-names(colorpal) <- sort(unique(met[["celltype"]]))
+met <- merge(data.table(sem@meta.data)
+             ,immune_typing$post_probs$l1[,.(cell_ID, celltype_supervised = celltype_granular)]
+             ,by="cell_ID")
+#colorpal <- c('#F0A0FF','#E0FF66','#C20088','#00998F','#426600','#808080','#191919','#003380', '#005C31','#94FFB5','#990000','#0075DC','#FFA405')
+colorpal <- c('#F0A0FF','#E0FF66','#C20088','#00998F','#426600','#808080','white','#003380', '#005C31','#94FFB5','#990000','#0075DC','#FFA405')
+names(colorpal) <- sort(unique(met[["celltype_supervised"]]))
 
 
 xyplist <- 
 lapply(split(met, by="portion"), function(xx){
-  smiSmooth:::xyplot(cluster_column = "celltype", metadata = xx, ptsize = 0.01, cls = colorpal) + coord_fixed()
+  smiSmooth:::xyplot(cluster_column = "celltype_supervised", metadata = xx, ptsize = 0.01, cls = colorpal) + coord_fixed() + ggdark::dark_theme_bw()
 })
 
-cowplot::plot_grid(plotlist=xyplist)
+cowplot::plot_grid(plotlist=xyplist) + 
+theme(plot.background = element_rect(fill = 'black',color='black')) + 
+  cowplot::panel_border(remove=TRUE) 
+
+```
 
 
+```{r}
+#| eval: false
+#| echo: false
+
+ggsave("figures/xyplot_celltypes.png",width = 1710*sqrt(50), height = 936*sqrt(50), units = "px", dpi=500)
 ```
 
 <div class="wider-image">
@@ -1051,6 +938,29 @@ knitr::include_graphics("./figures/xyplot_celltypes.png")
 
 
 
+
+```{r}
+#| eval: false
+#| echo: false
+
+
+sem <- Seurat::AddMetaData(sem, metadata = data.frame(immune_typing$post_probs$l1[,.(celltype_granular)], row.names = immune_typing$post_probs$l1$cell_ID))
+umapf("umap", "celltype_granular", semuse = sem, alpha = 0.5)
+umapf("umap", "clusters_unsup", semuse = sem, alpha = 0.5)
+comp <- 
+merge(
+  fc_l1[gene %in% c("CD3D", "CD3E", "CD3G","IL7R","MS4A1")][cluster %in% c("cd4t", "cd8t")][
+    ,.(ncells=sum(ncells),cluster_expr = sum(cluster_expr*ncells)/sum(ncells)),by=.(gene)]
+  ,fc_l1[gene %in% c("CD3D", "CD3E", "CD3G","IL7R","MS4A1")][!cluster %in% c("cd4t", "cd8t")][
+    ,.(ncells_prime=sum(ncells),cluster_expr_prime = sum(cluster_expr*ncells)/sum(ncells)),by=.(gene)]
+  ,by="gene")[,fold_change:=cluster_expr / cluster_expr_prime]
+
+fctbl_unsup[gene %in% c("CD3D","CD3G", "CD3E", "IL7R","MS4A1")][cluster==6]
+fc_l1[gene %in% c(smiSmooth::markerslist_immunemajor$bcell$index_marker)][cluster %in% c("bcell")][
+  order(-fold_change)]
+
+```
+
 # Conclusion
 
 We've discussed a method for cell typing that uses predefined sets of marker genes to build cell type specific metagene scores, which are probabilistically clustered into cell types.
@@ -1059,12 +969,11 @@ Using a predefined set of marker genes has several advantages.  For one, this al
 
 The NNLS regression framework for estimating celltype metagenes allows for improved prediction power by incorporating information from similar cells through an adjacency network. By restricting the direction of the regression coefficients, we've implicitly imposed an assumption of positive covariance between these markers within the corresponding cell type class.  Sign constraints have been shown to be as effective in some cases as explicit regularization [@nnlsref].  
 
-We use a mixture of overfitted multivariate gaussian mixture models for probabilistic cell type classification.  This approach is effectively a non-parametric mixture model, where we assume that the distribution of metagene scores for each cell type can be a approximated by a 'large-enough' mixture of multivariate gaussians [@aragam2020identifiability]. The simple selection of anchor cells based on score positivity, and ability to fine tune cell typing by controlling behavior of double positivity should allow for easy user control and flexibility. 
+We use a mixture of overfitted multivariate gaussian mixture models for probabilistic cell type classification.  This approach is effectively a non-parametric mixture model, where we assume that the distribution of metagene scores for each cell type can be approximated by a 'large-enough' mixture of multivariate gaussians [@aragam2020identifiability]. The simple selection of anchor cells based on score positivity, and ability to fine tune cell typing by controlling behavior of double positivity should allow for easy user control and flexibility. 
 
 There are several future improvements for this method we hope to work on.
-For example, allowing the use of multiple 'index genes' for each cell type; in this case the cell type metagene score is a composite score of multiple imputed 'index genes'.  
 Simultaneous estimation of metagene scores and clustering (perhaps through a regression-based mixture model) might enhance the power of metagene scores and classification by optimizing the cell allocations to the correct cluster simultaneously during model-fitting.  Exploring other frameworks outside of NNLS regression could potentially capture more flexible model structures with interaction and non-linearity.  
 The ability or freedom to learn additional marker genes from the data, and an extension to a semi-supervised framework where cell types where marker genes are unknown a priori would also be useful.
 
-We've implemented the tools presented here in the R package [XX](link).
+We've implemented the tools presented here in the R package [smiSmooth](link).
 
