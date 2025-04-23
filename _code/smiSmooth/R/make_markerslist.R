@@ -84,7 +84,7 @@ make_markerslist <- function(
                     ," but not specified as predictors."
                     ,"\nThese will be added to the predictors list and used when not also specified as the response variable in metagene model.")
       message(msg)
-      predictors[[ct]] <- c(index_markers_not_in_predictors, predictors[[ct]])
+      predictors[[ct]] <- unique(c(index_markers_not_in_predictors, predictors[[ct]]))
     }
   }
   
