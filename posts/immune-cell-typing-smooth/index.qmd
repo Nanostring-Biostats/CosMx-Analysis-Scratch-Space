@@ -1,5 +1,5 @@
 ---
-title: "Cell typing using metagenes and smoothing"
+title: "Using marker gene driven metagene scores for granular hierarchical cell typing."
 author:
   - name: Dan McGuire
     orcid: 0009-0006-0286-9625
@@ -17,7 +17,7 @@ date: "2025-04-22"
 categories:
   - cell typing
 image: figures/hm_tsubtype.png
-description: "Using marker gene driven cell type metagene scores for granular hierarchical cell typing. "
+description: "Cell typing using metagenes and smoothing."
 draft: false
 format:
   html: 
@@ -32,7 +32,7 @@ We use a 6K-plex colon-cancer dataset to demonstrate two common use cases for th
 1. Subtyping T cells
 2. Broad immune cell typing.
 
-Code for the method and utility functions used in this post can be found in the R package [smiSmooth](link). 
+Code for the method and utility functions used in this post can be found in the R package [HieroType](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HieroType). 
 
 # Quick links to the code
 
@@ -71,13 +71,13 @@ library(ggrepel)
 library(data.table)
 ```
 ```{r,eval=TRUE}
-library(smiSmooth)
+library(HieroType)
 ```
 
 
 ```{r , message=FALSE, eval = FALSE}
 sem <- readRDS("colon_seurat.rds")
-normed <- smiSmooth::totalcount_norm(Matrix::t(sem[["RNA"]]@counts))
+normed <- HieroType::totalcount_norm(Matrix::t(sem[["RNA"]]@counts))
 sem <- Seurat::SetAssayData(sem, layer = "data", new.data = Matrix::t(normed))
 ```
 
@@ -86,7 +86,7 @@ sem <- Seurat::SetAssayData(sem, layer = "data", new.data = Matrix::t(normed))
 #| echo: false
 
 #setwd("~/data/dan/scratch_space/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth")
-devtools::load_all("~/data/dan/imputation_smoothing/smiSmooth", export_all = FALSE)
+devtools::load_all("~/data/dan/imputation_smoothing/HieroType", export_all = FALSE)
 ```
 
 ```{r}
@@ -101,7 +101,7 @@ library(data.table)
 
 #sem <- readRDS("colon_seurat.rds")
 sem <- readRDS("~/data/dan/imputation_smoothing/colondata/semsub.rds")
-normed <- smiSmooth::totalcount_norm(Matrix::t(sem[["RNA"]]@counts))
+normed <- HieroType::totalcount_norm(Matrix::t(sem[["RNA"]]@counts))
 sem <- Seurat::SetAssayData(sem, layer = "data", new.data = Matrix::t(normed))
 
 ```
@@ -119,7 +119,7 @@ sem@meta.data$portion <- "part_a"
 sem@meta.data$portion[sem@meta.data$fov %in% 60:73] <- "part_b"
 xyplist <- 
 lapply(split(data.table(sem@meta.data), by = "portion"), function(xx){
-  smiSmooth::xyplot("clusters_unsup", metadata = xx,ptsize = 0.1) + coord_fixed()
+  HieroType::xyplot("clusters_unsup", metadata = xx,ptsize = 0.1) + coord_fixed()
 })
 xypl <- 
 cowplot::plot_grid(plotlist=xyplist, nrow=1) + 
@@ -145,18 +145,18 @@ knitr::include_graphics("./figures/xyp_unsup.png")
 #### Heatmap of initial clusters
 
 We can make a marker gene heatmap to identify some of the top marker genes for each cluster and see if we recognize any of the celltypes represented by the unsupervised clusters.
-Here we can use a couple of convenience functions provided in the R package `smiSmooth`.
+Here we can use a couple of convenience functions provided in the R package `HieroType`.
 
 ```{r, eval=FALSE}
 #| code-fold: true
 
 fctbl_unsup <- 
-smiSmooth::clusterwise_foldchange_metrics(normed  = sem[["RNA"]]@data
+HieroType::clusterwise_foldchange_metrics(normed  = sem[["RNA"]]@data
                                           ,metadata = sem@meta.data
                                           ,cluster_column = "clusters_unsup"
                                           )
 
-hm_unsup <- smiSmooth::marker_heatmap(fctbl_unsup
+hm_unsup <- HieroType::marker_heatmap(fctbl_unsup
                            ,extras = c("CD3D", "CD4", "FOXP3"
                                        , "CD8B", "CD8A")
                            )
@@ -189,7 +189,7 @@ I'd like to split these cells further into at least a few meaningful T-cell subt
 
 ## 'Just The Code' {#tldr}
 
-Here's the code for classifying leiden cluster '6' into `cd8t` and `cd4t` cell types , followed by more granular T cell subtyping.  We use the R package `smiSmooth` with a prespecified `tcell_pipeline`, and corresponding lists of marker genes included as package datasets.
+Here's the code for classifying leiden cluster '6' into `cd8t` and `cd4t` cell types , followed by more granular T cell subtyping.  We use the R package `HieroType` with a prespecified `tcell_pipeline`, and corresponding lists of marker genes included as package datasets.
 
 ```{r, eval=TRUE}
 
@@ -256,7 +256,7 @@ For example, CD3D, CD3E, and CD3G are general T cell markers, and so are include
 We can create our marker list manually like this:
 ```{r, eval=TRUE}
 markerslist_tcellmajor <- 
-smiSmooth::make_markerslist(
+HieroType::make_markerslist(
   index_marker = list(
     "cd8t" = c("CD8B", "CD8A")
     ,"cd4t" = c("CD4")
@@ -435,7 +435,7 @@ The `cluster_metagenes` function we run below estimates a mixture of overfitted 
 #| echo: true
 
 model_t <- 
-smiSmooth::cluster_metagenes(metagenes = metagenes_t)
+HieroType::cluster_metagenes(metagenes = metagenes_t)
 ```
 
 ```{r}
@@ -493,21 +493,21 @@ For example, if I wanted to go ahead and cluster the `cd4t` cells into subtypes,
 Below is an example of this syntax using the `cd4t` subtypes in the package dataset "markerslist_cd4tminor".
 
 ```{r, eval=TRUE}
-str(smiSmooth::markerslist_cd4tminor, max.level=2)
+str(HieroType::markerslist_cd4tminor, max.level=2)
 ```
 
 ```{r, eval=FALSE}
 #### Classify cd4t subtypes
 metagenes_t4 <-
-  smiSmooth::fit_metagene_scores(
-    markerslist = smiSmooth::markerslist_cd4tminor
+  HieroType::fit_metagene_scores(
+    markerslist = HieroType::markerslist_cd4tminor
     ,counts_matrix = Matrix::t(sem[["RNA"]]@counts[,tcell_ids])
     ,adjacency_matrix = as(sem@graphs$umapgrph
                            ,"CsparseMatrix")[tcell_ids,tcell_ids]
     ,prior_level_weights = model_t$post_probs$cd4t ## prior probability of cd4t
   )
 model_t4 <- 
-smiSmooth::cluster_metagenes(metagenes = metagenes_t4, prior_prob_level = model_t$post_probs$cd4t)
+HieroType::cluster_metagenes(metagenes = metagenes_t4, prior_prob_level = model_t$post_probs$cd4t)
 
 ```
 
@@ -521,9 +521,9 @@ A custom hierarchical cell typing pipeline could be created like this below, whe
 
 ```{r}
 pipeline_tcell <- 
-  make_pipeline(markerslists = list("tmajor" = smiSmooth::markerslist_tcellmajor
-                    ,"t4minor" = smiSmooth::markerslist_cd4tminor
-                    ,"t8minor" = smiSmooth::markerslist_cd8tminor
+  make_pipeline(markerslists = list("tmajor" = HieroType::markerslist_tcellmajor
+                    ,"t4minor" = HieroType::markerslist_cd4tminor
+                    ,"t8minor" = HieroType::markerslist_cd8tminor
                     )
                  ,priors = list("t4minor" = "tmajor"
                                ,"t8minor" = "tmajor")
@@ -537,7 +537,7 @@ class(pipeline_tcell)
 
 This particular pipeline is also saved as a package dataset.
 ```{r}
-str(smiSmooth::pipeline_tcell, max.level=2)
+str(HieroType::pipeline_tcell, max.level=2)
 ```
 
 The code to run the pipeline is shown below.
@@ -586,7 +586,7 @@ We can remake this table with a different cutoff in mind as needed, depending on
 As demonstration, we can look at the output if we were to raise our threshold from 0.5 to 0.8.  
 We can "`return_all_columns`" to show a more verbose result, with individual columns showing the joint probability scores for all possible cell type categories in each cell.
 ```{r}
-smiSmooth::combine_postprob_tables(pipeline = pipeline_tcell
+HieroType::combine_postprob_tables(pipeline = pipeline_tcell
                                    ,models = tcell_typing$models
                                    ,celltype_call_threshold = 0.8
                                    ,return_all_columns = TRUE)[["tmajor"]][1:10]
@@ -610,10 +610,10 @@ Looking at the specific index markers for each subtype, we see good agreement be
 fct <- clusterwise_foldchange_metrics(counts = sem[["RNA"]]@counts[,tcell_ids]
                                       ,metadata = tcell_typing$post_probs[["tmajor"]]
                                       ,cluster_column = "celltype_granular")
-idxs <- unique(unname(c(unlist(lapply(smiSmooth::markerslist_cd4tminor, "[[", "index_marker"))
-               ,unlist(lapply(smiSmooth::markerslist_cd8tminor, "[[", "index_marker")))))
+idxs <- unique(unname(c(unlist(lapply(HieroType::markerslist_cd4tminor, "[[", "index_marker"))
+               ,unlist(lapply(HieroType::markerslist_cd8tminor, "[[", "index_marker")))))
 
-nms <- c("cd4t", names(smiSmooth::markerslist_cd4tminor), "cd8t", names(smiSmooth::markerslist_cd8tminor))
+nms <- c("cd4t", names(HieroType::markerslist_cd4tminor), "cd8t", names(HieroType::markerslist_cd8tminor))
 hmsubtype <- marker_heatmap(fct, featsuse = c("CD8A", "CD8B", "CD4", idxs), geneorder = c("CD8A", "CD8B", "CD4", idxs), clusterorder = nms, orient_diagonal = TRUE)
 print(hmsubtype)
 ```
@@ -628,10 +628,10 @@ fwrite(fct, file="data/fc_t_subtypesonly.csv")
 
 ```{r}
 ### The key index markers for cd4 subtypes
-lapply(smiSmooth::markerslist_cd4tminor, "[[", "index_marker")
+lapply(HieroType::markerslist_cd4tminor, "[[", "index_marker")
 
 ### The key index markers for cd8 subtypes
-lapply(smiSmooth::markerslist_cd8tminor, "[[", "index_marker")
+lapply(HieroType::markerslist_cd8tminor, "[[", "index_marker")
 ```
 
 <div class="wider-image">
@@ -656,12 +656,12 @@ merge(data.table(sem@meta.data), tcell_typing$post_probs[["tmajor"]][,.(cell_ID,
 met[is.na(celltype),celltype:=clusters_unsup]
 
 fc_t_all <- 
-smiSmooth::clusterwise_foldchange_metrics(normed = sem[["RNA"]]@data
+HieroType::clusterwise_foldchange_metrics(normed = sem[["RNA"]]@data
                    ,metadata = met
                    ,cluster_column = "celltype"
                    )
 
-hm_tcell <- smiSmooth::marker_heatmap(fc_t_all
+hm_tcell <- HieroType::marker_heatmap(fc_t_all
                            ,extras = c("CD4", "CD8A", "CD8B")
                           )
 print(hm_tcell)
@@ -770,10 +770,10 @@ The next section will cover the details and discuss a few choices that were made
 ### level-2 ('l2') being classification of major immune cell categories
 ### level-t ('lt') being T8/T4 classification
 
-pipeline_io <- smiSmooth::make_pipeline(
-  markerslists = list("l1" = smiSmooth::markerslist_l1
-                      ,"l2" = smiSmooth::markerslist_immunemajor
-                      ,"lt" = smiSmooth::markerslist_tcellmajor)
+pipeline_io <- HieroType::make_pipeline(
+  markerslists = list("l1" = HieroType::markerslist_l1
+                      ,"l2" = HieroType::markerslist_immunemajor
+                      ,"lt" = HieroType::markerslist_tcellmajor)
   ,priors = list("lt" = "l2"
                  ,"l2" = "l1") 
   ,priors_category = list("lt" = "tcell"
@@ -816,7 +816,7 @@ saveRDS(immune_typing, "data/immune_typing.rds")
 
 Like previously, this `pipeline`, and the corresponding `markerslists` are saved as package datasets.
 ```{r}
-str(smiSmooth::pipeline_io,max.level=3)
+str(HieroType::pipeline_io,max.level=3)
 ```
 
 We can look at a heatmap showing the marker genes for our cell types to check whether the algorithm produced sensible results.
@@ -862,7 +862,7 @@ knitr::include_graphics("./figures/hm_l1.png")
 
 ```
 ```{r}
-lapply(smiSmooth::markerslist_immunemajor, "[[", "index_marker")
+lapply(HieroType::markerslist_immunemajor, "[[", "index_marker")
 
 ```
 
@@ -883,7 +883,7 @@ names(colorpal) <- sort(unique(met[["celltype_supervised"]]))
 
 xyplist_sup <- 
   lapply(split(met, by="portion"), function(xx){
-    smiSmooth:::xyplot(cluster_column = "celltype_supervised", metadata = xx
+    HieroType:::xyplot(cluster_column = "celltype_supervised", metadata = xx
                        , ptsize = 0.1, cls = colorpal
                        #,clusters = c("cd4t", "cd8t", "bcell")
 #                       , ptsize = 0.01, cls = colorpal
@@ -931,7 +931,7 @@ Below, we notice several interesting things about the spatial distribution of `c
 
 xyplist_lymph <- 
   lapply(split(met, by="portion"), function(xx){
-    smiSmooth:::xyplot(cluster_column = "celltype_supervised", metadata = xx
+    HieroType:::xyplot(cluster_column = "celltype_supervised", metadata = xx
                        , ptsize = 0.05, cls = colorpal
                        ,clusters = c("cd4t", "cd8t", "bcell")
                        ) + coord_fixed()
@@ -1000,5 +1000,5 @@ There are several future improvements for this method we hope to work on.
 Simultaneous estimation of metagene scores and clustering (perhaps through a regression-based mixture model) might enhance the power of metagene scores and classification by optimizing the cell allocations to the correct cluster simultaneously during model-fitting.  Exploring other frameworks outside of NNLS regression could potentially capture more flexible model structures with interaction and non-linearity.  
 The ability or freedom to learn additional marker genes from the data, and an extension to a semi-supervised framework where cell types where marker genes are unknown a priori would also be useful.
 
-We've implemented the tools presented here in the R package [smiSmooth](link).
+We've implemented the tools presented here in the R package [HieroType](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HieroType).
 
