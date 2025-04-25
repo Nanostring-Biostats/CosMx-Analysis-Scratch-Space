@@ -55,7 +55,7 @@ The basic framework for the method can be described in a few basic steps (we'll 
 We'll use an internally generated colon cancer dataset profiled with the CosMx Human 6K Discovery Panel comprised of about 112k cells, and work through two common cell typing scenarios in which we envision this methodology can be useful:
 
 1. Subclustering an existing set of cell types: 
-  * In this first case, we'll assume we've already done some basic clustering, but don't quite have the level of cell type granularity we'd like.  We'll take a 'T cell' cluster and sub-classify those cells into CD8-T, CD4-T, and T-reg cell categories.
+  * In this first case, we'll assume we've already done some basic clustering, but don't quite have the level of cell type granularity we'd like.  We'll take a 'T cell' cluster and sub-classify those cells into CD8-T and CD4-T, followed by more granular T cell subcategories.
 
 2. Top down hierarchical cell typing with focus on immune cells: 
   * Here we'll start from scratch; first assigning cells into major categories and identifying immune cells, then classifying those immune cells into various sub classifications of myeloid and lymphocyte cell types.
@@ -225,44 +225,14 @@ saveRDS(tcell_typing, "figures/tcell_typing.rds")
 #| echo: false
 tcell_typing <- readRDS("figures/tcell_typing.rds")
 ```
-The data table `post_probs` in our model object `model_t` holds the high-level cell typing result; showing a posterior probability that each of our cells belongs to either `cd8t`, or `cd4t` categories, along with a 'best_class' label depending on which of these scores is highest for each cell.
+The data table `post_probs` in our `tcell_typing` object holds the high-level cell typing results; the `celltype_thresh` column shows the *most granular* cell type call where posterior probability is $> 0.5$ (our `celltype_call_threshold`).  We can see the posterior probablity for the `celltype_thresh` category in `best_score_thresh`.  
+The best granular cell type call (regardless of score) is given by the `celltype_granular` column, with `best_score_granular` indicating the corresponding posterior probability. 
 
 
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 str(tcell_typing, max.level = 2)
 tcell_typing$post_probs$tmajor[1:10][]
 ```
-
-```{r, eval=TRUE}
-### List of genes used to estimate a celltype-metagene score for each cell
-data("markerslist_tcellmajor")
-str(markerslist_tcellmajor)
-```
-```{r,eval=FALSE}
-
-tpipeline <- 
-  make_pipeline(markerslists = list("tmajor" = smiSmooth::markerslist_tcellmajor
-                    ,"t4minor" = smiSmooth::markerslist_cd4tminor
-                    ,"t8minor" = smiSmooth::markerslist_cd8tminor
-                    )
-                 ,priors = list("t4minor" = "tmajor"
-                               ,"t8minor" = "tmajor")
-                 ,priors_category = list("t4minor" = "cd4t"
-                                         ,"t8minor" = "cd8t"
-                                         )
-    )
-
-
-```
-
-
-
-
-
-We then used the posterior probabilities from our high-level T cell model to predict more granular classifications of `cd8t` and `cd4t`, including memory, naive, helper, and exhausted subtypes using corresponding marker gene sets.
-The results from `model_t4` and `model_t8` can be combined into a table `probs`, showing the best classification for cd4t or cd8t subtype.
-
-
 Now lets take a closer look at the details and describe the methodology for each step.
 
 
@@ -575,7 +545,7 @@ str(smiSmooth::pipeline_tcell, max.level=2)
 The code to run the pipeline looks like below:
 ```{r}
 #| eval: false
-#| echo: false
+#| echo: true
 
 ### Run a 'tcell'-typing pipeline, which 
 ### first classifies into T8/T4 categories (using the `tmajor` markerslist), 
@@ -896,46 +866,117 @@ lapply(smiSmooth::markerslist_immunemajor, "[[", "index_marker")
 ```
 
 Here's a spatial plot of the cell types we've called so far.  We could stop here, or continue in the same manner for subclassifying any other cell types.
+
 ```{r,eval=FALSE}
 #| code-fold: true
 
 met <- merge(data.table(sem@meta.data)
              ,immune_typing$post_probs$l1[,.(cell_ID, celltype_supervised = celltype_granular)]
              ,by="cell_ID")
-#colorpal <- c('#F0A0FF','#E0FF66','#C20088','#00998F','#426600','#808080','#191919','#003380', '#005C31','#94FFB5','#990000','#0075DC','#FFA405')
-colorpal <- c('#F0A0FF','#E0FF66','#C20088','#00998F','#426600','#808080','white','#003380', '#005C31','#94FFB5','#990000','#0075DC','#FFA405')
+
+colorpal <- c('#F0A0FF','#E0FF66','#C20088','#00998F','#426600'
+              , "#4C005C" 
+              ,'#191919'
+              ,'#003380', '#005C31','#94FFB5','#990000','#0075DC','#FFA405')
 names(colorpal) <- sort(unique(met[["celltype_supervised"]]))
 
-
-xyplist <- 
-lapply(split(met, by="portion"), function(xx){
-  smiSmooth:::xyplot(cluster_column = "celltype_supervised", metadata = xx, ptsize = 0.01, cls = colorpal) + coord_fixed() + ggdark::dark_theme_bw()
-})
-
-cowplot::plot_grid(plotlist=xyplist) + 
-theme(plot.background = element_rect(fill = 'black',color='black')) + 
+xyplist_sup <- 
+  lapply(split(met, by="portion"), function(xx){
+    smiSmooth:::xyplot(cluster_column = "celltype_supervised", metadata = xx
+                       , ptsize = 0.1, cls = colorpal
+                       #,clusters = c("cd4t", "cd8t", "bcell")
+#                       , ptsize = 0.01, cls = colorpal
+                       ,plotfirst = c("epithelial", "endothelial", "fibroblast", "smooth_muscle", "plasma")
+                       ) + coord_fixed()
+  })  
+xyplot_sup <- 
+cowplot::plot_grid(plotlist = xyplist_sup,nrow = 1) + 
+  theme(plot.background = element_rect(fill = 'white',color='white')) + 
   cowplot::panel_border(remove=TRUE) 
+print(xyplot_sup)
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+ 
+ggsave(plot=xyplot_sup
+       ,filename = "figures/xyplot_sup.png"
+       ,width=1773*sqrt(14)
+       , height = 909*sqrt(10)
+       ,units = "px")
 
 ```
+
+
+<div class="wider-image">
+  <img src="./figures/xyplot_sup.png" alt="Wide Image">
+</div>
 
 
 ```{r}
 #| eval: false
 #| echo: false
 
-ggsave("figures/xyplot_celltypes.png",width = 1710*sqrt(50), height = 936*sqrt(50), units = "px", dpi=500)
+knitr::include_graphics("./figures/xyplot_sup.png")
+```
+
+Below, we notice several interesting things about the spatial distribution of `cd8t`, `cd4t`, and `bcell` types. The `cd4t` cells tend to show higher colocalization with `bcell`s in tertiary lymphoid type structures, while `cd8t` spatial distribution are more dispersed throughout the tissue. This reflects the role of `cd8t` cells in seeking out and killing tumor cells, compared to the role of `cd4t` cells in local antigen presentation.
+
+
+```{r, eval=FALSE}
+#| code-fold: true
+
+xyplist_lymph <- 
+  lapply(split(met, by="portion"), function(xx){
+    smiSmooth:::xyplot(cluster_column = "celltype_supervised", metadata = xx
+                       , ptsize = 0.05, cls = colorpal
+                       ,clusters = c("cd4t", "cd8t", "bcell")
+                       ) + coord_fixed()
+  })
+
+lymphplot <- 
+cowplot::plot_grid(
+xyplist_lymph[[1]]  + 
+  facet_wrap(~celltype_supervised) + ggdark::dark_theme_bw() + theme(text=element_text(size=12,face='bold'))
+,xyplist_lymph[[2]]  + 
+  facet_wrap(~celltype_supervised) + ggdark::dark_theme_bw() + theme(text=element_text(size=12,face='bold'))
+,nrow=2
+,rel_heights  = c(1.3,1)
+)  + 
+  theme(plot.background = element_rect(fill = 'black',color='black')) + 
+  cowplot::panel_border(remove=TRUE) 
+
+
+print(lymphplot)
+
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+ggsave(plot=lymphplot
+       ,filename = "./figures/lymphxyplot.png"
+       ,width = 1042 * sqrt(24), height = 840 * sqrt(20)
+       ,units = 'px'
+       )
+
 ```
 
 <div class="wider-image">
-  <img src="./figures/xyplot_celltypes.png" alt="Wide Image">
+  <img src="./figures/lymphxyplot.png" alt="Wide Image">
 </div>
+
 
 ```{r}
 #| eval: false
 #| echo: false
 
-knitr::include_graphics("./figures/xyplot_celltypes.png")
+knitr::include_graphics("./figures/lymphxyplot.png")
 ```
+
 
 
 
