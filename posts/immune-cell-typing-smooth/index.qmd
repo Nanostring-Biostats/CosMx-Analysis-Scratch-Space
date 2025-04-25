@@ -85,6 +85,7 @@ sem <- Seurat::SetAssayData(sem, layer = "data", new.data = Matrix::t(normed))
 #| eval: false
 #| echo: false
 
+#setwd("~/data/dan/scratch_space/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth")
 devtools::load_all("~/data/dan/imputation_smoothing/smiSmooth", export_all = FALSE)
 ```
 
@@ -990,6 +991,10 @@ Using a predefined set of marker genes has several advantages.  For one, this al
 The NNLS regression framework for estimating celltype metagenes allows for improved prediction power by incorporating information from similar cells through an adjacency network. By restricting the direction of the regression coefficients, we've implicitly imposed an assumption of positive covariance between these markers within the corresponding cell type class.  Sign constraints have been shown to be as effective in some cases as explicit regularization [@nnlsref].  
 
 We use a mixture of overfitted multivariate gaussian mixture models for probabilistic cell type classification.  This approach is effectively a non-parametric mixture model, where we assume that the distribution of metagene scores for each cell type can be approximated by a 'large-enough' mixture of multivariate gaussians [@aragam2020identifiability]. The simple selection of anchor cells based on score positivity, and ability to fine tune cell typing by controlling behavior of double positivity should allow for easy user control and flexibility. 
+While we envision the method to be useful for many cell typing applications, there are several caveats and limitations users should keep in mind.
+One primary assumption is that the user has a sense of the tissue type they are working with and the cell types that are likely to be present.  If the user were to run a "tcell typing pipeline"  on myeloid cells, they may see unexpected or poor results.  Similarly, the "io pipeline" we used in Example 2, may not perform well in a very different tissue type, like brain for example.  If we wanted to apply this method to a tissue type like 'brain', we may need to generate a new pipeline, with `markerslists` for brain specific cell types like `neurons` and `oligodendrocytes`.  For cases where a major cell type exists in a dataset but does not have a `markerslists` to be modeled, that cell type could manifest as cells which have "low posterior probability" for all of the other cell type classes included in the pipeline.
+
+Primarily,.   For cases where cell types exist in a dataset, but don't have , the. Along this same line
 
 There are several future improvements for this method we hope to work on.
 Simultaneous estimation of metagene scores and clustering (perhaps through a regression-based mixture model) might enhance the power of metagene scores and classification by optimizing the cell allocations to the correct cluster simultaneously during model-fitting.  Exploring other frameworks outside of NNLS regression could potentially capture more flexible model structures with interaction and non-linearity.  
