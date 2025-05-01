@@ -157,11 +157,11 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reporterc
          main = paste0(colnames(res$resid)[i], ": log2(fold-change)\nfrom comparable regions elsewhere"))
     for (f in unique(res$fov)) {
       inds <- res$fov == f
-      rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), border = "black")
+      rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), border = "black")
     }
     for (f in rownames(res$fovstats$flag)[res$fovstats$flag[, i] > 0]) {
       inds <- res$fov == f
-      rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), lwd = 2, border = "yellow")
+      rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), lwd = 2, border = "yellow")
     }
     legend("right", pch = 16,
            col = rev(c("darkblue", "blue", "grey80", "red", "darkred")),
@@ -200,13 +200,13 @@ FOVSignalLossSpatialPlot <- function(res, shownames = TRUE, outdir = NULL, plotw
        main = "Log2 fold-change in total counts compared to similar regions")
   for (f in unique(res$fov)) {
     inds <- res$fov == f
-    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), border = "black")
+    rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), border = "black")
   }
   for (f in res$flaggedfovs_fortotalcounts) {
     inds <- res$fov == f
-    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), border = "yellow", lwd = 2)
+    rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), border = "yellow", lwd = 2)
     if (shownames) {
-      text(median(range(xy[inds, 1])), median(range(xy[inds, 2])), f, col = "green")
+      text(median(range(res$xy[inds, 1])), median(range(res$xy[inds, 2])), f, col = "green")
     }
   }
   legend("right", pch = 16,
@@ -243,13 +243,13 @@ mapFlaggedFOVs <- function(res, shownames = TRUE, outdir = NULL, plotwidth = NUL
        main = "Flagged FOVs")
   for (f in unique(res$fov)) {
     inds <- res$fov == f
-    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), col = scales::alpha("dodgerblue2", 0.5))
+    rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), col = scales::alpha("dodgerblue2", 0.5))
   }
   for (f in res$flaggedfovs) {
     inds <- res$fov == f
-    rect(min(xy[inds, 1]), min(xy[inds, 2]), max(xy[inds, 1]), max(xy[inds, 2]), col = scales::alpha("red", 0.5))
+    rect(min(res$xy[inds, 1]), min(res$xy[inds, 2]), max(res$xy[inds, 1]), max(res$xy[inds, 2]), col = scales::alpha("red", 0.5))
     if (shownames) {
-      text(median(range(xy[inds, 1])), median(range(xy[inds, 2])), f, col = "green")
+      text(median(range(res$xy[inds, 1])), median(range(res$xy[inds, 2])), f, col = "green")
     }
   }
   if (!is.null(outdir)) {
@@ -344,18 +344,56 @@ cellxgene2squarexbit <- function(counts, grid, genes, barcodes) {
   bitmat = matrix(0, length(setdiff(unique(grid), NA)), nbits)
   colnames(bitmat) <- paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), c("B", "G", 'Y', "R"))
   rownames(bitmat) <- setdiff(unique(grid), NA)
+  
+  # sparse matrix of grid squares to cells: 
+  inasquare <- !is.na(grid)
+  counts <- counts[inasquare, ]
+  grid <- grid[inasquare]
+  
+  gridmap <- Matrix::sparseMatrix(
+    i = as.numeric(as.factor(grid)),
+    j = seq_len(length(grid)),
+    x = 1,
+    dims = c(length(levels(as.factor(grid))), length(grid)))
+  rownames(gridmap) <- levels(as.factor(grid))
+  colnames(gridmap) <- rownames(counts)
+  
+  # total expression of genes in grid squares:
+  gridxgenecounts <- gridmap[, rownames(counts)] %*% counts 
+  
+  # convert to mean:
+  ncellspergrid <- Matrix::rowSums(gridmap)
+  gridxgenecounts <- Matrix::Diagonal(x = 1/ncellspergrid) %*% gridxgenecounts
+  rownames(gridxgenecounts) <- rownames(gridmap)
+  
+  # make a sparse matrix of bit -> gene mappings
+  gene2bitmap <- barcode2bitmatrix(barcodes)
+  rownames(gene2bitmap) <- genes
+  
+  # total expression of BITs in grid squares:
+  sharedgenes <- intersect(genes, colnames(counts))
+  gridxbitcounts <- gridxgenecounts[, sharedgenes]%*% gene2bitmap[sharedgenes, ]
+  
+  return(as.matrix(gridxbitcounts))
+}
+
+
+#' Convert the barcode vector to a matrix of bit assignments (genes * bits)
+barcode2bitmatrix <- function(barcodes) {
+  # number of bits:
+  nreportercycles <- nchar(barcodes[1]) / 2
+  nbits <- nreportercycles * 4
+  bitmap <- matrix(0, length(barcodes), nbits)
+  colnames(bitmap) <- paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), rep(c("B", "Y", "G", "R"), nreportercycles))
+  # fill out matrix:
   for (i in seq_len(nreportercycles)) {
     barcodeposition <- i*2
     barcodehere <- substr(barcodes, barcodeposition, barcodeposition)
     for (col in c("B", "Y", "G", "R")) {
-      tempgenes <- setdiff(genes[barcodehere == col], NA)
-      tempgenes <- intersect(tempgenes, colnames(counts))
-      temptotal <- Matrix::rowSums(counts[, tempgenes, drop = FALSE])
-      tempsquaretotal <- by(temptotal, grid, mean)
-      bitmat[names(tempsquaretotal), paste0("reportercycle", i, col)] <- tempsquaretotal
+      bitmap[barcodehere == col, paste0("reportercycle", i, col)] <- 1
     }
   }
-  return(bitmat)
+  return(bitmap)
 }
 
 

@@ -1,0 +1,77 @@
+
+#' Summarize genes' perturbation levels
+#' 
+#' For each gene, summarize perturbation with the following statistics:
+#' \itemize{
+#'  \item How broadly perturbed in disease: its median perturbation in non-controls / its median perturbation in controls
+#'  \item How strongly perturbed in disease: its 0.99 quantile perturbation in non-controls / its 0.999 quantile perturbation in controls
+#'  \item How variably perturbed in disease: the SD of its perturbation scores in disease
+#' }
+#' @param x Expression matrix for complete dataset, same as was input to initializeISD. Cells in rows, genes in columns.
+#' @param obj Output of initializeISD
+#' @param cells Vector of cell IDs to consider, e.g. if you want to subset to a single disease tissue. 
+#' All control cells will be included regardless. Default of NULL includes all cells.
+#' @param residtype Either "log2ratio" or "diff"
+#' @param plotresults Logical, for whether to make a summary plot of the results
+#' @param subsetsize Number of cells to use for these calculations
+#' @param eps For log2ratio calculations, this value is added to mean neighborhood expression levels.
+#' @param ratioeps Added to means and means+2sds when calculating ratios between disease and controls.
+#' @export
+summarizeGenePerturbation <- function(x, obj, cells = NULL, residtype = "log2ratio", plotresults = FALSE, eps = 1, ratioeps = 0.1, subsetsize = 1e5) {
+  ## format:
+  if (is.numeric(obj$tissue)) {
+    obj$tissue <- as.character(obj$tissue)
+  }
+  
+  ## checks:
+  if (any(is.na(x))) {
+    stop("NAs are present in x; complete data is required")
+  }
+  
+  ## get perturbation scores for a subset:
+  if (is.null(cells)) {
+    sub <- InSituDiff:::pseudoRandomSample(vec = seq_len(nrow(x)), n = subsetsize) 
+  } else {
+    sub <- InSituDiff:::pseudoRandomSample(vec = is.element(rownames(obj$neighbors), cells) | obj$iscontrol, n = subsetsize) 
+  }  
+  ## calculate perturbation scores:
+  mat <- getPerturbations(x = x, obj = obj, cells = sub, genes = NULL, residtype = residtype, eps = eps)
+  
+  ## summarize genes' perturbation levels:
+  sqerr <- mat^2
+  
+  meanerr <- Matrix::colMeans(sqerr[!obj$iscontrol[sub], ])
+  sderr <- sqrt(Matrix::colMeans((sqerr^2)[!obj$iscontrol[sub], ]) - meanerr^2)
+  upperconferr <- meanerr + 2 * sderr
+  
+  meancontrolerr <- Matrix::colMeans(sqerr[obj$iscontrol[sub], ])
+  sdcontrolerr <- sqrt(Matrix::colMeans((sqerr^2)[obj$iscontrol[sub], ]) - meancontrolerr^2)
+  upperconfcontrolerr <- meancontrolerr + 2 * sdcontrolerr
+  
+  out <- cbind((meanerr + ratioeps) / (meancontrolerr + ratioeps), 
+               (upperconferr + ratioeps) / (upperconfcontrolerr + ratioeps))
+  colnames(out) <- c("broadness", "intensity")
+  rownames(out) <- colnames(mat)
+  
+  if (plotresults) {
+    plot(out, col = 0, log = "xy",
+         xlab = "Mean disease perturbation / mean control perturbation",
+         ylab = "Mean + 2SD disease perturbation / Mean + 2SD control perturbation")
+    text(out[, 1], out[, 2], rownames(out), cex = 0.8)
+    legend("bottomright", legend = "broadly perturbed", cex = 0.8, bty = "n", text.col = "darkblue")
+    legend("topleft", legend = "intensely perturbed", cex = 0.8, bty = "n", text.col = "darkblue")
+  }
+  
+  return(out)
+}
+
+#' Identify the most perturbed genes given output of summarizeGenePerturbation()
+#' @param genescores Output of summarizeGenePerturbation()
+#' @param n Maximum number of genes to return
+#' @return A vector of names of highly perturbed genes
+#' @export
+identifyMostPerturbedGenes <- function(genescores, n = 1000) {
+  rownames(genescores)[order(genescores[, "intensity"], decreasing = TRUE)[seq_len(min(n, nrow(genescores) / 5))]]
+}
+
+
