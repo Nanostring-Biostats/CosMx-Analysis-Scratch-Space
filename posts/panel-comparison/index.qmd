@@ -1,0 +1,151 @@
+---
+title: "Guide to comparing data from different CosMx panels" 
+author:
+  - name: Patrick Danaher
+    orcid: 0000-0002-2844-5883
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+number-sections: true
+number-depth: 4
+date: "2025-05-05"
+categories:
+image: figures/tbd.png
+description: "Our recommended analysis for choosing which panel will be best for your research. We assume you have data from the same tissue from two panels, e.g. the 1k and 6k panels."
+draft: false
+format:
+  html: 
+    code-tools: true
+---
+
+# Introduction 
+
+Choosing the right panel for your study is not always a trivial exercise. 
+Higher-plex panels have the obvious appeal of more data per cell and a view into a greater scope of biology,
+while lower-plex panels are cheaper and faster to run. 
+To help choose a panel, investigators often run the same tissue through multiple panels. 
+Here we recommend analyses for these datasets. 
+
+There are a *lot* of ways to compare two datasets, and a lot of energy is spent
+comparing metrics like plex, counts per cell, counts per gene per cell, background levels,
+segmentation accuracy, etc... 
+(Perhaps even more energy is spent arguing about which of these metrics are most important.)
+What actually matters, of course, isn't any single metric: 
+it's the *richness of biological insight* you are able to extract from a dataset. 
+While data quality is important, its importance lies entirely in how impacts your ability to
+ extract biological conclusions from your data. 
+To get at the rather broad concept of "biological richness", we suggest two standard analyses:
+
+1. How deep and clean are the cell typing results? 
+2. How much do you learn from a differential expression analysis? 
+
+We suggest these comparisons because they capture the two key phases of most analyses.
+You begin with cell typing, characterizing the basic layout of your tissue. 
+Then, perhaps after exploratory analyses, you ask a specific biological question.
+Very often, this question takes the form of a differential expression analysis.
+For example, "How do tumor cells respond when proximal to T-cells?", 
+"How do microglia react to amyloid beta plaques?",
+or "How do intratumoral macrophages differ in responders vs. non-responders?"
+Thus by performing a relevant differential expression analysis, we can get a sense of the
+richness of results produced by two panels.
+
+# Example: comparison of 6k and WTX data from a colorectal tumor
+
+To demonstrate this approach, we'll look at data from a colorectal tumor profiled with the 6k and WTX panels.
+Use the code below as a template for running similar comparisons in your own data (after QC, normalization, etc...).
+
+
+
+## Standardized cell typing analysis
+
+- we keep this approach tissue-agnostic by using unsupervised clustering, then by targeted classification of immune cells,
+which are more stable across tissue types than other cell types. 
+- leiden with hvgs, and smismooth
+
+### Gaining a gestalt of cell type resolution
+
+First, we'll ask a simple, high-level question: how many cell types can be detected,
+ and how well-resolved are they?
+Our goal here is not to carefully validate every cell type call; rather, we just
+ want to get a sense of how rich and crisp the cell typing results are. 
+Our usual expectation is that a given tissue has 10-20 highly distinct cell types,
+ and that most panels are sufficient to resolve them. 
+
+(Beyond broad cell types, we may wish for more nuanced dissection of cell states. 
+We will get at this ability with 1. an analysis of T-cell subtyping accuracy, and 
+2. differential expression analysis, which characterizes changes within a cell type across space.)
+
+To get at a general sense of the cell type granularity you can see with each panel, we'll simply run unsupervised clustering and UMAP. 
+
+```{r}
+#| eval: false
+#| echo: true
+
+
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+knitr::include_graphics("./figures/umaps.png")
+```
+
+While the UMAP plots appear quite different at first, we see on closer examination that
+ the broad structure is similar in both cases, with the same islands and bridges 
+ and largely the same clustering results in both datasets. 
+If we were inclined to do so, modifying the UMAP parameters could probably make either dataset
+ more strongly resemble the other.
+So in this example, our check for cell type resolution comes in reassuringly as a tie. 
+
+### Evaluating cell typing accuracy
+
+We also want to assess the quality of cell typing.
+For this comparison, we'll focus on immune cells, which are convenient because
+ there is widespread agreement about their marker genes and because they appear in most tissues. 
+If you tissue in question has very few immune cells (say, <2000), you may want to assess
+cell typing accuracy with other cell types. 
+
+For immune cell typing, we recommend our newly-released method ____, described in full 
+[here](___________________){target="_blank"}. 
+
+Use the below code to quickly identify and subtype immune cells:
+
+```{r}
+#| eval: false
+#| echo: true
+
+
+
+```
+
+To assess cell typing accuracy, we'll look at two outputs:
+
+- Rate at which immune cells are confidently classified
+- Average expression of marker genes per cell type
+
+The _____ algorithm produces a posterior probability for every cell type call. 
+We compare these confidence scores across two datasets as follows:
+
+
+
+
+More traditionally, we can also examine marker gene heatmaps. 
+We're looking to see how much marker genes are isolated in the appropriate clusters. 
+
+Note: to prevent background counts from confusing this assessment, we'll subtract
+ background from each cluster's mean expression profile prior to plotting. 
+A cluster's mean negprobe counts gives us a fairly accurate estimate of the 
+ level of background in its marker genes counts. 
+ 
+
+
+
+
+
+
+
+
+
