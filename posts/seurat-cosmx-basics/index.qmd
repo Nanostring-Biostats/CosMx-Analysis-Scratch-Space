@@ -112,6 +112,49 @@ Load the flat files into a Seurat object using the `LoadNanostring` function fro
 seu.obj <- LoadNanostring("/path/to/flatFileDirectory/", fov = "slide1")
 ```
 
+There are two main additions that we recommend making after generating this initial Seurat object. First, this initial Seurat object will not have many of the metadata columns included in the cell metadata flat file. Second, this Seurat object will store the expression of all probes, including negative probes and system controls, in one assay named "Nanostring". We modify the Seurat object from both of these defaults here.
+
+```{r}
+#| eval: false
+#| echo: true
+#| label: "modify_seurat"
+
+# Add cell metadata
+cell_meta <- read.csv("/path/to/flatFileDirectory/SlideName_metadata_file.csv")
+row.names(cell_meta) <- paste0(cell_meta$cell_ID, "_", cell_meta$fov)
+seu.obj <- AddMetaData(seu.obj, metadata = cell_meta)
+
+# Move control probes to separate assays
+if(length(grep("Neg", rownames(seu.obj@assays$Nanostring))) > 0){
+  # Extract neg probes to a separate assay
+  neg_probes <- grep("Neg", rownames(seu.obj@assays$Nanostring), value = T)
+  neg_matrix <- seu.obj@assays$Nanostring$counts[neg_probes,]
+  neg_assay <- CreateAssayObject(counts = neg_matrix)
+  
+  # Remove from original assay
+  seu.obj <- subset(seu.obj, features = setdiff(rownames(seu.obj@assays$Nanostring), neg_probes))
+  
+  # Add to new assay
+  seu.obj[["NegProbes"]] <- neg_assay 
+  
+}
+
+if(length(grep("SystemControl", rownames(seu.obj@assays$Nanostring))) > 0){
+  # Extract system control probes to a separate assay
+  sysctrl_probes <- grep("SystemControl", rownames(seu.obj@assays$Nanostring), value = T)
+  sysctrl_matrix <- seu.obj@assays$Nanostring$counts[sysctrl_probes,]
+  sysctrl_assay <- CreateAssayObject(counts = sysctrl_matrix)
+  
+  # Remove from original assay
+  seu.obj <- subset(seu.obj, features = setdiff(rownames(seu.obj@assays$Nanostring), sysctrl_probes))
+  
+  # Add to new assay
+  seu.obj[["SystemControls"]] <- sysctrl_assay 
+  
+}
+
+```
+
 For convenience, you may want to save this Seurat object for future use.
 ```{r}
 #| eval: false
