@@ -78,7 +78,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-a4a11d514c7d463668e07712114998e6.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8ba724684e086e0c348b20f734f40087.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-de74524f3bc6e9f9837899fa72087597.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
 <link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
@@ -242,7 +242,7 @@ cookieconsent.run({
       <div>
       <div class="quarto-title-meta-heading">Modified</div>
       <div class="quarto-title-meta-contents">
-        <p class="date-modified">April 15, 2025</p>
+        <p class="date-modified">May 2, 2025</p>
       </div>
     </div>
       
@@ -360,24 +360,60 @@ Figure&nbsp;2: Screenshot showing selection of flat files for export from AtoMx 
 <div class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>seu.obj <span class="ot">&lt;-</span> <span class="fu">LoadNanostring</span>(<span class="st">"/path/to/flatFileDirectory/"</span>, <span class="at">fov =</span> <span class="st">"slide1"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+<p>There are two main additions that we recommend making after generating this initial Seurat object. First, this initial Seurat object will not have many of the metadata columns included in the cell metadata flat file. Second, this Seurat object will store the expression of all probes, including negative probes and system controls, in one assay named “Nanostring”. We modify the Seurat object from both of these defaults here.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Add cell metadata</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>cell_meta <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">"/path/to/flatFileDirectory/SlideName_metadata_file.csv"</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">row.names</span>(cell_meta) <span class="ot">&lt;-</span> <span class="fu">paste0</span>(cell_meta<span class="sc">$</span>cell_ID, <span class="st">"_"</span>, cell_meta<span class="sc">$</span>fov)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>seu.obj <span class="ot">&lt;-</span> <span class="fu">AddMetaData</span>(seu.obj, <span class="at">metadata =</span> cell_meta)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Move control probes to separate assays</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span>(<span class="fu">length</span>(<span class="fu">grep</span>(<span class="st">"Neg"</span>, <span class="fu">rownames</span>(seu.obj<span class="sc">@</span>assays<span class="sc">$</span>Nanostring))) <span class="sc">&gt;</span> <span class="dv">0</span>){</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Extract neg probes to a separate assay</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  neg_probes <span class="ot">&lt;-</span> <span class="fu">grep</span>(<span class="st">"Neg"</span>, <span class="fu">rownames</span>(seu.obj<span class="sc">@</span>assays<span class="sc">$</span>Nanostring), <span class="at">value =</span> T)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  neg_matrix <span class="ot">&lt;-</span> seu.obj<span class="sc">@</span>assays<span class="sc">$</span>Nanostring<span class="sc">$</span>counts[neg_probes,]</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  neg_assay <span class="ot">&lt;-</span> <span class="fu">CreateAssayObject</span>(<span class="at">counts =</span> neg_matrix)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove from original assay</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  seu.obj <span class="ot">&lt;-</span> <span class="fu">subset</span>(seu.obj, <span class="at">features =</span> <span class="fu">setdiff</span>(<span class="fu">rownames</span>(seu.obj<span class="sc">@</span>assays<span class="sc">$</span>Nanostring), neg_probes))</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Add to new assay</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  seu.obj[[<span class="st">"NegProbes"</span>]] <span class="ot">&lt;-</span> neg_assay </span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span>(<span class="fu">length</span>(<span class="fu">grep</span>(<span class="st">"SystemControl"</span>, <span class="fu">rownames</span>(seu.obj<span class="sc">@</span>assays<span class="sc">$</span>Nanostring))) <span class="sc">&gt;</span> <span class="dv">0</span>){</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Extract system control probes to a separate assay</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>  sysctrl_probes <span class="ot">&lt;-</span> <span class="fu">grep</span>(<span class="st">"SystemControl"</span>, <span class="fu">rownames</span>(seu.obj<span class="sc">@</span>assays<span class="sc">$</span>Nanostring), <span class="at">value =</span> T)</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>  sysctrl_matrix <span class="ot">&lt;-</span> seu.obj<span class="sc">@</span>assays<span class="sc">$</span>Nanostring<span class="sc">$</span>counts[sysctrl_probes,]</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>  sysctrl_assay <span class="ot">&lt;-</span> <span class="fu">CreateAssayObject</span>(<span class="at">counts =</span> sysctrl_matrix)</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove from original assay</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>  seu.obj <span class="ot">&lt;-</span> <span class="fu">subset</span>(seu.obj, <span class="at">features =</span> <span class="fu">setdiff</span>(<span class="fu">rownames</span>(seu.obj<span class="sc">@</span>assays<span class="sc">$</span>Nanostring), sysctrl_probes))</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Add to new assay</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>  seu.obj[[<span class="st">"SystemControls"</span>]] <span class="ot">&lt;-</span> sysctrl_assay </span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 <p>For convenience, you may want to save this Seurat object for future use.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(seu.obj, <span class="at">file =</span> <span class="st">"seurat_object.Rds"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(seu.obj, <span class="at">file =</span> <span class="st">"seurat_object.Rds"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>If you have data from multiple CosMx SMI slides, you can join them all into a single Seurat object with multiple images.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Make a list of multiple Seurat objects</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>all_seurat_objects <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"slide1"</span> <span class="ot">=</span> seu.obj_1,</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"slide2"</span> <span class="ot">=</span> seu.obj_2,</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"slide3"</span> <span class="ot">=</span> seu.obj_3</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Merge objects together, appending a slide identifier to each cell ID</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>joined_seu.obj <span class="ot">&lt;-</span> <span class="fu">merge</span>(all_seurat_objects[[<span class="dv">1</span>]], </span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                        <span class="at">y =</span> all_seurat_objects[<span class="dv">2</span><span class="sc">:</span><span class="fu">length</span>(all_seurat_objects)], </span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>                        <span class="at">add.cell.ids =</span> <span class="fu">names</span>(all_seurat_objects), </span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>                        <span class="at">project =</span> <span class="st">"CosMx"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Make a list of multiple Seurat objects</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>all_seurat_objects <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"slide1"</span> <span class="ot">=</span> seu.obj_1,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"slide2"</span> <span class="ot">=</span> seu.obj_2,</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"slide3"</span> <span class="ot">=</span> seu.obj_3</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Merge objects together, appending a slide identifier to each cell ID</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>joined_seu.obj <span class="ot">&lt;-</span> <span class="fu">merge</span>(all_seurat_objects[[<span class="dv">1</span>]], </span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>                        <span class="at">y =</span> all_seurat_objects[<span class="dv">2</span><span class="sc">:</span><span class="fu">length</span>(all_seurat_objects)], </span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>                        <span class="at">add.cell.ids =</span> <span class="fu">names</span>(all_seurat_objects), </span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>                        <span class="at">project =</span> <span class="st">"CosMx"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </div>
 </div>
@@ -387,8 +423,8 @@ Figure&nbsp;2: Screenshot showing selection of flat files for export from AtoMx 
 <h1 data-number="3"><span class="header-section-number">3</span> Data Structure</h1>
 <p>Here we’ll show where various key data are stored in the Seurat object.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Cell metadata</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(seu.obj<span class="sc">@</span>meta.data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Cell metadata</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(seu.obj<span class="sc">@</span>meta.data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
@@ -444,8 +480,8 @@ Run1000.S1.Half_6_1           NGF Run1000.S1.Half_6_1</code></pre>
 </div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Transcript counts. Here, transcript counts are in the 'Nanostring' assay but in other objects they may be stored in an 'RNA' assay.</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>seu.obj<span class="sc">@</span>assays<span class="sc">$</span>Nanostring<span class="sc">$</span>counts[<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Transcript counts. Here, transcript counts are in the 'Nanostring' assay but in other objects they may be stored in an 'RNA' assay.</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>seu.obj<span class="sc">@</span>assays<span class="sc">$</span>Nanostring<span class="sc">$</span>counts[<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output cell-output-stderr">
@@ -468,8 +504,8 @@ Drd1                     .                   .</code></pre>
 </div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># UMAP positions</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>seu.obj<span class="sc">@</span>reductions<span class="sc">$</span>umap<span class="sc">@</span>cell.embeddings[<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>,]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># UMAP positions</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>seu.obj<span class="sc">@</span>reductions<span class="sc">$</span>umap<span class="sc">@</span>cell.embeddings[<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>,]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
@@ -487,8 +523,8 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 </div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Image names. Each slide is stored as a separate image within the object.</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="fu">Images</span>(seu.obj)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Image names. Each slide is stored as a separate image within the object.</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">Images</span>(seu.obj)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
@@ -496,8 +532,8 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 </div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Positions in space, here shown for one image / slide</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>seu.obj<span class="sc">@</span>images[[<span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>]]]<span class="sc">$</span>centroids<span class="sc">@</span>coords[<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>,] <span class="co"># In this object, this is equivalent to: seu.obj@images$Run1000.S1.Half$centroids@coords[1:10,]</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Positions in space, here shown for one image / slide</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>seu.obj<span class="sc">@</span>images[[<span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>]]]<span class="sc">$</span>centroids<span class="sc">@</span>coords[<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>,] <span class="co"># In this object, this is equivalent to: seu.obj@images$Run1000.S1.Half$centroids@coords[1:10,]</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
@@ -520,12 +556,12 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 <p>As noted above, within the Seurat object, each slide is stored as a separate ‘image’ or ‘fov’. This is an unfortunate naming convention difference between CosMx SMI nomenclature and the Seurat package. What Seurat refers to as an ‘fov’ is what NanoString refers to as a slide. When plotting cells in space, you need to specify the Seurat ‘fov’ to plot, and this is equivalent to choosing which CosMx SMI slide to plot.</p>
 <p>Plot all cells on one slide in space, coloring by cell type.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Get name of the first image</span></span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>image1 <span class="ot">&lt;-</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>]</span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot all cells.</span></span>
-<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="co"># We recommend setting the border color to 'NA' as the default 'white' often masks all cells when zoomed out, leading to a fully white plot.</span></span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageDimPlot</span>(seu.obj, <span class="at">fov =</span> image1, <span class="at">axes =</span> <span class="cn">TRUE</span>, <span class="at">border.color =</span> <span class="cn">NA</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Get name of the first image</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>image1 <span class="ot">&lt;-</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>]</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot all cells.</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="co"># We recommend setting the border color to 'NA' as the default 'white' often masks all cells when zoomed out, leading to a fully white plot.</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageDimPlot</span>(seu.obj, <span class="at">fov =</span> image1, <span class="at">axes =</span> <span class="cn">TRUE</span>, <span class="at">border.color =</span> <span class="cn">NA</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
@@ -538,14 +574,14 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 </div>
 <p>Plot the location of individual transcripts with the ‘molecules’ option.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageDimPlot</span>(seu.obj,</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>             <span class="at">border.color =</span> <span class="st">"black"</span>,</span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>             <span class="at">alpha =</span> <span class="fl">0.5</span>, <span class="co"># Reduce alpha of cell fills to better visualize the overlaying molcules</span></span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>             <span class="at">molecules =</span> <span class="fu">c</span>(<span class="st">"Slc17a7"</span>, <span class="st">"Gad1"</span>, <span class="st">"Plp1"</span>),</span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>             <span class="at">mols.size =</span> <span class="fl">0.2</span>,</span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>             <span class="at">nmols =</span> <span class="dv">100000</span>, <span class="co"># Set the total number of molecules to visualize</span></span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>             <span class="at">axes =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageDimPlot</span>(seu.obj,</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>             <span class="at">border.color =</span> <span class="st">"black"</span>,</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>             <span class="at">alpha =</span> <span class="fl">0.5</span>, <span class="co"># Reduce alpha of cell fills to better visualize the overlaying molcules</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>             <span class="at">molecules =</span> <span class="fu">c</span>(<span class="st">"Slc17a7"</span>, <span class="st">"Gad1"</span>, <span class="st">"Plp1"</span>),</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>             <span class="at">mols.size =</span> <span class="fl">0.2</span>,</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>             <span class="at">nmols =</span> <span class="dv">100000</span>, <span class="co"># Set the total number of molecules to visualize</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>             <span class="at">axes =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
@@ -558,10 +594,10 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 </div>
 <p>Plot one CosMx SMI FOV. To do this, we set the cells we’d like to plot to be all those in our target FOV. A similar strategy could be used to plot a subset of FOVs or a subset of cells of interest.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageDimPlot</span>(seu.obj,</span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>             <span class="at">border.color =</span> <span class="st">"black"</span>,</span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>             <span class="at">cells =</span> <span class="fu">row.names</span>(seu.obj<span class="sc">@</span>meta.data)[<span class="fu">which</span>(seu.obj<span class="sc">@</span>meta.data<span class="sc">$</span>fov <span class="sc">==</span> <span class="dv">99</span>)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageDimPlot</span>(seu.obj,</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>             <span class="at">border.color =</span> <span class="st">"black"</span>,</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>             <span class="at">cells =</span> <span class="fu">row.names</span>(seu.obj<span class="sc">@</span>meta.data)[<span class="fu">which</span>(seu.obj<span class="sc">@</span>meta.data<span class="sc">$</span>fov <span class="sc">==</span> <span class="dv">99</span>)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
@@ -574,16 +610,16 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 </div>
 <p>By default, cells are colored by the ‘Identity’ set in the Seurat object. We can change this by selecting another column to color by. Here we show coloring by leiden cluster, which we treat as a factor rather than an integer.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Check the default identities</span></span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">Idents</span>(seu.obj))</span>
-<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot by leiden cluster using the 'group.by' option</span></span>
-<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageDimPlot</span>(seu.obj,</span>
-<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
-<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>             <span class="at">border.color =</span> <span class="st">"black"</span>,</span>
-<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>             <span class="at">group.by =</span> <span class="st">"leiden_clus"</span>,</span>
-<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>             <span class="at">cols =</span> <span class="st">"glasbey"</span>, <span class="co"># Option to use a different palette for cell colors</span></span>
-<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>             <span class="at">cells =</span> <span class="fu">row.names</span>(seu.obj<span class="sc">@</span>meta.data)[<span class="fu">which</span>(seu.obj<span class="sc">@</span>meta.data<span class="sc">$</span>fov <span class="sc">==</span> <span class="dv">99</span>)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Check the default identities</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">Idents</span>(seu.obj))</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot by leiden cluster using the 'group.by' option</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageDimPlot</span>(seu.obj,</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>             <span class="at">border.color =</span> <span class="st">"black"</span>,</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>             <span class="at">group.by =</span> <span class="st">"leiden_clus"</span>,</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>             <span class="at">cols =</span> <span class="st">"glasbey"</span>, <span class="co"># Option to use a different palette for cell colors</span></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>             <span class="at">cells =</span> <span class="fu">row.names</span>(seu.obj<span class="sc">@</span>meta.data)[<span class="fu">which</span>(seu.obj<span class="sc">@</span>meta.data<span class="sc">$</span>fov <span class="sc">==</span> <span class="dv">99</span>)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
@@ -596,11 +632,11 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 </div>
 <p>To color cells by a continuous value, such as the log10totalcounts, or by the expression of a transcript of interest, such as <em>Slc17a7</em>, we use the function ‘ImageFeaturePlot’.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Color cells by log10totalcounts</span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageFeaturePlot</span>(seu.obj,</span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>             <span class="at">border.color =</span> <span class="cn">NA</span>,</span>
-<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">features =</span> <span class="st">"log10totalcounts"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Color cells by log10totalcounts</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageFeaturePlot</span>(seu.obj,</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>             <span class="at">border.color =</span> <span class="cn">NA</span>,</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">features =</span> <span class="st">"log10totalcounts"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
@@ -612,11 +648,11 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 </div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Color cells by the expression of a gene of interest, Slc17a7</span></span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageFeaturePlot</span>(seu.obj,</span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>             <span class="at">border.color =</span> <span class="cn">NA</span>,</span>
-<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">features =</span> <span class="st">"Slc17a7"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Color cells by the expression of a gene of interest, Slc17a7</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageFeaturePlot</span>(seu.obj,</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>             <span class="at">border.color =</span> <span class="cn">NA</span>,</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">features =</span> <span class="st">"Slc17a7"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
@@ -629,18 +665,18 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 </div>
 <p>Seurat can plot cells with either cell shapes shown (‘segmentation’) or with a single point at the center of where they’re located (‘centroids’). Here we show the switch to plotting centroids for one FOV.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Check what the current default boundary is</span></span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultBoundary</span>(seu.obj<span class="sc">@</span>images[[<span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>]]])</span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Change the default boundaries for the first slide</span></span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultBoundary</span>(seu.obj<span class="sc">@</span>images[[<span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>]]]) <span class="ot">&lt;-</span> <span class="st">"centroids"</span></span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot one FOV from this slide. Note that cell shapes are no longer shown</span></span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageDimPlot</span>(seu.obj,</span>
-<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
-<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>             <span class="at">size =</span> <span class="dv">5</span>,</span>
-<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>             <span class="at">shuffle.cols =</span> <span class="cn">TRUE</span>, <span class="co"># Option to randomly shuffle colors within the palette</span></span>
-<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>             <span class="at">cells =</span> <span class="fu">row.names</span>(seu.obj<span class="sc">@</span>meta.data)[<span class="fu">which</span>(seu.obj<span class="sc">@</span>meta.data<span class="sc">$</span>fov <span class="sc">==</span> <span class="dv">99</span>)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Check what the current default boundary is</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultBoundary</span>(seu.obj<span class="sc">@</span>images[[<span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>]]])</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Change the default boundaries for the first slide</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultBoundary</span>(seu.obj<span class="sc">@</span>images[[<span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>]]]) <span class="ot">&lt;-</span> <span class="st">"centroids"</span></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot one FOV from this slide. Note that cell shapes are no longer shown</span></span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a><span class="fu">ImageDimPlot</span>(seu.obj,</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>             <span class="at">fov =</span> <span class="fu">Images</span>(seu.obj)[<span class="dv">1</span>],</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>             <span class="at">size =</span> <span class="dv">5</span>,</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>             <span class="at">shuffle.cols =</span> <span class="cn">TRUE</span>, <span class="co"># Option to randomly shuffle colors within the palette</span></span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>             <span class="at">cells =</span> <span class="fu">row.names</span>(seu.obj<span class="sc">@</span>meta.data)[<span class="fu">which</span>(seu.obj<span class="sc">@</span>meta.data<span class="sc">$</span>fov <span class="sc">==</span> <span class="dv">99</span>)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
@@ -657,10 +693,10 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 <p>The CosMx SMI Seurat object contains coordinates for each cell for UMAP dimensional reduction.</p>
 <p>Here, we color cells by cell type and overlay cell type labels.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(seu.obj, </span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>        <span class="at">group.by =</span> <span class="st">"nb_clus"</span>,</span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>        <span class="at">label =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"none"</span>) <span class="co"># Suppress the legend since labels are plotted on top of UMAP</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(seu.obj, </span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>        <span class="at">group.by =</span> <span class="st">"nb_clus"</span>,</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>        <span class="at">label =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"none"</span>) <span class="co"># Suppress the legend since labels are plotted on top of UMAP</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
@@ -673,9 +709,9 @@ Run1000.S1.Half_10_1 -7.601895   4.258457</code></pre>
 </div>
 <p>Here, we color cells by a continuous value, using transcript expression for a transcript of interest.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">FeaturePlot</span>(seu.obj, </span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>        <span class="at">features =</span> <span class="st">"Slc17a7"</span>,</span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>        <span class="at">order =</span> <span class="cn">TRUE</span>) <span class="co"># plots cells in order of expression</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">FeaturePlot</span>(seu.obj, </span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>        <span class="at">features =</span> <span class="st">"Slc17a7"</span>,</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>        <span class="at">order =</span> <span class="cn">TRUE</span>) <span class="co"># plots cells in order of expression</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
