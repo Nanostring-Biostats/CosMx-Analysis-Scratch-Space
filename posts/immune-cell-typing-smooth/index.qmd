@@ -497,7 +497,20 @@ model_t$post_probs[1:10][]
 These posterior-probability scores can be passed directly to subtyping models for `cd4t` and `cd8t`, via the `prior_level_weights` arguments.
 For example, if I wanted to go ahead and cluster the `cd4t` cells into subtypes, I could follow the same process, passing in the prior probability of the cell being `cd4t` as a weight.
 
-Below is an example of this syntax using the `cd4t` subtypes in the package dataset "markerslist_cd4tminor".
+In the example below, the probability of `cd4t` is used as a weight in the NNLS regression fitting (akin to weighted least squares) when constructing metagene scores.  Cells with high probability of `cd4t` are emphasized, while cells with lower probability of `cd4t` have less influence on the regression coefficients used to generate metagene scores.
+
+In the clustering stage, probability of `cd4t` is again used as a weight (or prior probability), that factors into the expectation step of the EM algorithm.
+Letting `s(t)` denote the *subtype* of `cd4t`, then we have the below, where $P(y_c = t)$ would be the probability of `cd4t` from the previous stage of modeling.
+
+The final returned probability for each `cd4t` subtype is a *joint* probability of both being the subtype $s(t)$ and the major celltype $t$.
+
+
+$$P(y_c = s(t) \cap y_c = t  | scores_c) = P(y_c = s(t) | scores_c, y_c = t)P(y_c = t)$$
+
+
+
+Below is an example of this syntax using the `cd4t` subtypes in the package dataset "`markerslist_cd4tminor`".
+
 
 ```{r, eval=TRUE}
 str(HieraType::markerslist_cd4tminor, max.level=2)
