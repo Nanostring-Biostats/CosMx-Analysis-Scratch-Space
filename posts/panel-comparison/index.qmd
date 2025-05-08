@@ -77,14 +77,36 @@ Our usual expectation is that a given tissue has 10-20 highly distinct cell type
 We will get at this ability with 1. an analysis of T-cell subtyping accuracy, and 
 2. differential expression analysis, which characterizes changes within a cell type across space.)
 
-To get at a general sense of the cell type granularity you can see with each panel, we'll simply run unsupervised clustering and UMAP. 
+To get at a general sense of the cell type granularity you can see with each panel, we'll simply run unsupervised clustering and UMAP.
+Below is code to quickly perform these steps beginning with a Seurat object exported from AtoMx:
 
 ```{r}
 #| eval: false
 #| echo: true
 
+# get hvgs, scale and run PCA:
+seu <- FindVariableFeatures(seu, selection.method = "vst", nfeatures = 3000)
+seu <- ScaleData(seu, features = VariableFeatures(seu))
+seu <- RunPCA(seu, features = VariableFeatures(seu))
 
+# cluster:
+seu <- FindClusters(seu, resolution = 1)
 
+# umap:
+seu <- RunUMAP(seu, dims = 1:30, n.neighbors = 40, metric = "cosine", min.dist = 0.01, spread = 5)
+length(unique(seu@meta.data$RNA_snn_res.0.5))
+# plot umap and cell types:
+
+distinct_colors <- c(
+  "#e6194b", "#3cb44b", "#ffe119", "#0082c8", "#f58231", "#911eb4", "#46f0f0", "#f032e6",
+  "#d2f53c", "#fabebe", "#008080", "#e6beff", "#aa6e28", "#fffac8", "#800000", "#aaffc3",
+  "#808000", "#ffd8b1", "#000080", "#808080", "#FFFFFF", "#000000", "#a9a9a9", "#DC143C",
+  "#00FFFF", "#7FFF00", "#FF7F50", "#6495ED", "#DC143C", "#00CED1", "#FFD700", "#ADFF2F",
+  "#4B0082", "#FF69B4", "#CD5C5C", "#20B2AA", "#9370DB", "#3CB371", "#FF4500", "#DA70D6",
+  "#7B68EE", "#00FA9A", "#B22222", "#5F9EA0"
+)
+
+DimPlot(seu, cols = rep(distinct_colors, 10)) + NoLegend()
 ```
 
 ```{r}
@@ -111,7 +133,10 @@ cell typing accuracy with other cell types.
 For immune cell typing, we recommend our newly-released method ____, described in full 
 [here](___________________){target="_blank"}. 
 
-Use the below code to quickly identify and subtype immune cells:
+Use the below code to quickly identify and subtype immune cells, then produce a heatmap of marker genes
+This code picks up where the previous left off. 
+Specifically, it assumes we have a Seurat object, including UMAP results. 
+See the HieraType package documentation for how to run outside the Seurat ecosystem. 
 
 ```{r}
 #| eval: false
@@ -120,6 +145,19 @@ Use the below code to quickly identify and subtype immune cells:
 
 
 ```
+
+
+```{r}
+#| eval: true
+#| echo: false
+knitr::include_graphics("./figures/marker_heatmaps.png")
+```
+
+Comparing the marker gene heatmaps from both datasets, we see __________.
+For most purposes, we won't care about small differences between these heatmaps;
+rather, we just want to check that both sets of cell typing results are sane at 
+ an equivalently granular level. 
+
 
 To assess cell typing accuracy, we'll look at two outputs:
 
@@ -142,7 +180,11 @@ A cluster's mean negprobe counts gives us a fairly accurate estimate of the
  
 
 
+## Differential expression analysis
 
+- simple generalizeable example: DE of one cell type vs. proximity to another
+ or vs neighborhood counts of another
+- break the continuous variable into 
 
 
 
