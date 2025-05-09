@@ -51,20 +51,10 @@ or "How do intratumoral macrophages differ in responders vs. non-responders?"
 Thus by performing a relevant differential expression analysis, we can get a sense of the
 richness of results produced by two panels.
 
-# Example: comparison of 6k and WTX data from a colorectal tumor
-
 To demonstrate this approach, we'll look at data from a colorectal tumor profiled with the 6k and WTX panels.
 Use the code below as a template for running similar comparisons in your own data (after QC, normalization, etc...).
 
-
-
-## Standardized cell typing analysis
-
-- we keep this approach tissue-agnostic by using unsupervised clustering, then by targeted classification of immune cells,
-which are more stable across tissue types than other cell types. 
-- leiden with hvgs, and smismooth
-
-### Gaining a gestalt of cell type resolution
+# Gaining a gestalt of cell type resolution
 
 First, we'll ask a simple, high-level question: how many cell types can be detected,
  and how well-resolved are they?
@@ -122,7 +112,7 @@ If we were inclined to do so, modifying the UMAP parameters could probably make 
  more strongly resemble the other.
 So in this example, our check for cell type resolution comes in reassuringly as a tie. 
 
-### Evaluating cell typing accuracy
+# Evaluating cell typing accuracy
 
 We also want to assess the quality of cell typing.
 For this comparison, we'll focus on immune cells, which are convenient because
@@ -130,63 +120,303 @@ For this comparison, we'll focus on immune cells, which are convenient because
 If you tissue in question has very few immune cells (say, <2000), you may want to assess
 cell typing accuracy with other cell types. 
 
-For immune cell typing, we recommend our newly-released method ____, described in full 
-[here](___________________){target="_blank"}. 
+For immune cell typing, we recommend our newly-released method HieraType, 
+described in full elsewhere on the Scratch Space.
 
-Use the below code to quickly identify and subtype immune cells, then produce a heatmap of marker genes
+Use the below code to quickly identify and subtype immune cells, then produce a heatmap of marker genes.
 This code picks up where the previous left off. 
 Specifically, it assumes we have a Seurat object, including UMAP results. 
 See the HieraType package documentation for how to run outside the Seurat ecosystem. 
+
+Note: to prevent background counts from confusing the evaluation of marker heatmaps,
+ we'll subtract background from each cluster's mean expression profile prior to plotting. 
+A cluster's mean negprobe counts gives us a fairly accurate estimate of the 
+ level of background in its marker genes counts. 
 
 ```{r}
 #| eval: false
 #| echo: true
 
+# load package:
+devtools::load_all("/home/rstudio/data/dan/imputation_smoothing/HieroType", export_all  = FALSE)
+library(ggplot2)
 
+# define a pipeline to automatically call broad cell types then proceed through fine T-cell subtypes:
+ct_pipeline <- make_pipeline(
+  markerslists = list("l1" = HieroType::markerslist_l1,
+                      "l2" = HieroType::markerslist_immunemajor,
+                      "lt" = HieroType::markerslist_tcellmajor,
+                      "lt4" = HieroType::markerslist_cd4tminor,
+                      "lt8" = HieroType::markerslist_cd8tminor
+  ),
+  priors = list("l2" = "l1",
+                 "lt" = "l2",
+                 "lt4" = "lt",
+                 "lt8" = "lt"
+  ),
+  priors_category = list("l2" = "immune",
+                         "lt" = "tcell",
+                         "lt4" = "cd4t",
+                         "lt8" = "cd8t"
+  )
+)
 
+htres <-  HieroType::run_pipeline(
+  pipeline = ct_pipeline,
+  counts_matrix = Matrix::t(seu[["RNA"]]@counts),
+  totalcounts = Matrix::colSums(seu),
+  adjacency_matrix = as(seu@graphs$RNA_nn, "dgCMatrix")
+)
+
+# primary result: the cell type calls and posterior probabilities:
+probdf <- htres$post_probs$l1
+
+## prepare data for marker gene heatmap:
+fc_subclus_ctl_gran <- clusterwise_foldchange_metrics(seu[["RNA"]]@counts
+                                                      ,metadata = ct_ctl$post_probs[[1]]
+                                                      ,cluster_column = "celltype_granular"
+)
+# subtract background from the mean per-cluster expression profiles:
+for (name in unique(ct_ctl$post_probs[[1]]$celltype_granular)) {
+  isthiscelltype <- ct_ctl$post_probs[[1]]$celltype_granular == name
+  meannegthiscelltype <- Matrix::mean(seu@assays$negprobes$counts[, isthiscelltype])
+  
+  fc_subclus_ctl_gran$cluster_expr[fc_subclus_ctl_gran$cluster == name] <- 
+    pmax(fc_subclus_ctl_gran$cluster_expr[fc_subclus_ctl_gran$cluster == name] - meannegthiscelltype, 0)
+}
+# create the heatmap:
+hm_unsup <- marker_heatmap(fc_subclus_ctl_gran,
+                           extras = c("CD3D", "CD4", "FOXP3", "CD8B", "CD8A")
+)
+print(hm_unsup)
 ```
 
+The marker heatmaps from both datasets are below, first 6k, then WTX:
 
 ```{r}
 #| eval: true
 #| echo: false
 knitr::include_graphics("./figures/marker_heatmaps.png")
+knitr::include_graphics("./figures/marker_heatmaps.png")
 ```
 
-Comparing the marker gene heatmaps from both datasets, we see __________.
 For most purposes, we won't care about small differences between these heatmaps;
 rather, we just want to check that both sets of cell typing results are sane at 
  an equivalently granular level. 
+Comparing the marker gene heatmaps from both datasets, we see basic sanity in both cases,
+ and cleaner marker profiles in the WTX data, suggesting either more accurate cell typing
+ or better cell segmentation. 
 
-
-To assess cell typing accuracy, we'll look at two outputs:
-
-- Rate at which immune cells are confidently classified
-- Average expression of marker genes per cell type
-
-The _____ algorithm produces a posterior probability for every cell type call. 
-We compare these confidence scores across two datasets as follows:
-
-
-
-
-More traditionally, we can also examine marker gene heatmaps. 
-We're looking to see how much marker genes are isolated in the appropriate clusters. 
-
-Note: to prevent background counts from confusing this assessment, we'll subtract
- background from each cluster's mean expression profile prior to plotting. 
-A cluster's mean negprobe counts gives us a fairly accurate estimate of the 
- level of background in its marker genes counts. 
  
+# Differential expression analysis
 
+Spatial analyses often culminate in a differential expression analysis investigating
+ how a cell type changes based on its spatial context. 
+Below we give an easily-modifiable framework for such an analysis.
+The below code is designed to be simple and quick. 
+For optimal DE analyses, see the R package smiDE, described 
+[here](https://www.biorxiv.org/content/10.1101/2024.08.02.606405v2.abstract){target="_blank"}.
 
-## Differential expression analysis
+In our example, we'll look at how macrophages vary based on proximity to vasculature, 
+ which we detect as endothelial cells. 
 
-- simple generalizeable example: DE of one cell type vs. proximity to another
- or vs neighborhood counts of another
-- break the continuous variable into 
+```{r}
+#| eval: false
+#| echo: true
+# Example DE question: 
+# How does cell type 1 changes in response to neighboring cells of cell type 2?
 
+# designate which cells are cell type 1 and 2:
+is1 <- probdf$celltype_granular == "macrophage"
+is2 <- probdf$celltype_granular == "endothelial"
 
+# Special case: for a cell type where we care about structures, e.g. blood vessels
+# or epithelial walls, we can discard lonely cells to focus on distance to structures. 
+# The below function winnows down a set of cells to only those belonging to decent-sized
+# groups in space. 
+inastructure <- function(xy, inds, eps = 0.2, minPts = 10) {
+  #' xy: matrix of xy positions
+  #' inds: logical vector saying which elements of xy are the cell type in question
+  #' eps: radius argument in dbscan
+  #' minPts: minimum cluster size to keep
+  #' returns a logical vector like inds, but reporting membership in spatial clusters of size >= minPts
+  
+  # run dbscan clustering of positions:
+  db <- dbscan::dbscan(x = xy[inds, ], eps = eps, minPts = minPts)
+  # report all positions that are part of a cluster:
+  keep <- inds
+  keep[inds][db$cluster != 1] <- FALSE
+  return(keep)
+}
+# only keep cell type 2 cells that fall in a structure of at least 5 cells:
+is2 <- inastructure(xy = xy, inds = is2, eps = 0.2, minPts = 20)
+
+# plot their layouts:
+plot(xy, col = c("grey", "red", "blue")[1 + is1 + 2 * is2],
+     pch = 16, cex = 0.15 + 0.15 * (is1 + is2), asp = 1)
+```
+
+```{r}
+#| eval: true
+#| echo: false
+knitr::include_graphics("./figures/example layout.png")
+```
+
+We see macrophages spread throughout the tissue, and endothelial cells
+ at the border of the colon epithelium. 
+ 
+There are a number of ways to quantify proximity to a cell type. We can:
+
+- Count how many of the cell type falls in each cell's neighborhood
+- Measure each cell's distance to the nearest member of the cell type
+- Treat the above variables as continuous, dichotomize them into high/low, or break them into discrete bins.
+
+All the above approaches are valid. Below we'll demonstrate calculation of all approaches,
+ then run DE using continuous number of endothelial neighbors.
+
+```{r}
+#| eval: false
+#| echo: true
+# get distance to nearest cell of cell type 2:
+neighbors <- FNN::get.knnx(data = xy[is2, ], 
+                           query = xy, 
+                           k = 20)
+# record various metrics of proximity:
+proxdf <- data.frame(
+  dist_to_celltype = neighbors$nn.dist[, 1],
+  neighbor_count = rowSums(neighbors$nn.dist < 0.02)
+)
+# log-transformed distance:
+proxdf$log2_dist <- log2(0.01 + proxdf$dist_to_celltype)
+# example of binned distance:
+proxdf$distance_bin <- cut(proxdf$dist_to_celltype, c(seq(0, 0.5, length.out = 10), Inf))
+# example of dichotomous distance:
+# examine the distances:
+hist(log2(0.01 + proxdf$dist_to_celltype[is1]), breaks = 100) # use to choose a breakpoint
+# bin the distances:
+proxdf$is_close <- (log2(0.01 + disttocelltype2) < -3)
+
+# selected variable for DE analysis:
+varforDE <- proxdf$neighbor_count
+```
+
+One more step remains before running DE: we need to choose which genes to analyze 
+ for our cell type. 
+The intuition here is that if a gene is 1. barely expressed in your cell type, 
+and 2. highly expressed in neighbors of that cell type, then a large share of that gene's counts
+in your cell type will be misassignments from neighboring cells. 
+Such a gene will be prone to bias in DE analyses, and should often be excluded from analyses of your cell type. 
+See the smiDE paper linked above for details of this approach. 
+ 
+```{r}
+#| eval: false
+#| echo: true
+# identify genes with minimal bias from segmentation errors in this cell type
+# (see https://www.biorxiv.org/content/10.1101/2024.08.02.606405v2.abstract for details)
+source(url("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/refs/heads/Main/_code/cell-typing-advanced-strategies/getSubtypingGenes.R"))
+# get genes safe from contamination:
+contamfilter <- findSafeGenes(
+  counts = Matrix::t(seu[["RNA"]]@counts),  # note we're entering info for all cells           
+  xy = xy,                            # again entering info for all cells
+  ismycelltype = is1,                 # logical indicating the cells to subtype
+  tissue = NULL,                      # specify if tissues have xy overlap
+  self_vs_neighbor_threshold = 1   # min ratio of expression in the cell type vs. in its neighbors
+)
+safegenes <- contamfilter$safegenes
+```
+
+Now we'll run a DE analysis using simple linear models. 
+For proper DE analyses, we recommend using the full smiDE toolkit. 
+The below code is adequate for the purposes of comparing panels, and it runs very quickly.
+
+```{r}
+#| eval: false
+#| echo: true
+
+# normalized counts:
+scaling_factors <- Matrix::colSums(seu[["RNA"]]@counts) 
+y <- Matrix::Diagonal(x = scaling_factors[is1]^-1) %*% Matrix::t(seu[["RNA"]]@counts[, is1]) * mean(scaling_factors)
+y <- log2(1 + y)
+y <- y[, safegenes]
+
+# design matrix:
+df <- data.frame(distvar = varforDE[is1])
+
+## run DE:
+# Extract predictor and response
+x <- df[[1]]
+n <- length(x)
+
+# Center x for numerical stability
+x_centered <- x - mean(x)
+
+# Design matrix: intercept and centered predictor
+X <- cbind(1, x_centered)
+Q <- qr.Q(qr(X))
+XtX_inv <- solve(t(X) %*% X)  # (X'X)^-1 for SEs
+
+# Fit model: β = (X'X)^-1 X'Y
+betas <- XtX_inv %*% t(X) %*% y  # 2 x G matrix: row 1 = intercepts, row 2 = slopes
+
+# Residuals
+fitted <- X %*% betas
+resid <- y - fitted
+
+# Residual variance per gene
+sigma2 <- colSums(resid^2) / (n - 2)
+
+# Standard error of slope estimates
+se_beta1 <- sqrt(sigma2 * XtX_inv[2, 2])  # scalar * vector
+
+# T-statistics for slope (row 2 of beta matrix)
+t_stats <- betas[2, ] / se_beta1
+
+# Two-sided p-values
+pvals <- 2 * pt(-abs(t_stats), df = n - 2)
+
+# Output
+results <- data.frame(
+  slope = betas[2, ],
+  pval = pvals
+)
+results$padj <- p.adjust(results$pval)
+```
+
+A simple volcano plot suffices to convey the richness of the DE results:
+
+```{r}
+#| eval: false
+#| echo: true
+
+plot(betas[2, ], pmin(-log10(pvals), 75), 
+     cex = 0.7, pch = 16, col = scales::alpha("darkblue", 0.3),
+     xlab = "Log2 fold-change: near/far from cell type 2",
+     ylab = "-log10(p-value)",
+     cex.lab = 1.25)
+showgenes <- rownames(results)[results$padj < 0.3]
+abline(h = -log10(max(results$pval[results$padj < 0.05])), lty = 2, col = "grey50")
+abline(h = -log10(max(results$pval[results$padj < 0.25])), lty = 3, col = "grey50")
+legend("bottomright", lty = c(2,3), cex = 0.7,
+       legend = paste0("Adjusted p = ", c(0.05, 0.25), " (", c(sum(results$padj < 0.05), sum(results$padj < 0.25)), " genes)"))
+text(results[showgenes, "slope"],
+     pmin(-log10(results[showgenes, "pval"]), 75), 
+     showgenes,
+     col = 1, cex = 0.75)
+     
+```
+
+The resulting volcano plots are below:
+
+```{r}
+#| eval: true
+#| echo: false
+knitr::include_graphics("./figures/volcano plots.png")
+```
+
+We find that the WTX panel has more than double the significant (adjusted p-value < 0.05) genes.
+Reassuringly, shared genes tend to be significant in the same direction in both datasets. 
+From this figure, we would conclude (unsurprisingly) that the larger panel yields
+a richer set of results from the same differential expression analysis.
 
 
 
