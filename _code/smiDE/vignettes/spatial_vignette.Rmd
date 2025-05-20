@@ -1,0 +1,636 @@
+---
+title: "Performing differential expression analysis on spatial transcriptomics data with smiDE"
+author: "Ana Gabriela Vasconcelos"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  fig.width=6,fig.height=4, 
+  fig.align='center',
+  message=FALSE, warning=FALSE
+)
+```
+
+# Introduction
+
+Here we demonstrate use of the smiDE package to analyze spatial transcriptomics data. We'll use the package's `small_nsclc` dataset, a small and computationally convenient excerpt of the [CosMx NSCLC (non-small cell lung cancer) dataset](https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/). We'll show all the major modeling approached implemented within the package.
+
+## Quick start
+
+A typical analysis would proceed as follows. Assuming we have a count matrix `cts`, that is normalized by `totalcounts` to obtain matrix `norm`. The metadata matrix `metainfo` contains information for each cell, such as `cell_type`, `niche`, and information of each sample `Run_Tissue_name` if available. Then we would first filter out implausible genes (using `overlap_ratio_metric`).  Then we identify neighboring cells with `pre_de`, which will be adjusted for when obtaining DE results with `smi_de`, with the adequate `spatial_model` defined.
+
+```{r quick start, eval=FALSE, include=TRUE}
+
+totalcounts_scalefactors <- mean(metainfo[["totalcounts"]]) / metainfo[["totalcounts"]]
+names(totalcounts_scalefactors) <- metainfo[["cell_ID"]]
+norm <- cts %*% Matrix::Diagonal(x=totalcounts_scalefactors, names=TRUE)
+
+
+overlap_metrics <- 
+overlap_ratio_metric(assay_matrix = norm,
+                           metadata = metainfo,
+                           cluster_col = "cell_type",
+                           radius = 0.05,
+                           split_neighbors_by_colname = "Run_Tissue_name",
+                           sdimx_col = "sdimx",
+                           sdimy_col = "sdimy"
+                           )
+
+
+pre_de_obj <- 
+  pre_de(metadata = metainfo
+         ,cell_type_metadata_colname = "cell_type"
+         ,split_neighbors_by_colname = "tissue"
+         ,mm_radius = 0.05
+         ,sdimx_colname = "sdimx"
+         ,sdimy_colname = "sdimy"
+         ,verbose=TRUE
+  )
+
+
+de_obj  <- 
+smi_de(assay_matrix = cts
+           ,metadata = metainfo
+           ,formula = ~RankNorm(otherct_expr) + niche + offset(log(totalcounts))
+           ,pre_de_obj = pre_de_obj
+           ,neighbor_expr_cell_type_metadata_colname = "cell_type"
+           ,neighbor_expr_overlap_weight_colname = 'weight'
+           ,neighbor_expr_overlap_agg ="sum"
+           ,neighbor_expr_totalcount_normalize = TRUE
+           ,neighbor_expr_totalcount_scalefactor = totalcounts_scalefactors
+           ,family="nbinom2"
+           ,spatial_model = list(
+             name = "GP_Matern"
+             ,k_prop_n = 0.25
+             ,x_coord_col = "sdimx"
+             ,y_coord_col = "sdimy"
+             ,split_neighbors_by_colname = "Run_Tissue_name"
+             ,spatial_random_effect = ~Matern(1 | sdimx_cluster + sdimy_cluster %in% Run_Tissue_name)
+           )
+    ) 
+
+results(de_obj, "one.vs.rest", variable="niche")
+results(de_obj, "spatial_random_effect")
+```
+
+## Input data
+
+To perform analysis there are two main objects: a count matrix and meta data information. In the meta data matrix we have information of each sample (`Run_Tissue_name`) and of each individual cell, such as `cell_type`, spatial region (`niche`), two dimensional spatial information (`sdimx` and `sdimy`). For the count matrix we have count for each gene and cell, the value in the $i$-th row and $j$-th columns gives the number of reads for gene $i$ on cell $j$.
+
+```{r input data, message=FALSE, warning=FALSE, fig.width=8,fig.height=4, fig.align='center'}
+# Loading packages
+library(data.table)
+library(cowplot)
+library(smiDE)
+library(INLA)
+library(Seurat)
+library(ggrepel)
+library(pals)
+
+# Reading Seurat object
+datadir<-system.file("extdata", package="smiDE")
+sem <- readRDS(paste0(datadir, "/small_nsclc.rds"))
+str(sem, max.level = 3)
+
+sem <- subset(sem, Run_Tissue_name=="Lung5_Rep3")
+
+# Meta data from cells
+metainfo <- data.table(sem@meta.data)
+str(metainfo)
+metainfo[grep("tumor", metainfo$cell_type),"cell_type"] <- "tumor"
+
+# Niches from lung 5 patient
+ggplot(metainfo, aes(x = sdimx,y = sdimy, col = niche) ) +
+  geom_point(cex=0.5) + coord_fixed() +
+  scale_color_manual(values=unname(pals::alphabet())) + 
+  guides(color = guide_legend(override.aes = list(size = 3) ) ) +
+  theme(legend.margin = margin(0, 0, 0, 0))
+
+# Cell types from lung 5 patient
+ggplot(metainfo, aes(x = sdimx,y = sdimy, col = cell_type) ) +
+  geom_point(cex=0.5) + coord_fixed() +
+  scale_color_manual(values=unname(pals::alphabet())) + 
+  guides(color = guide_legend(override.aes = list(size = 3) ) ) +
+  theme(legend.margin = margin(0, 0, 0, 0))
+```
+
+DE analysis adjusting for spatial information is performed separately for each sample. So for this vignette we will focus on Lung 5 rep 3, with the interest to analyse difference in expression between macrophages cells in each niche.
+
+```{r metainfo}
+# Selecting data from macrophage cells
+modeldat <- metainfo[cell_type == "macrophage",]
+```
+
+## Dealing with cell overlap  and segmentation errors
+
+Cell segmentation errors can be a great nuisance which can distort cell-type specific DE results.  In practice, even minor errors can cause false positive DE findings. There are two main ways to deal with this: filtering out genes before DE analysis which may be falsely expressed primarily due to cell overlap in the cell type we want to analyze.
+The `overlap_ratio_metric` function calculates average expression in each celltype, and the average expression in the cells which *neighbor* that cell type within a specified radius.  We may choose to pre-filter genes from an analysis which are more expressed in a cell type's neighbors than they are in the cell type itself.
+
+
+```{r}
+overlap_metrics <- 
+overlap_ratio_metric(assay_matrix = sem[["RNA"]]@data,
+                           metadata = metainfo,
+                           cluster_col = "cell_type",
+                           radius = 0.05,
+                           split_neighbors_by_colname = "Run_Tissue_name",
+                           sdimx_col = "sdimx",
+                           sdimy_col = "sdimy"
+                           )
+overlap_metrics[cell_type=="macrophage"][order(ratio)][]
+analysis_genes <- overlap_metrics[cell_type=="macrophage" & ratio <= 1]$target
+```
+
+The column `ratio` in the table above is equal to `avg_neighbor_othercluster` / `avg_cluster`. Choosing to filter genes with `ratio > 1`, we may remove FN1, COL1A1, and TPSB2 from our analysis.
+
+Further, we can adjust for potential segmentation error with the regression model, by controlling for the expression of a gene within each cell's neighbors of different cell types.  The `pre_de` function identifies neighbors of each cell within a specified radius and records their cell types, so that this covariate can be computed and used within model fitting.  Below, we use the 'totalcounts' in each cell to create a totalcount normalized dataset for gaussian regression models; we'll also pass these normalization / scaling factors to smiDE to use for computing our covariate for constructing our cell overlap covariate.
+
+```{r pre_de, message=FALSE, warning=FALSE}
+
+
+# Pre DE object
+pre_de_obj <- 
+  pre_de(metadata = metainfo
+         ,cell_type_metadata_colname = "cell_type"
+         ,split_neighbors_by_colname = "tissue"
+         ,mm_radius = 0.05
+         ,sdimx_colname = "sdimx"
+         ,sdimy_colname = "sdimy"
+         ,verbose=TRUE
+  )
+pre_de_obj$cell_adjacency_dt[]
+
+### Normalizing data based on total counts in the cell, 
+### `totalcounts_scalefactors` later passed to smi_de() for creating "otherct_expr" covariate, normalzing neighbor 
+### expression by the neighbors 'totalcounts'
+
+totalcounts <- sem@meta.data[["totalcounts"]]
+totalcounts_scalefactors <- mean(totalcounts) / totalcounts
+names(totalcounts_scalefactors) <- rownames(sem@meta.data)
+sem <- Seurat::SetAssayData(sem
+                           ,"data"
+                           ,sem[["RNA"]]@counts %*% Matrix::Diagonal(x=totalcounts_scalefactors, names=colnames(sem)))
+
+
+
+```
+
+# Methods for differential expression
+
+Here we discuss different methods for performing differential expression. Due to the nature of the spatial data it is important to account for the correlation between cells to avoid spatial confounding. That is, cells' expression can be associated with spatial unknown variables, such as proximity to blood vessels or technical artefacts for example, and because of that we could consider that there's difference in expression between niches when it is actually due to some other factor unrelated to that. To deal with spatial confounding a common way is to model cell correlation using a Gaussian process.
+
+Let $y_{ig}$ be the transcript counts of the $g$th gene ($g=1,\dots,p$) on the $i$th cell ($i=1,\dots,n$). Then for each gene $g$ we model the conditional mean $\mu_g$ of $y_g=(y_{1g},\dots,y_{ng})$ as
+
+\begin{equation}\label{eqn:mu}
+    g(\mu_g) = Z\alpha + X\beta + b ,
+\end{equation}
+
+where $g$ is a link function, either the identity for Gaussian distribution, or log function for Negative Binomial. The vector $X$ represents the covariate of interest, with $\beta$ the DE effect sizes associated with it, and $Z$ represents the covariates to be adjusted for, for example the spatially lagged expression vectors $l_1,\dots,l_p$, with $\alpha$ the coefficients associated with it. The random component $b$ is assumed to have mean zero and covariance matrix $\Sigma$, which describes the correlation between cells. For a Gaussian Process we assume $\Sigma$ is a Matern matrix.
+
+An important aspect of spatial single cell transcriptomics data is the large number of cells assayed, often reaching hundreds of thousands or even millions of cells per subject. Modeling the correlation between these cells thus requires dealing with a covariance matrix of extremely large size, which introduces computational challenges. Therefore we implement here approximate approaches to address this challenge. The first one assumes a bayesian approach (*GP INLA*) and the second models correlation between groups of cells instead of individual cells. When modelling correlation of cluster of cells we further have two choices, assume each cluster is independent (*Independent clusters*), or model their correlation with a Matern type matrix (*GP cluster*).
+
+The choice of model depends on the goal of the analysis and the size of the dataset. When running DE for several genes it can take substantial time, specially when there is a high number of cells. Independent clusters is the fastest model to run and it provides good ranking of genes, however it does not maintain control of type 1 error so it is not recommended for inference. Alternatively it is a good alternative for pre screening genes in an exploratory way. GP INLA is the second fastest model, it provides good control of type 1 error and ranking of genes, however it is a bayesian approach thus it does not provide p-values and results depends on the choice or priors. GP clusters processing time and results is directed linked to the number of clusters chosen. Higher number of clusters leads to better control of type 1 error but takes longer to run. It is a frequentist approach thus it provides p-values and doesn't require prior choices. Below is a table summarizing results for each model.
+
+|                        | No spatial | Independent clusters      | GP cluster | GP INLA          |
+|------------------------|------------|---------------------------|------------|------------------|
+| **Time**               | Very fast  | Very fast                 | Slower     | Fast             |
+| **Type 1 error**       | $$         
+                          >>>\alpha   
+                          $$          | $>>\alpha$                | $\alpha$   | $\alpha$         |
+| **Ranking**            | Bad        | Good depending on cluster | Good       | Good             |
+| **Cluster suggestion** | \-         | 5%                        | 25%        | \-               |
+| **Results stability**  | Stable     | Stable                    | Stable     | Depends on prior |
+
+## No spatial
+
+As discussed it is important to account for the spatial variation, however here we demonstrate how to fit a model without accounting for it, to allow for comparisons later. We can fit either using raw counts and Negative Binomial distribution, or normalized counts and a Gaussian distribution. When fitting the models the arguments that will change is `assay_matrix`, `family` and when fitting a negative binomial we need to specify the offset as `log(totalcounts)`. For the `neighborhood_counts` we specify the object obtained from the `pre_de` function. The `formula` argument gives the fixed effects formula to be used in the `lm` function. It contains the variable `otherct_expr` which along side with `RankNorm` adjusts for cell overlap. The `groupVar` indicated which variable is of interest for DE analysis. 
+
+```{r fit nospatial, message=FALSE, warning=FALSE}
+num_genes <- length(analysis_genes)
+
+# Negative Binomial
+de_nospatial_nb <- 
+   smi_de(assay_matrix = sem[["RNA"]]@counts
+          ,metadata = modeldat
+          ,formula = ~RankNorm(otherct_expr) + niche + offset(log(totalcounts)) 
+          ,pre_de_obj = pre_de_obj
+          ,neighbor_expr_cell_type_metadata_colname = "cell_type"
+          ,neighbor_expr_overlap_agg ="sum"
+          ,neighbor_expr_totalcount_normalize = TRUE
+          ,neighbor_expr_totalcount_scalefactor = totalcounts_scalefactors
+          ,family="nbinom2"
+          ,targets=analysis_genes
+   ) 
+
+# Gaussian
+de_nospatial_gau <- 
+  smiDE::smi_de(assay_matrix = sem[["RNA"]]@data ## using 'totalcount normalized' data
+                ,metadata = modeldat
+                ,formula = ~RankNorm(otherct_expr) + niche
+                ,pre_de_obj = pre_de_obj
+                ,neighbor_expr_cell_type_metadata_colname = "cell_type"
+                ,neighbor_expr_overlap_agg ="sum"
+                ,neighbor_expr_totalcount_normalize = TRUE
+                ,neighbor_expr_totalcount_scalefactor = totalcounts_scalefactors
+                ,targets= analysis_genes
+                ,family = "gaussian"
+                )
+
+```
+
+We can access the results from each model with the `results` function. When comparing multiple niches it gives the options to access `pairwise`, `one.vs.rest`, `one.vs.all`, `emmeans` and `model_summary`. We specify `variable = "niche"` since it is the variable of interest. 
+
+```{r results nospatial}
+# Negative Binomial
+str(results(de_nospatial_nb), max.level = 1)
+results(de_nospatial_nb, variable = "niche")$pairwise[contrast == "plasmablast-enriched stroma / tumor-stroma boundary",]
+
+# Gaussian
+results(de_nospatial_gau, variable = "niche")$pairwise[contrast == "plasmablast-enriched stroma - tumor-stroma boundary",]
+```
+
+There are several possible analysis to be made. For exemplification here we will compare expression of macrophage cells in tumor-stroma boundary, plasmablast and myeloid-enriched stroma. Based on this modeling approach we would conclude that C1QC, TYK2 and HLA-DQA1 are up regulated, and FN1 and COL1A1 are down regulated, in macrophages that are in a myeloid enriched environment, compared to those that are located on the tumor boundary. Also, expression of HLA-DQA1, VIM and SPP1 are also different in macrcophages surrounded by plasmablasts, compared to those at the boundary.
+
+```{r volcano nospatial,  fig.width=8,fig.height=4}
+pairwise_res <- results(de_nospatial_nb, variable="niche")$pairwise[contrast %in% c("plasmablast-enriched stroma / tumor-stroma boundary",
+                        "myeloid-enriched stroma / tumor-stroma boundary")]
+pairwise_res[,sign:=ifelse(p.value < 0.05/num_genes, TRUE, FALSE)]
+ggplot(pairwise_res, aes(x = log2(fold_change), y = -log10(p.value), 
+             col = as.factor(sign), label = target)) +
+  geom_point() + facet_wrap(contrast~.)+
+  geom_hline(yintercept = -log10(0.05/num_genes), col = "darkgrey")+
+  geom_vline(xintercept = 0, col = "darkgrey")+
+  geom_text_repel(show.legend = F, box.padding = 0.5, cex = 3) +
+  labs(color = "Significant") +
+  theme(legend.position = "top")
+
+```
+
+
+## GP clusters
+
+```{r load results, include=FALSE}
+
+datadir<-system.file("extdata", package="smiDE")
+de_GPclust_nb <- readRDS(paste0(datadir, "/de_GPclust_nb.rds"))
+de_inla_nb <- readRDS(paste0(datadir, "/de_inla_nb.rds"))
+de_inla_nb2 <- readRDS(paste0(datadir, "/de_inla_nb2.rds"))
+
+
+
+```
+
+To fit models that account for spatial correlation we use similar arguments as before, with an additional `spatial_model` argument. Using a Gaussian Process may take longer to run, so to expedite processing time we model correlation between cluster of cells obtained based on their spatial location. We have to make a decision on the number of clusters to be considered, ideally we would model the correlation of individual cells, so we want to consider a large number of clusters. However as the number of clusters increase so does the computational time. Below we see some examples of clustering data with function `xy_kmeans_clusters`, either based on a proportion of total number of cells, with `k_prop_n`, or by directly choosing the number of clusters `k`.
+
+```{r examples clusters}
+# 10 clusters
+clusters10 <- 
+smiDE::xy_kmeans_clusters(modeldat, k = 10, 
+                          split_neighbors_by_colname = "Run_Tissue_name")
+ggplot(clusters10, aes(sdimx, sdimy, color=factor(k_cluster))) + 
+  geom_point(cex = 1) + labs(col = "cluster") +
+  coord_fixed()+
+  ggtitle("10 clusters")
+
+# 25% clusters
+clusters_prop_25 <- 
+smiDE::xy_kmeans_clusters(modeldat, k_prop_n = 0.25, 
+                          split_neighbors_by_colname = "Run_Tissue_name")
+
+ggplot(clusters_prop_25, aes(sdimx, sdimy, color=factor(k_cluster))) + 
+  geom_point(cex = 1) + labs(col = "cluster") +
+  scale_color_manual(values = sample(scales::hue_pal()(2776))) +
+  coord_fixed()+
+  ggtitle("25% clusters")+ 
+  theme(legend.position = "none")
+```
+
+A recommended cluster size corresponds to 25% of the sample size, but this number can be adjusted based on the specific dataset. If there's not a large number of cells in such way that computational time is not a problem we can increase this percentage, if there's a very high number of cells and we need computation to be faster we can decrease this percentage, however keep in mind that this can lead to more false positives. When performing DE analysis there's no need to obtain clusters previously, `smi_de` will calculate internally based on the number of clusters with either `k_prop_n` or `k` in the `spatial_model` argument, alongside with `GP_Matern`. For the following examples we will assume a Negative Binomial distribution for comparison.
+
+```{r fit GP cluster, eval=FALSE, include=TRUE}
+
+de_GPclust_nb  <- 
+smi_de(assay_matrix = sem[["RNA"]]@counts
+           ,metadata = modeldat
+           ,formula = ~RankNorm(otherct_expr) + niche + offset(log(totalcounts))
+           ,pre_de_obj = pre_de_obj
+           ,neighbor_expr_cell_type_metadata_colname = "cell_type"
+           ,neighbor_expr_overlap_agg ="sum"
+           ,neighbor_expr_totalcount_normalize = TRUE
+           ,neighbor_expr_totalcount_scalefactor = totalcounts_scalefactors
+           ,family="nbinom2"
+       ,targets = analysis_genes
+           ,spatial_model = list(
+             name = "GP_Matern"
+             ,k_prop_n = 0.25
+             ,x_coord_col = "sdimx"
+             ,y_coord_col = "sdimy"
+             ,spatial_random_effect =  ~Matern(1 | sdimx_cluster + sdimy_cluster)
+           )
+       ,nCores = 4
+    ) 
+```
+
+```{r results GP cluster, fig.width=8,fig.height=4, fig.align='center'}
+# pairwise results GP cluster
+results_GPclust_nb <- results(de_GPclust_nb, variable="niche")$pairwise
+results_GPclust_nb[contrast == "plasmablast-enriched stroma / tumor-stroma boundary"][order(abs(p.value))]
+```
+
+Continuing on the analysis of DE genes between tumor-stroma boundary and plasmablast and myeloid-enriched stroma, we analyze the results using a GP model. Unlike the previous model, we note that when accounting for spatial correlation, genes C1QC, TYK2 and HLA-DQA1 are not down-regulated on macrophages at the tumor-stroma boundary, and VIM is not differently expressed between myeloid-enriched stroma and tumor-stroma boundary. 
+
+```{r volcano GP cluster, fig.align='center', message=FALSE, warning=FALSE,fig.width=8,fig.height=4}
+results_GPclust_nb$sign <- ifelse(results_GPclust_nb$p.value < 0.05/num_genes, T, F)
+
+results_GPclust_nb_subset <- 
+results_GPclust_nb[contrast %in% c("plasmablast-enriched stroma / tumor-stroma boundary",
+                        "myeloid-enriched stroma / tumor-stroma boundary")]
+ggplot(results_GPclust_nb_subset, aes(x = log2(fold_change), y = -log10(p.value), 
+             col = as.factor(sign), label = target)) +
+  geom_point() + facet_wrap(contrast~.)+
+  geom_hline(yintercept = -log10(0.05/num_genes), col = "darkgrey")+
+  geom_vline(xintercept = 0, col = "darkgrey")+
+  geom_text_repel(show.legend = F, box.padding = 0.5, cex = 3) +
+  labs(color = "Significant")+
+  theme(legend.position = "top")
+```
+
+We can further look at the random effects obtained by the model for genes HLA-DQA1, TYK2, FN1 and COL1A1 to observe the spatial variation. Note that random effects are obtained for clusters of cells instead of individual cells. Each gene shows a specific pattern, even the ones that are still significant. In particular, for gene TYK2 the random effects highlight one of the field of views, so without accounting for spatial correlation we would conclude that this gene was significantly DE between niches, when in fact the difference comes from a technical artifact. 
+
+
+```{r GP clusters spatial, fig.width=8,fig.height=5}
+cowplot::plot_grid(plotlist=
+  lapply(
+    split(results(de_GPclust_nb, targets = c("HLA-DQA1","TYK2", "SPP1", "VIM"))$spatial_random_effect,
+          by="target"), function(xx){
+  ggplot(xx, aes(sdimx,sdimy, col= re)) +
+  geom_point(cex=0.8) +
+  scale_color_gradient2(midpoint = 0) +
+      theme(legend.position = "right") +
+      facet_wrap(~target) +
+      coord_fixed()
+  }), nrow = 2
+)
+```
+
+On another note, we compare results obtained with and without adjustment for spatial correlation for the analysis of expression of one niche vs average expression of the rest. The plot below compares -log10(p-values) obtained by each model, with lines indicating bonferroni corrected significance levels, colors indicate genes and points indicate each possible comparison. Note that p-values for no spatial model are much smaller than when accounting for spatial correlation, including several comparisons that are not obtained when adjusting for spatial correlation. 
+
+```{r comp nospatial GPcluster, fig.width=8,fig.height=5}
+results_nospatial <- results(de_nospatial_nb, 
+                                  variable="niche")$pairwise[grepl("tumor-stroma boundary", contrast)]
+results_GPclust <- results(de_GPclust_nb, 
+                              variable="niche")$pairwise[grepl("tumor-stroma boundary", contrast)]
+
+compar_nospatial <- merge(results_nospatial[,.(target, contrast, 
+                                                    est_nospatial = fold_change, 
+                                                    pvalue_nospatial = p.value)],
+                          results_GPclust[,.(target, contrast, 
+                                                est_GPclust = fold_change, 
+                                                pvalue_GPclust = p.value)],
+                          by=c("contrast", "target"))
+
+
+ggplot(compar_nospatial,
+       aes(x=-log10(pvalue_nospatial), y=-log10(pvalue_GPclust),
+           color=target, shape = contrast)) + 
+  geom_point() + theme_bw() + 
+  scale_shape_manual(guide = guide_legend(nrow=3),
+                     values = c(1:8)) +
+  geom_abline(slope=1,intercept=0,lty=2) + 
+  geom_hline(yintercept = -log10(0.05/num_genes)) +
+  geom_vline(xintercept = -log10(0.05/num_genes)) +
+   theme(legend.position = "top",
+        legend.direction = "horizontal", 
+        legend.box = "vertical",
+        legend.text = element_text(size = 8),
+        legend.margin = margin(0, 0, 0, 0))
+```
+
+## Independent clusters
+
+Another possibility for modelling spatial variation is using independent clusters. This approach is less successful at controlling false positives, but it may be useful for ranking genes based on their significance. For that we first create the clusters for cells using `xy_kmeans_clusters`. Then pass that as a random effect on the model with `(1|k_cluster)` in the formula. In this case a cluster size of 5% should be use, and inference should not be made on p-values as if may lead to false positives.
+
+```{r fit indep clust, message=FALSE, warning=FALSE, results = "hide"}
+modeldat <- smiDE::xy_kmeans_clusters(modeldat, k_prop_n = 0.05, split_neighbors_by_colname = "tissue")
+deindep_clusters <- 
+  smiDE::smi_de(assay_matrix = sem[["RNA"]]@counts
+                ,metadata = modeldat
+                ,formula = ~RankNorm(otherct_expr) + niche + offset(log(totalcounts)) + (1|k_cluster)
+                ,pre_de_obj = pre_de_obj
+                ,neighbor_expr_cell_type_metadata_colname = "cell_type"
+                ,neighbor_expr_overlap_agg ="sum"
+                ,neighbor_expr_totalcount_normalize = TRUE
+                ,neighbor_expr_totalcount_scalefactor = totalcounts_scalefactors
+                ,family="nbinom2"
+                )
+```
+
+When looking at the results and comparing with results from the GP cluster, we note that the top 4 genes obtained by the models are consistent. Here we have only a small example, but in practice this model can be useful to perform a first screen on the genes to select only the top genes for subsequent analysis and avoid the computational time of analyzing all hundreds of genes. 
+
+```{r results indep clust}
+### one niche vs. cell-weighted average of other niches
+results_indep <- results(deindep_clusters, variable="niche")$pairwise
+results_indep[contrast == "plasmablast-enriched stroma / tumor-stroma boundary"][order(abs(p.value))]
+```
+
+
+## GP - INLA
+
+Another approach to account for spatial correlation is by considering a Gaussian Process under a bayesian framework. For that we specify the name `GP_INLA`. This approach has processing time much faster than the frequentist GP, therefore there's no need to model correlation between cluster of cells like before. Since inference is performed based on credible intervals, to adjust for multiple comparison of genes, one possibility is to adjust the quantiles to correspond to a Bonferroni adjsuted level of significance (0.05/number of genes) by including `quantiles = c(0.025/num_genes, 0.5, 1-0.025/num_genes)` in the list for `spatial_model`.
+
+```{r fit inla, eval = FALSE, include = TRUE}
+# Negative Binomial
+
+de_inla_nb <- 
+  smiDE::smi_de(assay_matrix = sem[["RNA"]]@counts
+                ,metadata = modeldat
+                ,formula = ~RankNorm(otherct_expr) + niche + offset(log(totalcounts)) 
+                ,groupVar = "niche"
+                ,family="nbinom2"
+                ,targets = analysis_genes
+                ,pre_de_obj = pre_de_obj
+                ,neighbor_expr_cell_type_metadata_colname = "cell_type"
+                ,neighbor_expr_overlap_agg ="sum"
+                ,neighbor_expr_totalcount_normalize = TRUE
+                ,neighbor_expr_totalcount_scalefactor = totalcounts_scalefactors
+                ,spatial_model = list(name="GP_INLA", 
+                                     quantiles = c(0.025/num_genes, 0.5, 1-0.025/num_genes)
+                                     ,x_coord_col = "sdimx", y_coord_col = "sdimy"
+                                     )
+                ,nCores=1
+  )
+
+```
+
+Once again after fitting the model we can pull out contrasts, model summaries, and emmeans using the `smiDE::results` function. For INLA the point estimate is usually given by the median (`0.5quant`) of the posterior distribution. 
+
+```{r results inla, fig.width=8,fig.height=4, fig.align='center'}
+# pairwise results GP INLA
+results_inla_nb <- results(de_inla_nb, variable="niche")$pairwise
+colnames(results_inla_nb)[4:6] <- c("credible_lb","estimate","credible_ub")
+results_inla_nb[contrast == "plasmablast-enriched stroma / tumor-stroma boundary"] 
+```
+
+Inference here is performed based on credible intervals, that is, if the credible intervals contain one (or zero when using a Gaussian distribution), then there is not enough evidence of the gene being differently expressed between niches. Note that there are no p-values, so volcano plots can't be obtained. However we can obtain an ad hoc "bayesian volcano plot". First we get which genes are significant, based on credible interval. Then, for the x axis, for non significant we plot the point estimate, and for significant we plot the credible interval bound that is closes to 1 (for Negative Binomial), or 0 (for Gaussian). With this we can have an idea on how close each interval is of the null, and know the direction of the effect. For the y axis for non significant we plot 0, and for significant we plot the absolute value of the estimate, to understand which genes have higher effect.
+
+```{r bayesian volcano, fig.width=8,fig.height=4}
+# Creating variable indicating if credible interval contains 1
+results_inla_nb$sign <- with(results_inla_nb, 
+                             ifelse(credible_lb > 1 &  credible_ub > 1 |
+                                    credible_lb < 1 &  credible_ub < 1 , 1, 0))
+
+#Creating variable for "bayesian volcano plot"
+## gets interval bound closer to 1 for significant
+## gets median for non significant
+results_inla_nb$value <- with(results_inla_nb, 
+                             ifelse(sign == 0, estimate, 
+                                    ifelse(credible_lb > 1, credible_lb,credible_ub)))
+results_inla_nb_subset <- results_inla_nb[contrast %in% 
+                                            c("plasmablast-enriched stroma / tumor-stroma boundary",
+                        "myeloid-enriched stroma / tumor-stroma boundary")]
+ggplot(results_inla_nb_subset, aes(x = log2(value), y = sign*abs(log2(estimate)),
+          col = as.logical(sign), label = target)) +
+  geom_vline(xintercept = 0, col = "dark grey") +
+  facet_wrap(contrast~., scales = "free")+
+  geom_point()  + geom_text_repel(show.legend = F, box.padding = 0.5, cex = 3) +
+  labs(x = "log2(Credible interval limit)", y = "Significance * log2(|Estimate|)",
+       color = "Significant") +
+  theme(legend.position = "top")
+
+```
+
+Results here are almost equivalent to those obtained by GP clusters, with the difference that VIM and SPP1 were not found significant. It can be the case that some genes have different results between GP and GP-INLA, since there are two different methodologies, however for most cases results will be equivalent.
+
+We can then further examine the random effects obtained by GP INLA. Unlike GP cluster, here we have random effects for individual cells instead of clusters so patterns are more smooth, but mostly equivalent. The pattern for gene SPP1 differs by each model, which can be an indicative that either the GP clusters was not able to correctly model the spatial correlation, or that GP INLA failed to converge, which can be due to several reasons, for example low transcript counts in cells.
+
+
+```{r spatial effects inla, fig.width=8,fig.height=5}
+cowplot::plot_grid(plotlist=
+  lapply(
+    split(results(de_inla_nb, targets = c("HLA-DQA1","TYK2","SPP1","VIM"))$spatial_random_effect,
+          by="target"), function(xx){
+            ggplot(merge(xx, modeldat,
+                         by.x = c("x","y"), by.y = c("sdimx", "sdimy"), all.y = T),
+                   aes(x,y, col= `0.5quant`)) + 
+              geom_point(cex=0.8) + 
+              scale_color_gradient2(midpoint = 0) + 
+              theme(legend.position = "right") +
+              facet_wrap(~target) + coord_fixed()
+  }), nrow = 2
+)
+```
+
+Then, we compare results obtained by GP clusters and GP INLA for comparing expression of genes in one niche and average of the rest. Since GP-INLA doesn't provide p-values we compare estimates for both models. Results are highly correlated, with most different results being for genes SPP1 and FN1, which was noted by the differences in spatial random effects. 
+
+```{r comp GPcluster inla, fig.width=8,fig.height=5}
+results_inla <- results(de_inla_nb, variable="niche")$pairwise[contrast == "plasmablast-enriched stroma / tumor-stroma boundary"]
+colnames(results_inla)[4:6] <- c("lb","est","ub")
+results_GPclust <- results(de_GPclust_nb, variable="niche")$pairwise[contrast == "plasmablast-enriched stroma / tumor-stroma boundary"]
+# obtaining bonferroni correct confidence intervals
+results_GPclust$lb <- exp(log(results_GPclust$ratio) - qnorm(1-(0.025/num_genes)) * results_GPclust$SE)
+results_GPclust$ub <- exp(log(results_GPclust$ratio) + qnorm(1-(0.025/num_genes)) * results_GPclust$SE)
+
+
+
+compar_inla <- rbindlist(list(results_GPclust[,.(target, contrast, est=fold_change, lb, ub, model = "GP clusters")]
+                              ,results_inla[,.(target, contrast, est, lb, ub, model = "GP INLA")])
+                         )
+
+ggplot(compar_inla, aes(y = target, x = est, col = model)) +
+  geom_vline(xintercept = 1) +
+  labs(x = "Estimates", y = "Target", col = "Model") +
+  geom_point(position = position_dodge(0.5)) +
+  geom_errorbar(aes(xmin = lb, xmax = ub), 
+                  position = position_dodge(0.5), width = 0.2)
+
+
+```
+
+### Trying different priors
+
+One important aspect of bayesian statistics is the choice of priors. Priors are set for the range $\rho$ and standard deviation $\sigma$ parameters of the Matern matrix. The priors are specified based on the construction by Fuglstad, et al. (2016), in which we assume $P(\rho<\rho_0)=p_\rho$ and $P(\sigma>\sigma_0)=p_\sigma$, so we need to specify $(\rho_0, p_\rho)$ and $(\sigma_0, p_\sigma)$. The range parameters controls the range over which spatial correlation decays and needs to be accounted in the same scale of the data. In the spatial transcriptomics setting we expect that cells further away enough are spatially uncorrelated, so the range specifies the distance in which two cells would not be correlated. The variance parameter represents the marginal standard deviation of the process. When $\sigma=0$ there's no random spatial effect, and as $\sigma$ increases it indicates more variability on the spatial effect. It is worth nothing that this parameter will depend on the choice of the distribution, since the scale of normalized and raw data changes.
+
+If there's no previous knowledge about the spatial correlation it is of good practice to choose very wide priors. 
+By default, we first compute the average range of `x` and `y` coordinates of modeled cells, and set the priors for $rho$ as  $P(\rho< avg_range_xy)=0.5$, and $P(\sigma>0.5)=0.5$. For this dataset, the average of x/y coordinate ranges is
+```{r}
+mean(diff(range(modeldat[["sdimx"]])), diff(range(modeldat[["sdimy"]]))) ## average range, used to set prior P(\rho < avg_range_xy) = 0.5
+```
+
+Other priors may be optimal or could be more carefully chosen and specified based on the dataset.
+For comparison, we show alternate specifications for priors, choosing a much different setting, where $P(\rho<0.1)=0.05$ and $P(\sigma>5)=0.05$. 
+
+```{r fit inla priors2, eval = FALSE, include = TRUE}
+de_inla_nb2 <- 
+  smiDE::smi_de(assay_matrix = sem[["RNA"]]@counts
+                ,metadata = modeldat
+                ,formula = ~RankNorm(otherct_expr) + niche + offset(log(totalcounts))
+                ,targets = analysis_genes
+                ,family="nbinom2",
+                ,pre_de_obj = pre_de_obj
+                ,neighbor_expr_cell_type_metadata_colname = "cell_type"
+                ,neighbor_expr_overlap_agg ="sum"
+                ,neighbor_expr_totalcount_normalize = TRUE
+                ,neighbor_expr_totalcount_scalefactor = totalcounts_scalefactors
+                ,spatial_model = list(name="GP_INLA" 
+                                      ,prior.range.inlaprior = c(0.1, 0.05) # P(range < 0.1) = 0.05
+                                      ,prior.sigma.inlaprior = c(5, 0.05)   # P(sigma > 5) = 0.05
+                                      ,quantiles = c(0.025/num_genes, 0.5, 1-0.025/num_genes)
+                                      ,x_coord_col = "sdimx", y_coord_col = "sdimy"
+                                     )
+                ,nCores=1
+  )
+
+```
+
+Below we analyze estimates and credible intervals obtained with each prior, for comparison between plasmablast-enriched stroma and tumor-stroma boundary.
+We note that there’s a slight difference between estimates and bounds obtained with each prior. In particular we note that gene SPP1 was found to be significant with the new prior, similarly to GP clusters, and the bounds for this gene changed the most, whereas bounds for other genes are incredibly similar. Therefore, priors need to be chosen carefully as they can influence results, especially for smaller sample sizes.
+
+
+```{r}
+results_p1 <- results(de_inla_nb,  variable="niche")$pairwise[contrast == "plasmablast-enriched stroma / tumor-stroma boundary"]
+colnames(results_p1)[4:6] <- c("credible_lb","estimate","credible_ub")
+results_p2 <- results(de_inla_nb2, variable="niche")$pairwise[contrast == "plasmablast-enriched stroma / tumor-stroma boundary"]
+colnames(results_p2)[4:6] <- c("credible_lb","estimate","credible_ub")
+
+
+compar <- rbindlist(list(
+  results_p1[,.(target, contrast, est = estimate,
+                              lb = credible_lb,
+                              ub = credible_ub
+                              ,prior = "priors1")]
+  ,results_p2[,.(target, contrast, 
+                 est = estimate,
+                 lb = credible_lb,
+                 ub = credible_ub
+                 ,prior = "priors2")]
+))
+
+### comparison between priors
+compar[order(contrast, target, prior)][]
+
+ggplot(compar, aes(y = target, x = est, col = prior)) +
+  geom_vline(xintercept = 1) +
+  labs(x = "Estimate", y = "Target", col = "Prior") +
+  geom_point(position = position_dodge(0.5)) +
+  geom_errorbar(aes(xmin = lb, xmax = ub), 
+                    position = position_dodge(0.5), width = 0.2)
+
+```
+
+
+
+
+
+
+
+
+
+
+
