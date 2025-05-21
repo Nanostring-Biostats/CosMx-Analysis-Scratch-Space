@@ -59,7 +59,21 @@ You can install smiDE using the devtools package
 
 ```{r, eval=FALSE}
 # install.packages("devtools")
-devtools::install_github("Nanostring-Biostats/smiDE")
+# Make a temp dir
+dir.create("smiDE_tmp")
+setwd("smiDE_tmp")
+
+# Sparse clone only the submodule path
+system("
+  git init &&
+  git remote add origin https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space.git &&
+  git config core.sparseCheckout true &&
+  echo '_code/smiDE/*' > .git/info/sparse-checkout &&
+  git pull origin Main
+")
+
+# Install from local
+devtools::install_local("_code/smiDE")
 ```
 ## More vignettes
 
@@ -279,6 +293,6 @@ Some performance considerations are summarized in the table below, based on simu
 | **Cluster suggestion (as % of total cells)** | \-                       | 5%                        | 25%               | \-                                 |
 | **Results stability**  | Stable                   | Stable                    | Stable            | Depends on prior specified by user |
 
-For a more detailed discussion, as well as examples of syntax for calling these models, we point the reader to the [spatial-vignette](https://github.com/Nanostring-Biostats/smiDE/blob/main/vignettes) and the help page (`?smiDE::spatial_model`).
+For a more detailed discussion, as well as examples of syntax for calling these models, we point the reader to the [spatial-vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE/vignettes) and the help page (`?smiDE::spatial_model`).
 
 

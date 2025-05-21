@@ -52,7 +52,21 @@ You can install smiDE using the devtools package
 
 ``` r
 # install.packages("devtools")
-devtools::install_github("Nanostring-Biostats/smiDE")
+# Make a temp dir
+dir.create("smiDE_tmp")
+setwd("smiDE_tmp")
+
+# Sparse clone only the submodule path
+system("
+  git init &&
+  git remote add origin https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space.git &&
+  git config core.sparseCheckout true &&
+  echo '_code/smiDE/*' > .git/info/sparse-checkout &&
+  git pull origin Main
+")
+
+# Install from local
+devtools::install_local("_code/smiDE")
 ```
 
 ## More vignettes
@@ -196,7 +210,7 @@ pre_de(metadata = sem@meta.data
        ,sdimy_colname = "sdimy"
        ,verbose=TRUE
 )
-#> 2025-01-31 20:57:14.281626, identifying cell-cell spatial neighbors within 0.05 radius.
+#> 2025-05-21 17:29:39.070705, identifying cell-cell spatial neighbors within 0.05 radius.
 #> neighbors calculated for tissue: Lung5-5
 
 ### data.table of of cell-cell adjacencies
@@ -351,17 +365,17 @@ results(de_obj, comparisons = "model_summary", variable = "niche", target = "C1Q
 #> 10:                            theta  3.034291e+00 0.13654403          NA
 #> 11:                           logLik -8.696903e+03         NA          NA
 #>             pval    termtype user.self sys.self elapsed target             msg
-#>  1: 4.527190e-79       fixed     1.525    2.302   0.249   C1QC converged=TRUE 
-#>  2: 1.931731e-02       fixed     1.525    2.302   0.249   C1QC converged=TRUE 
-#>  3: 8.962927e-01       fixed     1.525    2.302   0.249   C1QC converged=TRUE 
-#>  4: 5.766058e-03       fixed     1.525    2.302   0.249   C1QC converged=TRUE 
-#>  5: 8.438632e-02       fixed     1.525    2.302   0.249   C1QC converged=TRUE 
-#>  6: 2.216312e-01       fixed     1.525    2.302   0.249   C1QC converged=TRUE 
-#>  7: 1.626486e-01       fixed     1.525    2.302   0.249   C1QC converged=TRUE 
-#>  8: 7.959163e-01       fixed     1.525    2.302   0.249   C1QC converged=TRUE 
-#>  9: 3.100289e-01       fixed     1.525    2.302   0.249   C1QC converged=TRUE 
-#> 10:           NA       fixed     1.525    2.302   0.249   C1QC converged=TRUE 
-#> 11:           NA model_stats     1.525    2.302   0.249   C1QC converged=TRUE
+#>  1: 4.527190e-79       fixed      1.61    2.087   0.296   C1QC converged=TRUE 
+#>  2: 1.931731e-02       fixed      1.61    2.087   0.296   C1QC converged=TRUE 
+#>  3: 8.962927e-01       fixed      1.61    2.087   0.296   C1QC converged=TRUE 
+#>  4: 5.766058e-03       fixed      1.61    2.087   0.296   C1QC converged=TRUE 
+#>  5: 8.438632e-02       fixed      1.61    2.087   0.296   C1QC converged=TRUE 
+#>  6: 2.216312e-01       fixed      1.61    2.087   0.296   C1QC converged=TRUE 
+#>  7: 1.626486e-01       fixed      1.61    2.087   0.296   C1QC converged=TRUE 
+#>  8: 7.959163e-01       fixed      1.61    2.087   0.296   C1QC converged=TRUE 
+#>  9: 3.100289e-01       fixed      1.61    2.087   0.296   C1QC converged=TRUE 
+#> 10:           NA       fixed      1.61    2.087   0.296   C1QC converged=TRUE 
+#> 11:           NA model_stats      1.61    2.087   0.296   C1QC converged=TRUE
 
 ### model estimated 'marginal mean' counts expression of each gene at each level of 'niche'
 results(de_obj, comparisons = "emmeans", variable = "niche")[[1]][1:10]
@@ -609,5 +623,5 @@ where data were simulated with spatial confounding.
 
 For a more detailed discussion, as well as examples of syntax for
 calling these models, we point the reader to the
-[spatial-vignette](https://github.com/Nanostring-Biostats/smiDE/blob/main/vignettes)
+[spatial-vignette](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE/vignettes)
 and the help page (`?smiDE::spatial_model`).
