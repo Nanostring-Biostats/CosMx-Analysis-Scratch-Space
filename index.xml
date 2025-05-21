@@ -105,6 +105,150 @@ Prompt to compile into HTML file
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-cheat-sheets/images/thumbnail.png" medium="image" type="image/png" height="131" width="144"/>
 </item>
 <item>
+  <title>Programmatic stitching of protein images with napari-cosmx</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/napari-cosmx-protein-stitching.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-example" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-example-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/figures/fig-protein-example.png" class="img-fluid figure-img" width="749">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-example-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: A small section of CosMx SMI data showing DNA (blue), PanCK (green) and the CD3 protein (yellow).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>The <code>napari-cosmx</code> plugin can be used to view CosMx<sup>®</sup> Spatial Molecular Imager (SMI) RNA and protein data. In a <a href="../../posts/napari-stitching/napari-cosmx-stitching.html">previous post</a>, I showed users how to programmatically stitch RNA exports from AtoMx<sup>®</sup> Spatial Informatics Platform (SIP). The process used to stitch protein is similar to RNA with some adjustments that are found below.</p>
+<p>This tutorial uses version 0.4.17.3 of the <code>napari-cosmx</code> plugin. This version is available as a <code>whl</code> file in the assets folder of the <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/assets/napari-cosmx%20releases/napari_CosMx-0.4.17.3-py3-none-any.whl">Scratch Space repository</a>. The tutorial below also builds upon the RNA-based post that more broadly covers how to create the napari environment, installing the plugin, and running scripts.</p>
+<p>When <code>napari-cosmx</code> is installed, we get a few package scripts that can be called directly. The ones needed to stitch protein are:</p>
+<ul>
+<li><code>stitch-images</code>, which builds the IF zarr stores</li>
+<li><code>stitch-expression</code>, which creates the zarr stores for each protein</li>
+</ul>
+<section id="exporting-protein-data" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Exporting protein data</h1>
+<p>When exporting data from AtoMx SIP, be sure to select “Raw Files” and include Morphology2D, Miscellaneous, and ProteinDir (Figure&nbsp;2).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-export-options" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-export-options-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/figures/fig-export-options.png" class="img-fluid figure-img" width="548">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export-options-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Export these components to stitch protein.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="stitching-immunofluorescence-images" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Stitching immunofluorescence images</h1>
+<p>This step is identical for RNA and protein.</p>
+<div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">stitch-images</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--help</span></span></code></pre></div>
+<pre><code>usage: stitch-images [-h] [-i INPUTDIR] [--imagesdir IMAGESDIR] [-o OUTPUTDIR] [-f OFFSETSDIR] [-l] [-u UMPERPX] [-z ZSLICE] [--dotzarr]
+
+Tile CellLabels and morphology TIFFs.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUTDIR, --inputdir INPUTDIR
+                        Required: Path to CellLabels and morphology images.
+  --imagesdir IMAGESDIR
+                        Optional: Path to morphology images, if different than inputdir.
+  -o OUTPUTDIR, --outputdir OUTPUTDIR
+                        Required: Where to create zarr output.
+  -f OFFSETSDIR, --offsetsdir OFFSETSDIR
+                        Required: Path to directory location containing a file ending in FOV_Locations.csv or legacy format latest.fovs.csv.
+  -l, --labels          
+                        Optional: Only stitch labels.
+  -u UMPERPX, --umperpx UMPERPX
+                        Optional: Override image scale in um per pixel.
+                        Instrument-specific values to use:
+                        -&gt; beta04 = 0.1228
+  -z ZSLICE, --zslice ZSLICE
+                        Optional: Z slice to stitch.
+  --dotzarr             
+                        Optional: Add .zarr extension on multiscale pyramids.</code></pre>
+<p>Example:</p>
+<div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">stitch-images</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-i</span> path/to/CellStatsDir <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-o</span> path/to/napari_zarr <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-f</span> /path/to/RunSummary</span></code></pre></div>
+</section>
+<section id="stitch-protein-images" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Stitch Protein Images</h1>
+<p>RNA uses <code>read-targets</code> to create a file that stores the spatial location of RNA transcripts. In contrast, Protein SMI data are more similar to IF TIFF files and so we use the <code>stitch-expression</code> package script to stitch together individual protein files. When complete, protein data will be found in the <code>images/protein</code> subfolder.</p>
+<div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">stitch-expression</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--help</span></span></code></pre></div>
+<pre><code>usage: stitch-expression [-h] [-i INPUTDIR] [-o OUTPUTDIR] [-t TAG] [-u UMPERPX] [-s SCALE] [-c CYCLE] [--dotzarr]
+
+Tile protein expression images
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUTDIR, --inputdir INPUTDIR
+                        Required: Path to parent directory containing CellStatsDir, RunSummary, AnalysisResults, and ProteinDir.
+  -o OUTPUTDIR, --outputdir OUTPUTDIR
+                        Required: Where to create zarr output.
+  -t TAG, --tag TAG     
+                        Optional: Tag to append to end of protein names.
+  -u UMPERPX, --umperpx UMPERPX
+                        Optional: Override image scale in um per pixel.
+                        Instrument-specific values to use:
+                        -&gt; beta04 = 0.1228
+  -s SCALE, --scale SCALE
+                        Optional: Scale of expression images relative to raw,
+                          use if decoded images are binned.
+  -c CYCLE, --cycle CYCLE
+                        Optional: Cycle to use, default is 1.
+  --dotzarr             
+                        Optional: Add .zarr extension on multiscale pyramids.</code></pre>
+<p>Example:</p>
+<div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">stitch-expression</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-i</span> path/to/parent/slide_folder <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-o</span> path/to/napari_zarr</span></code></pre></div>
+
+
+</section>
+
+ ]]></description>
+  <category>napari</category>
+  <category>how-tos</category>
+  <category>python</category>
+  <category>protein</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/napari-cosmx-protein-stitching.html</guid>
+  <pubDate>Fri, 21 Feb 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/figures/fig-protein-example.png" medium="image" type="image/png" height="140" width="144"/>
+</item>
+<item>
   <title>Exporting napari-cosmx Zarr stores to OME-TIFF</title>
   <dc:creator>Evelyn Metzger</dc:creator>
   <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-ome-tiff/cosmx-ome-tiff.html</link>
@@ -371,150 +515,6 @@ font-style: inherit;">--libvips</span></span></code></pre></div>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-ome-tiff/cosmx-ome-tiff.html</guid>
   <pubDate>Fri, 21 Feb 2025 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-ome-tiff/figures/fig-gc.png" medium="image" type="image/png" height="135" width="144"/>
-</item>
-<item>
-  <title>Programmatic stitching of protein images with napari-cosmx</title>
-  <dc:creator>Evelyn Metzger</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/napari-cosmx-protein-stitching.html</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-example" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-example-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/figures/fig-protein-example.png" class="img-fluid figure-img" width="749">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-example-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: A small section of CosMx SMI data showing DNA (blue), PanCK (green) and the CD3 protein (yellow).
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>The <code>napari-cosmx</code> plugin can be used to view CosMx<sup>®</sup> Spatial Molecular Imager (SMI) RNA and protein data. In a <a href="../../posts/napari-stitching/napari-cosmx-stitching.html">previous post</a>, I showed users how to programmatically stitch RNA exports from AtoMx<sup>®</sup> Spatial Informatics Platform (SIP). The process used to stitch protein is similar to RNA with some adjustments that are found below.</p>
-<p>This tutorial uses version 0.4.17.3 of the <code>napari-cosmx</code> plugin. This version is available as a <code>whl</code> file in the assets folder of the <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/assets/napari-cosmx%20releases/napari_CosMx-0.4.17.3-py3-none-any.whl">Scratch Space repository</a>. The tutorial below also builds upon the RNA-based post that more broadly covers how to create the napari environment, installing the plugin, and running scripts.</p>
-<p>When <code>napari-cosmx</code> is installed, we get a few package scripts that can be called directly. The ones needed to stitch protein are:</p>
-<ul>
-<li><code>stitch-images</code>, which builds the IF zarr stores</li>
-<li><code>stitch-expression</code>, which creates the zarr stores for each protein</li>
-</ul>
-<section id="exporting-protein-data" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Exporting protein data</h1>
-<p>When exporting data from AtoMx SIP, be sure to select “Raw Files” and include Morphology2D, Miscellaneous, and ProteinDir (Figure&nbsp;2).</p>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-export-options" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-export-options-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/figures/fig-export-options.png" class="img-fluid figure-img" width="548">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export-options-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Export these components to stitch protein.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="stitching-immunofluorescence-images" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Stitching immunofluorescence images</h1>
-<p>This step is identical for RNA and protein.</p>
-<div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="ex" style="color: null;
-background-color: null;
-font-style: inherit;">stitch-images</span> <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">--help</span></span></code></pre></div>
-<pre><code>usage: stitch-images [-h] [-i INPUTDIR] [--imagesdir IMAGESDIR] [-o OUTPUTDIR] [-f OFFSETSDIR] [-l] [-u UMPERPX] [-z ZSLICE] [--dotzarr]
-
-Tile CellLabels and morphology TIFFs.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i INPUTDIR, --inputdir INPUTDIR
-                        Required: Path to CellLabels and morphology images.
-  --imagesdir IMAGESDIR
-                        Optional: Path to morphology images, if different than inputdir.
-  -o OUTPUTDIR, --outputdir OUTPUTDIR
-                        Required: Where to create zarr output.
-  -f OFFSETSDIR, --offsetsdir OFFSETSDIR
-                        Required: Path to directory location containing a file ending in FOV_Locations.csv or legacy format latest.fovs.csv.
-  -l, --labels          
-                        Optional: Only stitch labels.
-  -u UMPERPX, --umperpx UMPERPX
-                        Optional: Override image scale in um per pixel.
-                        Instrument-specific values to use:
-                        -&gt; beta04 = 0.1228
-  -z ZSLICE, --zslice ZSLICE
-                        Optional: Z slice to stitch.
-  --dotzarr             
-                        Optional: Add .zarr extension on multiscale pyramids.</code></pre>
-<p>Example:</p>
-<div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><span class="ex" style="color: null;
-background-color: null;
-font-style: inherit;">stitch-images</span> <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">-i</span> path/to/CellStatsDir <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">-o</span> path/to/napari_zarr <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">-f</span> /path/to/RunSummary</span></code></pre></div>
-</section>
-<section id="stitch-protein-images" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Stitch Protein Images</h1>
-<p>RNA uses <code>read-targets</code> to create a file that stores the spatial location of RNA transcripts. In contrast, Protein SMI data are more similar to IF TIFF files and so we use the <code>stitch-expression</code> package script to stitch together individual protein files. When complete, protein data will be found in the <code>images/protein</code> subfolder.</p>
-<div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><span class="ex" style="color: null;
-background-color: null;
-font-style: inherit;">stitch-expression</span> <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">--help</span></span></code></pre></div>
-<pre><code>usage: stitch-expression [-h] [-i INPUTDIR] [-o OUTPUTDIR] [-t TAG] [-u UMPERPX] [-s SCALE] [-c CYCLE] [--dotzarr]
-
-Tile protein expression images
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i INPUTDIR, --inputdir INPUTDIR
-                        Required: Path to parent directory containing CellStatsDir, RunSummary, AnalysisResults, and ProteinDir.
-  -o OUTPUTDIR, --outputdir OUTPUTDIR
-                        Required: Where to create zarr output.
-  -t TAG, --tag TAG     
-                        Optional: Tag to append to end of protein names.
-  -u UMPERPX, --umperpx UMPERPX
-                        Optional: Override image scale in um per pixel.
-                        Instrument-specific values to use:
-                        -&gt; beta04 = 0.1228
-  -s SCALE, --scale SCALE
-                        Optional: Scale of expression images relative to raw,
-                          use if decoded images are binned.
-  -c CYCLE, --cycle CYCLE
-                        Optional: Cycle to use, default is 1.
-  --dotzarr             
-                        Optional: Add .zarr extension on multiscale pyramids.</code></pre>
-<p>Example:</p>
-<div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><span class="ex" style="color: null;
-background-color: null;
-font-style: inherit;">stitch-expression</span> <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">-i</span> path/to/parent/slide_folder <span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">-o</span> path/to/napari_zarr</span></code></pre></div>
-
-
-</section>
-
- ]]></description>
-  <category>napari</category>
-  <category>how-tos</category>
-  <category>python</category>
-  <category>protein</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/napari-cosmx-protein-stitching.html</guid>
-  <pubDate>Fri, 21 Feb 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-protein-stitching/figures/fig-protein-example.png" medium="image" type="image/png" height="140" width="144"/>
 </item>
 <item>
   <title>Cell typing with CosMx® SMI Cell Profiles</title>
@@ -2727,6 +2727,168 @@ Name: cell_ID, dtype: object
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-rois/figures/fig-initial.png" medium="image" type="image/png" height="137" width="144"/>
 </item>
 <item>
+  <title>smiDE: an open-source package for differential expression analysis with spatially correlated data</title>
+  <dc:creator>Dan McGuire</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="differential-expression-analysis-with-spatially-correlated-data" class="level1">
+<h1>Differential Expression Analysis With Spatially Correlated Data</h1>
+<p>Spatially-resolved transcriptomic (SRT) data offers unprecedented insights into gene expression patterns, but analyzing this data requires specialized approaches. Traditional differential expression (DE) methods often falter when applied to spatially correlated data, leading to unreliable results and significant rates of false discovery. To address this challenge, <span class="citation" data-cites="Vasconcelos2024">(Vasconcelos et al. 2024)</span> present a comprehensive analysis of DE methodologies in their preprint, <a href="https://www.biorxiv.org/content/10.1101/2024.08.02.606405v1.full" target="_blank">“Differential Expression Analysis for Spatially Correlated Data”</a> . This work systematically evaluates the performance of various modeling strategies, providing clear recommendations for researchers.</p>
+<p>The rest of this post aims to summarize some of the key findings from the paper and provide practical guidance on how to conduct robust DE analysis with spatial data. The accompanying <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE" target="_blank">smiDE</a> R package offers readily accessible tools for implementing these recommendations.</p>
+<section id="opportunities" class="level2">
+<h2 class="anchored" data-anchor-id="opportunities">Opportunities</h2>
+<p>While DE analysis has long been a core component of gene expression studies, SRT data presents new opportunities for addressing fundamental questions regarding how cells respond to their local environment and interact with other cell types.</p>
+<p>As a motivating example, suppose I have annotated cell type and spatial context in my dataset; I might be broadly interested in T cells, cancer cells, and how they behave within different spatial contexts.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/figures/fig1_ab.PNG" class="img-fluid figure-img" width="506"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Tons of interesting questions along these lines can be phrased as DE problems, for example</p>
+<ul>
+<li>How does the expression of genes in T cells differ when located in stroma vs.&nbsp;tumor bed? (Left panel, blue vs.&nbsp;purple points)</li>
+<li>How does expression of genes in cancer cells in the tumor bed differ based on distance to the nearest T-cell? (middle panel, cancer cells with arrow drawn to nearest T cell and colored by distance)</li>
+<li>How is gene expression for T-cells in stroma modulated by distance to the tumor bed? (Right panel, rings highlight benchmarks of “distance from tumor bed”)</li>
+</ul>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/figures/fig1_thumbnail.PNG" class="img-fluid figure-img" width="790"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="unique-challenges-for-de-analyis-with-srt-data" class="level2">
+<h2 class="anchored" data-anchor-id="unique-challenges-for-de-analyis-with-srt-data">Unique challenges for DE analyis with SRT data</h2>
+<p>While the types of questions we can tackle with DE are limitless, there are unique challenges associated with SRT technologies that can lead to false discoveries when not properly addressed.</p>
+<p>Two primary issues include:</p>
+<ul>
+<li>segmentation errors<br>
+</li>
+<li>unmodeled auto-correlation in expression amongst spatially neighboring cells</li>
+</ul>
+<p>Below, we’ll give a very brief overview of how these problems can lead to biased effects estimates and incorrect inferences in DE.</p>
+<section id="segmentation-error" class="level4">
+<h4 class="anchored" data-anchor-id="segmentation-error">Segmentation error</h4>
+<p>Even minor segmentation errors can distort DE results if the analysis doesn’t properly account for them. For example, suppose I want to analyze the behavior of macrophage cells, and how gene expression differs for macrophages in tumor-infiltrated regions of tissue.</p>
+<p>The picture below shows KRT17 transcripts from neighboring epithelial (cancer) cells falsely assigned to the macrophage cell inside a tumor region.</p>
+<p>A naiive DE analysis may identify KRT17 as DE in the tumor, while an experienced bioinformatician may immediately recognize that this gene should not be expressed in the macrophage cell type at all (the very presence of the gene would challenge the cell type identity).</p>
+<!-- The picture below shows KRT17 transcripts from neighboring epithelial cells falsely assigned to the <span style="color: DeepPink;"> macrophage cell </span>inside a tumor region. -->
+<p>The picture below shows KRT17 transcripts from neighboring cancer cells falsely assigned to the macrophage cell inside a tumor region.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/figures/napari_contam_example.png" class="img-fluid figure-img" width="1102"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Even if the number of falsely assigned transcripts is small, these errors are correlated with our DE question in a way that confounds the analysis. Namely, the false positive KRT17 transcripts are more likely than not to occur in tumor regions compared to elsewhere because they come from the cancer cells!</p>
+<p>We could describe this dilemma for a DE analysis through a directed-acyclic graph, where the neighboring KRT17 expression in cancer cells acts as a confounder.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/figures/contam_example_dag.png" class="img-fluid figure-img" width="250"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In the paper, we propose two approaches to deal with this issue.</p>
+<ol type="1">
+<li><p>A ‘overlapping cells metric’: Used to identify genes which may be expressed within specific cell types due primarily due to overlapping cells / segmentation errors , and exclude them from cell-type specific DE analysis. The metric computes the average expression in “macrophage cells”, and the average expression in <em>spatial neighbors</em> of macrophage cells among all non-macrophage cell types. The ratio of these two average expression vectors is a quick and useful way to discard implausible genes.</p></li>
+<li><p>Covariate adjustment: We can compute the total expression of ‘KRT17’ in the spatial neighbors of macrophage cells among all non-macrophage neighbors, and include this as a control variable in the regression model.</p></li>
+</ol>
+<p>Below is a side-by-side summary of volcano plots before and after implementing these approaches, where genes are colored by their plausible cell type annotation from the Human Protein Atlas, and marked by whether or not the gene passes the overlapping cells metric.</p>
+<p>On the left, a number of implausible brown genes which should be “Not detected in immune cells” are falsely identified as being upregulated in macrophages in the tumor region. Nearly all of these genes could be pre-filtered before DE is conducted, by nature of “failing the filter” metric.<br>
+On the right-hand side, we see the significance and fold change for a large number of genes is largely attenuated if we employ the covariate-adjustment approach; controlling for expression in neighboring cells of other cell types.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/figures/contamination_volcano.png" class="img-fluid figure-img" width="1452"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="spatial-correlation" class="level4">
+<h4 class="anchored" data-anchor-id="spatial-correlation">Spatial Correlation</h4>
+<p>Spatial auto-correlation is another way in which gene expression could inflate statistical significance in DE. Intuitively, neighboring cells may have more similar gene expression profiles compared to cells located at greater distances, due to factors which may be unrelated to our covariate of interest. A solution we propose is to include a spatially correlated random effect (SRE) in the DE model, which can account for the un-modeled spatial correlations in expression.</p>
+<p>For example, suppose I am working with a colon-cancer dataset, and am interested in researching how gene expression changes in B cells as they approach the center of tertiary lymphoid structures.</p>
+<p>I may count the number of immune cells neighboring the B-cells as a continuous measurement of how close the B cell is to the center of the TLS.</p>
+<p>Below, the left hand plot highlights two densely packed clusters of B cells in TLS regions, and on the right, these B cells are annotated by the covariate (# of immune cell neighbors).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/figures/colon_cancer_sre.png" class="img-fluid figure-img" width="1888"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Below, we show how inference can change from a naiive DE analysis (left), to a ‘segmentation-aware’ analysis (middle), to a DE analysis which also includes the spatial random effect (right). The model with SRE identifies a set of 9 high-confidence DE genes with up-regulated expression in TLS interior, down from 141 DE genes identified through the naiive approach.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/figures/colon_cancer_volcanos.png" class="img-fluid figure-img" width="1976"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ability to visually assess the behavior of the random effects can provide further context for the analysis. For example, CD79A retains significance in the SRE model, showing several concentrated regions of high expression captured by the random effect. For WNT7A, numerous small regions of autocorrelated expression reduce the significance of the gene when taken into context of the model.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/figures/visual_sre.png" class="img-fluid figure-img" width="1444"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+</section>
+<section id="conclusions" class="level1">
+<h1>Conclusions</h1>
+<p>Here we’ve discussed opportunities for DE analysis with SRT datasets, along with unique challenges this data type poses. All of the analysis tools described here are implemented in the <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE" target="_blank">smiDE R package</a>, with syntax examples and vignettes which can be found on the github page. We hope the reader will also check out the <a href="https://www.biorxiv.org/content/10.1101/2024.08.02.606405v1.full" target="_blank">preprint</a> for more thorough detail on the our study of DE with spatially correlated data.</p>
+</section>
+<section id="resources" class="level1">
+<h1>Resources</h1>
+<ul>
+<li><a href="https://www.biorxiv.org/content/10.1101/2024.08.02.606405v1.full" target="_blank">preprint</a></li>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE" target="_blank">smiDE R package</a></li>
+</ul>
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-Vasconcelos2024" class="csl-entry">
+Vasconcelos, Ana Gabriela, Daniel McGuire, Noah Simon, Patrick Danaher, and Ali Shojaie. 2024. <span>“Differential Expression Analysis for Spatially Correlated Data.”</span> <em>bioRxiv</em>. <a href="https://doi.org/10.1101/2024.08.02.606405">https://doi.org/10.1101/2024.08.02.606405</a>.
+</div>
+</div></section></div> ]]></description>
+  <category>differential expression</category>
+  <category>DE</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/</guid>
+  <pubDate>Fri, 08 Nov 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/figures/fig1_thumbnail.PNG" medium="image"/>
+</item>
+<item>
   <title>Cellular neighborhoods: a useful, simple and flexible analysis framework</title>
   <dc:creator>Patrick Danaher</dc:creator>
   <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cellular-neighborhoods/cellular-neighborhoods.html</link>
@@ -4095,6 +4257,33 @@ font-style: inherit;">"</span>)</span></code></pre></div>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-stitching/figures/fig-stitch-single-slide.png" medium="image" type="image/png" height="77" width="144"/>
 </item>
 <item>
+  <title>New Features of AtoMx® SIP v1.3.2</title>
+  <dc:creator>Evelyn Metzger</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/nanoU/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<p>Cross posting for our colleagues at <a href="https://university.nanostring.com/">NanoU</a>.</p>
+<p>Course links to AtoMx<sup>®</sup> SIP v.1.3.2 release notes and a video discussing and demoing new features covering:</p>
+<ul>
+<li>Image Viewer and Data Plotting Improvements</li>
+<li>Data Pipeline Orchestrator Improvements</li>
+<li>Protein Cell Segmentation</li>
+</ul>
+<p>can be found here: <a href="https://university.nanostring.com/new-features-of-atomxtm-v132">https://university.nanostring.com/new-features-of-atomxtm-v132</a>.</p>
+
+
+
+ ]]></description>
+  <category>nanoU</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/nanoU/</guid>
+  <pubDate>Thu, 17 Oct 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://cc.sj-cdn.net/instructor/j3v0702q7qcg-nanostring-university/courses/3ppjfhs3ah3wf/promo-image.1728930731.png" medium="image" type="image/png"/>
+</item>
+<item>
   <title>Stay up-to-date with our blog using your favorite RSS reader</title>
   <dc:creator>Evelyn Metzger</dc:creator>
   <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/</link>
@@ -4134,33 +4323,6 @@ font-style: inherit;">"</span>)</span></code></pre></div>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/</guid>
   <pubDate>Thu, 17 Oct 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/figures/rss-thumbnail.jpeg" medium="image" type="image/jpeg"/>
-</item>
-<item>
-  <title>New Features of AtoMx® SIP v1.3.2</title>
-  <dc:creator>Evelyn Metzger</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/nanoU/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<p>Cross posting for our colleagues at <a href="https://university.nanostring.com/">NanoU</a>.</p>
-<p>Course links to AtoMx<sup>®</sup> SIP v.1.3.2 release notes and a video discussing and demoing new features covering:</p>
-<ul>
-<li>Image Viewer and Data Plotting Improvements</li>
-<li>Data Pipeline Orchestrator Improvements</li>
-<li>Protein Cell Segmentation</li>
-</ul>
-<p>can be found here: <a href="https://university.nanostring.com/new-features-of-atomxtm-v132">https://university.nanostring.com/new-features-of-atomxtm-v132</a>.</p>
-
-
-
- ]]></description>
-  <category>nanoU</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/nanoU/</guid>
-  <pubDate>Thu, 17 Oct 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://cc.sj-cdn.net/instructor/j3v0702q7qcg-nanostring-university/courses/3ppjfhs3ah3wf/promo-image.1728930731.png" medium="image" type="image/png"/>
 </item>
 <item>
   <title>Creating reference profiles for InSituType</title>
@@ -11352,213 +11514,6 @@ Figure&nbsp;15: Same extent as Figure&nbsp;7 highlighting three cell types only.
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/using-napari-cosmx.html</guid>
   <pubDate>Mon, 17 Jun 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/figures/fig-duality.png" medium="image" type="image/png" height="144" width="144"/>
-</item>
-<item>
-  <title>Making composite images from layered morphology 2D images</title>
-  <dc:creator>Evelyn Metzger</dc:creator>
-  <dc:creator>Vikram Kohli</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/making-composite-images.html</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-composite" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-composite-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig1.png" class="img-fluid figure-img" width="468">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-composite-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: A composite image created using the make_composite.py script. This image represents all channels of a single field of view in the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">publicly available</a> mouse coronal hemisphere FFPE dataset.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<section id="description" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Description</h1>
-<p>Composite images of CosMx<sup>®</sup> Spatial Molecular Imager (SMI) fields of view (FOVs) can be useful when using open-sourced software such as <a href="https://squidpy.readthedocs.io/en/stable/index.html" target="_blank">squidpy</a> and <a href="https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html#create-a-giotto-object-for-each-fov" target="_blank">giotto</a>. In this post, we describe the make_composite.py script, a developmental python script that creates such composite images from layered morphology 2D images that can be exported from the AtoMx<sup>®</sup> Spatial Informatics Portal (SIP). Layered images are extracted from the 2D morphology TIF files and written in a file format selected by the user. The extracted images are converted to 8bit, and composite images are written from these 8bit images.</p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>make_composite.py is a development version. Use at your own risk.</p>
-</div>
-</div>
-</section>
-<section id="where-to-find-the-script" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Where to find the script?</h1>
-<p>The script and license can be found in the <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/make-composite" target="_blank"><code>assets/make-composite</code></a> folder of the repository.</p>
-</section>
-<section id="required-libraries" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Required libraries</h1>
-<p>The script requires the following libraries to be installed:</p>
-<ul>
-<li>Pillow (<em>e.g.</em>, <code>pip install pillow</code>)</li>
-<li>Numpy (<em>e.g.</em>, <code>pip install numpy</code>)</li>
-</ul>
-</section>
-<section id="user-inputs-required" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> User inputs (required)</h1>
-<ul>
-<li><p><code>clipping</code> (int or float) - Histogram clipping percentage. This value is the percentage of the histogram to clip on the left and right side. The effect changes the contrast of the image. A higher percentage produces more contrast. The user needs to determine the appropriate percentage by testing on a subset of images. The same clipping value is applied to all images. Generally, setting the value between 1 and 3 is a good starting point. Specifying a clipping value of 0 will not alter the histogram. A value is required, there is no default. <code>clipping</code> is a required input.</p></li>
-<li><p><code>user_format</code> (str) - File format to be written. Options are jpg, png, and tif. All output files will be written in the format specified by the user. <code>user_format</code> is a required input.</p></li>
-</ul>
-</section>
-<section id="additional-inputs-changed-within-the-script" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Additional inputs (changed within the script)</h1>
-<ul>
-<li><p>Variable: <code>colors</code> = [‘cyan’, ‘red’, ‘yellow’, ‘blue’, ‘magenta’]. The variable is the composite color scheme (not a user input; changeable within the script). The colors are listed in order of channel number (channel 0 to channel 4). Example: Channel 0 is colored ‘cyan’,</p></li>
-<li><p>Variable: <code>compress_value</code> (set to 3). Lossless file compression value. Higher values produce smaller files at the expense of increased script execution time. The set value is a compromise between file size and execution time.</p></li>
-</ul>
-</section>
-<section id="output" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> Output</h1>
-<ul>
-<li><p><code>raw</code> – The extracted tif files from the morphology 2D images will be saved in this folder. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_raw.&lt;user_format&gt;. &lt;fov_num&gt; is the fov number,<code>ch&lt;#&gt;</code> is the channel number (from 0 to 4), and &lt;user_format&gt; is the specified file type format (see User inputs). Note: If the specified <code>user_format</code> is jpg, the raw files will be 8bit jpg files.</p>
-<p>Example</p>
-<pre><code>F001_ch0_raw.jpg (for user_format = jpg)</code></pre></li>
-<li><p><code>8bit</code> - The images in the raw_folder are converted to 8bit and saved in this folder. Note: If the specified <code>user_format</code> is jpg, the 8bit files are identical to the raw files. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_8bit.&lt;user_format&gt; except when <code>user_format</code> = jpg</p>
-<p>Example</p>
-<pre><code>F001_ch0_8bit.tif (for user_format = tif)
-F001_ch0_raw.jpg (for user_format = jpg)</code></pre></li>
-<li><p><code>8bit_autocontrast</code> – Images in the 8bit folder are autocontrasted based on the user supplied clipping value. The file format will follow &lt;fov_num&gt;_ch&lt;#&gt;_8bit_autocontrast.&lt;user_format&gt;</p>
-<p>Example</p>
-<pre><code>F001_ch0_8bit_autocontrast.png (for user_format = png)</code></pre></li>
-<li><p><code>composite</code> - Composite images created from the images in the <code>8bit</code> folder. The composite type is a screen composite. The file format will follow &lt;fov_num&gt;_composite.&lt;user_format&gt;</p>
-<p>Example</p>
-<pre><code>F001_composite.jpg (for user_format = jpg)</code></pre></li>
-<li><p><code>composite_autocontrast</code> - Images in the composite_folder are autocontrasted based on the user specified clipping value. The file format will follow &lt;fov_num&gt;_composite_autocontrast.&lt;user_format&gt;</p>
-<p>Example</p>
-<pre><code>F001_composite_autocontrast.png (for user_format = png)</code></pre></li>
-</ul>
-</section>
-<section id="usage" class="level1" data-number="7">
-<h1 data-number="7"><span class="header-section-number">7</span> Usage</h1>
-<pre><code>cd to/your/Morphology2D folder
-python /path/to/your/make_composite.py # and follow the on-screen prompts</code></pre>
-<p>Regex pattern matching on 2D morphology file name format is implemented, however, only NanoString 2D morphology files should be present in the folder containing the make_composite script.</p>
-</section>
-<section id="example" class="level1" data-number="8">
-<h1 data-number="8"><span class="header-section-number">8</span> Example</h1>
-<p>The example dataset that we used was the mouse coronal hemisphere FFPE dataset that is available to download from NanoString’s website <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/cosmx-smi-mouse-brain-ffpe-dataset/" target="blank">here</a>.</p>
-<p>The Morphology2D folder is found within the CellStatsDir folder and has TIF files for each of the 130 FOVs.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># In Terminal</span></span>
-<span id="cb7-2">cd <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>path<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>to<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>slide<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>CellStatsDir<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>Morphology2D</span></code></pre></div>
-</div>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># In Terminal</span></span>
-<span id="cb8-2">tree <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>L <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span></code></pre></div>
-</div>
-<pre><code>├── 20230406_205644_S1_C902_P99_N99_F001.TIF
-├── 20230406_205644_S1_C902_P99_N99_F002.TIF
-...
-├── 20230406_205644_S1_C902_P99_N99_F129.TIF
-└── 20230406_205644_S1_C902_P99_N99_F130.TIF
-</code></pre>
-<p>Once in the Morphology2D folder, simply run the script and follow the on-screen prompts (Figure&nbsp;2).</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># In Terminal</span></span>
-<span id="cb10-2">python <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>path<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>to<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>CosMx<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>Analysis<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>Scratch<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>Space<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>assets<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>make<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>composite<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span>make_composite.py</span></code></pre></div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-run" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-run-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig-out.png" class="img-fluid figure-img" width="675">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-run-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Screenshot of standard output from terminal following script execution. In this example, I set the clipping percentage to 3 and the output to <code>png</code>. On a Macbook Pro M1, this took about 25 minutes to process 130 FOVs.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>When complete, the structure of the Morphology2D folder should resemble this:</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># In Terminal</span></span>
-<span id="cb11-2">tree <span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>L <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span></code></pre></div>
-</div>
-<pre><code>├── 20230406_205644_S1_C902_P99_N99_F001.TIF
-├── 20230406_205644_S1_C902_P99_N99_F002.TIF
-...
-├── 20230406_205644_S1_C902_P99_N99_F129.TIF
-├── 20230406_205644_S1_C902_P99_N99_F130.TIF
-├── 8bit
-├── 8bit_autocontrast
-├── composite
-├── composite_autocontrast
-└── raw</code></pre>
-<p>These composite images can now be imported into open-sourced software or explored further.</p>
-
-
-</section>
-
- ]]></description>
-  <category>Squidpy</category>
-  <category>Giotto</category>
-  <category>pre-processing</category>
-  <category>python</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/making-composite-images.html</guid>
-  <pubDate>Wed, 12 Jun 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/composite-images/figures/fig1.png" medium="image" type="image/png" height="144" width="144"/>
 </item>
 </channel>
 </rss>

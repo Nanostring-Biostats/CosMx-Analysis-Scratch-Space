@@ -6,11 +6,10 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Evelyn Metzger">
-<meta name="dcterms.date" content="2024-10-17">
-<meta name="description" content="NanoString University New Course Alert!">
+<meta name="author" content="Dan McGuire">
+<meta name="dcterms.date" content="2024-11-08">
 
-<title>New Features of AtoMx® SIP v1.3.2 – Blog</title>
+<title>smiDE: an open-source package for differential expression analysis with spatially correlated data – Blog</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -23,7 +22,27 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-</style>
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
 
 
 <script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
@@ -44,7 +63,7 @@ ul.task-list li input[type="checkbox"] {
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-a4a11d514c7d463668e07712114998e6.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-b4a96dd73ee95421b85bb004eac4b46b.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-78c6107a24f0dfe880bc134e5f718a84.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
 <link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
@@ -165,14 +184,10 @@ cookieconsent.run({
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">New Features of AtoMx<sup>®</sup> SIP v1.3.2</h1>
-                  <div>
-        <div class="description">
-          NanoString University New Course Alert!
-        </div>
-      </div>
-                          <div class="quarto-categories">
-                <div class="quarto-category">nanoU</div>
+      <h1 class="title">smiDE: an open-source package for differential expression analysis with spatially correlated data</h1>
+                                <div class="quarto-categories">
+                <div class="quarto-category">differential expression</div>
+                <div class="quarto-category">DE</div>
               </div>
                   </div>
   </div>
@@ -182,14 +197,14 @@ cookieconsent.run({
     <div class="quarto-title-meta-heading">Affiliations</div>
     
       <div class="quarto-title-meta-contents">
-      <p class="author">Evelyn Metzger <a href="https://orcid.org/0000-0002-4074-9003" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+      <p class="author">Dan McGuire <a href="https://orcid.org/0009-0006-0286-9625" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
     </div>
     <div class="quarto-title-meta-contents">
           <p class="affiliation">
               Bruker Spatial Biology
             </p>
           <p class="affiliation">
-              Github: <a href="https://github.com/eveilyeverafter" target="_blank">eveilyeverafter</a>
+              Github: <a href="https://github.com/dan11mcguire" target="_blank">dan11mcguire</a>
             </p>
         </div>
     </div>
@@ -200,10 +215,16 @@ cookieconsent.run({
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">October 17, 2024</p>
+        <p class="date">November 8, 2024</p>
       </div>
     </div>
     
+      <div>
+      <div class="quarto-title-meta-heading">Modified</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date-modified">November 8, 2024</p>
+      </div>
+    </div>
       
     </div>
     
@@ -219,18 +240,152 @@ cookieconsent.run({
 
 
 
-<p>Cross posting for our colleagues at <a href="https://university.nanostring.com/">NanoU</a>.</p>
-<p>Course links to AtoMx<sup>®</sup> SIP v.1.3.2 release notes and a video discussing and demoing new features covering:</p>
+<section id="differential-expression-analysis-with-spatially-correlated-data" class="level1">
+<h1>Differential Expression Analysis With Spatially Correlated Data</h1>
+<p>Spatially-resolved transcriptomic (SRT) data offers unprecedented insights into gene expression patterns, but analyzing this data requires specialized approaches. Traditional differential expression (DE) methods often falter when applied to spatially correlated data, leading to unreliable results and significant rates of false discovery. To address this challenge, <span class="citation" data-cites="Vasconcelos2024">(<a href="#ref-Vasconcelos2024" role="doc-biblioref">Vasconcelos et al. 2024</a>)</span> present a comprehensive analysis of DE methodologies in their preprint, <a href="https://www.biorxiv.org/content/10.1101/2024.08.02.606405v1.full" target="_blank">“Differential Expression Analysis for Spatially Correlated Data”</a> . This work systematically evaluates the performance of various modeling strategies, providing clear recommendations for researchers.</p>
+<p>The rest of this post aims to summarize some of the key findings from the paper and provide practical guidance on how to conduct robust DE analysis with spatial data. The accompanying <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE" target="_blank">smiDE</a> R package offers readily accessible tools for implementing these recommendations.</p>
+<section id="opportunities" class="level2">
+<h2 class="anchored" data-anchor-id="opportunities">Opportunities</h2>
+<p>While DE analysis has long been a core component of gene expression studies, SRT data presents new opportunities for addressing fundamental questions regarding how cells respond to their local environment and interact with other cell types.</p>
+<p>As a motivating example, suppose I have annotated cell type and spatial context in my dataset; I might be broadly interested in T cells, cancer cells, and how they behave within different spatial contexts.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="./figures/fig1_ab.PNG" class="img-fluid figure-img" width="506"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Tons of interesting questions along these lines can be phrased as DE problems, for example</p>
 <ul>
-<li>Image Viewer and Data Plotting Improvements</li>
-<li>Data Pipeline Orchestrator Improvements</li>
-<li>Protein Cell Segmentation</li>
+<li>How does the expression of genes in T cells differ when located in stroma vs.&nbsp;tumor bed? (Left panel, blue vs.&nbsp;purple points)</li>
+<li>How does expression of genes in cancer cells in the tumor bed differ based on distance to the nearest T-cell? (middle panel, cancer cells with arrow drawn to nearest T cell and colored by distance)</li>
+<li>How is gene expression for T-cells in stroma modulated by distance to the tumor bed? (Right panel, rings highlight benchmarks of “distance from tumor bed”)</li>
 </ul>
-<p>can be found here: <a href="https://university.nanostring.com/new-features-of-atomxtm-v132">https://university.nanostring.com/new-features-of-atomxtm-v132</a>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="./figures/fig1_thumbnail.PNG" class="img-fluid figure-img" width="790"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="unique-challenges-for-de-analyis-with-srt-data" class="level2">
+<h2 class="anchored" data-anchor-id="unique-challenges-for-de-analyis-with-srt-data">Unique challenges for DE analyis with SRT data</h2>
+<p>While the types of questions we can tackle with DE are limitless, there are unique challenges associated with SRT technologies that can lead to false discoveries when not properly addressed.</p>
+<p>Two primary issues include:</p>
+<ul>
+<li>segmentation errors<br>
+</li>
+<li>unmodeled auto-correlation in expression amongst spatially neighboring cells</li>
+</ul>
+<p>Below, we’ll give a very brief overview of how these problems can lead to biased effects estimates and incorrect inferences in DE.</p>
+<section id="segmentation-error" class="level4">
+<h4 class="anchored" data-anchor-id="segmentation-error">Segmentation error</h4>
+<p>Even minor segmentation errors can distort DE results if the analysis doesn’t properly account for them. For example, suppose I want to analyze the behavior of macrophage cells, and how gene expression differs for macrophages in tumor-infiltrated regions of tissue.</p>
+<p>The picture below shows KRT17 transcripts from neighboring epithelial (cancer) cells falsely assigned to the macrophage cell inside a tumor region.</p>
+<p>A naiive DE analysis may identify KRT17 as DE in the tumor, while an experienced bioinformatician may immediately recognize that this gene should not be expressed in the macrophage cell type at all (the very presence of the gene would challenge the cell type identity).</p>
+<!-- The picture below shows KRT17 transcripts from neighboring epithelial cells falsely assigned to the <span style="color: DeepPink;"> macrophage cell </span>inside a tumor region. -->
+<p>The picture below shows KRT17 transcripts from neighboring cancer cells falsely assigned to the macrophage cell inside a tumor region.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="./figures/napari_contam_example.png" class="img-fluid figure-img" width="1102"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Even if the number of falsely assigned transcripts is small, these errors are correlated with our DE question in a way that confounds the analysis. Namely, the false positive KRT17 transcripts are more likely than not to occur in tumor regions compared to elsewhere because they come from the cancer cells!</p>
+<p>We could describe this dilemma for a DE analysis through a directed-acyclic graph, where the neighboring KRT17 expression in cancer cells acts as a confounder.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="./figures/contam_example_dag.png" class="img-fluid figure-img" width="250"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In the paper, we propose two approaches to deal with this issue.</p>
+<ol type="1">
+<li><p>A ‘overlapping cells metric’: Used to identify genes which may be expressed within specific cell types due primarily due to overlapping cells / segmentation errors , and exclude them from cell-type specific DE analysis. The metric computes the average expression in “macrophage cells”, and the average expression in <em>spatial neighbors</em> of macrophage cells among all non-macrophage cell types. The ratio of these two average expression vectors is a quick and useful way to discard implausible genes.</p></li>
+<li><p>Covariate adjustment: We can compute the total expression of ‘KRT17’ in the spatial neighbors of macrophage cells among all non-macrophage neighbors, and include this as a control variable in the regression model.</p></li>
+</ol>
+<p>Below is a side-by-side summary of volcano plots before and after implementing these approaches, where genes are colored by their plausible cell type annotation from the Human Protein Atlas, and marked by whether or not the gene passes the overlapping cells metric.</p>
+<p>On the left, a number of implausible brown genes which should be “Not detected in immune cells” are falsely identified as being upregulated in macrophages in the tumor region. Nearly all of these genes could be pre-filtered before DE is conducted, by nature of “failing the filter” metric.<br>
+On the right-hand side, we see the significance and fold change for a large number of genes is largely attenuated if we employ the covariate-adjustment approach; controlling for expression in neighboring cells of other cell types.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="./figures/contamination_volcano.png" class="img-fluid figure-img" width="1452"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="spatial-correlation" class="level4">
+<h4 class="anchored" data-anchor-id="spatial-correlation">Spatial Correlation</h4>
+<p>Spatial auto-correlation is another way in which gene expression could inflate statistical significance in DE. Intuitively, neighboring cells may have more similar gene expression profiles compared to cells located at greater distances, due to factors which may be unrelated to our covariate of interest. A solution we propose is to include a spatially correlated random effect (SRE) in the DE model, which can account for the un-modeled spatial correlations in expression.</p>
+<p>For example, suppose I am working with a colon-cancer dataset, and am interested in researching how gene expression changes in B cells as they approach the center of tertiary lymphoid structures.</p>
+<p>I may count the number of immune cells neighboring the B-cells as a continuous measurement of how close the B cell is to the center of the TLS.</p>
+<p>Below, the left hand plot highlights two densely packed clusters of B cells in TLS regions, and on the right, these B cells are annotated by the covariate (# of immune cell neighbors).</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="./figures/colon_cancer_sre.png" class="img-fluid figure-img" width="1888"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Below, we show how inference can change from a naiive DE analysis (left), to a ‘segmentation-aware’ analysis (middle), to a DE analysis which also includes the spatial random effect (right). The model with SRE identifies a set of 9 high-confidence DE genes with up-regulated expression in TLS interior, down from 141 DE genes identified through the naiive approach.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="./figures/colon_cancer_volcanos.png" class="img-fluid figure-img" width="1976"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ability to visually assess the behavior of the random effects can provide further context for the analysis. For example, CD79A retains significance in the SRE model, showing several concentrated regions of high expression captured by the random effect. For WNT7A, numerous small regions of autocorrelated expression reduce the significance of the gene when taken into context of the model.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="./figures/visual_sre.png" class="img-fluid figure-img" width="1444"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+</section>
+<section id="conclusions" class="level1">
+<h1>Conclusions</h1>
+<p>Here we’ve discussed opportunities for DE analysis with SRT datasets, along with unique challenges this data type poses. All of the analysis tools described here are implemented in the <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE" target="_blank">smiDE R package</a>, with syntax examples and vignettes which can be found on the github page. We hope the reader will also check out the <a href="https://www.biorxiv.org/content/10.1101/2024.08.02.606405v1.full" target="_blank">preprint</a> for more thorough detail on the our study of DE with spatially correlated data.</p>
+</section>
+<section id="resources" class="level1">
+<h1>Resources</h1>
+<ul>
+<li><a href="https://www.biorxiv.org/content/10.1101/2024.08.02.606405v1.full" target="_blank">preprint</a></li>
+<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE" target="_blank">smiDE R package</a></li>
+</ul>
 
 
 
-</main> <!-- /main -->
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-Vasconcelos2024" class="csl-entry" role="listitem">
+Vasconcelos, Ana Gabriela, Daniel McGuire, Noah Simon, Patrick Danaher, and Ali Shojaie. 2024. <span>“Differential Expression Analysis for Spatially Correlated Data.”</span> <em>bioRxiv</em>. <a href="https://doi.org/10.1101/2024.08.02.606405">https://doi.org/10.1101/2024.08.02.606405</a>.
+</div>
+</div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {
