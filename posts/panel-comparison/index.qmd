@@ -1,8 +1,11 @@
 ---
-title: "Guide to comparing data from different CosMx panels" 
+title: "Guide to comparing data from different CosMx<sup>&#174;</sup> panels" 
 author:
   - name: Patrick Danaher
     orcid: 0000-0002-2844-5883
+    affiliations: 
+      - ref: bsb
+      - ref: patrickjdanaher
 toc: true
 toc-title: Contents
 toc-depth: 3
@@ -10,19 +13,18 @@ toc-expand: 2
 toc-location: left
 number-sections: true
 number-depth: 4
-date: "2025-05-05"
+date: "2025-21-05"
 categories:
-image: figures/tbd.png
+    - quality control
+    - differential expression
+image: figures/thumbnail.png
 description: "Our recommended analysis for choosing which panel will be best for your research. We assume you have data from the same tissue from two panels, e.g. the 1k and 6k panels."
 draft: false
-format:
-  html: 
-    code-tools: true
 ---
 
 # Introduction 
 
-Choosing the right panel for your study is not always a trivial exercise. 
+Choosing the right panel for a spatial transcriptomics study is not always a trivial exercise. 
 Higher-plex panels have the obvious appeal of more data per cell and a view into a greater scope of biology,
 while lower-plex panels are cheaper and faster to run. 
 To help choose a panel, investigators often run the same tissue through multiple panels. 
@@ -34,7 +36,7 @@ segmentation accuracy, etc...
 (Perhaps even more energy is spent arguing about which of these metrics are most important.)
 What actually matters, of course, isn't any single metric: 
 it's the *richness of biological insight* you are able to extract from a dataset. 
-While data quality is important, its importance lies entirely in how impacts your ability to
+While data quality is important, its importance lies entirely in how it impacts your ability to
  extract biological conclusions from your data. 
 To get at the rather broad concept of "biological richness", we suggest two standard analyses:
 
@@ -51,10 +53,12 @@ or "How do intratumoral macrophages differ in responders vs. non-responders?"
 Thus by performing a relevant differential expression analysis, we can get a sense of the
 richness of results produced by two panels.
 
-To demonstrate this approach, we'll look at data from a colorectal tumor profiled with the 6k and WTX panels.
+To demonstrate this approach, we'll look at data from a colorectal tumor profiled with the CosMx Human 6k Discovery Panel and the CosMx Human Whole Transcriptome Panel.
 Use the code below as a template for running similar comparisons in your own data (after QC, normalization, etc...).
 
-# Gaining a gestalt of cell type resolution
+# Cell typing
+
+## Gaining a gestalt of cell type resolution
 
 First, we'll ask a simple, high-level question: how many cell types can be detected,
  and how well-resolved are they?
@@ -64,17 +68,18 @@ Our usual expectation is that a given tissue has 10-20 highly distinct cell type
  and that most panels are sufficient to resolve them. 
 
 (Beyond broad cell types, we may wish for more nuanced dissection of cell states. 
-We will get at this ability with 1. an analysis of T-cell subtyping accuracy, and 
-2. differential expression analysis, which characterizes changes within a cell type across space.)
+We will get at this ability with an analysis of T-cell subtyping accuracy, and 
+with differential expression analysis, which characterizes changes within a cell type across space.)
 
 To get at a general sense of the cell type granularity you can see with each panel, we'll simply run unsupervised clustering and UMAP.
-Below is code to quickly perform these steps beginning with a Seurat object exported from AtoMx:
+Below is code to quickly perform these steps beginning with a Seurat object exported from AtoMx<sup>&#174;</sup> SIP:
 
 ```{r}
 #| eval: false
 #| echo: true
 
 # get hvgs, scale and run PCA:
+seu <- NormalizeData(seu) 
 seu <- FindVariableFeatures(seu, selection.method = "vst", nfeatures = 3000)
 seu <- ScaleData(seu, features = VariableFeatures(seu))
 seu <- RunPCA(seu, features = VariableFeatures(seu))
@@ -84,9 +89,8 @@ seu <- FindClusters(seu, resolution = 1)
 
 # umap:
 seu <- RunUMAP(seu, dims = 1:30, n.neighbors = 40, metric = "cosine", min.dist = 0.01, spread = 5)
-length(unique(seu@meta.data$RNA_snn_res.0.5))
-# plot umap and cell types:
 
+# plot umap and cell types:
 distinct_colors <- c(
   "#e6194b", "#3cb44b", "#ffe119", "#0082c8", "#f58231", "#911eb4", "#46f0f0", "#f032e6",
   "#d2f53c", "#fabebe", "#008080", "#e6beff", "#aa6e28", "#fffac8", "#800000", "#aaffc3",
@@ -112,12 +116,17 @@ If we were inclined to do so, modifying the UMAP parameters could probably make 
  more strongly resemble the other.
 So in this example, our check for cell type resolution comes in reassuringly as a tie. 
 
-# Evaluating cell typing accuracy
+For a more thorough evaluation of cell typing quality, consider the following additional analyses:
+
+- Plot cell types in physical space and confirm biological sanity
+- Run a marker ID heatmap and confirm that markers for distinct cell types concentrate in different clusters.
+
+## Evaluating accuracy of fine-grained cell typing
 
 We also want to assess the quality of cell typing.
 For this comparison, we'll focus on immune cells, which are convenient because
  there is widespread agreement about their marker genes and because they appear in most tissues. 
-If you tissue in question has very few immune cells (say, <2000), you may want to assess
+If your tissue in question has very few immune cells (say, <2000), you may want to assess
 cell typing accuracy with other cell types. 
 
 For immune cell typing, we recommend our newly-released method HieraType, 
@@ -165,7 +174,7 @@ htres <-  HieroType::run_pipeline(
   pipeline = ct_pipeline,
   counts_matrix = Matrix::t(seu[["RNA"]]@counts),
   totalcounts = Matrix::colSums(seu),
-  adjacency_matrix = as(seu@graphs$RNA_nn, "dgCMatrix")
+  adjacency_matrix = as(seu@graphs$umapgrph, "dgCMatrix")
 )
 
 # primary result: the cell type calls and posterior probabilities:
@@ -173,12 +182,12 @@ probdf <- htres$post_probs$l1
 
 ## prepare data for marker gene heatmap:
 fc_subclus_ctl_gran <- clusterwise_foldchange_metrics(seu[["RNA"]]@counts
-                                                      ,metadata = ct_ctl$post_probs[[1]]
+                                                      ,metadata = htres$post_probs[[1]]
                                                       ,cluster_column = "celltype_granular"
 )
 # subtract background from the mean per-cluster expression profiles:
-for (name in unique(ct_ctl$post_probs[[1]]$celltype_granular)) {
-  isthiscelltype <- ct_ctl$post_probs[[1]]$celltype_granular == name
+for (name in unique(htres$post_probs[[1]]$celltype_granular)) {
+  isthiscelltype <- htres$post_probs[[1]]$celltype_granular == name
   meannegthiscelltype <- Matrix::mean(seu@assays$negprobes$counts[, isthiscelltype])
   
   fc_subclus_ctl_gran$cluster_expr[fc_subclus_ctl_gran$cluster == name] <- 
@@ -196,8 +205,8 @@ The marker heatmaps from both datasets are below, first 6k, then WTX:
 ```{r}
 #| eval: true
 #| echo: false
-knitr::include_graphics("./figures/marker_heatmaps.png")
-knitr::include_graphics("./figures/marker_heatmaps.png")
+knitr::include_graphics("./figures/marker_heatmap - sixk.png")
+knitr::include_graphics("./figures/marker_heatmap - wtx.png")
 ```
 
 For most purposes, we won't care about small differences between these heatmaps;
@@ -207,6 +216,8 @@ Comparing the marker gene heatmaps from both datasets, we see basic sanity in bo
  and cleaner marker profiles in the WTX data, suggesting either more accurate cell typing
  or better cell segmentation. 
 
+We'll also want to look at our cell type calls in space as a final sanity check.
+ 
  
 # Differential expression analysis
 
@@ -224,7 +235,7 @@ In our example, we'll look at how macrophages vary based on proximity to vascula
 #| eval: false
 #| echo: true
 # Example DE question: 
-# How does cell type 1 changes in response to neighboring cells of cell type 2?
+# How does cell type 1 change in response to neighboring cells of cell type 2?
 
 # designate which cells are cell type 1 and 2:
 is1 <- probdf$celltype_granular == "macrophage"
@@ -306,7 +317,9 @@ The intuition here is that if a gene is 1. barely expressed in your cell type,
 and 2. highly expressed in neighbors of that cell type, then a large share of that gene's counts
 in your cell type will be misassignments from neighboring cells. 
 Such a gene will be prone to bias in DE analyses, and should often be excluded from analyses of your cell type. 
-See the smiDE paper linked above for details of this approach. 
+See [our post on segmentation error in DE](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/){target="_blank"} for why segmentation error must be considered in DE analyses, 
+see the smiDE paper linked earlier for countermeasures we recommend,
+and see [this post on advanced cell typing strategies](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/cell-typing-strategies/cell-typing-strategies.html){target="_blank"} for other relevant tools. 
  
 ```{r}
 #| eval: false
@@ -318,12 +331,16 @@ source(url("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis
 contamfilter <- findSafeGenes(
   counts = Matrix::t(seu[["RNA"]]@counts),  # note we're entering info for all cells           
   xy = xy,                            # again entering info for all cells
-  ismycelltype = is1,                 # logical indicating the cells to subtype
+  ismycelltype = is1,                 # logical indicating the cell type to be run in DE
   tissue = NULL,                      # specify if tissues have xy overlap
   self_vs_neighbor_threshold = 1   # min ratio of expression in the cell type vs. in its neighbors
 )
 safegenes <- contamfilter$safegenes
 ```
+
+This final vector "safegenes" is our effective plex for analyzing our chosen cell type, 
+ the genes useful for analysis within that cell type. 
+Comparing this across panels can also be informative.
 
 Now we'll run a DE analysis using simple linear models. 
 For proper DE analyses, we recommend using the full smiDE toolkit. 
@@ -352,7 +369,6 @@ x_centered <- x - mean(x)
 
 # Design matrix: intercept and centered predictor
 X <- cbind(1, x_centered)
-Q <- qr.Q(qr(X))
 XtX_inv <- solve(t(X) %*% X)  # (X'X)^-1 for SEs
 
 # Fit model: β = (X'X)^-1 X'Y
@@ -390,7 +406,7 @@ A simple volcano plot suffices to convey the richness of the DE results:
 
 plot(betas[2, ], pmin(-log10(pvals), 75), 
      cex = 0.7, pch = 16, col = scales::alpha("darkblue", 0.3),
-     xlab = "Log2 fold-change: near/far from cell type 2",
+     xlab = "Log2 fold-change per additional neighbor of cell type 2",
      ylab = "-log10(p-value)",
      cex.lab = 1.25)
 showgenes <- rownames(results)[results$padj < 0.3]
@@ -405,7 +421,7 @@ text(results[showgenes, "slope"],
      
 ```
 
-The resulting volcano plots are below:
+The resulting volcano plots are below (note the different y-axis scales):
 
 ```{r}
 #| eval: true
