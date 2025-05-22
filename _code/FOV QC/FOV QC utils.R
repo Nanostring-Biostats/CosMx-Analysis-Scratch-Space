@@ -16,17 +16,18 @@
 #' @param counts Raw counts matrix, cells in rows, genes in columns. Can be sparse or standard format.
 #' @param xy 2-column matrix of cells' xy positions, aligned to rows of counts.
 #' @param fov Vector of cells' FOV IDs, aligned to rows of counts.
+#' @param tissue Vector giving cells' tissue membership. This argument ensures different tissues don't overlap in xy space. Default of NULL assumes all cells come from the same tissue.
 #' @param barcodemap Data frame with two columns: "gene" and "barcode". Download the barcodemap for your panel
 #' from https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/code/FOV%20QC.
 #' @param max_prop_loss Maximum loss of efficiency allowed for any bit. E.g., a value of "0.3" means all FOVs with bias <log2(1 - 0.3) will be flagged.
 #' @param max_totalcounts_loss Maximum loss of total expression allowed for any FOV. E.g., a value of "0.5" means all FOVs with total counts <50% of comparable spatial regions will be flagged.
 #' @export
-runFOVQC <- function(counts, xy, fov, barcodemap, max_prop_loss = 0.6, max_totalcounts_loss = 0.6) {
+runFOVQC <- function(counts, xy, fov, tissue = NULL, barcodemap, max_prop_loss = 0.6, max_totalcounts_loss = 0.6) {
   
   if ((max_prop_loss > 1) | (max_prop_loss < 0)) {
     stop("max_prop_loss must fall in range of 0-1.")
   }
-  fov <- as.character(fov)
+  fov <- paste0(tissue, as.character(fov))
   ## create a matrix of barcode bit expression over sub-FOV grids:
   # define grids, get per-square gene expression:
   gridinfo <- makeGrid(xy = xy, fov = fov, squares_per_fov = 49, min_cells_per_square = 10) 
