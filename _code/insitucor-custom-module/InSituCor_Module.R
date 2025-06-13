@@ -147,7 +147,9 @@ if (verbose) {
 celltype <- match.arg(celltype, c("Insitutype", "Leiden"))
 obs_colns <- study$somas$RNA$obs$attrnames()
 if(celltype == "Insitutype"){
-  celltypecolumn <- obs_colns[min(which(grepl("nbclust", obs_colns) & grepl("clusters", obs_colns)))] #(column on the left is the latest)
+  celltypecolumn <- obs_colns[min(which(
+    (grepl("nbclust", obs_colns) | (grepl("InSituType", obs_colns))) & grepl("clusters", obs_colns)
+    ))] #(column on the left is the latest)
 }
 if (celltype == "Leiden") {
   celltypecolumn <- obs_colns[max(which(grepl("nn", obs_colns)))]  #(column on the right is the latest)
