@@ -26,13 +26,23 @@ format:
 
 # Abstract
 
-This post showcases a cell typing method optimized for detection and sub-clustering of immune cells.
-We use a 6K-plex colon-cancer dataset to demonstrate two common use cases for the method:
+This post showcases a hierarchical cell typing method (HieraType) optimized for detection and sub-clustering of immune cells.
+HieraType is
+ 
+ * organized around canonical marker genes, but harnesses cells' complete expression profiles.
+ * can be adapted to any arbitrary cell type hierarchy.
+
+Code for the method and utility functions used in this post can be found in the R package [HieraType](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HieraType).  The package contains carefully designed pipelines and marker gene lists for:
+ 
+ * Subclassifying T-cells into 12 categories
+ * Classifying a whole dataset into broad categories (epithelial, fibroblast, immune, endothelial), then subclassifying immune cells into 9 categories
+ * Classifying native brain cells
+
+In this post, we use a 6K-plex colon-cancer dataset to demonstrate two common use cases for the method:
 
 1. Subtyping T cells
 2. Broad immune cell typing.
 
-Code for the method and utility functions used in this post can be found in the R package [HieraType](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HieraType). 
 
 # Quick links to the code
 
@@ -44,9 +54,8 @@ For those in a hurry to 'just see the code', they can jump ahead to the "Just Th
 Often (particularly with immune cells), we may want our cell type calls to be guided by specific sets of marker genes.  
 In some spatially-resolved transcriptomics (SRT) datasets, directly using marker gene expression for determining cell type may be a challenge due to data sparsity, background due to autoflourescence, or segmentation ambiguity.  These challenges together can make marker genes noisy individual data points. 
 
-However, marker genes remain a strong organizing principle for differentiating cell types.  The cell typing method we describe here captures information from both (a) similar cells and (b) biologically relevant genes, to construct imputed marker gene scores which can be used for probabilistic cell type assignment.
-The method is designed to make it easy to enforce prior biological assumptions about the marker genes and expression profiles we expect to see in our cell types, 
-while being robust to platform or batch effects that may otherwise challenge the transfer of those assumptions from pre-trained models or reference datasets.  
+However, marker genes remain a strong organizing principle for differentiating cell types.  The cell typing method we describe here captures information from both (a) similar cells and (b) biologically relevant genes, in order to construct marker metagene scores which can be used for probabilistic cell type assignment.
+The method takes as input predefined 'marker lists' for each cell type, which make it easy to enforce prior biological assumptions about the marker genes and expression profiles we expect to see in our cell types.  By not requiring any training data or an explicit reference profile, we expect the method to be robust to platform or batch effects that may otherwise challenge cell type labeling from pre-trained models or external reference data.  
 
 
 The basic framework for the method can be described in a few basic steps (we'll describe each of these steps in more detail throughout our examples.)
@@ -157,12 +166,17 @@ Here we can use a couple of convenience functions provided in the R package `Hie
 ```{r, eval=FALSE}
 #| code-fold: true
 
+
+## calculate fold change, average expression, and other summary metrics 
+## for each gene and each cluster compared to other clusters
+## This is the data underlying the marker heatmap.
 fctbl_unsup <- 
 HieraType::clusterwise_foldchange_metrics(normed  = sem[["RNA"]]@data
                                           ,metadata = sem@meta.data
                                           ,cluster_column = "clusters_unsup"
                                           )
 
+## make a marker heatmap
 hm_unsup <- HieraType::marker_heatmap(fctbl_unsup
                            ,extras = c("CD3D", "CD4", "FOXP3"
                                        , "CD8B", "CD8A")
@@ -197,11 +211,15 @@ I'd like to split these cells further into at least a few meaningful T-cell subt
 ## 'Just The Code' {#tldr}
 
 Here's the code for classifying leiden cluster '6' into `cd8t` and `cd4t` cell types , followed by more granular T cell subtyping.  We use the R package `HieraType` with a prespecified `tcell_pipeline`, and corresponding lists of marker genes included as package datasets.
-
+A `pipeline` specifies the hierarchical order we want to do our cell typing, and which cell types go in each level of the hierarchy.
+Each cell type has a list of associated marker genes.
 ```{r, eval=TRUE}
 
 data("pipeline_tcell")
 str(pipeline_tcell, max.level = 2)
+names(pipeline_tcell$markerslists$tmajor)
+names(pipeline_tcell$markerslists$t4minor)
+names(pipeline_tcell$markerslists$t8minor)
 ```
 
 ```{r, eval=FALSE}
@@ -255,10 +273,11 @@ For each of my cell types, `cd4t` and `cd8t`, I specify
 * a set of other marker genes which I expect could be expressed as "predictors"  
 
 In this case, we'll use [CD4], and [CD8A, CD8B], as "index genes" for `cd4t` and `cd8t` respectively.
-The other genes we'll specify as predictors are based on the literature.  For example, FOXP3 is often associated with cd4t 'Treg' cells, so we include it as a predictor here for `cd4t`. 
+The other genes we'll specify as predictors are based on the literature.  For example, FOXP3 is often associated with cd4t 'Treg' cells, so we include it as a predictor here for `cd4t`. In general, it's okay to include a gene as a "predictor" even if we only expect to see it in a subset of cells (like FOXP3 in this example, which we expect to be present in a 'Treg' subtype, but not all `cd4t` cells).
 
 It's okay to include markers in multiple cell types if that fits our mental model.
 For example, CD3D, CD3E, and CD3G are general T cell markers, and so are included as predictors for both subtypes, as are other genes like IL7R, CD27, SELL which could be seen in either `cd4t` or `cd8t` cells.
+When manually creating a marker list, consider "more predictors is better" as a general rule of thumb; a larger number of predictor genes can help build more accurate metagene models for celltype index markers.
 
 We can create our marker list manually like this:
 ```{r, eval=TRUE}
