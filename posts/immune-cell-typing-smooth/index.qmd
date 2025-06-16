@@ -301,10 +301,10 @@ str(markerslist_tcellmajor)
 
 ### Part 2: Estimating a metagene score for each cell type
 
-In this next step, we fit a model for each cell type, using the primary index marker as the response variable and covariates derived from the predictor genes.  
+In this next step, we fit a model for each cell type, using the primary index marker as the response variable and covariates derived from the predictor genes.  The predicted values of the primary index marker for this model make a continuous "metagene score" that will later be used for probabilistic cell type assignment. 
 
 We fit our models for each cell type class using the `fit_metagene_scores` function.
-This function uses 'smoothing', as well as our prior biology / assumptions about which markers are associated with each celltype to predict the pearson residuals of the index gene.
+This function uses 'smoothing' (averaging over a set of similar cells), as well as our prior biology / assumptions about which markers are associated with each celltype to predict the pearson residuals of the index gene.
 
 The default regression model setup looks like this:
 $$Y = WY\eta  + WX\beta + X\gamma + \epsilon $$
@@ -322,7 +322,6 @@ One way to think about this model specification could be as an implementation of
 * other marker genes in similar cells ($WX$)
 
 We use a non-negative least squares [@nnlsref] (NNLS) regression to estimate our models.  The NNLS model enforces that all of the covariates based on predictor genes we specified must have positive regression coefficients (in practice we'll observe that a number of regression coefficients may shrink to zero).
-
 
 By specifying `use_offclass_markers_as_negative_predictors = TRUE` in the section above, we further assume that predictors for *other celltypes* that we haven't listed can be used as *negative* predictors of our index gene.
 For example, genes like like "GZMA" and "GZMB", which are markers associated with `cd8t`, will be assumed to be *negative* predictors of the other classes (`cd4t`) where they are not listed. 
