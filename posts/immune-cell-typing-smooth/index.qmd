@@ -56,7 +56,7 @@ For those in a hurry to 'just see the code', they can jump ahead to the "Just Th
 Often (particularly with immune cells), we may want our cell type calls to be guided by specific sets of marker genes.  
 In some spatially-resolved transcriptomics (SRT) datasets, directly using marker gene expression for determining cell type may be a challenge due to data sparsity, background, or segmentation ambiguity.  These challenges together can make marker genes noisy individual data points. 
 
-However, marker genes remain a strong organizing principle for differentiating cell types.  The cell typing method we describe here captures information from both (a) similar cells and (b) biologically relevant genes, in order to construct marker metagene scores which can be used for probabilistic cell type assignment.
+However, marker genes remain a strong organizing principle for differentiating cell types. To overcome the intrinsic noise of single marker genes, the cell typing method we describe here captures information from both (a) similar cells and (b) biologically relevant genes, in order to construct metagenes that more stably estimate true marker expression. These marker metagene scores are then used for probabilistic cell type assignment.
 The method takes as input predefined 'marker lists' for each cell type, which make it easy to enforce prior biological assumptions about the marker genes and expression profiles we expect to see in our cell types.  By not requiring any training data or an explicit reference profile, we expect the method to be robust to platform or batch effects that may otherwise challenge cell type labeling from pre-trained models or external reference data.  
 
 
@@ -322,7 +322,11 @@ str(markerslist_tcellmajor)
 
 ### Part 2: Estimating a metagene score for each cell type
 
-In this next step, we fit a model for each cell type, using the primary index marker as the response variable and covariates derived from the predictor genes.  The predicted values of the primary index marker for this model make a continuous "metagene score" that will later be used for probabilistic cell type assignment. 
+Because single count values marker genes can be noisy, we seek to derive variables
+ that more stably estimate marker expression. To do so, we'll exploit biologically relevant genes (e.g. CD8A expression is predictive of CD8B expression), and cells with similar expression patterns. 
+To do so, we fit a model for each cell type, using the primary index marker as the response variable and covariates derived from the predictor genes.  The predicted values of the primary index marker for this model make a continuous "metagene score" that will later be used for probabilistic cell type assignment. 
+You can think of each metagene score as estimating the canonical marker gene's expression for a single cell type;
+ e.g. we will produce a FOXP3-estimating metagene to capture Treg's, a CD68-estimating metagene to capture macrophages, etc...
 
 We fit our models for each cell type class using the `fit_metagene_scores` function.
 This function uses 'smoothing' (averaging over a set of similar cells), as well as our prior biology / assumptions about which markers are associated with each celltype to predict the pearson residuals of the index gene.
@@ -338,9 +342,9 @@ where
 
 One way to think about this model specification could be as an implementation of a 'smoothing model', which leverages information across multiple dimensions:
 
-* the index gene in similar cells ($WY$) 
-* other expected marker genes (our predictor genes $X$)
-* other marker genes in similar cells ($WX$)
+* the index gene in similar cells ($WY$) (roughly, neighbors in UMAP space)
+* expression of other expected marker genes ($X$) (our predictor genes defined from biological knowledge)
+* expression of other expected marker genes in similar cells ($WX$) 
 
 We use a non-negative least squares [@nnlsref] (NNLS) regression to estimate our models.  The NNLS model enforces that all of the covariates based on predictor genes we specified must have positive regression coefficients (in practice we'll observe that a number of regression coefficients may shrink to zero).
 
@@ -349,7 +353,7 @@ For example, genes like like "GZMA" and "GZMB", which are markers associated wit
 
 Estimating this model from the dataset at hand rather than using a reference model could make this framework more robust to platform effects or batch effects compared to pre-trained models or reference profiles which used different technology or data with slightly different biology.
 
-Because the model is only using genes we've specified in our 'markers list', we also have complete control over which genes influence the metagene scores, reducing the chance that noisy or irrelevant genes can have negative impact on our cell type classification. 
+Genes not included in the marker gene lists will not be considered in assigning cell types. Because the model is only using genes we’ve specified in our ‘markers list’, we have complete control over which genes influence the metadata scores, reducing the chance that noisy or irrelevant genes can have an impact on our cell type classifications. Furthermore, by estimating the metagenes directly from the dataset at hand, we are not reliant on reference datasets or pre-trained models influenced by different technology (example: scRNA-seq) or underlying biology (example: different tissue type or disease status, etc).
 
 Here I call the `fit_metagene_scores` function to estimate these models for cells corresponding to the unsupervised cluster I've identified to be T cells.  
 For the cells $\times$ cells `adjacency_matrix`, I've used the nearest neighbor matrix in my Seurat object.  This is the same graph that was used to generate my UMAP and my unsupervised leiden clusters.
@@ -389,6 +393,7 @@ str(metagenes_t,max.level = 2)
 
 For cell types using multiple 'index marker genes', like `cd8t` here (using CD8A and CD8B), metagene scores are combined together using non-negative sparse pca (implemented in the `nsprcomp` R package) [@nonnegpca].  This allows for summarizing an overall cell type metagene score, using a constrained non-negative combination of individual index-gene scores that explains maximal variation across individual index gene scores. 
 Below, we see the PCA rotation representing the individual weights given to CD8A and CD8B metagene scores.
+
 ```{r}
 metagenes_t$cd8t$nnpcfit
 
@@ -452,9 +457,10 @@ ggsave("figures/yhatpairs_tcells.png", width = 858*sqrt(20), height = 634*sqrt(2
 knitr::include_graphics("./figures/yhatpairs_tcells.png")
 ```
 
-### Part 3: Clustering via overfitted gaussian mixture-models 
+### Part 3: Assigning cell types based on metagene scores
 
-Now, we estimate the multivariate distribution of metagene scores that characterize each cell type.  This allows us to compute the likelihoods for a cell belonging to any of these types, and infer a posterior probability of T cell subtype for each cell.
+Now we use the metagene scores to classify cell types. 
+To do so, we estimate the multivariate distribution of metagene scores that characterize each cell type.  This allows us to compute the likelihoods for a cell belonging to any of these types, and infer a posterior probability of T-cell subtype for each cell.
 The `cluster_metagenes` function we run below estimates a mixture of overfitted multivariate gaussian mixture models [@aragam2020identifiability] to estimate the distribution of metagene scores.
 
 ```{r}
