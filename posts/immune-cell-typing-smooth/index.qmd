@@ -126,7 +126,7 @@ sem <- Seurat::SetAssayData(sem, layer = "data", new.data = Matrix::t(normed))
 
 
 
-#### Spatial plot of initial clusters
+**Spatial plot of initial clusters**
 
 Here's a spatial plot of our leiden clusters.  At first glance, we see that some of these unsupervised clusters (i.e., 3, 0, 1, 2, and 7 for example) have distinct spatial patterns; it definitely looks like some meaningful biological structure in these tissue were captured by unsupervised clustering.  
 
@@ -160,7 +160,7 @@ print(xypl)
 knitr::include_graphics("./figures/xyp_unsup.png")
 ```
 
-#### Heatmap of initial clusters
+** Heatmap of initial clusters **
 
 We can make a marker gene heatmap to identify some of the top marker genes for each cluster and see if we recognize any of the celltypes represented by the unsupervised clusters.
 Here we can use a couple of convenience functions provided in the R package `HieraType`.
@@ -342,7 +342,7 @@ where
 
 One way to think about this model specification could be as an implementation of a 'smoothing model', which leverages information across multiple dimensions:
 
-* the index gene in similar cells ($WY$) (roughly, neighbors in UMAP space)
+* the index gene's mean expression in similar cells ($WY$) (roughly, neighbors in UMAP space)
 * expression of other expected marker genes ($X$) (our predictor genes defined from biological knowledge)
 * expression of other expected marker genes in similar cells ($WX$) 
 
@@ -350,6 +350,7 @@ We use a non-negative least squares [@nnlsref] (NNLS) regression to estimate our
 
 By specifying `use_offclass_markers_as_negative_predictors = TRUE` in the section above, we further assume that predictors for *other celltypes* that we haven't listed can be used as *negative* predictors of our index gene.
 For example, genes like like "GZMA" and "GZMB", which are markers associated with `cd8t`, will be assumed to be *negative* predictors of the other classes (`cd4t`) where they are not listed. 
+This argument should be set to FALSE if your markers list has extensive genes expected to be enriched in multiple cell types; e.g. if many genes like CD3E appeared in marker lists for both CD4 T-cells and CD8 T-cells. 
 
 Estimating this model from the dataset at hand rather than using a reference model could make this framework more robust to platform effects or batch effects compared to pre-trained models or reference profiles which used different technology or data with slightly different biology.
 
@@ -402,9 +403,11 @@ metagenes_t$cd8t$nnpcfit
 
 We can get a better understanding of the metagene model outputs by looking at a few diagnostics plots.  In the below, we plot the regression coefficients for each model, ordering them on the x-axis by their ranking.
 For each cell type, the positive $\hat{\beta}$ correspond to genes we specified as predictors, and negative $\hat{\beta}$ were predictors for either of the other two cell types.  
-A lot of the covariates which have the largest magnitudes have "*lag.*" in their name indicating they correspond to a smoothed (or neighbor-averaged) covariate for that gene.
+A lot of the covariates which have the largest magnitudes have "*lag.*" in their name indicating they correspond to a smoothed (or neighbor-averaged) covariate for that gene. 
 
-For `cd4t`, we see that smoothed CD4 (indicated by '*lag.y.CD4*' in the plot) is the strongest predictor of observed 'CD4'.  For `cd8t`, '*lag.y.CD8A*' and '*lag.y.CD8B*' (indicating smoothed CD8A and CD8B) are also among the strongest predictors, but not first in rank.
+We also see that many genes end up with weights of 0. These genes failed to be predictive in the direction our biological priors expected. 
+
+For `cd4t`, we see that smoothed CD4 (indicated by '*lag.y.CD4*' in the plot) is the strongest predictor of observed 'CD4'.  For `cd8t`, '*lag.y.CD8A*' and '*lag.y.CD8B*' (indicating smoothed CD8A and CD8B) are also among the strongest predictors, but not first in rank. 
 
 
 ```{r, eval=FALSE}
@@ -513,6 +516,8 @@ $$P(scores_c | y_c = t) = \sum_{j=1}^K P(scores_c | k=j, y_c = t) P(k=j | y_c = 
 The prior probability for a particular cell type class $t$ can be estimated by counting the number of cells used to estimate the mixture model in each cell type, and computing a proportion amongst all possible cell type classes, i.e.,
 $$P(y_c = t) = \frac{\sum_{c=1}^C I(scores_{c,t} > 0)}{\sum_{l=1}^T \sum_{c=1}^C I(scores_{c,l} > 0)}$$
 These probabilities are in the `post_probs` data.table object of the model.
+The "best class" column gives each cell's best-fitting cell type. 
+
 ```{r}
 model_t$post_probs[1:10][]
 
