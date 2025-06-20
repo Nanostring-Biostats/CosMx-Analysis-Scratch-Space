@@ -221,6 +221,12 @@ Each cell type has a list of associated marker genes.
 #| echo: false
 
 load("../../_code/HieraType/data/pipeline_tcell.rda")
+load("../../_code/HieraType/data/markerslist_tcellmajor.rda")
+load("../../_code/HieraType/data/markerslist_cd4tminor.rda")
+load("../../_code/HieraType/data/markerslist_cd8tminor.rda")
+load("../../_code/HieraType/data/pipeline_tcell.rda")
+load("../../_code/HieraType/data/pipeline_io.rda")
+load("../../_code/HieraType/data/markerslist_immunemajor.rda") 
 
 ```
 
@@ -297,13 +303,7 @@ For example, CD3D, CD3E, and CD3G are general T cell markers, and so are include
 When manually creating a marker list, consider "more predictors is better" as a general rule of thumb; a larger number of predictor genes can help build more accurate metagene models for celltype index markers.
 
 We can create our marker list manually like this:
-```{r}
-#| eval: true
-#| echo: false
 
-markerslist_tcellmajor <- load("../../_code/HieraType/data/markerslist_tcellmajor.rda")
-
-```
 ```{r, eval=FALSE}
 markerslist_tcellmajor <- 
 HieraType::make_markerslist(
@@ -584,9 +584,14 @@ $$P(y_c = s(t) \cap y_c = t  | scores_c) = P(y_c = s(t) | scores_c, y_c = t)P(y_
 
 Below is an example of this syntax using the `cd4t` subtypes in the package dataset "`markerslist_cd4tminor`".
 
-
-```{r, eval=TRUE}
+```{r, eval=FALSE}
 str(HieraType::markerslist_cd4tminor, max.level=2)
+```
+```{r, eval=TRUE}
+#| eval: true
+#| echo: false
+
+str(markerslist_cd4tminor, max.level=2)
 ```
 
 ```{r, eval=FALSE}
@@ -613,13 +618,6 @@ A custom hierarchical cell typing pipeline could be created like this below, whe
 * `priors_category`, a list specifying 'parent' /  major categories of each celltype. Here , `t4minor` is a subset of `"cd4t"`.  "tmajor" runs first, and does not have a prior.
 
 ```{r}
-#| eval: true
-#| echo: false
-
-load("../../_code/HieraType/data/pipeline_tcell.rda")
-
-```
-```{r}
 #| eval: false
 #| echo: true
 
@@ -643,10 +641,14 @@ This particular pipeline is also saved as a package dataset.
 ```{r}
 #| eval: false
 #| echo: true
+
 str(HieraType::pipeline_tcell, max.level=2)
 
 ```
 ```{r}
+#| eval: true
+#| echo: false
+
 str(pipeline_tcell, max.level=2)
 ```
 
@@ -737,12 +739,26 @@ ggsave(plot=hmsubtype, filename = "figures/hm_tsubtype.png", width = 1084 * sqrt
 fwrite(fct, file="data/fc_t_subtypesonly.csv")
 ```
 
+
 ```{r}
+#| eval: false
+#| echo: true
+
 ### The key index markers for cd4 subtypes
 lapply(HieraType::markerslist_cd4tminor, "[[", "index_marker")
 
 ### The key index markers for cd8 subtypes
 lapply(HieraType::markerslist_cd8tminor, "[[", "index_marker")
+```
+```{r}
+#| eval: true
+#| echo: false
+
+### The key index markers for cd4 subtypes
+lapply(markerslist_cd4tminor, "[[", "index_marker")
+
+### The key index markers for cd8 subtypes
+lapply(markerslist_cd8tminor, "[[", "index_marker")
 ```
 
 <div class="wider-image">
@@ -876,6 +892,9 @@ The next section will cover the details and discuss a few choices that were made
 
 
 ```{r}
+#| eval: false
+#| echo: true
+
 ### Pipeline, with 
 ### level-1 ('l1') being major categorization 
 ### level-2 ('l2') being classification of major immune cell categories
@@ -892,8 +911,6 @@ pipeline_io <- HieraType::make_pipeline(
 )
 
 ```
-
-
 ```{r}
 #| eval: false
 #| echo: true
@@ -972,8 +989,21 @@ fwrite(fc_l1, "data/fc_l1.csv")
 knitr::include_graphics("./figures/hm_l1.png")
 
 ```
+
+
 ```{r}
+#| eval: false
+#| echo: true
+
 lapply(HieraType::markerslist_immunemajor, "[[", "index_marker")
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+lapply(markerslist_immunemajor, "[[", "index_marker")
 
 ```
 
