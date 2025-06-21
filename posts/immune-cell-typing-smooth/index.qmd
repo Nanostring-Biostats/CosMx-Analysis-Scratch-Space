@@ -698,14 +698,38 @@ We can remake this table with a different cutoff in mind as needed, depending on
 
 As demonstration, we can look at the output if we were to raise our threshold from 0.5 to 0.8.  
 We can "`return_all_columns`" to show a more verbose result, with individual columns showing the joint probability scores for all possible cell type categories in each cell.
+
 ```{r}
+#| eval: false
+#| echo: false
+
+pptables <- 
+HieraType::combine_postprob_tables(pipeline = pipeline_tcell
+                                   ,models = tcell_typing$models
+                                   ,celltype_call_threshold = 0.8
+                                   ,return_all_columns = TRUE)[["tmajor"]]
+data.table::fwrite(pptables, file="figures/postprob_tables_demo.csv")
+
+```
+
+```{r}
+#| eval: false
+#| echo: true
+
 HieraType::combine_postprob_tables(pipeline = pipeline_tcell
                                    ,models = tcell_typing$models
                                    ,celltype_call_threshold = 0.8
                                    ,return_all_columns = TRUE)[["tmajor"]][1:10]
 ```
 
+```{r}
+#| eval: true
+#| echo: false
 
+pptables <- fread("figures/postprob_tables_demo.csv")
+pptables[1:10][]
+
+```
 
 
 ### Examining and validating clustering results
