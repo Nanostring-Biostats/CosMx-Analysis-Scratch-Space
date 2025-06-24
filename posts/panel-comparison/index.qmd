@@ -178,7 +178,6 @@ ct_pipeline <- make_pipeline(
 htres <-  HieroType::run_pipeline(
   pipeline = ct_pipeline,
   counts_matrix = Matrix::t(seu[["RNA"]]@counts),
-  totalcounts = Matrix::colSums(seu),
   adjacency_matrix = as(seu@graphs$umapgrph, "dgCMatrix")
 )
 
@@ -186,9 +185,9 @@ htres <-  HieroType::run_pipeline(
 probdf <- htres$post_probs$l1
 
 ## prepare data for marker gene heatmap:
-fc_subclus_ctl_gran <- clusterwise_foldchange_metrics(seu[["RNA"]]@counts
-                                                      ,metadata = htres$post_probs[[1]]
-                                                      ,cluster_column = "celltype_granular"
+fc_subclus_ctl_gran <- clusterwise_foldchange_metrics(counts = seu[["RNA"]]@counts,
+                                                      metadata = htres$post_probs[[1]],
+                                                      cluster_column = "celltype_granular"
 )
 # subtract background from the mean per-cluster expression profiles:
 for (name in unique(htres$post_probs[[1]]$celltype_granular)) {
