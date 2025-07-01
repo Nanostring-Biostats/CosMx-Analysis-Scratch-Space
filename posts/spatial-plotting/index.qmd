@@ -6,6 +6,10 @@ author:
     affiliations:
       - ref: bsb
       - ref: crwilliams11
+  - name: Felicia New
+    affiliations:
+      - ref: bsb
+      - ref: fnew
 toc: true
 code-fold: true
 toc-title: Contents
@@ -29,14 +33,14 @@ draft: false
 Spatial transcriptomics data provide rich opportunities for visual exploration. 
 In this post, we demonstrate several useful visualizations for CosMx<sup>&#174;</sup> data, 
 particularly when working from [flat files](../flat-file-exports/flat-files-compare.qmd), 
-and showcase a range of visualizations to highlight different aspects of CosMx® data.
+and showcase a range of visualizations to highlight different aspects of CosMx data.
 Similar plots could be generated when 
 working with common packages such as Seurat [@Hao2024] or Squidpy [@Palla2022]. 
 For more plotting ideas with these tools, see the following posts:
 
 [Plotting with Seurat objects](../seurat-cosmx-basics/index.qmd)
 
-[Plotting and analysis with Squidpy](../squidpy-essentials/index.qmd)
+[Plotting and analysis with Squidpy](../squidpy-essentials/squidpy-essentials.qmd)
 
 These plots serve as a foundation for both quality control and exploratory analysis
 and are meant to serve as inspiration for additional plots you could make.
@@ -445,7 +449,11 @@ knitr::include_graphics(paste0(out_dir, "python_cell_outlines_singleFOV.png"))
 
 ### Color Cells by Metadata
 
-Overlay polygons with metadata such as cell type. Here we're using Leiden clustering results. There are a small number of cells with no associated cell type as they got flagged in QC. These show up as `NA` in the plots.
+Overlay polygons with metadata such as cell type. Here we're using Leiden clustering results. 
+
+::: {.callout-note}
+There are a small number of cells with no associated cell type as they got flagged in QC. These show up as `NA` in the plots.
+:::
 
 :::{.panel-tabset}
 
@@ -1081,7 +1089,9 @@ row.names(meta) <- meta$cell
 plot.df$cell_type <- as.data.frame(meta)[plot.df$cell, "leiden_cluster"] 
 
 ## Set alpha by cell type
-plot.df$alpha <- ifelse(plot.df$cell_type == "5", 1, 0.3)
+alpha_vals <- rep(0.2, length(unique(plot.df$cell_type)))
+names(alpha_vals) <- c(unique(plot.df$cell_type))
+alpha_vals["5"] <- 1
 
 ## Set up scale bar
 # Conversion factor for commercial CosMx instrument.
@@ -1129,12 +1139,12 @@ y_pos <- min(plot.df %>% select(y_global_px), na.rm = TRUE) + scale_length_px*0.
 ## Plot it
 ggplot(plot.df,
        aes(x = x_global_px, y = y_global_px, group = cell,
-           fill = as.factor(cell_type), alpha = alpha)) +
+           fill = as.factor(cell_type), alpha = as.factor(cell_type))) +
   geom_polygon(color = "darkgrey") +
   coord_fixed() +
   theme_void() +
-  labs(fill = "Cell type") +
-  guides(alpha = "none")  +
+  labs(fill = "Cell type", alpha = "Cell type") +
+  scale_alpha_manual(values = alpha_vals, na.value = 0.2) +
   # Add a transparent rectangle to help the scale bar appear on a busy background
   annotation_custom(
     grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
@@ -1169,6 +1179,18 @@ plot_df = cell_polygons[cell_polygons["fov"] == 100]
 # Merge only the 'leiden_cluster' and 'nCount_RNA' columns
 meta_subset = cell_meta[['cell', 'leiden_cluster']]
 plot_df = plot_df.merge(meta_subset, on='cell', how='left')
+
+# Create a colormap
+clusters = plot_df["leiden_cluster"].unique()
+
+# Filter out NA values first
+valid_clusters = [c for c in clusters if pd.notna(c)]
+
+cmap = cm.get_cmap("tab20", len(valid_clusters))
+cluster_to_color = {cluster: cmap(i) for i, cluster in enumerate(valid_clusters)}
+
+#Add color for NA values
+cluster_to_color[np.nan] = "lightgrey"
 
 # Add alpha column
 plot_df['alpha'] = np.where(plot_df['leiden_cluster'] == 5, 1, 0.3)
@@ -1211,7 +1233,8 @@ for key, group in plot_df.groupby("cell"):
     cell_type = group["leiden_cluster"].iloc[0]
     alpha = group["alpha"].iloc[0]
     #cluster_to_color[np.nan] if pd.isna(cluster) else cluster_to_color[cluster]
-    fill_color = "lightgrey" if pd.isna(cell_type) else plt.cm.tab20(int(cell_type) % 20)  # Use a colormap for fill color
+    fill_color = cluster_to_color[np.nan] if pd.isna(cell_type) else cluster_to_color[cell_type]
+    #fill_color = "lightgrey" if pd.isna(cell_type) else plt.cm.tab20(int(cell_type) % 20)  # Use a colormap for fill color
     coords = group[["x_global_px", "y_global_px"]].values
     coords = np.vstack([coords, coords[0]])  # close the polygon
     ax.fill(coords[:, 0], coords[:, 1], facecolor=fill_color, edgecolor='darkgrey', alpha=alpha, zorder=1)
@@ -1244,10 +1267,17 @@ unique_clusters = plot_df["leiden_cluster"].unique()
 legend_handles = [
     mpatches.Patch(
       color=color, 
-      label=f"Cluster {int(cluster)}" if pd.notna(cluster) else "Cluster NA")
+      label=f"Cluster {int(cluster)}" if pd.notna(cluster) else "Cluster NA",
+      alpha = 1 if cluster == 5 else 0.3)
     for cluster, color in cluster_to_color.items()
 ]
-ax.legend(handles=legend_handles, title="Cell type", bbox_to_anchor=(1.05, 1), loc='upper left')
+ax.legend(
+  handles=legend_handles, 
+  title="Cell type", 
+  bbox_to_anchor=(1.05, 0.95), 
+  loc='upper left',
+  fontsize = 6,
+  title_fontsize=8)
 
 plt.savefig(os.path.join(out_dir, "python_celltypeAlphaHighlight_polygons_singleFOV.png"), bbox_inches='tight', pad_inches=0, dpi=300)
 plt.close()
@@ -1953,7 +1983,7 @@ knitr::include_graphics(paste0(out_dir, "python_polygons_singleFOV_singleTx.png"
 
 Here we generate plots to visualize many of the metrics output by the [RNAQC plots module](https://github.com/Nanostring-Biostats/CosMxDACustomModules/tree/main/RNAQCPlots){target="_blank"} for AtoMx SIP.
 
-We start by reading in the outputs of this module for use in multiple of the plots in this section.
+We start by reading in the outputs of this module for use in multiple of the plots in this section. We also add one more column, SNR, which we calculate as mean transcripts per plex / mean negative probes per plex.
 
 :::{.panel-tabset}
 
@@ -1962,12 +1992,24 @@ We start by reading in the outputs of this module for use in multiple of the plo
 ```{r echo = TRUE, eval = FALSE}
 qc <- read.csv(paste0(raw_data_dir, "Per_FOV_data_quality_metrics.csv"), # For convenience, we assume this is stored in the same directory as the flat files.
                row.names = 1)
+
+# Set up plex for this dataset
+dataset_plex <- 18935
+
+# Add per FOV SNR
+qc$SNR_Per_FOV <- (qc$Mean_Transcripts_Per_Cell_Per_FOV / dataset_plex) / qc$Mean_Negative_Probe_Per_Plex_Per_Cell_Per_FOV
 ```
 
 ### Python
 
 ```{python echo = TRUE, eval = FALSE}
 qc = pd.read_csv(Path(raw_data_dir / f"Per_FOV_data_quality_metrics.csv"), index_col=0) # For convenience, we assume this is stored in the same directory as the flat files.
+
+# Set up plex for this dataset
+dataset_plex = 18935
+
+# Add per FOV SNR
+qc['SNR_Per_FOV'] = (qc['Mean_Transcripts_Per_Cell_Per_FOV'] / dataset_plex) / qc['Mean_Negative_Probe_Per_Plex_Per_Cell_Per_FOV']
 ```
 
 :::
