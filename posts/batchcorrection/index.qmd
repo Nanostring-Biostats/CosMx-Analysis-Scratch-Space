@@ -19,17 +19,38 @@ categories:
     - data integration
     - CosMx 2.0
 image: figures/thumbnail.png
-description: "Our recommended analysis for choosing which panel will be best for your research. We assume you have data from the same tissue from two panels, e.g. the 1k and 6k panels."
+description: ""
 draft: false
 ---
 
 # Introduction 
 
-When analyzing multiple samples or 'batches' of data collected under different technologies or sample conditions, we may need to harmonize the data in a way that preserves the biological differences while minimizing technical variation.
+When analyzing multiple samples or 'batches' of data collected under different technologies or sample conditions, we may need to harmonize the data in a way that preserves biological variation while minimizing technical variation.  
+For example, suppose I were interested in analyzing multiple breast cancer tissue samples, but these samples were processed in different labs, by different scientists, with different sample prep protocols. These technical differences could subtly effect gene detection efficiency in ways that may influence or confound an analysis.
 
-There is a multitude of existing research on batch correction methodology [link] as well as methods . 
-Here, we demonstrate the effectiveness of Harmony[link ] (cite), and show  
+To check for presence of batch effects and whether correction is required, we recommend plotting the 'batch' on a UMAP or in principal component space [](#pcplotbatch).  In the presence of batch effects, we may observe that cells cluster together by batch more distinctly than they do by their biological cell type. 
 
+For dimension reduction and clustering analyses, there are a multitude of existing research on batch correction methodology [@luecken2019current].  Harmony [] has been recommended as a best-in-class approach in several studies [@tran2020benchmark] [@emmanuel2024batch] which benchmarked different batch correction methodology for scRNAseq. 
+
+For some other downstream analyses, batch effects can be explicitly handled or may be less of a concern.
+In the case of differential expression (DE) analysis, we could account for the technical effects by specifying 'batch' as a covariate in our DE models.
+Supervised or semi-supervised cell typing analyses that are independent of PCA dimension reductions  (i.e., InSituType [@Danaher2022]), may be less affected by batch effects.  If we were to observe batch effects in this setting, one useful approach would be to perform the cell typing separately by batch before aggregating the cell type annotations.
+
+
+
+There is a multitude of existing research on batch correction methodology as well as methods implemented in popular packages like Seurat [link](https://satijalab.org/seurat/articles/integration_introduction) . 
+
+In this post, we demonstrate batch effect correction using Harmony on two 6k-plex tonsil tissue datasets; one dataset generated with CosMx 1.5, while the other generated with CosMx 2.0.  The recent CosMx 2.0 release offers noticeable increases in sensitivity; while sensitivity increases will vary from sample-to-sample, transcripts per cell often increase 1.5-2x compared to the same sample processed with previous CosMx 1.5 software.  In case we want to analyze a v1.5 and v2.0 dataset in the same analysis, we might consider treating this variable as a batch effect. 
+
+
+
+
+to analyze multiple flow cells of the same tissue type.  
+
+
+Here, we demonstrate the effectiveness of one of these Harmony [paper link](https://pmc.ncbi.nlm.nih.gov/articles/PMC6884693/) [@harmony], and show  
+
+Here we demonstrate how one could use Harmony for batch correction.  We start with two comparable sections  of 6k-plex tonsil tissue.  
 
 For those in a hurry to 'just see the code' , they can jump ahead to [Harmony Analysis](#tldr) section.
 
@@ -505,11 +526,9 @@ Seurat::AddMetaData(sem_comb
 ```
 
 
-# Comparison with and without integration
+# Comparison with and without integration {#pcplotbatch}
 
 Plotting the first two PC's, colored by `batchid`, it looks like the v1.5 data may span a more similar domain of PC1 and PC2 space after Harmony, indicating better integration.
-
-
 
 ```{r}
 #| eval: false
@@ -594,6 +613,9 @@ umap_harmony <-
 cbind(data.table(sem_comb@meta.data)[,.(cell_ID, batchid, x_slide_mm, y_slide_mm)]
       ,data.table(sem_comb@reductions$umapharmony@cell.embeddings))
 
+set.seed(123)
+umap_harmony <- umap_harmony[sample(1:.N)] ## shuffle cell order for plotting
+
 harmony_plt <- 
 ggplot(umap_harmony, aes(x = UMAP_1, y = UMAP_2, color=batchid)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
   scale_color_manual(values = c("purple","darkgreen")) + 
@@ -604,6 +626,9 @@ ggplot(umap_harmony, aes(x = UMAP_1, y = UMAP_2, color=batchid)) + geom_point(si
 umap_regular <- 
 cbind(data.table(sem_comb@meta.data)[,.(cell_ID, batchid, x_slide_mm, y_slide_mm)]
       ,data.table(sem_comb@reductions$umap@cell.embeddings))
+
+set.seed(123)
+umap_regular <- umap_regular[sample(1:.N)] ## shuffle cell order for plotting
 
 regular_umap_plt <- 
 ggplot(umap_regular, aes(x = umap_1, y = umap_2, color=batchid)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
@@ -648,6 +673,68 @@ ggsave(filename = "figures/umap_comparison_plot.png"
 knitr::include_graphics("./figures/umap_comparison_plot.png")
 ```
 
+```{r}
+#| eval: false
+#| code-fold: true
+
+umap_harmony_clusters <- 
+cbind(data.table(sem_comb@meta.data)[,.(cell_ID, clusters_unsup_harmony, x_slide_mm, y_slide_mm)]
+      ,data.table(sem_comb@reductions$umapharmony@cell.embeddings))
+
+harmony_plt_clusters <- 
+ggplot(umap_harmony_clusters, aes(x = UMAP_1, y = UMAP_2, color=clusters_unsup_harmony)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
+  scale_color_manual(values=unname(pals::alphabet())) + 
+  theme_bw() + 
+  coord_fixed() + 
+  guides(color = guide_legend(override.aes=list(size=4, alpha=1)))
+
+umap_regular_clusters <- 
+cbind(data.table(sem_comb@meta.data)[,.(cell_ID, clusters_unsup_unintegrated, x_slide_mm, y_slide_mm)]
+      ,data.table(sem_comb@reductions$umap@cell.embeddings))
+
+regular_umap_plt_clusters <- 
+ggplot(umap_regular_clusters, aes(x = umap_1, y = umap_2, color=clusters_unsup_unintegrated)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
+  scale_color_manual(values=unname(pals::alphabet())) + 
+  theme_bw() + 
+  coord_fixed() + 
+  guides(color = guide_legend(override.aes=list(size=4, alpha=1)))
+
+umap_comparison_plt_clusters <- 
+cowplot::plot_grid(harmony_plt_clusters + labs(title = "integrated using harmony")
+                   ,regular_umap_plt_clusters + labs(title = "un-integrated")) + 
+  theme(plot.background = element_rect(fill = 'white',color='white')) + 
+  cowplot::panel_border(remove=TRUE) 
+
+print(umap_comparison_plt_clusters)
+
+
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+ggsave(filename = "figures/umap_comparison_plot_clusters.png"
+       ,plot = umap_comparison_plt_clusters
+       ,width = 1704*sqrt(10)
+       ,height = 848*sqrt(10)
+       ,units = 'px'
+       ,dpi=450
+       )
+```
+
+<div class="wider-image">
+  <img src="./figures/umap_comparison_plot_clusters.png" alt="Wide Image">
+</div>
+
+
+```{r}
+#| eval: false
+#| echo: false
+
+knitr::include_graphics("./figures/umap_comparison_plot_clusters.png")
+```
+
 
 # Conclusion
 
@@ -655,7 +742,7 @@ Here we demonstrate a well established technique for batch integration, applied 
 
 
 
-
+May depend on both the scope and depth of the analysis.
 
 
 
