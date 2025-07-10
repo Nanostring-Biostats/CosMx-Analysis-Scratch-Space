@@ -13,7 +13,7 @@ toc-expand: 2
 toc-location: left
 number-sections: true
 number-depth: 4
-date: "06/23/2025"
+date: "07/10/2025"
 categories:
     - batch correction
     - data integration
@@ -23,36 +23,28 @@ description: ""
 draft: false
 ---
 
+# Abstract
+
+This post discusses the topic 'batch effect correction'; what it is, how to detect it, and what downstream methods are potentially impacted. We recommend Harmony [@harmony] as a useful method for correcting batch effects in dimension reduction embeddings such as PCA, and demonstrate an example of how to use the software package.
+
+For those in a hurry to 'just see the code', feel free to jump ahead to the [Harmony Analysis](#tldr) section of this post.
+
 # Introduction 
 
 When analyzing multiple samples or 'batches' of data collected under different technologies or sample conditions, we may need to harmonize the data in a way that preserves biological variation while minimizing technical variation.  
-For example, suppose I were interested in analyzing multiple breast cancer tissue samples, but these samples were processed in different labs, by different scientists, with different sample prep protocols. These technical differences could subtly effect gene detection efficiency in ways that may influence or confound an analysis.
 
-To check for presence of batch effects and whether correction is required, we recommend plotting the 'batch' on a UMAP or in principal component space [](#pcplotbatch).  In the presence of batch effects, we may observe that cells cluster together by batch more distinctly than they do by their biological cell type. 
+For example, suppose I were interested in analyzing multiple breast cancer tissue samples, but these samples were processed in different labs, by different scientists, or with different sample prep protocols. These technical differences could subtly effect gene detection efficiency in ways that may influence or confound an analysis.
 
-For dimension reduction and clustering analyses, there are a multitude of existing research on batch correction methodology [@luecken2019current].  Harmony [] has been recommended as a best-in-class approach in several studies [@tran2020benchmark] [@emmanuel2024batch] which benchmarked different batch correction methodology for scRNAseq. 
+To check for presence of batch effects and whether correction is required, we recommend [plotting](#pcplotbatch) the 'batch' on a UMAP plot or in principal component (PC) space.  In the presence of batch effects, we may observe that cells cluster together by batch more distinctly than they do by their biological cell type. 
+
+For dimension reduction and clustering analyses, there is a multitude of existing research on batch correction methodology [@luecken2019current].  The Harmony method [@harmony] has been recommended as a best-in-class approach in several studies which benchmarked different batch correction methodology for scRNAseq [@tran2020benchmark] [@emmanuel2024batch] . Harmony takes as input a low-dimensional cell embedding such as PCA, and projects cells onto a new unsupervised joint embedding that groups cells by biological cell type rather than dataset-specific conditions.  This Harmony embedding can be used as an input to downstream dimension reduction and clustering algorithms like UMAP[@umap] and Leiden[@leiden]. 
 
 For some other downstream analyses, batch effects can be explicitly handled or may be less of a concern.
 In the case of differential expression (DE) analysis, we could account for the technical effects by specifying 'batch' as a covariate in our DE models.
 Supervised or semi-supervised cell typing analyses that are independent of PCA dimension reductions  (i.e., InSituType [@Danaher2022]), may be less affected by batch effects.  If we were to observe batch effects in this setting, one useful approach would be to perform the cell typing separately by batch before aggregating the cell type annotations.
 
+In this post, we demonstrate using Harmony for batch effect correction on two 6k-plex tonsil tissue datasets; one dataset generated with CosMx 1.5, while the other generated with CosMx 2.0.  The recent CosMx 2.0 release offers noticeable increases in sensitivity; while sensitivity increases will vary from sample-to-sample, transcripts per cell often increase 1.5-2x compared to the same sample processed with previous CosMx 1.5 software.  In case we want to analyze a v1.5 and v2.0 dataset in the same analysis, we might consider treating this variable as a batch effect. 
 
-
-There is a multitude of existing research on batch correction methodology as well as methods implemented in popular packages like Seurat [link](https://satijalab.org/seurat/articles/integration_introduction) . 
-
-In this post, we demonstrate batch effect correction using Harmony on two 6k-plex tonsil tissue datasets; one dataset generated with CosMx 1.5, while the other generated with CosMx 2.0.  The recent CosMx 2.0 release offers noticeable increases in sensitivity; while sensitivity increases will vary from sample-to-sample, transcripts per cell often increase 1.5-2x compared to the same sample processed with previous CosMx 1.5 software.  In case we want to analyze a v1.5 and v2.0 dataset in the same analysis, we might consider treating this variable as a batch effect. 
-
-
-
-
-to analyze multiple flow cells of the same tissue type.  
-
-
-Here, we demonstrate the effectiveness of one of these Harmony [paper link](https://pmc.ncbi.nlm.nih.gov/articles/PMC6884693/) [@harmony], and show  
-
-Here we demonstrate how one could use Harmony for batch correction.  We start with two comparable sections  of 6k-plex tonsil tissue.  
-
-For those in a hurry to 'just see the code' , they can jump ahead to [Harmony Analysis](#tldr) section.
 
 # Initial Look at the data
 ```{r}
@@ -89,7 +81,7 @@ sem_v15 <- readRDS("sem_v15.tiss_b.rds") ## tonsil dataset B with CosMx v1.5
 ```
 
 ## Plot the two batches
-Lets take a quick peek at these two tissues, with unsupervised clustering has been performed independently on each:
+Let's take a quick peek at these two tissues, where unsupervised clustering has been performed independently on each:
 
 ```{r}
 #| eval: false
@@ -175,7 +167,7 @@ knitr::include_graphics("./figures/xyplot_v15_v20.png")
 
 ## Differences in sensitivity between batches
 
-Here, we can compute some high level summary stats like transcripts per cell and signal to noise ratio (SNR) for each batch.
+Here, we can compute a few high-level summary stats like transcripts per cell and signal to noise ratio (SNR) for each batch.
 
 We see ~2x increase in transcripts per cell with the v2.0 dataset, and higher signal to noise ratio (snr).
 
@@ -258,7 +250,8 @@ sem_comb@meta.data$x_slide_mm[sem_comb@meta.data$batchid=="v1.5"] <-  sem_comb@m
 
 # 'Harmony Analysis' {#tldr}
 
-Initial tertiary analysis on the combined dataset using the `Seurat` package, up through principal component analysis.
+With our combined dataset containing all batches, we'll perform a few standard tertiary analysis steps using the `Seurat` package.
+After principal component analysis, we will pass the PC embeddings to Harmony for batch correction.
 
 ```{r}
 #| eval: false 
@@ -294,7 +287,7 @@ sem_comb[["pca"]] <- pcaobj
 
 ```
 
-Then we run harmony with our PCA embeddings and specifying `"batchid"` as our variable to adjust for (our indicator for v1.5 and v2.0).
+Now we run harmony with our PCA embeddings, specifying `"batchid"` as our variable to adjust for (our indicator for v1.5 and v2.0).
 ```{r}
 #| eval: false
 #| echo: true
@@ -325,6 +318,8 @@ harmony_embeddings <- readRDS("figures/harmony_embeddings.rds")
 ```
 
 # UMAP and clustering with harmony
+
+Let's continue the analysis. We'll use the Harmony embeddings rather than PCA embeddings to generate a UMAP and perform unsupervised clustering on the combined dataset.
 
 ```{r}
 #| eval: false
@@ -361,6 +356,8 @@ make_umap <- function(pcaobj, min_dist=0.01, n_neighbors=30, metric="cosine",key
 #| eval: false
 #| echo: true
 
+##### Run helper function to make a umap and return the 
+##### nearest-neighbors graph used for unsupervised clustering.
 umapharmony <- make_umap(pcaobj = list(
   reduction.data = Seurat::CreateDimReducObject(embeddings = harmony_embeddings)
   ))
@@ -419,7 +416,7 @@ Seurat::AddMetaData(sem_comb
 
 ```
 
-Here's another look at the tissue, with clustering results after using Harmony integration.
+Here's another look at the tissues, with clustering results generated downstream of the Harmony embeddings.
 
 ```{r}
 #| eval: false
@@ -460,20 +457,15 @@ knitr::include_graphics("./figures/xyplotharmony_v15_v20.png")
 
 
 
-
-
 # UMAP and clustering without harmony
 
 
-Here we can re-make the UMAP and cluster without integration for sake of comparison.
+Here we can re-make the UMAP and cluster without batch correction for sake of comparison.
 ```{r}
 #| eval: false
 #| echo: true
 
-##### Run helper function to make a umap, and also return the nearest-neighbors graph.
-#### ( Using the same nearest-neighbors graph as the UMAP can give better concordance 
-#### between unsupervised clusters and UMAP )
-
+##### Run helper function to make a umap and return the nearest-neighbors graph.
 pcaobj <- sem_comb[["pca"]]
 class(pcaobj)
 umapobj <- make_umap(list(reduction.data = pcaobj))
@@ -602,7 +594,7 @@ ggsave(filename = "figures/pc_comparison_plot.png"
 knitr::include_graphics("./figures/pc_comparison_plot.png")
 ```
 
-Plotting the UMAP, colored by `batchid`, there doesn't appear to be a large difference (which is not a bad thing).  But it does look perhaps like there may be some areas of the UMAP better covered by both datasets (less batch-specific) after Harmony integration.
+Plotting the UMAP, colored by `batchid`, there doesn't appear to be an enourmous difference (which is not a bad thing), but it does look like there may be areas of the UMAP better covered by both datasets (less batch-specific) after Harmony integration.
 
 
 ```{r}
@@ -738,11 +730,7 @@ knitr::include_graphics("./figures/umap_comparison_plot_clusters.png")
 
 # Conclusion
 
-Here we demonstrate a well established technique for batch integration, applied to two tonsil datasets, where 'v1.5' is 'v2.0'.
-
-
-
-May depend on both the scope and depth of the analysis.
-
+In this post we demonstrated applying the batch effect correction technique 'Harmony' to two 6K-plex tonsil tissue datasets generated with very different sensitivity performance. 
+In general, the impact of batch effects may depend on the severity of the technical artifact, as well as the scope and depth of the analysis. In the event that one wishes to analyze multiple samples together which were generated under different technical conditions, we recommend plotting the technical batch variable in UMAP or PC space as a qualitative diagnostic, and inspecting whether cells are clustered by 'batch'.  For this example, the batch effect between our two datasets was visually noticeable when plotted on a UMAP and the first two principal components.  Cells were visually less segregated by batch after the correction was applied.
 
 
