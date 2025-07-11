@@ -10,7 +10,2111 @@
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
 <generator>quarto-1.6.30</generator>
-<lastBuildDate>Mon, 23 Jun 2025 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 10 Jul 2025 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Recommendations for batch correction</title>
+  <dc:creator>Dan McGuire</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="abstract" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Abstract</h1>
+<p>This post discusses batch effects in CosMx; how they impact analyses, how to detect them, and how to correct them. We recommend Harmony <span class="citation" data-cites="harmony">(Korsunsky et al. 2019)</span> as a useful method for correcting batch effects in dimension reduction embeddings such as PCA, and demonstrate an example of how to use the software package.</p>
+<p>For those in a hurry to ‘just see the code’, feel free to jump ahead to the Harmony Analysis section of this post.</p>
+</section>
+<section id="introduction" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Introduction</h1>
+<p>When analyzing multiple samples or ‘batches’ of data collected under different technologies or sample conditions, we may need to harmonize the data in a way that preserves biological variation while minimizing technical variation.</p>
+<p>For example, suppose I were interested in analyzing multiple breast cancer tissue samples, but these samples were processed in different labs, by different scientists, or with different sample prep protocols. These technical differences could subtly effect gene detection efficiency in ways that may influence or confound an analysis. In particular, PCA, which responds quickly to small systematic changes impacting large numbers of variables, is highly sensitive to batch effects. This sensitivity then cascades down to analyses depending on PCA, e.g.&nbsp;UMAP and the Leiden and Louvain algorithms.</p>
+<p>To check for presence of batch effects and whether correction is required, we recommend plotting the ‘batch’ on a UMAP plot or in principal component (PC) space link to example figure. In the presence of batch effects, we may observe that cells cluster together by batch more distinctly than they do by their biological cell type.</p>
+<p>For dimension reduction and clustering analyses, there is a multitude of existing research on batch correction methodology <span class="citation" data-cites="luecken2019current">(Luecken and Theis 2019)</span>. The Harmony method <span class="citation" data-cites="harmony">(Korsunsky et al. 2019)</span> has been recommended as a best-in-class approach in several studies which benchmarked different batch correction methodology for scRNAseq <span class="citation" data-cites="tran2020benchmark">(Tran et al. 2020)</span> <span class="citation" data-cites="emmanuel2024batch">(Emmanúel Antonsson and Melsted 2024)</span> . Harmony takes as input a low-dimensional cell embedding such as PCA, and projects cells onto a new unsupervised joint embedding that groups cells by biological cell type rather than dataset-specific conditions. This Harmony embedding can be used as an input to downstream dimension reduction and clustering algorithms like UMAP<span class="citation" data-cites="umap">(Ghojogh et al. 2021)</span> and Leiden<span class="citation" data-cites="leiden">(Traag, Waltman, and Van Eck 2019)</span>.</p>
+<p>For some other downstream analyses, batch effects can be explicitly handled or may be less of a concern. In the case of differential expression (DE) analysis, we could account for the technical effects by specifying ‘batch’ as a covariate in our DE models. Supervised or semi-supervised cell typing analyses that are independent of PCA dimension reductions (i.e., InSituType <span class="citation" data-cites="Danaher2022">(Danaher et al. 2022)</span>), may be less affected by batch effects. If we were to observe batch effects in this setting, one useful approach would be to perform the cell typing separately by batch before aggregating the cell type annotations.</p>
+<p>In this post, we demonstrate using Harmony for batch effect correction on two 6k-plex tonsil tissue datasets; one dataset generated with CosMx 1.5, while the other generated with CosMx 2.0. The recent CosMx 2.0 release offers noticeable increases in sensitivity; often obtaining 1.5-2x the transcripts compared to the same sample processed with previous CosMx 1.5 software. In case we want to analyze a v1.5 and v2.0 dataset in the same analysis, we might consider treating this variable as a batch effect.</p>
+</section>
+<section id="initial-look-at-the-data" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Initial Look at the data</h1>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(data.table)</span>
+<span id="cb1-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(ggplot2)</span>
+<span id="cb1-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(ggrepel)</span>
+<span id="cb1-4"></span>
+<span id="cb1-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">options</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">Seurat.object.assay.version =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v3"</span>)  </span>
+<span id="cb1-6"></span>
+<span id="cb1-7"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">#### Make a combined Seurat Object</span></span>
+<span id="cb1-8">sem_v20 <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">readRDS</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"sem_v20.tiss_a.rds"</span>) <span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## tonsil dataset A with CosMx v2.0</span></span>
+<span id="cb1-9">sem_v15 <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">readRDS</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"sem_v15.tiss_b.rds"</span>) <span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## tonsil dataset B with CosMx v1.5</span></span></code></pre></div>
+</div>
+<section id="plot-the-two-batches" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="plot-the-two-batches"><span class="header-section-number">3.1</span> Plot the two batches</h2>
+<p>Let’s take a quick peek at these two tissues, where unsupervised clustering has been performed independently on each:</p>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1">xyplot <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span> (cluster_column, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x_column =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"x_slide_mm"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y_column =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"y_slide_mm"</span>, </span>
+<span id="cb2-2">                   <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">cls =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">clusters =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>, metadata, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">ptsize =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.25</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plotfirst =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>, </span>
+<span id="cb2-3">                   <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alphasize =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>){</span>
+<span id="cb2-4">  pd <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> data.table<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">copy</span>(data.table<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(metadata))</span>
+<span id="cb2-5">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> (<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">is.null</span>(clusters)) </span>
+<span id="cb2-6">    clusters <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">unique</span>(pd[[cluster_column]])</span>
+<span id="cb2-7">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> (<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">is.null</span>(plotfirst)) {</span>
+<span id="cb2-8">    plotfirst <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">intersect</span>(clusters, plotfirst)</span>
+<span id="cb2-9">    notplotfirst <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">setdiff</span>(clusters, plotfirst)</span>
+<span id="cb2-10">    p <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(pd[pd[[cluster_column]] <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%in%</span> plotfirst], </span>
+<span id="cb2-11">                <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(.data[[x_column]], .data[[y_column]], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> .data[[cluster_column]])) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb2-12">      <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> ptsize)</span>
+<span id="cb2-13">    p <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> p <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">data =</span> pd[pd[[cluster_column]] <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%in%</span> </span>
+<span id="cb2-14">                                    notplotfirst], <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(.data[[x_column]], .data[[y_column]], </span>
+<span id="cb2-15">                                                       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> .data[[cluster_column]]), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> ptsize, </span>
+<span id="cb2-16">                        <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> alphasize) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_bw</span>()</span>
+<span id="cb2-17">  }</span>
+<span id="cb2-18">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> {</span>
+<span id="cb2-19">    p <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(pd[pd[[cluster_column]] <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%in%</span> clusters], <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(.data[[x_column]], </span>
+<span id="cb2-20">                                                            .data[[y_column]], <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> .data[[cluster_column]])) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb2-21">      <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> ptsize, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> alphasize) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_bw</span>()</span>
+<span id="cb2-22">  }</span>
+<span id="cb2-23">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> (<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">is.null</span>(cls)) {</span>
+<span id="cb2-24">    cls <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rep</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">unname</span>(pals<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">alphabet</span>()), <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>)</span>
+<span id="cb2-25">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> (<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">any</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">is.na</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">suppressWarnings</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.numeric</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.character</span>(clusters)))))) {</span>
+<span id="cb2-26">      clnames <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sort</span>(clusters)</span>
+<span id="cb2-27">    }</span>
+<span id="cb2-28">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> {</span>
+<span id="cb2-29">      clnames <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sort</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.numeric</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.character</span>(clusters)))</span>
+<span id="cb2-30">    }</span>
+<span id="cb2-31">    cls <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cls[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">length</span>(clusters)]</span>
+<span id="cb2-32">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">names</span>(cls) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> clnames</span>
+<span id="cb2-33">    p <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> p <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_color_manual</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">values =</span> cls, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">guide =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guide_legend</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">override.aes =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>, </span>
+<span id="cb2-34">                                                                                       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)))</span>
+<span id="cb2-35">  }</span>
+<span id="cb2-36">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> {</span>
+<span id="cb2-37">    p <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> p <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_color_manual</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">values =</span> cls, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">guide =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guide_legend</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">override.aes =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>, </span>
+<span id="cb2-38">                                                                                       <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)))</span>
+<span id="cb2-39">  }</span>
+<span id="cb2-40">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">return</span>(p)</span>
+<span id="cb2-41">}</span>
+<span id="cb2-42"></span>
+<span id="cb2-43">xyp <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb2-44">cowplot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">plot_grid</span>(</span>
+<span id="cb2-45">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">xyplot</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"seurat_clusters"</span>,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">metadata =</span>  sem_v20<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">ptsize =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.02</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">coord_fixed</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">" v2.0"</span>)</span>
+<span id="cb2-46">  ,<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">xyplot</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"seurat_clusters"</span>,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">metadata =</span>  sem_v15<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">ptsize =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.02</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">coord_fixed</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v1.5"</span>)</span>
+<span id="cb2-47">  ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">nrow=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb2-48">) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plot.background =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_rect</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'white'</span>,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'white'</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb2-49">  cowplot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">panel_border</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">remove=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>) </span></code></pre></div>
+</details>
+</div>
+<div class="wider-image">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/figures/xyplot_v15_v20.png" alt="Wide Image"></p>
+</div>
+</section>
+<section id="differences-in-sensitivity-between-batches" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="differences-in-sensitivity-between-batches"><span class="header-section-number">3.2</span> Differences in sensitivity between batches</h2>
+<p>Here, we can compute a few high-level summary stats like transcripts per cell and signal to noise ratio (SNR) for each batch.</p>
+<p>We see ~2x increase in transcripts per cell with the v2.0 dataset, and higher signal to noise ratio (snr).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## Comparing counts/cell</span></span>
+<span id="cb3-2"></span>
+<span id="cb3-3">cts_cell_1<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.5</span> <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colSums</span>(sem_v15[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"RNA"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>counts))</span>
+<span id="cb3-4">cts_cell_2<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.0</span> <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colSums</span>(sem_v20[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"RNA"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>counts))</span>
+<span id="cb3-5"></span>
+<span id="cb3-6"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## Comparing SNR</span></span>
+<span id="cb3-7">snr_1<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.5</span> <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colMeans</span>(sem_v15[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"RNA"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>counts)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colMeans</span>(sem_v15[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"negprobes"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>counts)) </span>
+<span id="cb3-8">snr_2<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.0</span> <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colMeans</span>(sem_v20[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"RNA"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>counts)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colMeans</span>(sem_v20[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"negprobes"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>counts))</span>
+<span id="cb3-9"></span>
+<span id="cb3-10">summary_stats <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb3-11"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">transcripts_per_cell =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(cts_cell_1<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.5</span>, cts_cell_2<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.0</span>)</span>
+<span id="cb3-12">           ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">snr =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(snr_1<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.5</span>, snr_2<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">.0</span>)</span>
+<span id="cb3-13">           ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">version =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v1.5"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v2.0"</span>))[]</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">print</span>(summary_stats[])</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   transcripts_per_cell      snr version
+                  &lt;num&gt;    &lt;num&gt;  &lt;char&gt;
+1:             448.3808 3.770205    v1.5
+2:            1026.5255 6.043639    v2.0</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="combining-the-data" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Combining the data</h1>
+<p>Here we’ll combine the two datasets and prepare to harmonize them.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">### Get overlapping genes (all the genes in this case) to combine the two datasets</span></span>
+<span id="cb6-2">overlapping_genes <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">intersect</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(sem_v20), <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(sem_v15))</span>
+<span id="cb6-3">combined_metadata <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> data.table<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rbindlist</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(</span>
+<span id="cb6-4">  sem_v20<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data</span>
+<span id="cb6-5">  ,sem_v15<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data</span>
+<span id="cb6-6">  )</span>
+<span id="cb6-7">  ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">use.names=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>)</span>
+<span id="cb6-8">combined_metadata[cell_ID <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%in%</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(sem_v15),batchid<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="er" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v1.5"</span>]</span>
+<span id="cb6-9">combined_metadata[cell_ID <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%in%</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(sem_v20),batchid<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="er" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v2.0"</span>]</span>
+<span id="cb6-10"></span>
+<span id="cb6-11"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">### Create a combined seurat object</span></span>
+<span id="cb6-12">sem_comb <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb6-13">Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">CreateSeuratObject</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">counts =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">cbind</span>(sem_v20[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"RNA"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>counts[overlapping_genes,]</span>
+<span id="cb6-14">                                          ,sem_v15[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"RNA"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>counts[overlapping_genes,])</span>
+<span id="cb6-15">                           ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">meta.data =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.frame</span>(combined_metadata</span>
+<span id="cb6-16">                                                   ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">row.names =</span> combined_metadata<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>cell_ID)</span>
+<span id="cb6-17">                           )</span>
+<span id="cb6-18"></span>
+<span id="cb6-19"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">### offset the x-coordinate of v1.5 to </span></span>
+<span id="cb6-20"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">### more easily plot both tissues side-by-side</span></span>
+<span id="cb6-21">x_offset <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">max</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>x_slide_mm[sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>batchid<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v2.0"</span>]) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb6-22">sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>x_slide_mm[sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>batchid<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v1.5"</span>] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span>  sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>x_slide_mm[sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>batchid<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v1.5"</span>]  <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> x_offset</span></code></pre></div>
+</div>
+</section>
+<section id="tldr" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Harmony Analysis</h1>
+<p>With our combined dataset containing all batches, we’ll perform a few standard tertiary analysis steps using the <code>Seurat</code> package. After principal component analysis, we will pass the PC embeddings to Harmony for batch correction.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">### Normalize, Scale, and Run PCA on the combined dataset </span></span>
+<span id="cb7-2"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">#### (standard data analysis steps so far)</span></span>
+<span id="cb7-3">sem_comb <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">FindVariableFeatures</span>(sem_comb)</span>
+<span id="cb7-4">normed <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">LogNormalize</span>(sem_comb[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"RNA"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>counts</span>
+<span id="cb7-5">                                 ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">scale.factor =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mean</span>(Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colSums</span>(sem_comb[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"RNA"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>counts))</span>
+<span id="cb7-6">                                 )</span>
+<span id="cb7-7">sem_comb <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">SetAssayData</span>(sem_comb, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">layer=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"data"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">new.data =</span> normed)</span>
+<span id="cb7-8">sem_comb <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ScaleData</span>(sem_comb)</span>
+<span id="cb7-9">sem_comb <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">RunPCA</span>(sem_comb)</span></code></pre></div>
+</div>
+<p>Now we run harmony with our PCA embeddings, specifying <code>"batchid"</code> as our variable to adjust for (our indicator for v1.5 and v2.0).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1">harmony_embeddings <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> harmony<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">RunHarmony</span>(sem_comb[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"pca"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>cell.embeddings</span>
+<span id="cb8-2">                                          ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">meta_data =</span> sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data</span>
+<span id="cb8-3">                                          ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">vars_use =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"batchid"</span></span>
+<span id="cb8-4">                                          )</span></code></pre></div>
+</div>
+<p>The <code>harmony_embeddings</code> returned are a <code>cells</code> <img src="https://latex.codecogs.com/png.latex?%5Ctimes"> <code># of pc's</code> dimension matrix, with the same structure as the PCA embeddings.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str</span>(harmony_embeddings)</span>
+<span id="cb9-2">harmony_embeddings[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>]</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code> num [1:405690, 1:50] -0.6465 2.4765 -0.8616 -0.0705 1.3351 ...
+ - attr(*, "dimnames")=List of 2
+  ..$ : chr [1:405690] "c_1_204_1008" "c_1_204_1026" "c_1_204_1032" "c_1_204_1037" ...
+  ..$ : chr [1:50] "PC_1" "PC_2" "PC_3" "PC_4" ...</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                    PC_1       PC_2       PC_3       PC_4       PC_5
+c_1_204_1008 -0.64646187 -0.2827039 -2.8347802  1.6610461  2.2474144
+c_1_204_1026  2.47653185  0.5783416 -0.4183124  0.9130872 -1.6640251
+c_1_204_1032 -0.86158008 -3.1340938 -7.1958762 -3.2585168  1.8184731
+c_1_204_1037 -0.07046239  0.8755237 -1.8787555  0.8000141  2.5718387
+c_1_204_1046  1.33506948  1.1483278 -1.8171200  1.0649917  3.6876637
+c_1_204_1051  2.10865793  1.8783302 -0.9869917  1.3061003  5.2610306
+c_1_204_1068 -0.12255521 -1.0006297 -3.8287685  0.2517314  2.7422425
+c_1_204_1099 -0.09401621 -0.3220125  0.3505044 -0.5086164  4.4133441
+c_1_204_1100  1.21582681  1.8189899  0.1252721 -0.4560591  4.1331302
+c_1_204_1110  2.92880860  1.4376377 -1.6135393  2.6411662 -0.4019986</code></pre>
+</div>
+</div>
+<p>Here are what the original PCA embeddings look like for comparison:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str</span>(sem_comb[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"pca"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>cell.embeddings)</span>
+<span id="cb12-2">sem_comb[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"pca"</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>cell.embeddings[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>]</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code> num [1:405690, 1:50] -1.117 1.994 -1.456 -0.476 0.869 ...
+ - attr(*, "dimnames")=List of 2
+  ..$ : chr [1:405690] "c_1_204_1008" "c_1_204_1026" "c_1_204_1032" "c_1_204_1037" ...
+  ..$ : chr [1:50] "PC_1" "PC_2" "PC_3" "PC_4" ...</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                   PC_1       PC_2       PC_3       PC_4       PC_5
+c_1_204_1008 -1.1173966 -0.6867905 -2.8949895  1.6105015  2.9180760
+c_1_204_1026  1.9937914  0.2274147 -0.3855459  0.8213885 -1.0934278
+c_1_204_1032 -1.4558828 -3.6307548 -7.3110656 -3.5378910  2.5581377
+c_1_204_1037 -0.4759800  0.5822518 -1.8031810  0.6380289  3.0891367
+c_1_204_1046  0.8686478  0.7673256 -1.8542354  0.9790450  4.3717053
+c_1_204_1051  1.7701286  1.6232100 -0.9709824  1.1699966  6.0201625
+c_1_204_1068 -0.6146554 -1.4230712 -3.9015371  0.1792131  3.4066027
+c_1_204_1099 -0.5735693 -0.6600411  0.3747940 -0.6467651  4.9810832
+c_1_204_1100  0.8734515  1.5610131  0.1432252 -0.5936082  4.8778765
+c_1_204_1110  2.4355067  1.0686404 -1.6010894  2.5582519  0.1892688</code></pre>
+</div>
+</div>
+</section>
+<section id="umap-and-clustering-with-harmony" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> UMAP and clustering with harmony</h1>
+<p>Let’s continue the analysis. We’ll use the Harmony embeddings rather than PCA embeddings to generate a UMAP and perform unsupervised clustering on the combined dataset.</p>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## (minor side-note), this helper function `make_umap` calls the same package </span></span>
+<span id="cb15-2"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## and function as Seurat::RunUMAP, but also returns the </span></span>
+<span id="cb15-3"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## 'nearest-neighbor graph' used in the UMAP algorithm.</span></span>
+<span id="cb15-4"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## Using the same nearest neighbor graph for clustering and UMAP, </span></span>
+<span id="cb15-5"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## can give better concordance between UMAP and unsupervised clusters.</span></span>
+<span id="cb15-6"></span>
+<span id="cb15-7">make_umap <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">function</span>(pcaobj, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">min_dist=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.01</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">n_neighbors=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">30</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">metric=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cosine"</span>,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">key =</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"UMAP_"</span> ){</span>
+<span id="cb15-8">  ump <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb15-9">    uwot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">umap</span>(pcaobj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>reduction.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>cell.embeddings</span>
+<span id="cb15-10">               ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">n_neighbors =</span> n_neighbors</span>
+<span id="cb15-11">               ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">nn_method =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"annoy"</span></span>
+<span id="cb15-12">               ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">metric =</span> metric</span>
+<span id="cb15-13">               ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">min_dist =</span> min_dist</span>
+<span id="cb15-14">               ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">ret_extra =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"fgraph"</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"nn"</span>)</span>
+<span id="cb15-15">               ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">verbose =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>)</span>
+<span id="cb15-16">  </span>
+<span id="cb15-17">  umpgraph <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> ump<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>fgraph</span>
+<span id="cb15-18">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">dimnames</span>(umpgraph) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(ump<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>nn[[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>idx), <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(ump<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>nn[[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>idx))</span>
+<span id="cb15-19">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">colnames</span>(ump<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>embedding) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">paste0</span>(key, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)) </span>
+<span id="cb15-20">  ump <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">CreateDimReducObject</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">embeddings =</span> ump<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>embedding, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">key =</span> key)</span>
+<span id="cb15-21">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">return</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">grph =</span> umpgraph</span>
+<span id="cb15-22">              ,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">ump =</span> ump))</span>
+<span id="cb15-23">}</span></code></pre></div>
+</details>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">##### Run helper function to make a umap and return the </span></span>
+<span id="cb16-2"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">##### nearest-neighbors graph used for unsupervised clustering.</span></span>
+<span id="cb16-3">umapharmony <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">make_umap</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">pcaobj =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(</span>
+<span id="cb16-4">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">reduction.data =</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">CreateDimReducObject</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">embeddings =</span> harmony_embeddings)</span>
+<span id="cb16-5">  ))</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1">sem_comb[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"umapharmony"</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> umapharmony<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>ump</span>
+<span id="cb17-2">sem_comb[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"umapharmonygrph"</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.Graph</span>(umapharmony<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>grph)</span>
+<span id="cb17-3">sem_comb <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">FindClusters</span>(sem_comb, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">graph.name =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"umapharmonygrph"</span>)</span>
+<span id="cb17-4">sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>clusters_unsup_harmony <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>seurat_clusters</span></code></pre></div>
+</div>
+<p>Here’s another look at the tissues, with clustering results generated downstream of the Harmony embeddings.</p>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1">xyp_harmony <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb18-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">xyplot</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"clusters_unsup_harmony"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">metadata =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data),<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">ptsize =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.02</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb18-3">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">coord_fixed</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"After integration: v2.0 (left) and v1.5 (right)"</span>)</span>
+<span id="cb18-4"></span>
+<span id="cb18-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">print</span>(xyp_harmony)</span></code></pre></div>
+</details>
+</div>
+<div class="wider-image">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/figures/xyplotharmony_v15_v20.png" alt="Wide Image"></p>
+</div>
+</section>
+<section id="umap-and-clustering-without-harmony" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> UMAP and clustering without harmony</h1>
+<p>Here we can re-make the UMAP and cluster without batch correction for sake of comparison.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">##### Run helper function to make a umap and return the nearest-neighbors graph.</span></span>
+<span id="cb19-2">pcaobj <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> sem_comb[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"pca"</span>]]</span>
+<span id="cb19-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">class</span>(pcaobj)</span>
+<span id="cb19-4">umapobj <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">make_umap</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">reduction.data =</span> pcaobj))</span></code></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1">sem_comb[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"umap"</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> umapobj<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>ump</span>
+<span id="cb20-2">sem_comb[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"umapgrph"</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.Graph</span>(umapobj[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"grph"</span>]])</span>
+<span id="cb20-3"></span>
+<span id="cb20-4"><span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">### Unsupervised clustering</span></span>
+<span id="cb20-5">sem_comb <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Seurat<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">FindClusters</span>(sem_comb, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">graph.name =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"umapgrph"</span>)</span>
+<span id="cb20-6">sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>clusters_unsup_unintegrated <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>seurat_clusters</span></code></pre></div>
+</div>
+</section>
+<section id="pcplotbatch" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Comparison with and without integration</h1>
+<p>Plotting the first two PC’s, colored by <code>batchid</code>, it looks like the v1.5 data may span a more similar domain of PC1 and PC2 space after Harmony, indicating better integration.</p>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">set.seed</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">123</span>)</span>
+<span id="cb21-2">shuffle_order <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sample</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">nrow</span>(harmony_embeddings)) <span class="do" style="color: #5E5E5E;
+background-color: null;
+font-style: italic;">## shuffle cell order for plotting</span></span>
+<span id="cb21-3">cls <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#1f77b4"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#ff7f0e"</span>)</span>
+<span id="cb21-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">names</span>(cls) <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v2.0"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v1.5"</span>)</span>
+<span id="cb21-5"></span>
+<span id="cb21-6"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">all.equal</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rownames</span>(harmony_embeddings), sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>cell_ID)</span>
+<span id="cb21-7">pc1vs2_harmony <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb21-8"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">cbind</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data)[,.(cell_ID, batchid, x_slide_mm, y_slide_mm)]</span>
+<span id="cb21-9">      ,<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(harmony_embeddings))</span>
+<span id="cb21-10"></span>
+<span id="cb21-11">harmony_plt <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb21-12"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(pc1vs2_harmony[shuffle_order], <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> PC_1, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> PC_2, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span>batchid)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">shape=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb21-13">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_color_manual</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">values =</span> cls) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb21-14">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_bw</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb21-15">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">coord_fixed</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb21-16">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guides</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guide_legend</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">override.aes=</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)))</span>
+<span id="cb21-17"></span>
+<span id="cb21-18">pc1vs2_regular <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb21-19"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">cbind</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data)[,.(cell_ID, batchid, x_slide_mm, y_slide_mm)]</span>
+<span id="cb21-20">      ,<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>reductions<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>pca<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>cell.embeddings))</span>
+<span id="cb21-21"></span>
+<span id="cb21-22">regular_pca_plt <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb21-23"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(pc1vs2_regular[shuffle_order], <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> PC_1, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> PC_2, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span>batchid)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">shape=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb21-24">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_color_manual</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">values =</span> cls) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb21-25">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_bw</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb21-26">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">coord_fixed</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb21-27">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guides</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guide_legend</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">override.aes=</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)))</span>
+<span id="cb21-28"></span>
+<span id="cb21-29">pc_comparison_plt <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb21-30">cowplot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">plot_grid</span>(harmony_plt <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"integrated using harmony"</span>)</span>
+<span id="cb21-31">                   ,regular_pca_plt <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"un-integrated"</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb21-32">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plot.background =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_rect</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'white'</span>,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'white'</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb21-33">  cowplot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">panel_border</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">remove=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>) </span>
+<span id="cb21-34"></span>
+<span id="cb21-35"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">print</span>(pc_comparison_plt)</span></code></pre></div>
+</details>
+</div>
+<div class="wider-image">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/figures/pc_comparison_plot.png" alt="Wide Image"></p>
+</div>
+<p>Plotting the UMAP, colored by <code>batchid</code>, there doesn’t appear to be an enourmous difference (which is not a bad thing), but it does look like there may be areas of the UMAP better covered by both datasets (less batch-specific) after Harmony integration.</p>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1">umap_harmony <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb22-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">cbind</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data)[,.(cell_ID, batchid, x_slide_mm, y_slide_mm)]</span>
+<span id="cb22-3">      ,<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>reductions<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>umapharmony<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>cell.embeddings))</span>
+<span id="cb22-4"></span>
+<span id="cb22-5">harmony_plt <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb22-6"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(umap_harmony[shuffle_order], <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> UMAP_1, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> UMAP_2, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span>batchid)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">shape=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb22-7">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_color_manual</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">values =</span> cls) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb22-8">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_bw</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb22-9">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">coord_fixed</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb22-10">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guides</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guide_legend</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">override.aes=</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)))</span>
+<span id="cb22-11"></span>
+<span id="cb22-12">umap_regular <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb22-13"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">cbind</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data)[,.(cell_ID, batchid, x_slide_mm, y_slide_mm)]</span>
+<span id="cb22-14">      ,<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>reductions<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>umap<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>cell.embeddings))</span>
+<span id="cb22-15"></span>
+<span id="cb22-16">regular_umap_plt <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb22-17"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(umap_regular[shuffle_order], <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> umap_1, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> umap_2, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span>batchid)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">shape=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb22-18">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_color_manual</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">values =</span> cls) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb22-19">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_bw</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb22-20">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">coord_fixed</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb22-21">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guides</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guide_legend</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">override.aes=</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)))</span>
+<span id="cb22-22"></span>
+<span id="cb22-23">umap_comparison_plt <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb22-24">cowplot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">plot_grid</span>(harmony_plt <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"integrated using harmony"</span>)</span>
+<span id="cb22-25">                   ,regular_umap_plt <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"un-integrated"</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb22-26">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plot.background =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_rect</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'white'</span>,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'white'</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb22-27">  cowplot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">panel_border</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">remove=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>) </span>
+<span id="cb22-28"></span>
+<span id="cb22-29"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">print</span>(umap_comparison_plt)</span></code></pre></div>
+</details>
+</div>
+<div class="wider-image">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/figures/umap_comparison_plot.png" alt="Wide Image"></p>
+</div>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1">umap_harmony_clusters <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb23-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">cbind</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data)[,.(cell_ID, clusters_unsup_harmony, x_slide_mm, y_slide_mm)]</span>
+<span id="cb23-3">      ,<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>reductions<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>umapharmony<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>cell.embeddings))</span>
+<span id="cb23-4"></span>
+<span id="cb23-5">harmony_plt_clusters <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb23-6"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(umap_harmony_clusters, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> UMAP_1, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> UMAP_2, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span>clusters_unsup_harmony)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">shape=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb23-7">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_color_manual</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">values=</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">unname</span>(pals<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">alphabet</span>())) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb23-8">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_bw</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb23-9">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">coord_fixed</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb23-10">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guides</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guide_legend</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">override.aes=</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)))</span>
+<span id="cb23-11"></span>
+<span id="cb23-12">umap_regular_clusters <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb23-13"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">cbind</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>meta.data)[,.(cell_ID, clusters_unsup_unintegrated, x_slide_mm, y_slide_mm)]</span>
+<span id="cb23-14">      ,<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">data.table</span>(sem_comb<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>reductions<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>umap<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">@</span>cell.embeddings))</span>
+<span id="cb23-15"></span>
+<span id="cb23-16">regular_umap_plt_clusters <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb23-17"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(umap_regular_clusters, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> umap_1, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> umap_2, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span>clusters_unsup_unintegrated)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">shape=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb23-18">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_color_manual</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">values=</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">unname</span>(pals<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">alphabet</span>())) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb23-19">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_bw</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb23-20">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">coord_fixed</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb23-21">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guides</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guide_legend</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">override.aes=</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)))</span>
+<span id="cb23-22"></span>
+<span id="cb23-23">umap_comparison_plt_clusters <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> </span>
+<span id="cb23-24">cowplot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">plot_grid</span>(harmony_plt_clusters <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"integrated using harmony"</span>)</span>
+<span id="cb23-25">                   ,regular_umap_plt_clusters <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"un-integrated"</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb23-26">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plot.background =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_rect</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'white'</span>,<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">color=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'white'</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> </span>
+<span id="cb23-27">  cowplot<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">panel_border</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">remove=</span><span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>) </span>
+<span id="cb23-28"></span>
+<span id="cb23-29"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">print</span>(umap_comparison_plt_clusters)</span></code></pre></div>
+</details>
+</div>
+<div class="wider-image">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/figures/umap_comparison_plot_clusters.png" alt="Wide Image"></p>
+</div>
+</section>
+<section id="conclusion" class="level1" data-number="9">
+<h1 data-number="9"><span class="header-section-number">9</span> Conclusion</h1>
+<p>In this post we demonstrated applying the batch effect correction technique ‘Harmony’ to two 6K-plex tonsil tissue datasets generated with very different sensitivity performance. In general, the impact of batch effects may depend on the severity of the technical artifact, as well as the scope and depth of the analysis. In the event that one wishes to analyze multiple samples together which were generated under different technical conditions, we recommend plotting the technical batch variable in UMAP or PC space as a qualitative diagnostic, and inspecting whether cells are clustered by ‘batch’. For this example, the batch effect between our two datasets was visually noticeable when plotted on a UMAP and the first two principal components. Cells were visually less segregated by batch after the correction was applied.</p>
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-Danaher2022" class="csl-entry">
+Danaher, Patrick, Edward Zhao, Zhi Yang, David Ross, Mark Gregory, Zach Reitz, Tae K. Kim, et al. 2022. <span>“Insitutype: Likelihood-Based Cell Typing for Single Cell Spatial Transcriptomics.”</span> <em>bioRxiv</em>. <a href="https://doi.org/10.1101/2022.10.19.512902">https://doi.org/10.1101/2022.10.19.512902</a>.
+</div>
+<div id="ref-emmanuel2024batch" class="csl-entry">
+Emmanúel Antonsson, Sindri, and Páll Melsted. 2024. <span>“Batch Correction Methods Used in Single Cell RNA-Sequencing Analyses Are Often Poorly Calibrated.”</span> <em>bioRxiv</em>, 2024–03.
+</div>
+<div id="ref-umap" class="csl-entry">
+Ghojogh, Benyamin, Ali Ghodsi, Fakhri Karray, and Mark Crowley. 2021. <span>“Uniform Manifold Approximation and Projection (UMAP) and Its Variants: Tutorial and Survey.”</span> <em>arXiv Preprint arXiv:2109.02508</em>.
+</div>
+<div id="ref-harmony" class="csl-entry">
+Korsunsky, Ilya, Nghia Millard, Jean Fan, Kamil Slowikowski, Fan Zhang, Kevin Wei, Yuriy Baglaenko, Michael Brenner, Po-ru Loh, and Soumya Raychaudhuri. 2019. <span>“Fast, Sensitive and Accurate Integration of Single-Cell Data with Harmony.”</span> <em>Nature Methods</em> 16 (12): 1289–96.
+</div>
+<div id="ref-luecken2019current" class="csl-entry">
+Luecken, Malte D, and Fabian J Theis. 2019. <span>“Current Best Practices in Single-Cell RNA-Seq Analysis: A Tutorial.”</span> <em>Molecular Systems Biology</em> 15 (6): e8746.
+</div>
+<div id="ref-leiden" class="csl-entry">
+Traag, Vincent A, Ludo Waltman, and Nees Jan Van Eck. 2019. <span>“From Louvain to Leiden: Guaranteeing Well-Connected Communities.”</span> <em>Scientific Reports</em> 9 (1): 1–12.
+</div>
+<div id="ref-tran2020benchmark" class="csl-entry">
+Tran, Hoa Thi Nhu, Kok Siong Ang, Marion Chevrier, Xiaomeng Zhang, Nicole Yee Shin Lee, Michelle Goh, and Jinmiao Chen. 2020. <span>“A Benchmark of Batch-Effect Correction Methods for Single-Cell RNA Sequencing Data.”</span> <em>Genome Biology</em> 21: 1–32.
+</div>
+</div></section></div> ]]></description>
+  <category>batch correction</category>
+  <category>data integration</category>
+  <category>CosMx 2.0</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/</guid>
+  <pubDate>Thu, 10 Jul 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/figures/thumbnail.png" medium="image" type="image/png" height="72" width="144"/>
+</item>
 <item>
   <title>Guide to comparing data from different CosMx® panels</title>
   <dc:creator>Patrick Danaher</dc:creator>
@@ -9016,1130 +11120,6 @@ font-style: inherit;">head</span>(ref)</span></code></pre></div>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/</guid>
   <pubDate>Thu, 18 Jul 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/figures/insitucor-tile.png" medium="image" type="image/png" height="148" width="144"/>
-</item>
-<item>
-  <title>Using Squidpy with AtoMx® SIP exports</title>
-  <dc:creator>Evelyn Metzger</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/squidpy-essentials.html</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="introduction" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
-<p>Elucidating the spatial distribution of RNA transcripts and protein is one of the fundamental utilities of the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/single-cell-imaging-overview/" target="_blank">CosMx<sup>®</sup></a> Spatial Molecular Imager (SMI). When it comes to analysis, the <a href="https://nanostring.com/products/atomx-spatial-informatics-platform/atomx-sip-overview/" target="blank">AtoMx<sup>®</sup></a> Spatial Informatics Portal (SIP) is an end-to-end solution that has several advantages including built-in analysis modules, data storage, and the ability to analyze from a browser window. For fully custom analyses, the SIP also has the ability to export the data.</p>
-<p>There are a growing number of open-sourced analysis solutions that can analyze and visualize SMI data. For example, <a href="https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html" target="_blank">Giotto</a> <span class="citation" data-cites="Dries2021">(Dries et al. 2021)</span> has been available for a few years, uses a range of algorithms, and has ways to visualize tissue images built in. More recently, Seurat <span class="citation" data-cites="Hao2024">(Hao et al. 2024)</span>, another R package (and another artist!), has added image viewing capabilities into its workflow. For vignettes on how to analyze and visualize SMI data with Seurat, check out <a href="../../posts/seurat-cosmx-basics/index.html" target="_blank">our recent blog post</a> or the vignette from <a href="https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2#human-lung-nanostring-cosmx-spatial-molecular-imager" target="_blank">Seurat’s website</a>.</p>
-<p>For python users, I find <a href="https://squidpy.readthedocs.io/en/stable/" target="_blank">squidpy</a> <span class="citation" data-cites="Palla2022">(Palla et al. 2022)</span> works well, is feature-rich, and is speedy. Part of this efficiency is thanks to the <a href="https://anndata.readthedocs.io/en/stable/" target="_blank">anndata</a> package. For more info on creating anndata objects with SMI data, see <a href="../../posts/h5ad_conversion/index.html">this post</a>. Squidpy also has a built-in function to read in SMI data, <a href="https://squidpy.readthedocs.io/en/stable/api/squidpy.read.nanostring.html" target="_blank"><code>read.nanostring</code></a>, that reads in the counts data, metadata, and optionally the field of view (FOV) file and image data. The developers also have a <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data" target="_blank">vignette</a> that uses a slide from the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/" target="_blank">first public data release</a> of SMI data <span class="citation" data-cites="He2022">(He et al. 2022)</span>. Note that the example dataset in that vignette uses a legacy file format that differs slightly compared to AtoMx SIP. For more information on the differences, see <a href="../../posts/flat-file-exports/flat-files-compare.html">this post</a>.</p>
-<p>In this blog post, I’ll show you how to:</p>
-<ul>
-<li>Section&nbsp;2 export the squidpy-relevant files from AtoMx SIP</li>
-<li>Section&nbsp;3 (and Appendix Section&nbsp;7.1) tips for installing squidpy</li>
-<li>Section&nbsp;4 analysis examples without spatial images</li>
-<li>Section&nbsp;5 how to pivot your AtoMx SIP-exported data into a format that can be used with squidpy and image-based analysis examples</li>
-</ul>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>In this blog post I provide some analysis examples but this is not intended to provide recommendations of parameters, clustering approaches, <em>etc</em>. I have not tested my example dataset on all of the squidpy functions so there may be errors.</p>
-<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
-</div>
-</div>
-</section>
-<section id="sec-export" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Exporting data from AtoMx<sup>®</sup> SIP</h1>
-<p>For this post I will be analyzing a single breast cancer slide that has about 80,000 cells, 64 FOVs, and with the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/cosmx-rna-assays/human-6k-discovery-panel/">6K Discovery Panel</a>. I’m using the CosMx Data Analysis v1.3.2 software in AtoMx SIP. To take full advantage of squidpy’s functionality, I’ll need to partially export 1) “flat files” and 2) raw data (Figure&nbsp;1).</p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>We call them “flat files” since they are in a human-readable and accessible format (<em>i.e.</em>, comma separated files). These files, like Seurat files and Tiledb files, aren’t actually raw data but rather processed from the raw data. Versions of flat files may change with time and over the course of an analysis (<em>e.g.</em>, cell type column added to the metadata file as highlighted in <a href="../../posts/flat-file-exports/flat-files-compare.html">this post</a>).</p>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-export" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-export-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-export1.png" class="img-fluid figure-img" width="1320">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Selected flat files and raw data for exporting.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>Squidpy uses three of the five flat files:</p>
-<p>The two required input files for squidpy are:</p>
-<ul>
-<li>counts_file - cell (row) by target (column) expression matrix</li>
-<li>meta_file - cell-level metadata file</li>
-</ul>
-<p>And an optional input file is:</p>
-<ul>
-<li>fov_file - containing coordinates of all FOVs.</li>
-</ul>
-<p>Once export is complete, download the data using your SFTP application (<em>e.g.</em>, cyberduck, FileZilla, WinSCP).</p>
-<p>Figure&nbsp;2 shows a screenshot of the data structure in Cyberduck. The flat files are nested within a folder named after the flow cell (<em>e.g.</em>, <code>AUG29_13INTEGR_6k_BRST_PS_S2</code>) and are compressed in <code>gz</code> format. The raw data are in a separate folder and nested within a folder named after the flow cell and another folder named after the slide (<em>e.g.</em>, <code>20230829_212648_S2</code>). Of the subfolders of the raw data, the data that we’ll need for today are in <code>CellStatsDir</code>.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-export2" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-export2.png" class="img-fluid figure-img" width="446">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Folder structure following AtoMx SIP export.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="sec-install" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Install Squidpy</h1>
-<p>Assuming you have Python3 installed on your system, squidpy can be installed using <code>pip3</code> like this:</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb1-1">pip3 install squidpy</span></code></pre></div>
-</div>
-</div>
-<p>For installing within a virtual environment (recommended), see the Appendix (Section&nbsp;7.1).</p>
-</section>
-<section id="sec-noimage" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> Analysis without imaging data</h1>
-<p>In the simplest form, we can use squidpy without imaging data by reading the expression data, metadata, and optionally the FOV positions data. These analyses include normalization, PCA, umap, <em>etc.</em> I’ll provide some code here but for more details please see the squidpy <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data" target="_blank">vignette</a>.</p>
-<section id="reading-expression-and-metadata-only" class="level2" data-number="4.1">
-<h2 data-number="4.1" class="anchored" data-anchor-id="reading-expression-and-metadata-only"><span class="header-section-number">4.1</span> Reading expression and metadata only</h2>
-<p>Create an anndata object like this:</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-from pathlib import Path
-import os
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import scanpy as sc
-import squidpy as sq
-
-flat_file_dir = 'path/to/breast_cancer_example/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2'
-meta_file = [item for item in os.listdir(flat_file_dir) if 'metadata_file' in item][0]
-counts_file = [item for item in os.listdir(flat_file_dir) if 'exprMat_file' in item][0]
-
-adata0 = sq.read.nanostring(
-    path=flat_file_dir,
-    counts_file=counts_file,
-    meta_file=meta_file
-)
-adata0</code></pre>
-</div>
-<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
-    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
-    uns: 'spatial'
-    obsm: 'spatial', 'spatial_fov'</code></pre>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>The column names that you have may differ from the ones above. That’s because the example dataset has been processed in AtoMx SIP which created additional columns (<em>e.g.</em>, RNA_nbclust_[GUID]_1_clusters). For more information on the expected columns from flat file exports, see the <a href="../../posts/flat-file-exports/flat-files-compare.html#sec-meta">metadata column descriptions</a>.</p>
-</div>
-</div>
-</section>
-<section id="including-the-fov-file" class="level2" data-number="4.2">
-<h2 data-number="4.2" class="anchored" data-anchor-id="including-the-fov-file"><span class="header-section-number">4.2</span> Including the FOV file</h2>
-<p>If we try to read in the optional FOV file generated in AtoMx SIP using squidpy v1.5.0, we might get an error stating “Index fov invalid”.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
-
-adata = sq.read.nanostring(
-    path=flat_file_dir,
-    counts_file=counts_file,
-    meta_file=meta_file,
-    fov_file=fov_file
-)
-</code></pre>
-</div>
-<div class="cell">
-<details class="code-fold">
-<summary>Click to show error</summary>
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb5-1">---------------------------------------------------------------------------</span>
-<span id="cb5-2">ValueError                                Traceback (most recent call last)</span>
-<span id="cb5-3">Cell In[23], line 3</span>
-<span id="cb5-4">      1 fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]</span>
-<span id="cb5-5">----&gt; 3 adata = sq.read.nanostring(</span>
-<span id="cb5-6">      4     path=flat_file_dir,</span>
-<span id="cb5-7">      5     counts_file=counts_file,</span>
-<span id="cb5-8">      6     meta_file=meta_file,</span>
-<span id="cb5-9">      7     fov_file=fov_file</span>
-<span id="cb5-10">      8 )</span>
-<span id="cb5-11"></span>
-<span id="cb5-12">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/squidpy/read/_read.py:266, in nanostring(path, counts_file, meta_file, fov_file)</span>
-<span id="cb5-13">    263                     continue</span>
-<span id="cb5-14">    265 if fov_file is not None:</span>
-<span id="cb5-15">--&gt; 266     fov_positions = pd.read_csv(path / fov_file, header=0, index_col=fov_key)</span>
-<span id="cb5-16">    267     for fov, row in fov_positions.iterrows():</span>
-<span id="cb5-17">    268         try:</span>
-<span id="cb5-18"></span>
-<span id="cb5-19">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1026, in read_csv(filepath_or_buffer, sep, delimiter, header, names, index_col, usecols, dtype, engine, converters, true_values, false_values, skipinitialspace, skiprows, skipfooter, nrows, na_values, keep_default_na, na_filter, verbose, skip_blank_lines, parse_dates, infer_datetime_format, keep_date_col, date_parser, date_format, dayfirst, cache_dates, iterator, chunksize, compression, thousands, decimal, lineterminator, quotechar, quoting, doublequote, escapechar, comment, encoding, encoding_errors, dialect, on_bad_lines, delim_whitespace, low_memory, memory_map, float_precision, storage_options, dtype_backend)</span>
-<span id="cb5-20">   1013 kwds_defaults = _refine_defaults_read(</span>
-<span id="cb5-21">   1014     dialect,</span>
-<span id="cb5-22">   1015     delimiter,</span>
-<span id="cb5-23">   (...)</span>
-<span id="cb5-24">   1022     dtype_backend=dtype_backend,</span>
-<span id="cb5-25">   1023 )</span>
-<span id="cb5-26">   1024 kwds.update(kwds_defaults)</span>
-<span id="cb5-27">-&gt; 1026 return _read(filepath_or_buffer, kwds)</span>
-<span id="cb5-28"></span>
-<span id="cb5-29">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:626, in _read(filepath_or_buffer, kwds)</span>
-<span id="cb5-30">    623     return parser</span>
-<span id="cb5-31">    625 with parser:</span>
-<span id="cb5-32">--&gt; 626     return parser.read(nrows)</span>
-<span id="cb5-33"></span>
-<span id="cb5-34">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1923, in TextFileReader.read(self, nrows)</span>
-<span id="cb5-35">   1916 nrows = validate_integer("nrows", nrows)</span>
-<span id="cb5-36">   1917 try:</span>
-<span id="cb5-37">   1918     # error: "ParserBase" has no attribute "read"</span>
-<span id="cb5-38">   1919     (</span>
-<span id="cb5-39">   1920         index,</span>
-<span id="cb5-40">   1921         columns,</span>
-<span id="cb5-41">   1922         col_dict,</span>
-<span id="cb5-42">-&gt; 1923     ) = self._engine.read(  # type: ignore[attr-defined]</span>
-<span id="cb5-43">   1924         nrows</span>
-<span id="cb5-44">   1925     )</span>
-<span id="cb5-45">   1926 except Exception:</span>
-<span id="cb5-46">   1927     self.close()</span>
-<span id="cb5-47"></span>
-<span id="cb5-48">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/c_parser_wrapper.py:333, in CParserWrapper.read(self, nrows)</span>
-<span id="cb5-49">    330     data = {k: v for k, (i, v) in zip(names, data_tups)}</span>
-<span id="cb5-50">    332     names, date_data = self._do_date_conversions(names, data)</span>
-<span id="cb5-51">--&gt; 333     index, column_names = self._make_index(date_data, alldata, names)</span>
-<span id="cb5-52">    335 return index, column_names, date_data</span>
-<span id="cb5-53"></span>
-<span id="cb5-54">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:371, in ParserBase._make_index(self, data, alldata, columns, indexnamerow)</span>
-<span id="cb5-55">    368     index = None</span>
-<span id="cb5-56">    370 elif not self._has_complex_date_col:</span>
-<span id="cb5-57">--&gt; 371     simple_index = self._get_simple_index(alldata, columns)</span>
-<span id="cb5-58">    372     index = self._agg_index(simple_index)</span>
-<span id="cb5-59">    373 elif self._has_complex_date_col:</span>
-<span id="cb5-60"></span>
-<span id="cb5-61">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:403, in ParserBase._get_simple_index(self, data, columns)</span>
-<span id="cb5-62">    401 index = []</span>
-<span id="cb5-63">    402 for idx in self.index_col:</span>
-<span id="cb5-64">--&gt; 403     i = ix(idx)</span>
-<span id="cb5-65">    404     to_remove.append(i)</span>
-<span id="cb5-66">    405     index.append(data[i])</span>
-<span id="cb5-67"></span>
-<span id="cb5-68">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:398, in ParserBase._get_simple_index.&lt;locals&gt;.ix(col)</span>
-<span id="cb5-69">    396 if not isinstance(col, str):</span>
-<span id="cb5-70">    397     return col</span>
-<span id="cb5-71">--&gt; 398 raise ValueError(f"Index {col} invalid")</span>
-<span id="cb5-72"></span>
-<span id="cb5-73">ValueError: Index fov invalid</span></code></pre></div>
-</details>
-</div>
-<p>This error arises because of a format change that is detailed in <a href="../../posts/flat-file-exports/flat-files-compare.html#sec-fov-pos">this post</a>. A simple fix is to adjust the column name in the fov file from “FOV” to the legacy “fov” like this:</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
-
-fov_df = pd.read_csv(os.path.join(flat_file_dir, fov_file))
-if 'FOV' in fov_df.columns:
-  print("Refactoring file to older format.")
-  # Rename 'FOV' column to 'fov'
-  fov_df.rename(columns={'FOV': 'fov'}, inplace=True)
-  # have fov_file reference the new, formatted file and write it
-  fov_file = os.path.join(flat_file_dir,'fov_positions_formatted.csv')
-  fov_df.to_csv(fov_file, index=False)
-
-adata1 = sq.read.nanostring(
-    path=flat_file_dir,
-    counts_file=counts_file,
-    meta_file=meta_file,
-    fov_file=fov_file
-)
-</code></pre>
-</div>
-<blockquote class="blockquote">
-<p>Refactoring file to older format.</p>
-</blockquote>
-<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
-    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
-    uns: 'spatial'
-    obsm: 'spatial', 'spatial_fov'</code></pre>
-</section>
-<section id="analysis" class="level2" data-number="4.3">
-<h2 data-number="4.3" class="anchored" data-anchor-id="analysis"><span class="header-section-number">4.3</span> Analysis</h2>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Please note that the code in this section is an example and not a recommendation for specific thresholding, QC filtering, clustering parmaterization, <em>etc.</em> of SMI data.</p>
-</div>
-</div>
-<p>With the expression and metadata loaded, we can run exploratory data analysis similar to what was described in the squidpy vignette. There are some adjustments to squidpy’s vignette that are needed. These adjustments reflect the flat file format changes (<a href="../../posts/flat-file-exports/flat-files-compare.html#sec-fov-pos">detailed here</a>).</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-# Place control targets into separate variables
-adata1.var["Negative"] = adata1.var_names.str.startswith("Negative")
-adata1.var["SystemControl"] = adata1.var_names.str.startswith("SystemControl")
-adata1</code></pre>
-</div>
-<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
-    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
-    var: 'Negative', 'SystemControl'
-    uns: 'spatial'
-    obsm: 'spatial', 'spatial_fov'</code></pre>
-<p>We can calculate QC metrics with scanpy’s <span class="citation" data-cites="Wolf2018">(Wolf, Angerer, and Theis 2018)</span> pre-processing tool <a href="https://scanpy.readthedocs.io/en/latest/generated/scanpy.pp.calculate_qc_metrics.html" target="_blank"><code>calculate_qc_metrics</code> method</a>. In the code below, we are going to add Negatives and SystemControls as the <code>qc_var</code> argument (which will add cell-level columns to <code>obs</code>). In addition, target-level columns are added to <code>var</code>.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>sc.pp.calculate_qc_metrics(adata1, qc_vars=["Negative", "SystemControl"], inplace=True)
-adata1</code></pre>
-</div>
-<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
-    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID', 'n_genes_by_counts', 'log1p_n_genes_by_counts', 'total_counts', 'log1p_total_counts', 'pct_counts_in_top_50_genes', 'pct_counts_in_top_100_genes', 'pct_counts_in_top_200_genes', 'pct_counts_in_top_500_genes', 'total_counts_Negative', 'log1p_total_counts_Negative', 'pct_counts_Negative', 'total_counts_SystemControl', 'log1p_total_counts_SystemControl', 'pct_counts_SystemControl'
-    var: 'Negative', 'SystemControl', 'n_cells_by_counts', 'mean_counts', 'log1p_mean_counts', 'pct_dropout_by_counts', 'total_counts', 'log1p_total_counts'
-    uns: 'spatial'
-    obsm: 'spatial', 'spatial_fov'</code></pre>
-<p>We can explore these cell-level and target-level QC metrics with visuals using the <a href="https://seaborn.pydata.org/" target="_blank"><code>seaborn</code></a> package. For example the code below generates Figure&nbsp;3 and shows how the number of unique genes in a cell correlates with the total number of transcripts in a cell.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sns.jointplot(
-    data=adata1.obs,
-    x="total_counts",
-    y="n_genes_by_counts",
-    kind="scatter",
-    alpha=0.2
-)
-plt.savefig("figures/fig-qc.png", dpi=200)
-</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-qc" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc.png" class="img-fluid figure-img" width="600">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;3: Unique genes by total counts. Each dot represents a cell. Y-axis: the number of genes with postive counts in a cell. X-axis the sum of counts for a cell.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>The total Negative probe counts by total counts is shown below and Figure&nbsp;4.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sns.jointplot(
-    data=adata1.obs,
-    x="total_counts",
-    y="total_counts_Negative",
-    kind="scatter",
-    alpha=0.2
-)
-plt.savefig("figures/fig-qc1.png", dpi=200)
-</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-qc1" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-qc1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc1.png" class="img-fluid figure-img" width="600">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;4: The number of negative counts (Y) relative to the total counts (X) per cell.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>We see that the proportion of negative counts relative to total counts is:</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>adata1.obs["total_counts_Negative"].sum() / adata1.obs["total_counts"].sum()</code></pre>
-</div>
-<blockquote class="blockquote">
-<p>0.00041567286608445926 (i.e., 0.04%)</p>
-</blockquote>
-<p>Histograms of total transcripts, total unique genes per cell, and total transcrips per FOV can be seen in Figure&nbsp;5.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>fig, axs = plt.subplots(1, 3, figsize=(15, 4))
-
-axs[0].set_title("Total transcripts per cell")
-sns.histplot(
-    adata1.obs["total_counts"],
-    kde=False,
-    ax=axs[0],
-)
-
-axs[1].set_title("Unique transcripts per cell")
-sns.histplot(
-    adata1.obs["n_genes_by_counts"],
-    kde=False,
-    ax=axs[1],
-)
-
-axs[2].set_title("Transcripts per FOV")
-sns.histplot(
-    adata1.obs.groupby("fov").sum()["total_counts"],
-    kde=False,
-    ax=axs[2],
-)
-plt.savefig("figures/fig-qc2.png", dpi=200)
-</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-qc2" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-qc2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc2.png" class="img-fluid figure-img" width="1500">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5: Total counts per cell (left), total unique genes per cell (middle) and total transcripts per FOV (right).
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>We can filter, normalize, and cluster with scanpy’s functions. For a full list of available functions, see scanpy’s <a href="https://scanpy.readthedocs.io/en/latest/api/index.html" target="_blank">API documentation</a>.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>adata1.shape</code></pre>
-</div>
-<blockquote class="blockquote">
-<p>(80073, 6524)</p>
-</blockquote>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>sc.pp.filter_cells(adata1, min_counts=250)
-sc.pp.filter_genes(adata1, min_cells=1000)
-adata1.shape</code></pre>
-</div>
-<blockquote class="blockquote">
-<p>(69293, 6177)</p>
-</blockquote>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>adata1.layers["counts"] = adata1.X.copy()
-sc.pp.normalize_total(adata1, inplace=True, exclude_highly_expressed=True)
-sc.pp.log1p(adata1)
-sc.pp.pca(adata1, n_comps=50)
-sc.pp.neighbors(adata1)
-sc.tl.umap(adata1, min_dist=0.2, spread=1)
-sc.tl.leiden(adata1)</code></pre>
-</div>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>adata1.obs["logpMean.PanCK"] = np.log1p(adata1.obs['Mean.PanCK'])
-sc.pl.umap(
-    adata1,
-    color=["logpMean.PanCK","leiden"]
-)</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-umap" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-umap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-umap.png" class="img-fluid figure-img" width="1441">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-umap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;6: UMAP figures with cells colored by natural log Mean PanCK expression (left) and Leiden clusters (right).
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-</section>
-<section id="sec-imageanalysis" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Image and Spatial Analysis</h1>
-<p>Up until this point we haven’t use image data. In this section I’ll show how to prepare a slide exported from AtoMx SIP into squidpy, and touch on some of the image-based analyses that are possible.</p>
-<section id="rearrange-data-files-to-match-squidpys-layout" class="level2" data-number="5.1">
-<h2 data-number="5.1" class="anchored" data-anchor-id="rearrange-data-files-to-match-squidpys-layout"><span class="header-section-number">5.1</span> Rearrange data files to match squidpy’s layout</h2>
-<p>If we take a look one of the NSCLC public datasets from <span class="citation" data-cites="He2022">He et al. (2022)</span> (Lung5_Rep1), we can see the expected file structure has four folders (<code>CellComposite</code>, <code>CellLabels</code>, <code>CellOverlay</code>, and <code>CompartmentLabels</code>) and four flat files.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb20-1">tree -L 3</span>
-<span id="cb20-2"></span>
-<span id="cb20-3">├── Lung5_Rep1-Flat_files_and_images</span>
-<span id="cb20-4">│&nbsp;&nbsp; ├── CellComposite</span>
-<span id="cb20-5">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellComposite_F001.jpg</span>
-<span id="cb20-6">|   |   ...</span>
-<span id="cb20-7">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellComposite_F032.jpg</span>
-<span id="cb20-8">│&nbsp;&nbsp; ├── CellLabels</span>
-<span id="cb20-9">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
-<span id="cb20-10">|   |   ...</span>
-<span id="cb20-11">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellLabels_F032.tif</span>
-<span id="cb20-12">│&nbsp;&nbsp; ├── CellOverlay</span>
-<span id="cb20-13">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellOverlay_F001.jpg</span>
-<span id="cb20-14">|   |   ...</span>
-<span id="cb20-15">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellOverlay_F032.jpg</span>
-<span id="cb20-16">│&nbsp;&nbsp; ├── CompartmentLabels</span>
-<span id="cb20-17">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CompartmentLabels_F001.tif</span>
-<span id="cb20-18">|   |   ...</span>
-<span id="cb20-19">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CompartmentLabels_F032.tif</span>
-<span id="cb20-20">│&nbsp;&nbsp; ├── Lung5_Rep1_exprMat_file.csv</span>
-<span id="cb20-21">│&nbsp;&nbsp; ├── Lung5_Rep1_fov_positions_file.csv</span>
-<span id="cb20-22">│&nbsp;&nbsp; ├── Lung5_Rep1_metadata_file.csv</span>
-<span id="cb20-23">│&nbsp;&nbsp; └── Lung5_Rep1_tx_file.csv</span></code></pre></div>
-</div>
-</div>
-<p>This file structure is actually a subset of the raw data and flat files that are exported from AtoMx SIP.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb21-1">tree -L 3</span>
-<span id="cb21-2"></span>
-<span id="cb21-3">├── RawFiles</span>
-<span id="cb21-4">│&nbsp;&nbsp; └── &lt;flow cell&gt;</span>
-<span id="cb21-5">│&nbsp;&nbsp;     └── &lt;slide&gt;</span>
-<span id="cb21-6">│&nbsp;&nbsp;         ├── AnalysisResults</span>
-<span id="cb21-7">│&nbsp;&nbsp;         │&nbsp;&nbsp; └── muy2ybakqy</span>
-<span id="cb21-8">│&nbsp;&nbsp;         ├── CellStatsDir</span>
-<span id="cb21-9">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── &lt;slide&gt;_C902_P02_To_P01_RegStats.csv</span>
-<span id="cb21-10">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── CellComposite</span>
-<span id="cb21-11">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── CellOverlay</span>
-<span id="cb21-12">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── FOV001</span>
-<span id="cb21-13">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellBoundaries_F001.csv</span>
-<span id="cb21-14">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellBoundaries_F001_935.fz</span>
-<span id="cb21-15">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
-<span id="cb21-16">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CompartmentLabels_F001.tif</span>
-<span id="cb21-17">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── Run_86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Cell_Stats_F001.csv</span>
-<span id="cb21-18">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; └── Run_86906312-688f-4f31-9fc5-48b04db5f958_FOV001__complete_code_cell_target_call_coord.cs</span>
-<span id="cb21-19">│&nbsp;&nbsp;         │&nbsp;&nbsp; ...</span>
-<span id="cb21-20">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── FOV064</span>
-<span id="cb21-21">│&nbsp;&nbsp;         │&nbsp;&nbsp; └── Morphology2D</span>
-<span id="cb21-22">│&nbsp;&nbsp;         └── RunSummary</span>
-<span id="cb21-23">│&nbsp;&nbsp;             ├── 75d021be-b81e-4d7d-ad28-d390a13da7ad.mkit</span>
-<span id="cb21-24">│&nbsp;&nbsp;             ├── Beta15_Affine_Transform_20221118.csv</span>
-<span id="cb21-25">│&nbsp;&nbsp;             ├── Distortion</span>
-<span id="cb21-26">│&nbsp;&nbsp;             ├── FovTracking</span>
-<span id="cb21-27">│&nbsp;&nbsp;             ├── Morphology_ChannelID_Dictionary.txt</span>
-<span id="cb21-28">│&nbsp;&nbsp;             ├── Run86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Beta15_RNA_SpatialBC_Metrics4D.csv</span>
-<span id="cb21-29">│&nbsp;&nbsp;             ├── Run_86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Beta15_ExptConfig.txt</span>
-<span id="cb21-30">│&nbsp;&nbsp;             ├── SampleSlide_PlaneFit_&lt;slide&gt;_History.csv</span>
-<span id="cb21-31">│&nbsp;&nbsp;             ├── Shading</span>
-<span id="cb21-32">│&nbsp;&nbsp;             ├── c902.fovs.csv</span>
-<span id="cb21-33">│&nbsp;&nbsp;             ├── latest.af.fovs.csv</span>
-<span id="cb21-34">│&nbsp;&nbsp;             └── latest.fovs.csv</span>
-<span id="cb21-35">├── flatFiles</span>
-<span id="cb21-36">│&nbsp;&nbsp; └── &lt;flow cell&gt;</span>
-<span id="cb21-37">│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_exprMat_file.csv.gz</span>
-<span id="cb21-38">│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_fov_positions_file.csv.gz</span>
-<span id="cb21-39">│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_metadata_file.csv.gz</span>
-<span id="cb21-40">│&nbsp;&nbsp;     └── fov_positions_formatted.csv</span></code></pre></div>
-</div>
-</div>
-<p>So in order to read in image data into squidpy, we must first rearrange our folders. We can do this manually by moving, copying, or linking files to match the expected format. Normally I am a big fan of symbolic links for just this situation. However, I have noticed that <code>read.nanostring</code> can have an error when using symbolic links for some of the files (error not shown). So for simplicity I will make a copy of the data and place them into a new folder <code>sample_dir_formatted</code>.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb22-1"># Note that this code works for a single slide. If exporting</span>
-<span id="cb22-2"># multiple slides, some modification might be necessary.</span>
-<span id="cb22-3"></span>
-<span id="cb22-4"># cd to parent directory</span>
-<span id="cb22-5"></span>
-<span id="cb22-6"># create a directory adjacent to RawData and flatFiles</span>
-<span id="cb22-7">mkdir -p sample_dir_formatted &amp;&amp; cd $_</span>
-<span id="cb22-8"></span>
-<span id="cb22-9"># Add flat files</span>
-<span id="cb22-10">for file in $(ls ../flatFiles/*/*csv*); do cp $file ./; done</span>
-<span id="cb22-11"></span>
-<span id="cb22-12"># Add folders</span>
-<span id="cb22-13">cp -r ../RawFiles/*/*/CellStatsDir/CellComposite ./</span>
-<span id="cb22-14">cp -r ../RawFiles/*/*/CellStatsDir/CellOverlay ./</span>
-<span id="cb22-15"></span>
-<span id="cb22-16">mkdir -p CellLabels</span>
-<span id="cb22-17">for file in $(ls ../RawFiles/*/*/CellStatsDir/FOV*/CellLabels*); do cp $file ./CellLabels/ ; done</span>
-<span id="cb22-18">rm ./CellLabels/._Cell*</span>
-<span id="cb22-19">  </span>
-<span id="cb22-20">mkdir -p CompartmentLabels</span>
-<span id="cb22-21">for file in $(ls ../RawFiles/*/*/CellStatsDir/FOV*/CompartmentLabels*); do cp $file ./CompartmentLabels/ ; done</span></code></pre></div>
-</div>
-</div>
-<p>The file structure of <code>sample_dir_formatted</code> now looks like this:</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb23-1">tree -L 2</span>
-<span id="cb23-2"></span>
-<span id="cb23-3">.</span>
-<span id="cb23-4">├── &lt;flow cell&gt;_exprMat_file.csv.gz</span>
-<span id="cb23-5">├── &lt;flow cell&gt;_fov_positions_file.csv.gz</span>
-<span id="cb23-6">├── &lt;flow cell&gt;_metadata_file.csv.gz</span>
-<span id="cb23-7">├── CellComposite</span>
-<span id="cb23-8">│&nbsp;&nbsp; ├── CellComposite_F001.jpg</span>
-<span id="cb23-9">|   ├── ...</span>
-<span id="cb23-10">│&nbsp;&nbsp; └── CellComposite_F064.jpg</span>
-<span id="cb23-11">├── CellLabels</span>
-<span id="cb23-12">│&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
-<span id="cb23-13">|   ├── ...</span>
-<span id="cb23-14">│&nbsp;&nbsp; └── CellLabels_F064.tif</span>
-<span id="cb23-15">├── CellOverlay</span>
-<span id="cb23-16">│&nbsp;&nbsp; ├── CellOverlay_F001.jpg</span>
-<span id="cb23-17">|   ├── ...</span>
-<span id="cb23-18">│&nbsp;&nbsp; └── CellOverlay_F064.jpg</span>
-<span id="cb23-19">└── CompartmentLabels</span>
-<span id="cb23-20">    ├── CompartmentLabels_F001.tif</span>
-<span id="cb23-21">    ...</span>
-<span id="cb23-22">    └── CompartmentLabels_F064.tif</span></code></pre></div>
-</div>
-</div>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>If your flow cell was created prior to AtoMx v1.3.2, the CellComposite jpg files may not show the composites but instead just blank images. They will still load into squidpy but will not show the expected tissue structure. This issue was patched for samples created in v1.3.2+. If you have blank images and would like to replace them with composite images, check out <a href="../../posts/composite-images/making-composite-images.html" target="_blank">this post</a>.</p>
-</div>
-</div>
-</section>
-<section id="read-expression-and-image-data-into-squidpy" class="level2" data-number="5.2">
-<h2 data-number="5.2" class="anchored" data-anchor-id="read-expression-and-image-data-into-squidpy"><span class="header-section-number">5.2</span> Read expression and image data into squidpy</h2>
-<p>The block of code below reads the flat files <em>and images</em> now that the image data are in the specified format. The location of the data in the example code below is <code>sample_dir</code> and is provided as the argument for the <code>path</code> parameter of <code>read.nanostring</code>.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-from pathlib import Path
-import os
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import scanpy as sc
-import squidpy as sq
-
-sample_dir = 'path/to/breast_cancer_example/sample_dir_formatted'
-meta_file = [item for item in os.listdir(sample_dir) if 'metadata_file' in item][0]
-counts_file = [item for item in os.listdir(sample_dir) if 'exprMat_file' in item][0]
-fov_file = [item for item in os.listdir(sample_dir) if 'fov_positions_file' in item][0]
- 
-fov_df = pd.read_csv(os.path.join(sample_dir, fov_file))
-if 'FOV' in fov_df.columns:
-  print("Refactoring file to older format.")
-  # Rename 'FOV' column to 'fov'
-  fov_df.rename(columns={'FOV': 'fov'}, inplace=True)
-  # have fov_file reference the new, formatted file and write it
-  fov_file = os.path.join(sample_dir,'fov_positions_formatted.csv')
-  fov_df.to_csv(fov_file, index=False)
-
-adata2 = sq.read.nanostring(
-    path=sample_dir,
-    counts_file=counts_file,
-    meta_file=meta_file,
-    fov_file=fov_file
-)
-
-# This part of the analyis is similar to above
-adata2.var["Negative"] = adata2.var_names.str.startswith("Negative")
-adata2.var["SystemControl"] = adata2.var_names.str.startswith("SystemControl")
-sc.pp.calculate_qc_metrics(adata2, qc_vars=["Negative", "SystemControl"], inplace=True)
-sc.pp.filter_cells(adata2, min_counts=250)
-sc.pp.filter_genes(adata2, min_cells=1000)
-adata2.layers["counts"] = adata2.X.copy()
-sc.pp.normalize_total(adata2, inplace=True, exclude_highly_expressed=True)
-sc.pp.log1p(adata2)
-sc.pp.pca(adata2, n_comps=50)
-sc.pp.neighbors(adata2)
-sc.tl.umap(adata2, min_dist=0.2, spread=1)
-sc.tl.leiden(adata2)
-</code></pre>
-</div>
-</section>
-<section id="spatial-analysis" class="level2" data-number="5.3">
-<h2 data-number="5.3" class="anchored" data-anchor-id="spatial-analysis"><span class="header-section-number">5.3</span> Spatial Analysis</h2>
-<p>In addition to the analysis code we’ve already covered, we can view and analyze our CosMx results with image data. For a full list of features, please see <a href="https://squidpy.readthedocs.io/en/stable/api.html" target="_blank">squidpy’s documentation</a>. For some of the examples below, I’ll use a subset of the data – a single FOV – to speed up computation and to make plotting easier.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>adata_subset = adata2[adata2.obs.fov == "35"].copy()</code></pre>
-</div>
-<section id="viewing-results-in-space" class="level3" data-number="5.3.1">
-<h3 data-number="5.3.1" class="anchored" data-anchor-id="viewing-results-in-space"><span class="header-section-number">5.3.1</span> Viewing results in space</h3>
-<p>Figure&nbsp;7 shows a single FOV image data with cells drawn as contours that are colored based on their Leiden cluster.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>sq.pl.spatial_segment(
-    adata2,
-    color="leiden",
-    seg_contourpx=20,
-    seg_cell_id="cell_ID",
-    library_key="fov",
-    library_id="35",
-    img=True,
-    size=60,
-    figsize = (4, 4),
-    dpi = 200,
-    save = "fig-image1.png"
-)
-
-</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-image1" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-image1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-image1.png" class="img-fluid figure-img" width="412">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-image1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;7: Leiden clusters in space for a single FOV of breast cancer tissue. Clusters are displayed as cell contours overlaid on morphology image (green = PanCK, magenta = DAPI).
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="autocorrelation-with-morans-i" class="level3" data-number="5.3.2">
-<h3 data-number="5.3.2" class="anchored" data-anchor-id="autocorrelation-with-morans-i"><span class="header-section-number">5.3.2</span> Autocorrelation with Moran’s <em>I</em></h3>
-<p>Moran’s <em>I</em> is a useful spatial statistic for measuring the extent that a gene’s expression is clustered in space (verus random or dispersed). Taking a look at the single-FOV subset, we see genes with positive Moran’s <em>I</em>.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sq.gr.spatial_neighbors(adata_subset, coord_type="generic", delaunay=True)
-sq.gr.spatial_autocorr(
-    adata_subset,
-    mode="moran",
-    n_perms=100,
-    n_jobs=1,
-)
-adata_subset.uns["moranI"].head(10)</code></pre>
-</div>
-<pre><code>                I  pval_norm  var_norm  pval_z_sim  pval_sim   var_sim  pval_norm_fdr_bh  pval_z_sim_fdr_bh  pval_sim_fdr_bh
-CRIP1    0.634842        0.0  0.000279         0.0  0.009901  0.000460               0.0                0.0         0.044936
-COX6C    0.624853        0.0  0.000279         0.0  0.009901  0.000496               0.0                0.0         0.044936
-COL1A1   0.616015        0.0  0.000279         0.0  0.009901  0.000476               0.0                0.0         0.044936
-SCGB2A2  0.587074        0.0  0.000279         0.0  0.009901  0.000419               0.0                0.0         0.044936
-COL1A2   0.572189        0.0  0.000279         0.0  0.009901  0.000487               0.0                0.0         0.044936
-COL3A1   0.559603        0.0  0.000279         0.0  0.009901  0.000449               0.0                0.0         0.044936
-SPARC    0.547069        0.0  0.000279         0.0  0.009901  0.000394               0.0                0.0         0.044936
-KRT8     0.516281        0.0  0.000279         0.0  0.009901  0.000427               0.0                0.0         0.044936
-ERBB2    0.509171        0.0  0.000279         0.0  0.009901  0.000458               0.0                0.0         0.044936
-KRT19    0.502475        0.0  0.000279         0.0  0.009901  0.000529               0.0                0.0         0.044936
-</code></pre>
-<p>When we plot the expression of some of these genes (Figure&nbsp;8), we indeed see some how they are aggregated. For example, <em>COX6C</em> expression, which may have clinical significance with breast cancer <span class="citation" data-cites="Tian2021">(Tian et al. 2021)</span>, is autocorrelated and co-occurs with cells high in <em>KRT19</em>.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sq.pl.spatial_segment(
-    adata_subset,
-    library_id="35",
-    seg_cell_id="cell_ID",
-    library_key="fov",
-    color=["COX6C", "COL1A1", "KRT19"],
-    size=60,
-    img=False,
-    figsize=(4, 4),
-    dpi = 200,
-    save = "fig-nhood-Morans-I.png"
-)</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-morans" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-morans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-nhood-Morans-I.png" class="img-fluid figure-img" width="1142">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-morans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;8: Expression for select genes showing relatively high Moran’s <em>I</em>.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="spatial-co-occurence" class="level3" data-number="5.3.3">
-<h3 data-number="5.3.3" class="anchored" data-anchor-id="spatial-co-occurence"><span class="header-section-number">5.3.3</span> Spatial co-occurence</h3>
-<p>While Moran’s <em>I</em> quantifies autocorrelation of genes, spatial co-occurence with <code>gr.co_occurence</code> quantifies cell-level co-occurences. In example below, co-occurence of Leiden clusters was used (Figure&nbsp;9).</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sq.gr.co_occurrence(
-    adata_subset,
-    cluster_key="leiden",
-)
-
-sq.pl.co_occurrence(
-    adata_subset,
-    cluster_key="leiden",
-    clusters="1",
-    save = "fig-co-occurence1.png"
-)
-sq.pl.spatial_segment(
-    adata_subset,
-    shape="hex",
-    color="leiden",
-    library_id="35",
-    library_key="fov",
-    seg_cell_id="cell_ID",
-    img=False,
-    size=60,
-    ax = ax[1],
-    save = "fig-co-occurence2.png"
-)</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-co-occurence" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-co-occurence-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-co-occurence1and2.png" class="img-fluid figure-img" width="894">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-co-occurence-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;9: Co-occurence of Leiden clusters. Left: Leiden clusters in space for a single FOV of breast cancer tissue. Right: co-occurence probability ratio (Y) for each cluster relative to Leiden cluster 1 (orange cells in left plot) with increasing radius (X).
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="neighborhood-enrichment" class="level3" data-number="5.3.4">
-<h3 data-number="5.3.4" class="anchored" data-anchor-id="neighborhood-enrichment"><span class="header-section-number">5.3.4</span> Neighborhood enrichment</h3>
-<p>We can take a look at neighborhood enrichment scores using <code>gr.nhood_enrichment</code> and <code>pl.nhood_enrichment</code>(Figure&nbsp;10).</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sq.gr.nhood_enrichment(adata2, cluster_key="leiden")
-sq.pl.nhood_enrichment(
-    adata2,
-    cluster_key="leiden",
-    figsize=(5, 5),
-    dpi = 200,
-    title="Neighborhood enrichment",
-    save = "fig-nhood-enrichment.png"
-)
-</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-neighbors" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-neighbors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-nhood-enrichment.png" class="img-fluid figure-img" width="613">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-neighbors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;10: Neighborhood enrichment across all FOVs for each pairwise combination of Leiden clusters.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<!-- # Saving annData -->
-<!-- ```{filename="Python"} -->
-<!-- adata2.write("./adata2.h5ad") -->
-<!-- ``` -->
-</section>
-</section>
-</section>
-<section id="conclusion" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> Conclusion</h1>
-<p>In this post I showed how to pivot CosMx SMI data that were exported from AtoMx SIP into a format that can be read with the open-sourced python package squidpy. A full analysis of SMI data in squidpy was beyond the scope of this post but look for additional blog post that utilize squidpy’s functions.</p>
-</section>
-<section id="appendix" class="level1" data-number="7">
-<h1 data-number="7"><span class="header-section-number">7</span> Appendix</h1>
-<section id="sec-venv" class="level2" data-number="7.1">
-<h2 data-number="7.1" class="anchored" data-anchor-id="sec-venv"><span class="header-section-number">7.1</span> Create a virtual environment for squidpy</h2>
-<p>I recommend creating a separate virtual environment to run squidpy and to keep packages isolated from the rest of your system. This can be operating system and architecture specific so my (M1 Mac) specific example code below may not work with your configuration.</p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Troubleshooting or assistance with squidpy installation is beyond the scope of this post. Please see <a href="https://squidpy.readthedocs.io/en/stable/api.html" target="_blank">squidpy’s documentation</a>.</p>
-</div>
-</div>
-<p>In general, there are two main package management systems: the default one that ships with python and conda. I’ll use the former for this post. For more information, please see the <a href="https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#create-and-use-virtual-environments" target="_blank">Python Packaging User Guide</a> for examples on Windows and Mac/Linux.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb32-1">python3.10 -m venv .venv</span>
-<span id="cb32-2">source .venv/bin/activate</span>
-<span id="cb32-3">python --version</span></code></pre></div>
-</div>
-</div>
-<blockquote class="blockquote">
-<p>Python 3.10.6</p>
-</blockquote>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb33-1">pip install squidpy</span></code></pre></div>
-</div>
-</div>
-<p>Here are the packages that I used for this post:</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb34-1">pip freeze &gt; requirements.txt</span></code></pre></div>
-</div>
-</div>
-<div class="cell">
-<details class="code-fold">
-<summary>Click to show contents of requirements.txt</summary>
-<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb35-1">aiobotocore==2.5.4</span>
-<span id="cb35-2">aiohttp==3.9.5</span>
-<span id="cb35-3">aioitertools==0.11.0</span>
-<span id="cb35-4">aiosignal==1.3.1</span>
-<span id="cb35-5">anndata==0.10.8</span>
-<span id="cb35-6">array_api_compat==1.7.1</span>
-<span id="cb35-7">asciitree==0.3.3</span>
-<span id="cb35-8">async-timeout==4.0.3</span>
-<span id="cb35-9">attrs==23.2.0</span>
-<span id="cb35-10">botocore==1.31.17</span>
-<span id="cb35-11">certifi==2024.6.2</span>
-<span id="cb35-12">charset-normalizer==3.3.2</span>
-<span id="cb35-13">click==8.1.7</span>
-<span id="cb35-14">click-plugins==1.1.1</span>
-<span id="cb35-15">cligj==0.7.2</span>
-<span id="cb35-16">cloudpickle==3.0.0</span>
-<span id="cb35-17">colorcet==3.1.0</span>
-<span id="cb35-18">contourpy==1.2.1</span>
-<span id="cb35-19">cycler==0.12.1</span>
-<span id="cb35-20">dask==2024.6.1</span>
-<span id="cb35-21">dask-expr==1.1.4</span>
-<span id="cb35-22">dask-image==2024.5.3</span>
-<span id="cb35-23">datashader==0.16.2</span>
-<span id="cb35-24">distributed==2024.6.1</span>
-<span id="cb35-25">docrep==0.3.2</span>
-<span id="cb35-26">exceptiongroup==1.2.1</span>
-<span id="cb35-27">fasteners==0.19</span>
-<span id="cb35-28">fiona==1.9.6</span>
-<span id="cb35-29">fonttools==4.53.0</span>
-<span id="cb35-30">frozenlist==1.4.1</span>
-<span id="cb35-31">fsspec==2023.6.0</span>
-<span id="cb35-32">geopandas==0.14.4</span>
-<span id="cb35-33">h5py==3.11.0</span>
-<span id="cb35-34">idna==3.7</span>
-<span id="cb35-35">igraph==0.11.5</span>
-<span id="cb35-36">imageio==2.34.1</span>
-<span id="cb35-37">importlib_metadata==7.2.0</span>
-<span id="cb35-38">inflect==7.2.1</span>
-<span id="cb35-39">Jinja2==3.1.4</span>
-<span id="cb35-40">jmespath==1.0.1</span>
-<span id="cb35-41">joblib==1.4.2</span>
-<span id="cb35-42">kiwisolver==1.4.5</span>
-<span id="cb35-43">lazy_loader==0.4</span>
-<span id="cb35-44">legacy-api-wrap==1.4</span>
-<span id="cb35-45">leidenalg==0.10.2</span>
-<span id="cb35-46">llvmlite==0.43.0</span>
-<span id="cb35-47">locket==1.0.0</span>
-<span id="cb35-48">markdown-it-py==3.0.0</span>
-<span id="cb35-49">MarkupSafe==2.1.5</span>
-<span id="cb35-50">matplotlib==3.9.0</span>
-<span id="cb35-51">matplotlib-scalebar==0.8.1</span>
-<span id="cb35-52">mdurl==0.1.2</span>
-<span id="cb35-53">more-itertools==10.3.0</span>
-<span id="cb35-54">msgpack==1.0.8</span>
-<span id="cb35-55">multidict==6.0.5</span>
-<span id="cb35-56">multipledispatch==1.0.0</span>
-<span id="cb35-57">multiscale_spatial_image==0.11.2</span>
-<span id="cb35-58">natsort==8.4.0</span>
-<span id="cb35-59">networkx==3.3</span>
-<span id="cb35-60">numba==0.60.0</span>
-<span id="cb35-61">numcodecs==0.12.1</span>
-<span id="cb35-62">numpy==1.26.4</span>
-<span id="cb35-63">ome-zarr==0.9.0</span>
-<span id="cb35-64">omnipath==1.0.8</span>
-<span id="cb35-65">packaging==24.1</span>
-<span id="cb35-66">pandas==2.2.2</span>
-<span id="cb35-67">param==2.1.0</span>
-<span id="cb35-68">partd==1.4.2</span>
-<span id="cb35-69">patsy==0.5.6</span>
-<span id="cb35-70">pillow==10.3.0</span>
-<span id="cb35-71">PIMS==0.7</span>
-<span id="cb35-72">psutil==6.0.0</span>
-<span id="cb35-73">pyarrow==16.1.0</span>
-<span id="cb35-74">pyct==0.5.0</span>
-<span id="cb35-75">pygeos==0.14</span>
-<span id="cb35-76">Pygments==2.18.0</span>
-<span id="cb35-77">pynndescent==0.5.13</span>
-<span id="cb35-78">pyparsing==3.1.2</span>
-<span id="cb35-79">pyproj==3.6.1</span>
-<span id="cb35-80">python-dateutil==2.9.0.post0</span>
-<span id="cb35-81">pytz==2024.1</span>
-<span id="cb35-82">PyYAML==6.0.1</span>
-<span id="cb35-83">requests==2.32.3</span>
-<span id="cb35-84">rich==13.7.1</span>
-<span id="cb35-85">s3fs==2023.6.0</span>
-<span id="cb35-86">scanpy==1.10.1</span>
-<span id="cb35-87">scikit-image==0.24.0</span>
-<span id="cb35-88">scikit-learn==1.5.0</span>
-<span id="cb35-89">scipy==1.13.1</span>
-<span id="cb35-90">seaborn==0.13.2</span>
-<span id="cb35-91">session-info==1.0.0</span>
-<span id="cb35-92">shapely==2.0.4</span>
-<span id="cb35-93">six==1.16.0</span>
-<span id="cb35-94">slicerator==1.1.0</span>
-<span id="cb35-95">sortedcontainers==2.4.0</span>
-<span id="cb35-96">spatial_image==0.3.0</span>
-<span id="cb35-97">spatialdata==0.0.15</span>
-<span id="cb35-98">squidpy==1.5.0</span>
-<span id="cb35-99">statsmodels==0.14.2</span>
-<span id="cb35-100">stdlib-list==0.10.0</span>
-<span id="cb35-101">tblib==3.0.0</span>
-<span id="cb35-102">texttable==1.7.0</span>
-<span id="cb35-103">threadpoolctl==3.5.0</span>
-<span id="cb35-104">tifffile==2024.6.18</span>
-<span id="cb35-105">toolz==0.12.1</span>
-<span id="cb35-106">tornado==6.4.1</span>
-<span id="cb35-107">tqdm==4.66.4</span>
-<span id="cb35-108">typeguard==4.3.0</span>
-<span id="cb35-109">typing_extensions==4.12.2</span>
-<span id="cb35-110">tzdata==2024.1</span>
-<span id="cb35-111">umap-learn==0.5.6</span>
-<span id="cb35-112">urllib3==1.26.19</span>
-<span id="cb35-113">validators==0.28.3</span>
-<span id="cb35-114">wrapt==1.16.0</span>
-<span id="cb35-115">xarray==2024.6.0</span>
-<span id="cb35-116">xarray-dataclasses==1.8.0</span>
-<span id="cb35-117">xarray-datatree==0.0.14</span>
-<span id="cb35-118">xarray-schema==0.0.3</span>
-<span id="cb35-119">xarray-spatial==0.4.0</span>
-<span id="cb35-120">yarl==1.9.4</span>
-<span id="cb35-121">zarr==2.18.2</span>
-<span id="cb35-122">zict==3.0.0</span>
-<span id="cb35-123">zipp==3.19.2</span></code></pre></div>
-</details>
-</div>
-
-
-
-</section>
-</section>
-
-<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
-<div id="ref-Dries2021" class="csl-entry">
-Dries, Ruben, Qian Zhu, Rui Dong, Chee-Huat Linus Eng, Huipeng Li, Kan Liu, Yuntian Fu, et al. 2021. <span>“Giotto: A Toolbox for Integrative Analysis and Visualization of Spatial Expression Data.”</span> <em>Genome Biology</em> 22 (December): 78. <a href="https://doi.org/10.1186/s13059-021-02286-2">https://doi.org/10.1186/s13059-021-02286-2</a>.
-</div>
-<div id="ref-Hao2024" class="csl-entry">
-Hao, Yuhan, Tim Stuart, Madeline H. Kowalski, Saket Choudhary, Paul Hoffman, Austin Hartman, Avi Srivastava, et al. 2024. <span>“Dictionary Learning for Integrative, Multimodal and Scalable Single-Cell Analysis.”</span> <em>Nature Biotechnology</em> 42 (February): 293–304. <a href="https://doi.org/10.1038/s41587-023-01767-y">https://doi.org/10.1038/s41587-023-01767-y</a>.
-</div>
-<div id="ref-He2022" class="csl-entry">
-He, Shanshan, Ruchir Bhatt, Carl Brown, Emily A Brown, Derek L Buhr, Kan Chantranuvatana, Patrick Danaher, et al. 2022. <span>“High-Plex Imaging of RNA and Proteins at Subcellular Resolution in Fixed Tissue by Spatial Molecular Imaging.”</span> <em>Nature Biotechnology</em> 40 (December): 1794–1806. <a href="https://doi.org/10.1038/s41587-022-01483-z">https://doi.org/10.1038/s41587-022-01483-z</a>.
-</div>
-<div id="ref-Palla2022" class="csl-entry">
-Palla, Giovanni, Hannah Spitzer, Michal Klein, David Fischer, Anna Christina Schaar, Louis Benedikt Kuemmerle, Sergei Rybakov, et al. 2022. <span>“Squidpy: A Scalable Framework for Spatial Omics Analysis.”</span> <em>Nature Methods</em> 19 (February): 171–78. <a href="https://doi.org/10.1038/s41592-021-01358-2">https://doi.org/10.1038/s41592-021-01358-2</a>.
-</div>
-<div id="ref-Tian2021" class="csl-entry">
-Tian, Bi-Xia, Wei Sun, Shu-Hong Wang, Pei-Jun Liu, and Yao-Chun Wang. 2021. <span>“<a href="https://www.ncbi.nlm.nih.gov/pubmed/33527004">Differential Expression and Clinical Significance of COX6C in Human Diseases.</a>”</span> <em>American Journal of Translational Research</em> 13: 1–10.
-</div>
-<div id="ref-Wolf2018" class="csl-entry">
-Wolf, F Alexander, Philipp Angerer, and Fabian J Theis. 2018. <span>“SCANPY: Large-Scale Single-Cell Gene Expression Data Analysis.”</span> <em>Genome Biology</em> 19: 15. <a href="https://doi.org/10.1186/s13059-017-1382-0">https://doi.org/10.1186/s13059-017-1382-0</a>.
-</div>
-</div></section></div> ]]></description>
-  <category>Squidpy</category>
-  <category>python</category>
-  <category>visualization</category>
-  <category>AnnData</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/squidpy-essentials.html</guid>
-  <pubDate>Wed, 03 Jul 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-image1.png" medium="image" type="image/png" height="125" width="144"/>
 </item>
 <item>
   <title>Comparing AtoMx® SIP flat files with the legacy format</title>
