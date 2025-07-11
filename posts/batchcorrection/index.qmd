@@ -275,7 +275,7 @@ sem_comb <- Seurat::RunPCA(sem_comb)
 #| echo: false
 
 saveRDS(pcaobj, "figures/pcaobj.combined.regular.rds")
-
+saveRDS(list(pca_head = pcaobj@cell.embeddings[1:100,], pca_str = capture.output(str(pcaobj@cell.embeddings))), file="figures/pcaobj.embeddings.str.rds")
 ```
 
 ```{r}
@@ -305,6 +305,7 @@ harmony_embeddings <- harmony::RunHarmony(sem_comb[["pca"]]@cell.embeddings
 
 
 saveRDS(harmony_embeddings, "figures/harmony_embeddings.rds")
+saveRDS(list(harmony_head = harmony_embeddings[1:100,], harmony_str = capture.output(str(harmony_embeddings))), file="figures/harmony.embeddings.str.rds")
 
 ```
 ```{r}
@@ -313,9 +314,52 @@ saveRDS(harmony_embeddings, "figures/harmony_embeddings.rds")
 
 
 harmony_embeddings <- readRDS("figures/harmony_embeddings.rds")
-harmony_embeddings <- readRDS("figures/harmony_embeddings.rds")
 
 ```
+
+The `harmony_embeddings` returned are a `cells`  $\times$ `# of pc's` dimension matrix, with the same structure as the PCA embeddings.
+
+```{r}
+#| eval: false
+#| echo: true
+
+str(harmony_embeddings)
+harmony_embeddings[1:10,1:5]
+
+```
+```{r}
+#| eval: true
+#| echo: false
+
+pca_head <- readRDS("figures/pcaobj.embeddings.str.rds")
+harmony_head <- readRDS("figures/harmony.embeddings.str.rds")
+
+cat(harmony_head$harmony_str, sep="\n")
+
+print(harmony_head$harmony_head[1:10,1:5])
+```
+
+
+Here are what the original PCA embeddings look like for comparison:
+
+```{r}
+#| eval: false
+#| echo: true
+
+str(sem_comb[["pca"]]@cell.embeddings)
+sem_comb[["pca"]]@cell.embeddings[1:10,1:5]
+
+```
+```{r}
+#| eval: true
+#| echo: false
+
+cat(pca_head$pca_str, sep="\n")
+
+print(pca_head$pca_head[1:10,1:5])
+
+```
+
 
 # UMAP and clustering with harmony
 
