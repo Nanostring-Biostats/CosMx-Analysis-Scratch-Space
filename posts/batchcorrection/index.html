@@ -8,6 +8,7 @@
 
 <meta name="author" content="Dan McGuire">
 <meta name="dcterms.date" content="2025-07-10">
+<meta name="description" content="This post discusses batch effects in CosMx; how they impact analyses, how to detect them, and how to correct them.">
 
 <title>Recommendations for batch correction – Blog</title>
 <style>
@@ -248,7 +249,12 @@ window.Quarto = {
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
       <h1 class="title">Recommendations for batch correction</h1>
-                                <div class="quarto-categories">
+                  <div>
+        <div class="description">
+          This post discusses batch effects in CosMx; how they impact analyses, how to detect them, and how to correct them.
+        </div>
+      </div>
+                          <div class="quarto-categories">
                 <div class="quarto-category">batch correction</div>
                 <div class="quarto-category">data integration</div>
                 <div class="quarto-category">CosMx 2.0</div>
@@ -330,7 +336,7 @@ window.Quarto = {
 <h1 data-number="2"><span class="header-section-number">2</span> Introduction</h1>
 <p>When analyzing multiple samples or ‘batches’ of data collected under different technologies or sample conditions, we may need to harmonize the data in a way that preserves biological variation while minimizing technical variation.</p>
 <p>For example, suppose I were interested in analyzing multiple breast cancer tissue samples, but these samples were processed in different labs, by different scientists, or with different sample prep protocols. These technical differences could subtly effect gene detection efficiency in ways that may influence or confound an analysis. In particular, PCA, which responds quickly to small systematic changes impacting large numbers of variables, is highly sensitive to batch effects. This sensitivity then cascades down to analyses depending on PCA, e.g.&nbsp;UMAP and the Leiden and Louvain algorithms.</p>
-<p>To check for presence of batch effects and whether correction is required, we recommend plotting the ‘batch’ on a UMAP plot or in principal component (PC) space <a href="#pcplotbatch">link to example figure</a>. In the presence of batch effects, we may observe that cells cluster together by batch more distinctly than they do by their biological cell type.</p>
+<p>To check for presence of batch effects and whether correction is required, we recommend plotting the ‘batch’ on a UMAP plot or in principal component (PC) space (<a href="#pcplotbatch">link to example figure</a>). In the presence of batch effects, we may observe that cells cluster together by batch more distinctly than they do by their biological cell type.</p>
 <p>For dimension reduction and clustering analyses, there is a multitude of existing research on batch correction methodology <span class="citation" data-cites="luecken2019current">(<a href="#ref-luecken2019current" role="doc-biblioref">Luecken and Theis 2019</a>)</span>. The Harmony method <span class="citation" data-cites="harmony">(<a href="#ref-harmony" role="doc-biblioref">Korsunsky et al. 2019</a>)</span> has been recommended as a best-in-class approach in several studies which benchmarked different batch correction methodology for scRNAseq <span class="citation" data-cites="tran2020benchmark">(<a href="#ref-tran2020benchmark" role="doc-biblioref">Tran et al. 2020</a>)</span> <span class="citation" data-cites="emmanuel2024batch">(<a href="#ref-emmanuel2024batch" role="doc-biblioref">Emmanúel Antonsson and Melsted 2024</a>)</span> . Harmony takes as input a low-dimensional cell embedding such as PCA, and projects cells onto a new unsupervised joint embedding that groups cells by biological cell type rather than dataset-specific conditions. This Harmony embedding can be used as an input to downstream dimension reduction and clustering algorithms like UMAP<span class="citation" data-cites="umap">(<a href="#ref-umap" role="doc-biblioref">Ghojogh et al. 2021</a>)</span> and Leiden<span class="citation" data-cites="leiden">(<a href="#ref-leiden" role="doc-biblioref">Traag, Waltman, and Van Eck 2019</a>)</span>.</p>
 <p>For some other downstream analyses, batch effects can be explicitly handled or may be less of a concern. In the case of differential expression (DE) analysis, we could account for the technical effects by specifying ‘batch’ as a covariate in our DE models. Supervised or semi-supervised cell typing analyses that are independent of PCA dimension reductions (i.e., InSituType <span class="citation" data-cites="Danaher2022">(<a href="#ref-Danaher2022" role="doc-biblioref">Danaher et al. 2022</a>)</span>), may be less affected by batch effects. If we were to observe batch effects in this setting, one useful approach would be to perform the cell typing separately by batch before aggregating the cell type annotations.</p>
 <p>In this post, we demonstrate using Harmony for batch effect correction on two 6k-plex tonsil tissue datasets; one dataset generated with CosMx 1.5, while the other generated with CosMx 2.0. The recent CosMx 2.0 release offers noticeable increases in sensitivity; often obtaining 1.5-2x the transcripts compared to the same sample processed with previous CosMx 1.5 software. In case we want to analyze a v1.5 and v2.0 dataset in the same analysis, we might consider treating this variable as a batch effect.</p>
