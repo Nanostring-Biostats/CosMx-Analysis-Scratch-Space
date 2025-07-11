@@ -570,15 +570,19 @@ Plotting the first two PC's, colored by `batchid`, it looks like the v1.5 data m
 #| eval: false
 #| code-fold: true
 
-all.equal(rownames(harmony_embeddings), sem_comb@meta.data$cell_ID)
+set.seed(123)
+shuffle_order <- sample(1:nrow(harmony_embeddings)) ## shuffle cell order for plotting
+cls <- c("#1f77b4", "#ff7f0e")
+names(cls) <- c("v2.0", "v1.5")
 
+all.equal(rownames(harmony_embeddings), sem_comb@meta.data$cell_ID)
 pc1vs2_harmony <- 
 cbind(data.table(sem_comb@meta.data)[,.(cell_ID, batchid, x_slide_mm, y_slide_mm)]
       ,data.table(harmony_embeddings))
 
 harmony_plt <- 
-ggplot(pc1vs2_harmony, aes(x = PC_1, y = PC_2, color=batchid)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
-  scale_color_manual(values = c("purple","darkgreen")) + 
+ggplot(pc1vs2_harmony[shuffle_order], aes(x = PC_1, y = PC_2, color=batchid)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
+  scale_color_manual(values = cls) + 
   theme_bw() + 
   coord_fixed() + 
   guides(color = guide_legend(override.aes=list(size=4, alpha=1)))
@@ -588,8 +592,8 @@ cbind(data.table(sem_comb@meta.data)[,.(cell_ID, batchid, x_slide_mm, y_slide_mm
       ,data.table(sem_comb@reductions$pca@cell.embeddings))
 
 regular_pca_plt <- 
-ggplot(pc1vs2_regular, aes(x = PC_1, y = PC_2, color=batchid)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
-  scale_color_manual(values = c("purple", "darkgreen")) + 
+ggplot(pc1vs2_regular[shuffle_order], aes(x = PC_1, y = PC_2, color=batchid)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
+  scale_color_manual(values = cls) + 
   theme_bw() + 
   coord_fixed() + 
   guides(color = guide_legend(override.aes=list(size=4, alpha=1)))
@@ -616,12 +620,12 @@ ggsave(filename = "figures/pc_comparison_plot.png"
        ,units = 'px'
        ,dpi=450
        )
-ggsave(filename = "figures/pc_comparison_plot.png"
+ggsave(filename = "figures/thumbnail.png"
        ,plot = pc_comparison_plt
-       ,width = 1704*sqrt(10)
-       ,height = 848*sqrt(10)
+       ,width = 1704/3.5
+       ,height = 848/3.5
        ,units = 'px'
-       ,dpi=450
+       ,dpi=72
        )
 
 ```
@@ -649,12 +653,9 @@ umap_harmony <-
 cbind(data.table(sem_comb@meta.data)[,.(cell_ID, batchid, x_slide_mm, y_slide_mm)]
       ,data.table(sem_comb@reductions$umapharmony@cell.embeddings))
 
-set.seed(123)
-umap_harmony <- umap_harmony[sample(1:.N)] ## shuffle cell order for plotting
-
 harmony_plt <- 
-ggplot(umap_harmony, aes(x = UMAP_1, y = UMAP_2, color=batchid)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
-  scale_color_manual(values = c("purple","darkgreen")) + 
+ggplot(umap_harmony[shuffle_order], aes(x = UMAP_1, y = UMAP_2, color=batchid)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
+  scale_color_manual(values = cls) + 
   theme_bw() + 
   coord_fixed() + 
   guides(color = guide_legend(override.aes=list(size=4, alpha=1)))
@@ -663,12 +664,9 @@ umap_regular <-
 cbind(data.table(sem_comb@meta.data)[,.(cell_ID, batchid, x_slide_mm, y_slide_mm)]
       ,data.table(sem_comb@reductions$umap@cell.embeddings))
 
-set.seed(123)
-umap_regular <- umap_regular[sample(1:.N)] ## shuffle cell order for plotting
-
 regular_umap_plt <- 
-ggplot(umap_regular, aes(x = umap_1, y = umap_2, color=batchid)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
-  scale_color_manual(values = c("purple", "darkgreen")) + 
+ggplot(umap_regular[shuffle_order], aes(x = umap_1, y = umap_2, color=batchid)) + geom_point(size=0.2, alpha=0.5, shape=16) + 
+  scale_color_manual(values = cls) + 
   theme_bw() + 
   coord_fixed() + 
   guides(color = guide_legend(override.aes=list(size=4, alpha=1)))
