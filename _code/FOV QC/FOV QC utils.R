@@ -117,10 +117,10 @@ runFOVQC <- function(counts, xy, fov, tissue = NULL, barcodemap, max_prop_loss =
 }
 
 
-#' Infer letters from barcodes:
+#' Infer colorvals from barcodes:
 #' @param barcodes Vector of barcodes
 #' @return Vector of unique color values
-getLetters <- function(barcodes) {
+getcolorvals <- function(barcodes) {
   allvals <- paste0(barcodes, collapse = "")
   uniquevals <- unique(unlist(strsplit(allvals, "")))
   return(setdiff(uniquevals, "."))
@@ -139,9 +139,9 @@ getLetters <- function(barcodes) {
 #' @export
 FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reportercycles", plotwidth = NULL, plotheight = NULL) {
   
-  # get unique letters:
+  # get unique colorvals:
   bitnames <- colnames(res$fovstats$p)
-  letters <- unique(substr(bitnames, nchar(bitnames), nchar(bitnames)))
+  colorvals <- unique(substr(bitnames, nchar(bitnames), nchar(bitnames)))
   
   if (is.null(plotwidth)) {
     plotwidth <- diff(range(res$xy[, 1])) * 1.5
@@ -152,7 +152,7 @@ FOVEffectsSpatialPlots <- function(res, outdir = NULL, bits = "flagged_reporterc
   bits_to_plot <- match(bits, colnames(res$fovstats$flag))
   if (bits == "flagged_reportercycles") {
     flaggedreportercycles <- colnames(res$flags_per_fov_x_reportercycle)[colSums(res$flags_per_fov_x_reportercycle >= 0.5) > 0]
-    names_of_bits_to_plot  <- paste0(rep(flaggedreportercycles, each = 4), rep(letters, length(flaggedreportercycles)))
+    names_of_bits_to_plot  <- paste0(rep(flaggedreportercycles, each = 4), rep(colorvals, length(flaggedreportercycles)))
     bits_to_plot <- match(names_of_bits_to_plot, colnames(res$resid))
   }
   if (bits == "flagged_bits") {
@@ -352,14 +352,14 @@ makeGrid <- function(xy, fov, squares_per_fov = 49, min_cells_per_square = 25) {
 #' @return A matrix of total gene expression in gridsquares x barcode bits
 cellxgene2squarexbit <- function(counts, grid, genes, barcodes) {
   
-  letters <- getLetters(barcodes)
+  colorvals <- getcolorvals(barcodes)
   
   # number of bits:
   nreportercycles <- nchar(barcodes[1]) / 2
   nbits <- nreportercycles * 4
   # parse barcodes:
   bitmat = matrix(0, length(setdiff(unique(grid), NA)), nbits)
-  colnames(bitmat) <- paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), letters)
+  colnames(bitmat) <- paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), colorvals)
   rownames(bitmat) <- setdiff(unique(grid), NA)
   
   # sparse matrix of grid squares to cells: 
@@ -398,18 +398,18 @@ cellxgene2squarexbit <- function(counts, grid, genes, barcodes) {
 #' Convert the barcode vector to a matrix of bit assignments (genes * bits)
 barcode2bitmatrix <- function(barcodes) {
   
-  letters <- getLetters(barcodes)
+  colorvals <- getcolorvals(barcodes)
   
   # number of bits:
   nreportercycles <- nchar(barcodes[1]) / 2
   nbits <- nreportercycles * 4
   bitmap <- matrix(0, length(barcodes), nbits)
-  colnames(bitmap) <- paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), rep(letters, nreportercycles))
+  colnames(bitmap) <- paste0("reportercycle", rep(seq_len(nreportercycles), each = 4), rep(colorvals, nreportercycles))
   # fill out matrix:
   for (i in seq_len(nreportercycles)) {
     barcodeposition <- i*2
     barcodehere <- substr(barcodes, barcodeposition, barcodeposition)
-    for (col in letters) {
+    for (col in colorvals) {
       bitmap[barcodehere == col, paste0("reportercycle", i, col)] <- 1
     }
   }
