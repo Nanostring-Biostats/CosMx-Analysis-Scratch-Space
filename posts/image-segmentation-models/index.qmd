@@ -1,0 +1,65 @@
+---
+title: "Advancing Cell Segmentation in Spatial Omics: New Models for Diverse Morphologies"
+author:
+  - name: Lidan Wu
+    orcid: 0000-0003-3150-6170
+    affiliations:
+      - ref: nstg
+      - ref: lidanwu
+toc: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 2
+toc-location: left
+number-sections: true
+number-depth: 4
+date: "2024-07-16"
+date-modified: last-modified
+categories:
+  - segmentation
+  - algorithms
+  - CosMx 2.0
+image: figures/Fig1-seg-pipeline.png
+description: "This post introduces three newly developed deep learning models for nuclear, whole-cell, and neural segmentation in spatial omics, highlighting innovations in training data diversity, multi-channel input design, and post-processing techniques to improve segmentation accuracy across diverse tissue types."
+draft: false
+---
+
+# Introduction 
+
+Cell segmentation is a foundational step in spatial omics analysis. Inaccurate boundaries can lead to the misassignment of transcripts or proteins, ultimately distorting cellular profiles and downstream interpretations. To address this, we developed a robust image-based segmentation pipeline that leverages deep learning to generate accurate and biologically meaningful cell masks across a wide range of tissue types and imaging conditions.
+
+In this post, we introduce our full segmentation pipeline, describe the three custom-trained models that power it. These models improve segmentation fidelity by tailoring input channels, training data composition, and post-processing workflows to specific biological challenges.
+
+Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
+the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
+
+
+# Compartment-Aware Segmentation Pipeline
+
+Our pipeline integrates two complementary segmentation models to produce both **cell-level** and **subcellular** compartment labels for each sample:
+
+1. A **nuclear segmentation model** detects nuclei with high precision.
+2. A **whole-cell segmentation model**, which is either a generic **cyto model** or a specific **neural model**, depending on tissue context, identifies the full cell boundaries including cytoplasmic regions.
+3. These two masks are then **reconciled and merged** to assign:
+   - A unique **Cell ID** to each detected cell
+   - Labels for **subcellular compartments** (nucleus vs. cytoplasm)
+
+This two-model architecture ensures redundancy and resilience: when one compartment is weakly stained or difficult to model, the other can often compensate. The resulting merged masks are more complete and biologically accurate, especially for complex tissues such as brain.
+
+![Schematic of full cell segmentation pipeline. Input morphology images feed into two parallel models: nuclear and whole-cell segmentation. Their outputs are merged into a final, compartment-labeled cell mask based on the overlapping behavior.](figures/Fig1-seg-pipeline.png){#fig-seg-pipeline}
+
+# Segmentation Models
+
+## Nuclear Segmentation Model
+
+Designed to work across many tissue types, this model takes a **single-channel nuclear stain** (e.g., DAPI) as input. It prioritizes accuracy in nucleus identification, even in densely packed or noisy imaging conditions. This model forms the backbone for subcellular compartment labeling.
+
+## Generic Segmentation Model
+
+This model uses **two channels**—typically nuclear and membrane stains—to segment complete cell boundaries. It is best suited for tissues with relatively regular morphology and clearly defined cell edges (e.g., epithelial, immune-rich, or stromal samples).
+
+## Neural Segmentation Model
+
+To address the unique challenges of brain tissue, including **irregular cell shapes**, **long processes**, and **closely apposed glial and neuronal cells**, we developed a neural-specific model that uses **three channels**: nuclear, neuronal, and glial stains. This model more accurately segments astrocytes, neurons with elongated axons, and densely packed neuropil regions.
+
+
