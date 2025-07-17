@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.30">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Lidan Wu">
+<meta name="dcterms.date" content="2025-07-15">
+<meta name="description" content="A practical walk-through of transcript-based analysis techniques for cell segmentation and refinement using CosMx data as inputs. This post also introduces the AtoMx custom module for FastReseg analysis.">
+
+<title>A practical guide to transcript-based cell segmentation in spatial transcriptomics – Blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../assets/logo_Bruker_black.png" rel="icon" type="image/png">
+<script src="../../site_libs/cookie-consent/cookie-consent.js"></script>
+<link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-3a01e2046221230fdceeea94b1ec5d67.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-a4a11d514c7d463668e07712114998e6.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-4a13e4ba4f9647f177968fa3ed477ad0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-29W4MW0Y2W"></script>
+
+<script type="text/plain" cookie-consent="tracking">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-29W4MW0Y2W', { 'anonymize_ip': true});
+</script>
+
+<script type="text/javascript" charset="UTF-8">
+document.addEventListener('DOMContentLoaded', function () {
+cookieconsent.run({
+  "notice_banner_type":"simple",
+  "consent_type":"implied",
+  "palette":"light",
+  "language":"en",
+  "page_load_consent_levels":["strictly-necessary","functionality","tracking","targeting"],
+  "notice_banner_reject_button_hide":false,
+  "preferences_center_close_button_hide":false,
+  "website_name":""
+  ,
+"language":"en"
+  });
+});
+</script> 
+  
+
+
+</head>
+
+<body class="floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../.././assets/logo_Bruker_white.png" alt="" class="navbar-logo">
+    </a>
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../license.html"> 
+<span class="menu-text">License</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../link-to-code.html"> 
+<span class="menu-text">Code</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">Browse Posts by Topic</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/company/bruker-spatial"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">A practical guide to transcript-based cell segmentation in spatial transcriptomics</h1>
+                  <div>
+        <div class="description">
+          A practical walk-through of transcript-based analysis techniques for cell segmentation and refinement using CosMx data as inputs. This post also introduces the AtoMx custom module for FastReseg analysis.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">segmentation</div>
+                <div class="quarto-category">algorithms</div>
+                <div class="quarto-category">CosMx 2.0</div>
+                <div class="quarto-category">how-tos</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliations</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author">Lidan Wu <a href="https://orcid.org/0000-0003-3150-6170" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              Bruker Spatial Biology
+            </p>
+          <p class="affiliation">
+              Github: <a href="https://github.com/lidanwu" target="_blank">lidanwu</a>
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">July 15, 2025</p>
+      </div>
+    </div>
+    
+      <div>
+      <div class="quarto-title-meta-heading">Modified</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date-modified">July 17, 2025</p>
+      </div>
+    </div>
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="2">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
+  <li><a href="#choosing-the-right-transcript-based-approach" id="toc-choosing-the-right-transcript-based-approach" class="nav-link" data-scroll-target="#choosing-the-right-transcript-based-approach"><span class="header-section-number">2</span> Choosing the Right Transcript-Based Approach</a>
+  <ul class="collapse">
+  <li><a href="#sec-txSeg" id="toc-sec-txSeg" class="nav-link" data-scroll-target="#sec-txSeg"><span class="header-section-number">2.1</span> Transcript-Based Segmentation</a></li>
+  <li><a href="#sec-txRefine" id="toc-sec-txRefine" class="nav-link" data-scroll-target="#sec-txRefine"><span class="header-section-number">2.2</span> Segmentation Refinement</a></li>
+  <li><a href="#sec-segFree" id="toc-sec-segFree" class="nav-link" data-scroll-target="#sec-segFree"><span class="header-section-number">2.3</span> Segmentation-Free Analysis</a></li>
+  </ul></li>
+  <li><a href="#running-transcript-informed-approaches-with-cosmx-data" id="toc-running-transcript-informed-approaches-with-cosmx-data" class="nav-link" data-scroll-target="#running-transcript-informed-approaches-with-cosmx-data"><span class="header-section-number">3</span> Running transcript-informed approaches with CosMx data</a>
+  <ul class="collapse">
+  <li><a href="#baysor-probabilistic-transcript-based-segmentation" id="toc-baysor-probabilistic-transcript-based-segmentation" class="nav-link" data-scroll-target="#baysor-probabilistic-transcript-based-segmentation"><span class="header-section-number">3.1</span> Baysor: Probabilistic Transcript-Based Segmentation</a>
+  <ul class="collapse">
+  <li><a href="#sec-baysor-install" id="toc-sec-baysor-install" class="nav-link" data-scroll-target="#sec-baysor-install"><span class="header-section-number">3.1.1</span> Install Baysor</a></li>
+  <li><a href="#run-baysor" id="toc-run-baysor" class="nav-link" data-scroll-target="#run-baysor"><span class="header-section-number">3.1.2</span> Run Baysor</a></li>
+  </ul></li>
+  <li><a href="#proseg-fast-transcript-simulation-based-segmentation" id="toc-proseg-fast-transcript-simulation-based-segmentation" class="nav-link" data-scroll-target="#proseg-fast-transcript-simulation-based-segmentation"><span class="header-section-number">3.2</span> ProSeg: Fast Transcript Simulation Based Segmentation</a>
+  <ul class="collapse">
+  <li><a href="#install-proseg" id="toc-install-proseg" class="nav-link" data-scroll-target="#install-proseg"><span class="header-section-number">3.2.1</span> Install ProSeg</a></li>
+  <li><a href="#run-proseg" id="toc-run-proseg" class="nav-link" data-scroll-target="#run-proseg"><span class="header-section-number">3.2.2</span> Run ProSeg</a></li>
+  </ul></li>
+  <li><a href="#fastreseg-transcript-based-segmentation-refinement" id="toc-fastreseg-transcript-based-segmentation-refinement" class="nav-link" data-scroll-target="#fastreseg-transcript-based-segmentation-refinement"><span class="header-section-number">3.3</span> FastReseg: Transcript-Based Segmentation Refinement</a>
+  <ul class="collapse">
+  <li><a href="#fastreseg-custom-module-in-atomx" id="toc-fastreseg-custom-module-in-atomx" class="nav-link" data-scroll-target="#fastreseg-custom-module-in-atomx"><span class="header-section-number">3.3.1</span> FastReseg Custom Module in AtoMx</a></li>
+  </ul></li>
+  <li><a href="#ficture-segmentation-free-spatial-transcript-analysis" id="toc-ficture-segmentation-free-spatial-transcript-analysis" class="nav-link" data-scroll-target="#ficture-segmentation-free-spatial-transcript-analysis"><span class="header-section-number">3.4</span> FICTURE: Segmentation-Free Spatial Transcript Analysis</a>
+  <ul class="collapse">
+  <li><a href="#install-ficture" id="toc-install-ficture" class="nav-link" data-scroll-target="#install-ficture"><span class="header-section-number">3.4.1</span> Install FICTURE</a></li>
+  <li><a href="#run-ficture" id="toc-run-ficture" class="nav-link" data-scroll-target="#run-ficture"><span class="header-section-number">3.4.2</span> Run FICTURE</a></li>
+  </ul></li>
+  </ul></li>
+  </ul>
+</nav>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Spatial transcriptomics technologies provide high-resolution spatial maps of transcript locations within tissue. A central challenge in these datasets is cell segmentation, which assigns transcripts to individual cells accurately, particularly when image data is noisy, missing, or ambiguous.</p>
+<p>To address this, researchers have developed <strong>transcript-based analysis techniques</strong> that either:</p>
+<ol type="1">
+<li><a href="#sec-txSeg" class="quarto-xref">Section&nbsp;2.1</a> Segment cells from transcript locations (e.g., Baysor, ProSeg),</li>
+<li><a href="#sec-txRefine" class="quarto-xref">Section&nbsp;2.2</a> Refine existing image-based segmentations using transcript patterns (e.g., FastReseg),</li>
+<li><a href="#sec-segFree" class="quarto-xref">Section&nbsp;2.3</a> Avoid segmentation entirely by analyzing the spatial organization of transcripts directly (e.g., FICTURE).</li>
+</ol>
+<p>This post provides a practical walk-through of each technique with examples on using it with CosMx<sup>®</sup> data, whose standard data format are described <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/assets/Pancreas-CosMx-ReadMe.html" target="_blank">here</a>.</p>
+<div id="fig-transcript-seg-methods" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-transcript-seg-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="figures/Fig1-transcript-segmentation.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-transcript-seg-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Schematic of transcript-informed approaches
+</figcaption>
+</figure>
+</div>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+</section>
+<section id="choosing-the-right-transcript-based-approach" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Choosing the Right Transcript-Based Approach</h1>
+<p>Spatial transcriptomics platforms differ in resolution, density, and image quality, and so do the challenges in analyzing them. Before diving into individual tools, it’s helpful to understand the three major transcript-informed approaches to working with spatial data: segmentation, refinement, and segmentation-free analysis. Each method type fits different scenarios and solves a unique class of problems.</p>
+<section id="sec-txSeg" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="sec-txSeg"><span class="header-section-number">2.1</span> Transcript-Based Segmentation</h2>
+<p>These methods directly infer cell boundaries by clustering or modeling the spatial distribution of transcripts, often using gene identity as additional signal.</p>
+<p><strong>Use when:</strong></p>
+<ul>
+<li>You <strong>don’t have reliable cell images</strong> (e.g., missing or low-quality DAPI/membrane stains)</li>
+<li>You want to define cells purely from <strong>mRNA localization</strong></li>
+<li>You need a <strong>de novo</strong> segmentation pipeline without preprocessing</li>
+</ul>
+<p><strong>Limitations:</strong></p>
+<ul>
+<li>May oversegment sparse cells or misplace boundaries without priors</li>
+<li>Transcript noise can bias clustering in low-resolution assays and introduce circularity in analysis pipeline</li>
+</ul>
+<p><strong>Best for:</strong> Datasets where transcript positions are abundant and dense.</p>
+</section>
+<section id="sec-txRefine" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="sec-txRefine"><span class="header-section-number">2.2</span> Segmentation Refinement</h2>
+<p>These tools enhance an existing segmentation mask, correcting common segmentation errors using transcript-level context only when there is sufficient evidence.</p>
+<p><strong>Use when:</strong></p>
+<ul>
+<li>You <strong>already ran an image-based segmentation</strong> (e.g., Cellpose, watershed)</li>
+<li>You notice cells with <strong>minor contamination from neighboring cells</strong></li>
+<li>You want to <strong>keep image-based alignment but improve transcript association</strong></li>
+</ul>
+<p><strong>Limitations:</strong></p>
+<ul>
+<li>Relies on the quality of the initial mask — can’t fix everything</li>
+<li>Adds an extra pipeline step, but is lightweight</li>
+</ul>
+<p><strong>Best for:</strong> Any pipeline combining tissue images with transcript-based validation, especially if accurate cell boundaries affect downstream quantification.</p>
+</section>
+<section id="sec-segFree" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="sec-segFree"><span class="header-section-number">2.3</span> Segmentation-Free Analysis</h2>
+<p>Instead of forcing transcripts into discrete cells, these approaches model <strong>gene expression directly in space</strong>, uncovering continuous spatial features, patterns, and regions.</p>
+<p><strong>Use when:</strong></p>
+<ul>
+<li>You want to <strong>avoid cell segmentation biases</strong></li>
+<li>Your tissue has ambiguous or <strong>poorly defined boundaries</strong></li>
+<li>You aim to study <strong>gradients, niches, or expression domains</strong> more than individual cells</li>
+</ul>
+<p><strong>Limitations:</strong></p>
+<ul>
+<li>No per-cell outputs (e.g., no cell-by-gene matrices)</li>
+<li>Some tools are exploratory and require interpretation beyond standard stats</li>
+</ul>
+<p><strong>Best for:</strong> Ultra-dense data like Seq-Scope or CosMx where transcript resolution enables high-fidelity spatial patterning without segmentation artifacts.</p>
+</section>
+</section>
+<section id="running-transcript-informed-approaches-with-cosmx-data" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Running transcript-informed approaches with CosMx data</h1>
+<p>With this foundation in place, let’s now walk through tools that exemplify each approach. The input files used are exported by AtoMx<sup>®</sup> Spatial Informatics Portal (SIP) and their file structures are described in this <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/assets/Pancreas-CosMx-ReadMe.html" target="_blank">ReadMe</a>.</p>
+<div id="tbl-txSeg-types" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-txSeg-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: Categories of Transcript-Based Methods
+</figcaption>
+<div aria-describedby="tbl-txSeg-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 32%">
+<col style="width: 49%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Goal</th>
+<th>Example Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Segmentation</td>
+<td>Create cell boundaries from transcripts</td>
+<td>Baysor, ProSeg</td>
+</tr>
+<tr class="even">
+<td>Segmentation Refinement</td>
+<td>Improve pre-existing cell boundaries</td>
+<td>FastReseg</td>
+</tr>
+<tr class="odd">
+<td>Segmentation-Free Analysis</td>
+<td>Analyze transcript patterns directly</td>
+<td>FICTURE</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<section id="baysor-probabilistic-transcript-based-segmentation" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="baysor-probabilistic-transcript-based-segmentation"><span class="header-section-number">3.1</span> Baysor: Probabilistic Transcript-Based Segmentation</h2>
+<p><a href="https://github.com/kharchenkolab/Baysor" target="_blank">Baysor</a> <span class="citation" data-cites="petukhov2021cell">(<a href="#ref-petukhov2021cell" role="doc-biblioref">Petukhov et al. 2021</a>)</span> segments cells by modeling transcript positions and gene identities using a Bayesian mixture model. It optionally incorporates nuclei positions for prior constraints.</p>
+<p><strong>Pros</strong></p>
+<ul>
+<li>Fully probabilistic</li>
+<li>Handles overlapping cells and ambiguous boundaries</li>
+<li>Optional priors improve accuracy</li>
+</ul>
+<p><strong>Cons</strong></p>
+<ul>
+<li>Slower and very high memory consumption on large datasets</li>
+<li>Requires Julia and formatting input data</li>
+<li>Sensitive to input parameters, tend to over-segmenting and bias towards smaller cells.</li>
+</ul>
+<section id="sec-baysor-install" class="level3" data-number="3.1.1">
+<h3 data-number="3.1.1" class="anchored" data-anchor-id="sec-baysor-install"><span class="header-section-number">3.1.1</span> Install Baysor</h3>
+<p>The simplest way to install <code>Baysor</code> on Linux is by downloading a precompiled binary from the repository’s <a href="https://github.com/kharchenkolab/Baysor/releases" target="_blank">release section</a>. Once downloaded, you can run the executable located at <code>bin/baysor</code>. Below is the example code on how to setup an AWS EC2 instance to run <code>baysor</code>. For other platforms, please refer to the full installation instruction provided by the original authors <a href="https://kharchenkolab.github.io/Baysor/dev/installation/" target="_blank">here</a>.</p>
+<ol type="1">
+<li>SSH log into your AWS EC2 instance as admin and navigate to a folder you can write on, e.g.&nbsp;<code>/home/YourUserName/data</code>.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>log into ec2 as admin</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># replace content inside &lt;&gt; with your actual setup</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> <span class="at">-i</span> <span class="st">"your-key-to-ec2.pem"</span> <span class="op">&lt;</span>admin-name<span class="op">&gt;</span>@<span class="op">&lt;</span>instance-ip-address<span class="op">&gt;</span> </span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># show container/docker info to get container ID</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> docker ps <span class="at">-a</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># get into the container, replace "root" with your admin name </span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> docker exec <span class="at">--user</span><span class="op">=</span><span class="st">"root"</span> <span class="at">-it</span> <span class="op">&lt;</span>container-ID<span class="op">&gt;</span> /bin/bash</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># navigate to working directory</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /home/YourUserName/data</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<ol start="2" type="1">
+<li>Download and unzip the precompiled binary to target folder. For Baysor v0.7.1, there should be two executable <code>baysor</code> and <code>julia</code> inside the unzipped<code>./bin</code> folder.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>obtain Baysor binary</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://github.com/kharchenkolab/Baysor/releases/download/v0.7.1/baysor-x86_x64-linux-v0.7.1_build.zip</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">unzip</span> baysor-x86_x64-linux-v0.7.1_build.zip</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> <span class="at">-l</span> bin/julia</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> <span class="at">-l</span> bin/baysor</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<ol start="3" type="1">
+<li>Make the downloaded binary executable (<code>./bin</code> folder) for all users, <strong>set library path to empty</strong> (necessary to work with pre-compiled executable) and verify if <code>baysor/bin</code> is working.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>make Baysor executable</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">chmod</span> <span class="at">-R</span> o+x /home/YourUserName/data/bin </span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">chmod</span> <span class="at">-R</span> o+r /home/YourUserName/data/bin </span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> <span class="at">-l</span> /home/YourUserName/data/bin/julia </span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> <span class="at">-l</span> /home/YourUserName/data/bin/baysor</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="va">LD_LIBRARY_PATH</span><span class="op">=</span><span class="st">""</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="va">$LD_LIBRARY_PATH</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="ex">/home/YourUserName/data/bin/julia</span> <span class="at">--help</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="ex">/home/YourUserName/data/bin/baysor</span> <span class="at">--help</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<ol start="4" type="1">
+<li>Create symbolic links such that one could run with command line without the full path to the binary file.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>create symbolic link</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> ln <span class="at">-s</span> /home/YourUserName/data/bin/julia /usr/local/bin/julia</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> ln <span class="at">-s</span> /home/YourUserName/data/bin/baysor /usr/local/bin/baysor</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="ex">julia</span> <span class="at">--help</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="ex">baysor</span> <span class="at">--help</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>Now you should be able to run <code>Baysor</code> from command line in your EC2 instance.</p>
+</section>
+<section id="run-baysor" class="level3" data-number="3.1.2">
+<h3 data-number="3.1.2" class="anchored" data-anchor-id="run-baysor"><span class="header-section-number">3.1.2</span> Run Baysor</h3>
+<p>As detailed in Baysor’s <a href="https://kharchenkolab.github.io/Baysor/dev/segmentation/" target="_blank">documentations</a>, <code>baysor</code> segmentation command requires data frame of transcripts’ coordinates and gene type as inputs. One can specify the data format as command arguments and configure the processing in the <code>.toml</code> file.</p>
+<p><strong>Prepare Inputs</strong></p>
+<p>The transcript file (e.g.&nbsp;<code>Pancreas_tx_file.csv</code>) exported by AtoMx<sup>®</sup> SIP has spatial coordinates under pixel unit in global coordinate system and is recommended to convert into micrometer unit before processing. Besides, AtoMx exported transcript file has study-unique cell ID under <code>cell</code> column which could be provided to <code>baysor</code> command as prior segmentation.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># prepare Tx file in R</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>fullTx <span class="ot">&lt;-</span> data.table<span class="sc">::</span><span class="fu">fread</span>(<span class="st">"Pancreas_tx_file.csv"</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># convert to micrometer </span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>pixel_size <span class="ot">&lt;-</span> <span class="fl">0.12028</span> <span class="co"># micron per pixel </span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>z_step <span class="ot">&lt;-</span> <span class="fl">0.8</span> <span class="co"># micron per z step </span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>fullTx[[<span class="st">'x_allS_um'</span>]] <span class="ot">&lt;-</span> fullTx[[<span class="st">'x_global_px'</span>]] <span class="sc">*</span> pixel_size</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>fullTx[[<span class="st">'y_allS_um'</span>]] <span class="ot">&lt;-</span> fullTx[[<span class="st">'y_global_px'</span>]] <span class="sc">*</span> pixel_size</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>fullTx[[<span class="st">'z_allS_um'</span>]] <span class="ot">&lt;-</span> fullTx[[<span class="st">'z'</span>]] <span class="sc">*</span> z_step</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co"># assign unify "cell" ID to extracellular transcripts in tx file </span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>fullTx[cell_ID <span class="sc">==</span> <span class="dv">0</span>, cell <span class="sc">:</span><span class="er">=</span> <span class="st">"0"</span>]</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="co"># export the modified transcript file to use with command line </span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>data.table<span class="sc">::</span><span class="fu">fwrite</span>(fullTx, <span class="at">file =</span> <span class="st">"Pancreas_prepared_tx_file.csv"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><strong>Run Command</strong></p>
+<p>Below is an example command that performs Baysor segmentation on transcript file (e.g.&nbsp;<code>Pancreas_prepared_tx_file.csv</code>) and output results to folder <code>~/data/baysor_outputs</code>. Optionally, one can disable the polygon outputs for faster processing by passing <code>--polygon-format none</code> to the command.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>run Baysor</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">baysor</span> run Pancreas_prepared_tx_file.csv :cell <span class="dt">\</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output</span> ~/data/baysor_outputs <span class="dt">\</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--gene-column</span> target <span class="dt">\</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--x-column</span> x_allS_um <span class="dt">\</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--y-column</span> y_allS_um <span class="dt">\</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--z-column</span> z_allS_um <span class="dt">\</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--config</span> baysor_cosmx_config.toml <span class="dt">\</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--count-matrix-format</span> tsv</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>An example configuration file for using CosMx data with <code>Baysor</code> is shown below.</p>
+<div class="sourceCode" id="cb7" data-caption="baysor_cosmx_config.toml"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">[data]</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="dt">gene</span> <span class="op">=</span> <span class="st">"target"</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="dt">min_molecules_per_gene</span> <span class="op">=</span> <span class="dv">1</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="dt">exclude_genes</span> <span class="op">=</span> <span class="st">"FalseCode*,NegPrb*,SystemControl*,Negative*,Custom*"</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="dt">min_molecules_per_cell</span> <span class="op">=</span> <span class="dv">20</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="kw">[segmentation]</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="dt">prior_segmentation_confidence</span> <span class="op">=</span> <span class="fl">0.2</span> <span class="co"># Confidence of the prior segmentation. Default: 0.2</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="dt">unassigned_prior_label</span> <span class="op">=</span> <span class="st">"0"</span> <span class="co"># Label for unassigned cells in the prior segmentation. Default: "0"</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="kw">[plotting]</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="dt">min_pixels_per_cell</span> <span class="op">=</span> <span class="dv">10</span> <span class="co"># Number of pixels per cell of minimal size, used to estimate size of the final plot. For most protocols values around 7-30 give enough visualization quality. Default: 15</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="dt">max_plot_size</span> <span class="op">=</span> <span class="dv">3000</span> <span class="co"># Maximum size of the molecule plot in pixels. Default: 5000A</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Since a full run can be time-consuming, it’s recommended to perform a quick preview to extract initial insights from the data and to make informed guesses about the parameters for the full analysis. One can achieve this with <code>baysor preview</code> command using the same input arguments. For more details, see <a href="https://kharchenkolab.github.io/Baysor/dev/preview/" target="_blank">here</a> and a discussion on parameter choices could be found <a href="https://kharchenkolab.github.io/Baysor/dev/segmentation/#Choice-of-parameters" target="_blank">here</a>.</p>
+</div>
+</div>
+<p><strong>Outputs</strong></p>
+<p>By default, <code>baysor</code> segmentation generates the following outputs.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Baysor outputs</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">baysor_outputs/</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> segmentation_cell_stats.csv</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> segmentation_counts.tsv</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> segmentation.csv</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> segmentation_log.log</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> segmentation_params.dump.toml</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> segmentation_polygons_2d.json</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="ex">└──</span> segmentation_polygons_3d.json</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>A full description on outputs could be found in Baysor’s <a href="https://kharchenkolab.github.io/Baysor/dev/segmentation/" target="_blank">documentations</a>. Briefly,</p>
+<ul>
+<li><p><code>segmentation_cell_stats.csv</code>: a cell x attributes data frame with new cell ID under <code>cell</code> column, number of transcripts assigned under <code>n_transcripts</code> column, and average assignment confidence per cell under <code>avg_assignment_confidence</code> column.</p></li>
+<li><p><code>segmentation_counts.tsv</code>: the single-cell count matrix with segmented statistics; one could choose to output it as <code>loom</code> format when setting <code>--count-matrix-format loom</code> in command.</p></li>
+<li><p><code>segmentation.csv</code>: the per molecular level information for the full transcript file, with <code>cell</code> column for new cell ID, <code>confidence</code> and <code>is_noise</code> columns for whether the molecule is real (not noise), and <code>assignment_confidence</code> column for the confidence that the particular molecule is assigned to a correct cell.</p>
+<ul>
+<li>We recommend to remove molecules with <code>confidence</code> below <code>0.9</code> or <code>is_nose = True</code> from single-cell expression matrix for downstream analysis.</li>
+</ul></li>
+</ul>
+</section>
+</section>
+<section id="proseg-fast-transcript-simulation-based-segmentation" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="proseg-fast-transcript-simulation-based-segmentation"><span class="header-section-number">3.2</span> ProSeg: Fast Transcript Simulation Based Segmentation</h2>
+<p><a href="https://github.com/dcjones/proseg" target="_blank">ProSeg</a> <span class="citation" data-cites="jones2025cell">(<a href="#ref-jones2025cell" role="doc-biblioref">Jones et al. 2025</a>)</span> is a high-speed, Rust-based tool that segments cells using density-based clustering of transcript positions. It is optimized for large datasets from platforms like CosMx.</p>
+<p><strong>Pros</strong></p>
+<ul>
+<li>Much faster and smaller memory footprint than Baysor</li>
+<li>Does not require image inputs to consider prior segmentation with assigned nuclear compartment</li>
+<li>Works on compressed csv.gz files directly</li>
+</ul>
+<p><strong>Cons</strong></p>
+<ul>
+<li>Fewer model-based refinements than Baysor</li>
+<li>A sampling method which runs in non-deterministic way in its current form.</li>
+<li>The direct outputs are posterior expectations instead of integers counts assigned to each cell.</li>
+<li>Prone to merge error and generate abnormally large cells near sample edge next to cell-free region.</li>
+</ul>
+<section id="install-proseg" class="level3" data-number="3.2.1">
+<h3 data-number="3.2.1" class="anchored" data-anchor-id="install-proseg"><span class="header-section-number">3.2.1</span> Install ProSeg</h3>
+<p>To install <code>ProSeg</code>, one would need to first install <code>cargo</code> and then the <code>proseg</code> package. For an AWS EC2 instance, one should first log into the instance as admin (see Baysor installation above <a href="#sec-baysor-install" class="quarto-xref">Section&nbsp;3.1.1</a> for details) and then do the following.</p>
+<ol type="1">
+<li>Install <code>cargo</code> as admin <code>root</code> and set it up for all users.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>install cargo</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">--proto</span> <span class="st">'=https'</span> <span class="at">--tlsv1.2</span> <span class="at">-sSf</span> https://sh.rustup.rs <span class="kw">|</span> <span class="fu">sh</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># activate cargo environment or restart session to have PATH change in effect </span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="bu">.</span> <span class="st">"</span><span class="va">$HOME</span><span class="st">/.cargo/env"</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="va">$HOME</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co"># test installation</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="fu">which</span> cargo</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> <span class="at">--version</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>By default, <code>cargo</code> would be installed under <code>/root/.cargo</code> folder. To make it executable for all users, one could copy its binary to local environment.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>setup cargo for all users</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> /root/.cargo/bin/</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> cp /root/.cargo/bin/<span class="pp">*</span> /usr/local/bin/</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> chmod 755 /usr/local/bin/<span class="pp">*</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>Now, one could use <code>cargo</code> as non-admin user.</p>
+<ol start="2" type="1">
+<li>Clone and install <code>proseg</code>.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>install proseg</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/dcjones/proseg.git</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> install proseg</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co"># test installation</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="fu">which</span> proseg</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="ex">proseg</span> <span class="at">--version</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</section>
+<section id="run-proseg" class="level3" data-number="3.2.2">
+<h3 data-number="3.2.2" class="anchored" data-anchor-id="run-proseg"><span class="header-section-number">3.2.2</span> Run ProSeg</h3>
+<p>Same as <code>baysor</code>, the primary input for <code>proseg</code> is the transcript data frame. Since <code>proseg</code> command allows a more flexible data structure and internal conversion between pixel and micrometer units using <code>coordinate-scale</code> argument, the transcript file exported by AtoMx<sup>®</sup> SIP could be used directly without modification or decompression (i.e.&nbsp;working for <code>.csv.gz</code> file).</p>
+<p><strong>Run Command</strong></p>
+<p>Below is an example command that performs ProSeg segmentation on transcript file (e.g.&nbsp;<code>Pancreas_tx_file.csv</code>) and output results to folder <code>~/data/proseg_outputs</code>. In addition to prior segmentation, the assigned nuclear compartments in transcript files are also provided to <code>proseg</code> via arguments <code>--compartment-column CellComp --compartment-nuclear Nuclear</code>.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>run ProSeg</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">proseg</span> Pancreas_tx_file.csv <span class="dt">\</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-path</span> ~/data/proseg_outputs <span class="dt">\</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--gene-column</span> target <span class="dt">\</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--x-column</span> x_global_px <span class="dt">\</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--y-column</span> y_global_px <span class="dt">\</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--z-column</span> z <span class="dt">\</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--compartment-column</span> CellComp <span class="dt">\</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--compartment-nuclear</span> Nuclear <span class="dt">\</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">--fov-column</span> fov <span class="dt">\</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--cell-id-column</span> cell <span class="dt">\</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--cell-id-unassigned</span> <span class="st">''</span> <span class="dt">\</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">--cell-assignment-column</span> cell_ID <span class="dt">\</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">--cell-assignment-unassigned</span> <span class="st">'0'</span> <span class="dt">\</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">--excluded-genes</span> <span class="st">'^(SystemControl|Negative)'</span> <span class="dt">\</span></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">--coordinate-scale</span> 0.12028 </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>ProSeg performs a z coordinate normalization step to remove sample tilt and cap z coordinates within 1st ~ 99th percentile of original value. Thus, it’s recommended to split your dataset by tissue sections first and then process each one separately. This helps avoid problems that can happen because the sections may have different z-coordinate values. More advice and description on argument options could be found <a href="https://github.com/dcjones/proseg/tree/main?tab=readme-ov-file#modeling-assumptions" target="_blank">here</a>.</p>
+</div>
+</div>
+<p><strong>Outputs</strong></p>
+<p>By default, <code>proseg</code> segmentation generates the following outputs.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>ProSeg outputs</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">proseg_outputs/</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> cell-metadata.csv</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> cell-polygons.geojson</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> cell-polygons-layers.geojson</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> expected-counts.csv</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> transcript-metadata.csv</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="ex">└──</span> union-cell-polygons.geojson</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>A full description on ProSeg’s output format could be found <a href="https://github.com/dcjones/proseg/tree/main?tab=readme-ov-file#output-options" target="_blank">here</a>. Briefly.</p>
+<ul>
+<li><p><code>cell-metadata.csv</code>: a cell x attributes data frame with new cell ID under <code>cell</code> column, cell volume under <code>volume</code> column.</p>
+<ul>
+<li>We recommend to inspect the <code>volume</code> value to remove cells that are abnormally large.</li>
+</ul></li>
+<li><p><code>expected-counts.csv</code>: the single-cell expression matrix with segmented statistics; the reported expression values are posterior expectations shown as fractional counts instead of integers.</p>
+<ul>
+<li>We recommend to calculate the observed single-cell count matrix with the new cell ID assignment from the output <code>transcript-metadata.csv</code> before downstream single-cell analysis for consistency.</li>
+</ul></li>
+<li><p><code>transcript-metadata.csv</code>: the per molecular level information for the full transcript file, with <code>gene</code> column for gene name, <code>assignment</code> column for new cell ID, <code>probability</code> and <code>background</code> columns for whether the molecule is real and confidently assigned.</p>
+<ul>
+<li>We recommend to remove molecules with <code>background = 1</code> before generating the observed single-cell count matrix from transcript file.</li>
+</ul></li>
+</ul>
+<p><strong>Generate Count Matrix</strong></p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># read in ProSeg processed transcript files in R</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>dt <span class="ot">&lt;-</span> data.table<span class="sc">::</span><span class="fu">fread</span>(<span class="st">"proseg_outputs/transcript-metadata.csv"</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="co"># remove background transcripts and keep only the needed columns </span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>dt <span class="ot">&lt;-</span> dt[background <span class="sc">!=</span><span class="dv">1</span>, .SD, .SDcols <span class="ot">=</span> <span class="fu">c</span>(<span class="st">'assignment'</span>, <span class="st">'gene'</span>)]</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>dt[[<span class="st">'gene'</span>]] <span class="ot">&lt;-</span> <span class="fu">factor</span>(dt[[<span class="st">'gene'</span>]])</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>dt[[<span class="st">'assignment'</span>]] <span class="ot">&lt;-</span> <span class="fu">as.character</span>(dt[[<span class="st">'assignment'</span>]])</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="co"># get observed cell x gene count matrix </span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> reshape2<span class="sc">::</span><span class="fu">acast</span>(dt, assignment <span class="sc">~</span> gene, <span class="at">fun.aggregate =</span> length)</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> Matrix<span class="sc">::</span><span class="fu">Matrix</span>(counts, <span class="at">sparse =</span> <span class="cn">TRUE</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+</section>
+<section id="fastreseg-transcript-based-segmentation-refinement" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="fastreseg-transcript-based-segmentation-refinement"><span class="header-section-number">3.3</span> FastReseg: Transcript-Based Segmentation Refinement</h2>
+<p><a href="https://github.com/Nanostring-Biostats/FastReseg" target="_blank">FastReseg</a> <span class="citation" data-cites="Wu2024">(<a href="#ref-Wu2024" role="doc-biblioref">Wu, Beechem, and Danaher 2024</a>)</span> is a transcript-informed refinement tool that improves segmentation masks (e.g., from Cellpose or watershed) by leveraging local transcript expression profiles to resolve over-segmentation, under-segmentation, and cell boundaries.</p>
+<p><strong>Pros</strong></p>
+<ul>
+<li>Fast and lightweight</li>
+<li>Enhances biological accuracy without radically redefining cell boundaries</li>
+<li>Supports configurable refinement rules</li>
+</ul>
+<p><strong>Cons</strong></p>
+<ul>
+<li>Requires an existing segmentation mask</li>
+<li>Works best with dense, high-plex data</li>
+</ul>
+<p>Please refer to <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/" target="_blank">earlier post</a> and the <a href="https://nanostring-biostats.github.io/FastReseg/articles/tutorial.html" target="_blank">package tutorial</a> on how to use <code>FastReseg</code> to evaluate segmentation performance and further perform refinement.</p>
+<section id="fastreseg-custom-module-in-atomx" class="level3" data-number="3.3.1">
+<h3 data-number="3.3.1" class="anchored" data-anchor-id="fastreseg-custom-module-in-atomx"><span class="header-section-number">3.3.1</span> FastReseg Custom Module in AtoMx</h3>
+<p>For AtoMx users (version 2.0.1 or later), here we provide a <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/fastReseg-custom-module" target="_blank">custom module</a> designed to perform FastReseg analysis on CosMx RNA studies hosted on the AtoMx SIP platform.</p>
+<p>This module conducts segmentation evaluation on pre-segmented data and introduces a new cell metadata column, <code>lrtest_nlog10P</code>, which quantifies the degree of spatial dependency observed within existing cells. It also enables the removal of flagged transcripts from current cell segments. When the module is executed a second time with the same configuration and <code>overwrite_RNA_soma = TRUE</code>, it allows downstream AtoMx analysis to proceed using the trimmed RNA data. Currently, the FastReseg custom module supports transcript cleanup through trimming only, as this is the primary error mode encountered in thin tissue sections.</p>
+</section>
+</section>
+<section id="ficture-segmentation-free-spatial-transcript-analysis" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="ficture-segmentation-free-spatial-transcript-analysis"><span class="header-section-number">3.4</span> FICTURE: Segmentation-Free Spatial Transcript Analysis</h2>
+<p><a href="https://github.com/seqscope/ficture" target="_blank">FICTURE</a> <span class="citation" data-cites="si2024ficture">(<a href="#ref-si2024ficture" role="doc-biblioref">Si et al. 2024</a>)</span> is a segmentation-free spatial factorization method. It models spatial transcript patterns using statistical models to extract biologically meaningful regions and interactions.</p>
+<p><strong>Pros</strong></p>
+<ul>
+<li>No reliance on image or segmentation</li>
+<li>Ideal for spatial transcriptomics data of submicron-resolution (e.g., Seq-Scope, CosMx)</li>
+<li>Avoids biases of segmentation methods</li>
+</ul>
+<p><strong>Cons</strong></p>
+<ul>
+<li>Works on 2D transcript data only</li>
+<li>Doesn’t yield per-cell outputs (i.e., no cell boundaries)</li>
+<li>Interpretation can be abstract for some users</li>
+</ul>
+<section id="install-ficture" class="level3" data-number="3.4.1">
+<h3 data-number="3.4.1" class="anchored" data-anchor-id="install-ficture"><span class="header-section-number">3.4.1</span> Install FICTURE</h3>
+<p><code>FICTURE</code> relies on <code>bgzip</code> and <code>tabix</code> for file processing and one could install those libraries as part of <code>htslib</code> installation. For an AWS EC2 instance, one should first log into the instance as admin (see Baysor installation above <a href="#sec-baysor-install" class="quarto-xref">Section&nbsp;3.1.1</a> for details) and then do the following.</p>
+<ol type="1">
+<li>Install <code>htslib</code>C library (<a href="https://www.htslib.org/download/" target="_blank">latest release</a>).</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>install C dependencies of FICTURE</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># download and unzip the release version</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://github.com/samtools/htslib/releases/download/1.20/htslib-1.20.tar.bz2</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="fu">tar</span> <span class="at">-xvjf</span> htslib-1.20.tar.bz2</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> htslib-1.20</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="co"># setup location to install, typically under /usr/local/ for all users</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="ex">./configure</span> <span class="at">--prefix</span><span class="op">=</span>/usr/local/</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> make</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> make install</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="co"># test installation</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="ex">htsfile</span> <span class="at">--version</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>If the installation location is not under <code>/usr/local/</code>, one would need to add the installation path to <code>PATH</code> system environment variable when login as non-admin user.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>update PATH</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="va">PATH</span><span class="op">=</span>/where/to/install/bin/:<span class="va">$PATH</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="co"># test installation</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="ex">bgzip</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="ex">tabix</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<ol start="2" type="1">
+<li>Set up python virtual environment and install <code>FICTURE</code> package via pip.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>create env and install FICTURE</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co">## Create a virtual environment</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="va">VENV</span><span class="op">=</span>/path/to/venv/name   <span class="co">## replace it with your desired path</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> venv <span class="va">${VENV}</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="co">## Activate the virtual environment</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> <span class="va">${VENV}</span>/bin/activate</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a><span class="co">## Clone the GitHub repository</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/seqscope/ficture.git</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ficture</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a><span class="co">## Install the required packages</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-r</span> requirements.txt</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a><span class="co">## Install FICTURE locally</span></span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-e</span> .</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</section>
+<section id="run-ficture" class="level3" data-number="3.4.2">
+<h3 data-number="3.4.2" class="anchored" data-anchor-id="run-ficture"><span class="header-section-number">3.4.2</span> Run FICTURE</h3>
+<p>A full description on how to run FICTURE could be found <a href="https://seqscope.github.io/ficture/localrun/" target="_blank">here</a>. More information regarding how to submit FICTURE jobs to SLURM cluster is described in FICTURE’s <a href="https://seqscope.github.io/ficture/run/" target="_blank">documents</a>.</p>
+<p><strong>Prepare Inputs</strong></p>
+<p>Below is an example command that prepares AtoMx-exported transcript file (e.g.&nbsp;<code>Pancreas_tx_file.csv</code>) for FICTURE processing using its utility function. See <a href="https://seqscope.github.io/ficture/format_input/cosmx/" target="_blank">here</a> for more details.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>prepare CosMx Tx file for FICTURE</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># path to input transcript file, working for .csv.gz file too </span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="va">inputFile</span><span class="op">=</span>/path/to/input/Pancreas_tx_file.csv</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="co">## set up output folder and identifier </span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="va">outDir</span><span class="op">=</span>/path/to/preprocess_data</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a><span class="va">iden</span><span class="op">=</span>pancreas</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a><span class="va">filteredFile</span><span class="op">=</span><span class="va">${outDir}</span>/filtered.matrix.<span class="va">${iden}</span>.tsv</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a><span class="va">featureFile</span><span class="op">=</span><span class="va">${outDir}</span>/feature.clean.<span class="va">${iden}</span>.tsv</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a><span class="co"># navigate to the root folder of FICTURE package to use its utilities function</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ficture </span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a><span class="co"># generate transcript file (required) and gene list (optional)</span></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> misc/format_cosmx.py <span class="dt">\</span></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input</span> <span class="va">${inputFile}</span> <span class="dt">\</span></span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output</span> <span class="va">${filteredFile}</span> <span class="dt">\</span></span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">--gcol</span> target <span class="dt">\</span></span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>  <span class="at">--feature</span> <span class="va">${featureFile}</span> <span class="dt">\</span></span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">--dummy_genes</span> <span class="st">'Negative|SystemControl'</span> <span class="dt">\</span></span>
+<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a>  <span class="at">--px_to_um</span> 0.12028 <span class="dt">\</span></span>
+<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a>  <span class="at">--precision</span> 2 <span class="dt">\</span></span>
+<span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a>  <span class="at">--annotation</span> cell fov</span>
+<span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a><span class="co"># sort the filtered transcript files based on coordinate columns (first 2) and then zip it</span></span>
+<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a><span class="fu">sort</span> <span class="at">-k2,2g</span> <span class="at">-k1,1g</span> <span class="va">${filteredFile}</span> <span class="kw">|</span> <span class="fu">gzip</span> <span class="at">-c</span> <span class="op">&gt;</span> <span class="va">${filteredFile}</span>.gz</span>
+<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a><span class="co"># remove the unsorted unzip version</span></span>
+<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span> <span class="va">${filteredFile}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>preprocess outputs</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="ex">preprocess_data/</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> coordinate_minmax.tsv</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> feature.clean.pancreas.tsv</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="ex">└──</span> filtered.matrix.pancreas.tsv.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p><strong>Run Command</strong></p>
+<p>Below is an example command that perform the complete FICTURE pipeline with 2 different hexagon flat-to-flat widths <code>train-width</code>, 12 and 18 micron, at same time.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>run FICTURE</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># setup pipeline output folder</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="va">outDir2</span><span class="op">=</span>/path/to/ficture_outputs</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="co"># generate transcript file and gene list (optional)</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="ex">ficture</span> run together <span class="at">--in-tsv</span> <span class="va">${filteredFile}</span>.gz <span class="dt">\</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--in-minmax</span> <span class="va">${outDir}</span>/coordinate_minmax.tsv <span class="dt">\</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--in-feature</span> <span class="va">${featureFile}</span> <span class="dt">\</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--out-dir</span> <span class="va">${outDir2}</span> <span class="dt">\</span></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">--train-width</span> 12,18 <span class="dt">\</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--n-factor</span> 12 <span class="dt">\</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--n-jobs</span> 4<span class="dt">\</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">--plot-each-factor</span> <span class="dt">\</span></span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">--all</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>If the installation path for <code>bgzip</code> and <code>tabix</code> is not under <code>/usr/local/bin/</code>, pass the installation location to the <code>ficture</code> command as well: <code>--bgzip /where/to/install/bin/bgzip --tabix /where/to/install/bin/tabix</code>.</p>
+<p><strong>Outputs</strong></p>
+<p>By default, <code>ficture run together</code> command generates the following outputs when setting number of expression factors <code>n-factor</code> to 12 with 2 different <code>train-width</code> values. A detailed description on the output files are described in FICTURE’s <a href="https://seqscope.github.io/ficture/localrun/#output" target="_blank">documents</a>.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>FICTURE outputs</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="ex">ficture_outputs</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> analysis</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   ├── nF12.d_12</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── figure</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │   ├── nF12.d_12.cbar.png</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │   ├── nF12.d_12.coarse.png</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │   ├── nF12.d_12.coarse.top.png</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │   ├── nF12.d_12.decode.prj_12.r_4_5.pixel.png</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │   ├── nF12.d_12.rgb.tsv</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │   └── sub</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_0.png</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_10.png</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_11.png</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_1.png</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_2.png</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_3.png</span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_4.png</span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_5.png</span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_6.png</span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_7.png</span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_8.png</span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   │       └── nF12.d_12.decode.prj_12.r_4_5.pixel.F_9.png</span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.coherence.tsv</span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.anchor.tsv.gz</span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.bulk_chisq.tsv</span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.done</span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.factor.info.html</span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.factor.info.tsv</span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.pixel.sorted.tsv.gz</span>
+<span id="cb21-30"><a href="#cb21-30" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.pixel.sorted.tsv.gz.tbi</span>
+<span id="cb21-31"><a href="#cb21-31" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.posterior.count.tsv.gz</span>
+<span id="cb21-32"><a href="#cb21-32" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.done</span>
+<span id="cb21-33"><a href="#cb21-33" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.fit_result.tsv.gz</span>
+<span id="cb21-34"><a href="#cb21-34" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.model_matrix.tsv.gz</span>
+<span id="cb21-35"><a href="#cb21-35" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.model.p</span>
+<span id="cb21-36"><a href="#cb21-36" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.model_selection_candidates.p</span>
+<span id="cb21-37"><a href="#cb21-37" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.posterior.count.tsv.gz</span>
+<span id="cb21-38"><a href="#cb21-38" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   ├── nF12.d_12.prj_12.r_4.fit_result.tsv.gz</span>
+<span id="cb21-39"><a href="#cb21-39" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   │   └── nF12.d_12.prj_12.r_4.posterior.count.tsv.gz</span>
+<span id="cb21-40"><a href="#cb21-40" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>   └── nF12.d_18</span>
+<span id="cb21-41"><a href="#cb21-41" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── figure</span>
+<span id="cb21-42"><a href="#cb21-42" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │   ├── nF12.d_18.cbar.png</span>
+<span id="cb21-43"><a href="#cb21-43" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │   ├── nF12.d_18.coarse.png</span>
+<span id="cb21-44"><a href="#cb21-44" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │   ├── nF12.d_18.coarse.top.png</span>
+<span id="cb21-45"><a href="#cb21-45" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │   ├── nF12.d_18.decode.prj_18.r_4_5.pixel.png</span>
+<span id="cb21-46"><a href="#cb21-46" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │   ├── nF12.d_18.rgb.tsv</span>
+<span id="cb21-47"><a href="#cb21-47" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │   └── sub</span>
+<span id="cb21-48"><a href="#cb21-48" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_0.png</span>
+<span id="cb21-49"><a href="#cb21-49" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_10.png</span>
+<span id="cb21-50"><a href="#cb21-50" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_11.png</span>
+<span id="cb21-51"><a href="#cb21-51" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_1.png</span>
+<span id="cb21-52"><a href="#cb21-52" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_2.png</span>
+<span id="cb21-53"><a href="#cb21-53" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_3.png</span>
+<span id="cb21-54"><a href="#cb21-54" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_4.png</span>
+<span id="cb21-55"><a href="#cb21-55" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_5.png</span>
+<span id="cb21-56"><a href="#cb21-56" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_6.png</span>
+<span id="cb21-57"><a href="#cb21-57" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_7.png</span>
+<span id="cb21-58"><a href="#cb21-58" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_8.png</span>
+<span id="cb21-59"><a href="#cb21-59" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       │       └── nF12.d_18.decode.prj_18.r_4_5.pixel.F_9.png</span>
+<span id="cb21-60"><a href="#cb21-60" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.coherence.tsv</span>
+<span id="cb21-61"><a href="#cb21-61" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.anchor.tsv.gz</span>
+<span id="cb21-62"><a href="#cb21-62" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.bulk_chisq.tsv</span>
+<span id="cb21-63"><a href="#cb21-63" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.done</span>
+<span id="cb21-64"><a href="#cb21-64" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.factor.info.html</span>
+<span id="cb21-65"><a href="#cb21-65" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.factor.info.tsv</span>
+<span id="cb21-66"><a href="#cb21-66" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.sorted.tsv.gz</span>
+<span id="cb21-67"><a href="#cb21-67" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.sorted.tsv.gz.tbi</span>
+<span id="cb21-68"><a href="#cb21-68" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.posterior.count.tsv.gz</span>
+<span id="cb21-69"><a href="#cb21-69" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.done</span>
+<span id="cb21-70"><a href="#cb21-70" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.fit_result.tsv.gz</span>
+<span id="cb21-71"><a href="#cb21-71" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.model_matrix.tsv.gz</span>
+<span id="cb21-72"><a href="#cb21-72" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.model.p</span>
+<span id="cb21-73"><a href="#cb21-73" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.model_selection_candidates.p</span>
+<span id="cb21-74"><a href="#cb21-74" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.posterior.count.tsv.gz</span>
+<span id="cb21-75"><a href="#cb21-75" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       ├── nF12.d_18.prj_18.r_4.fit_result.tsv.gz</span>
+<span id="cb21-76"><a href="#cb21-76" aria-hidden="true" tabindex="-1"></a><span class="ex">│</span>       └── nF12.d_18.prj_18.r_4.posterior.count.tsv.gz</span>
+<span id="cb21-77"><a href="#cb21-77" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> batched.matrix.tsv.gz</span>
+<span id="cb21-78"><a href="#cb21-78" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> hexagon.d_12.tsv.gz</span>
+<span id="cb21-79"><a href="#cb21-79" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> hexagon.d_18.tsv.gz</span>
+<span id="cb21-80"><a href="#cb21-80" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> Makefile</span>
+<span id="cb21-81"><a href="#cb21-81" aria-hidden="true" tabindex="-1"></a><span class="ex">└──</span> sort_decode.sh</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+
+
+
+</section>
+</section>
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-jones2025cell" class="csl-entry" role="listitem">
+Jones, D. C., A. E. Elz, A. Hadadianpour, et al. 2025. <span>“Cell Simulation as Cell Segmentation.”</span> <em>Nature Methods</em>. <a href="https://doi.org/10.1038/s41592-025-02697-0">https://doi.org/10.1038/s41592-025-02697-0</a>.
+</div>
+<div id="ref-petukhov2021cell" class="csl-entry" role="listitem">
+Petukhov, Vladimir, Rui J. Xu, Ruslan A. Soldatov, Pietro Cadinu, Konstantin Khodosevich, Jeffrey R. Moffitt, and Peter V. Kharchenko. 2021. <span>“Cell Segmentation in Imaging-Based Spatial Transcriptomics.”</span> <em>Nature Biotechnology</em>. <a href="https://doi.org/10.1038/s41587-021-01044-w">https://doi.org/10.1038/s41587-021-01044-w</a>.
+</div>
+<div id="ref-si2024ficture" class="csl-entry" role="listitem">
+Si, Yichen, ChangHee Lee, Yongha Hwang, Jeong H. Yun, Weiqiu Cheng, Chun-Seok Cho, Miguel Quiros, et al. 2024. <span>“FICTURE: Scalable Segmentation-Free Analysis of Submicron-Resolution Spatial Transcriptomics.”</span> <em>Nature Methods</em> 21 (10): 1843–54. <a href="https://doi.org/10.1038/s41592-024-02415-2">https://doi.org/10.1038/s41592-024-02415-2</a>.
+</div>
+<div id="ref-Wu2024" class="csl-entry" role="listitem">
+Wu, Lidan, Joseph M Beechem, and Patrick Danaher. 2024. <span>“FastReseg: Using Transcript Locations to Refine Image-Based Cell Segmentation Results in Spatial Transcriptomics.”</span> <em>bioRxiv</em>. <a href="https://doi.org/10.1101/2024.12.05.627051">https://doi.org/10.1101/2024.12.05.627051</a>.
+</div>
+</div></section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/nanostring-biostats\.github\.io\/CosMx-Analysis-Scratch-Space");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+    <a class="nav-link" href="../../license.html">
+<p>License</p>
+</a>
+  </li>  
+</ul>
+    <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

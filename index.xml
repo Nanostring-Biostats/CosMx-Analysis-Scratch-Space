@@ -10,7 +10,1664 @@
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
 <generator>quarto-1.6.30</generator>
-<lastBuildDate>Thu, 10 Jul 2025 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Tue, 15 Jul 2025 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>A practical guide to transcript-based cell segmentation in spatial transcriptomics</title>
+  <dc:creator>Lidan Wu</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/transcript-segmentation/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Spatial transcriptomics technologies provide high-resolution spatial maps of transcript locations within tissue. A central challenge in these datasets is cell segmentation, which assigns transcripts to individual cells accurately, particularly when image data is noisy, missing, or ambiguous.</p>
+<p>To address this, researchers have developed <strong>transcript-based analysis techniques</strong> that either:</p>
+<ol type="1">
+<li>Section&nbsp;2.1 Segment cells from transcript locations (e.g., Baysor, ProSeg),</li>
+<li>Section&nbsp;2.2 Refine existing image-based segmentations using transcript patterns (e.g., FastReseg),</li>
+<li>Section&nbsp;2.3 Avoid segmentation entirely by analyzing the spatial organization of transcripts directly (e.g., FICTURE).</li>
+</ol>
+<p>This post provides a practical walk-through of each technique with examples on using it with CosMx<sup>®</sup> data, whose standard data format are described <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/assets/Pancreas-CosMx-ReadMe.html" target="_blank">here</a>.</p>
+<div id="fig-transcript-seg-methods" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-transcript-seg-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/transcript-segmentation/figures/Fig1-transcript-segmentation.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-transcript-seg-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Schematic of transcript-informed approaches
+</figcaption>
+</figure>
+</div>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+</section>
+<section id="choosing-the-right-transcript-based-approach" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Choosing the Right Transcript-Based Approach</h1>
+<p>Spatial transcriptomics platforms differ in resolution, density, and image quality, and so do the challenges in analyzing them. Before diving into individual tools, it’s helpful to understand the three major transcript-informed approaches to working with spatial data: segmentation, refinement, and segmentation-free analysis. Each method type fits different scenarios and solves a unique class of problems.</p>
+<section id="sec-txSeg" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="sec-txSeg"><span class="header-section-number">2.1</span> Transcript-Based Segmentation</h2>
+<p>These methods directly infer cell boundaries by clustering or modeling the spatial distribution of transcripts, often using gene identity as additional signal.</p>
+<p><strong>Use when:</strong></p>
+<ul>
+<li>You <strong>don’t have reliable cell images</strong> (e.g., missing or low-quality DAPI/membrane stains)</li>
+<li>You want to define cells purely from <strong>mRNA localization</strong></li>
+<li>You need a <strong>de novo</strong> segmentation pipeline without preprocessing</li>
+</ul>
+<p><strong>Limitations:</strong></p>
+<ul>
+<li>May oversegment sparse cells or misplace boundaries without priors</li>
+<li>Transcript noise can bias clustering in low-resolution assays and introduce circularity in analysis pipeline</li>
+</ul>
+<p><strong>Best for:</strong> Datasets where transcript positions are abundant and dense.</p>
+</section>
+<section id="sec-txRefine" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="sec-txRefine"><span class="header-section-number">2.2</span> Segmentation Refinement</h2>
+<p>These tools enhance an existing segmentation mask, correcting common segmentation errors using transcript-level context only when there is sufficient evidence.</p>
+<p><strong>Use when:</strong></p>
+<ul>
+<li>You <strong>already ran an image-based segmentation</strong> (e.g., Cellpose, watershed)</li>
+<li>You notice cells with <strong>minor contamination from neighboring cells</strong></li>
+<li>You want to <strong>keep image-based alignment but improve transcript association</strong></li>
+</ul>
+<p><strong>Limitations:</strong></p>
+<ul>
+<li>Relies on the quality of the initial mask — can’t fix everything</li>
+<li>Adds an extra pipeline step, but is lightweight</li>
+</ul>
+<p><strong>Best for:</strong> Any pipeline combining tissue images with transcript-based validation, especially if accurate cell boundaries affect downstream quantification.</p>
+</section>
+<section id="sec-segFree" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="sec-segFree"><span class="header-section-number">2.3</span> Segmentation-Free Analysis</h2>
+<p>Instead of forcing transcripts into discrete cells, these approaches model <strong>gene expression directly in space</strong>, uncovering continuous spatial features, patterns, and regions.</p>
+<p><strong>Use when:</strong></p>
+<ul>
+<li>You want to <strong>avoid cell segmentation biases</strong></li>
+<li>Your tissue has ambiguous or <strong>poorly defined boundaries</strong></li>
+<li>You aim to study <strong>gradients, niches, or expression domains</strong> more than individual cells</li>
+</ul>
+<p><strong>Limitations:</strong></p>
+<ul>
+<li>No per-cell outputs (e.g., no cell-by-gene matrices)</li>
+<li>Some tools are exploratory and require interpretation beyond standard stats</li>
+</ul>
+<p><strong>Best for:</strong> Ultra-dense data like Seq-Scope or CosMx where transcript resolution enables high-fidelity spatial patterning without segmentation artifacts.</p>
+</section>
+</section>
+<section id="running-transcript-informed-approaches-with-cosmx-data" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Running transcript-informed approaches with CosMx data</h1>
+<p>With this foundation in place, let’s now walk through tools that exemplify each approach. The input files used are exported by AtoMx<sup>®</sup> Spatial Informatics Portal (SIP) and their file structures are described in this <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/assets/Pancreas-CosMx-ReadMe.html" target="_blank">ReadMe</a>.</p>
+<div id="tbl-txSeg-types" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-txSeg-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: Categories of Transcript-Based Methods
+</figcaption>
+<div aria-describedby="tbl-txSeg-types-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 32%">
+<col style="width: 49%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Goal</th>
+<th>Example Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Segmentation</td>
+<td>Create cell boundaries from transcripts</td>
+<td>Baysor, ProSeg</td>
+</tr>
+<tr class="even">
+<td>Segmentation Refinement</td>
+<td>Improve pre-existing cell boundaries</td>
+<td>FastReseg</td>
+</tr>
+<tr class="odd">
+<td>Segmentation-Free Analysis</td>
+<td>Analyze transcript patterns directly</td>
+<td>FICTURE</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<section id="baysor-probabilistic-transcript-based-segmentation" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="baysor-probabilistic-transcript-based-segmentation"><span class="header-section-number">3.1</span> Baysor: Probabilistic Transcript-Based Segmentation</h2>
+<p><a href="https://github.com/kharchenkolab/Baysor" target="_blank">Baysor</a> <span class="citation" data-cites="petukhov2021cell">(Petukhov et al. 2021)</span> segments cells by modeling transcript positions and gene identities using a Bayesian mixture model. It optionally incorporates nuclei positions for prior constraints.</p>
+<p><strong>Pros</strong></p>
+<ul>
+<li>Fully probabilistic</li>
+<li>Handles overlapping cells and ambiguous boundaries</li>
+<li>Optional priors improve accuracy</li>
+</ul>
+<p><strong>Cons</strong></p>
+<ul>
+<li>Slower and very high memory consumption on large datasets</li>
+<li>Requires Julia and formatting input data</li>
+<li>Sensitive to input parameters, tend to over-segmenting and bias towards smaller cells.</li>
+</ul>
+<section id="sec-baysor-install" class="level3" data-number="3.1.1">
+<h3 data-number="3.1.1" class="anchored" data-anchor-id="sec-baysor-install"><span class="header-section-number">3.1.1</span> Install Baysor</h3>
+<p>The simplest way to install <code>Baysor</code> on Linux is by downloading a precompiled binary from the repository’s <a href="https://github.com/kharchenkolab/Baysor/releases" target="_blank">release section</a>. Once downloaded, you can run the executable located at <code>bin/baysor</code>. Below is the example code on how to setup an AWS EC2 instance to run <code>baysor</code>. For other platforms, please refer to the full installation instruction provided by the original authors <a href="https://kharchenkolab.github.io/Baysor/dev/installation/" target="_blank">here</a>.</p>
+<ol type="1">
+<li>SSH log into your AWS EC2 instance as admin and navigate to a folder you can write on, e.g.&nbsp;<code>/home/YourUserName/data</code>.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>log into ec2 as admin</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># replace content inside &lt;&gt; with your actual setup</span></span>
+<span id="cb1-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ssh</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-i</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"your-key-to-ec2.pem"</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span>admin-name<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span>@<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span>instance-ip-address<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> </span>
+<span id="cb1-3"></span>
+<span id="cb1-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># show container/docker info to get container ID</span></span>
+<span id="cb1-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sudo</span> docker ps <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-a</span></span>
+<span id="cb1-6"></span>
+<span id="cb1-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># get into the container, replace "root" with your admin name </span></span>
+<span id="cb1-8"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sudo</span> docker exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--user</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"root"</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-it</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span>container-ID<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> /bin/bash</span>
+<span id="cb1-9"></span>
+<span id="cb1-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># navigate to working directory</span></span>
+<span id="cb1-11"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">cd</span> /home/YourUserName/data</span></code></pre></div>
+</div>
+</div>
+<ol start="2" type="1">
+<li>Download and unzip the precompiled binary to target folder. For Baysor v0.7.1, there should be two executable <code>baysor</code> and <code>julia</code> inside the unzipped<code>./bin</code> folder.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>obtain Baysor binary</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">wget</span> https://github.com/kharchenkolab/Baysor/releases/download/v0.7.1/baysor-x86_x64-linux-v0.7.1_build.zip</span>
+<span id="cb2-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">unzip</span> baysor-x86_x64-linux-v0.7.1_build.zip</span>
+<span id="cb2-3"></span>
+<span id="cb2-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ls</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-l</span> bin/julia</span>
+<span id="cb2-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ls</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-l</span> bin/baysor</span></code></pre></div>
+</div>
+</div>
+<ol start="3" type="1">
+<li>Make the downloaded binary executable (<code>./bin</code> folder) for all users, <strong>set library path to empty</strong> (necessary to work with pre-compiled executable) and verify if <code>baysor/bin</code> is working.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>make Baysor executable</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">chmod</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-R</span> o+x /home/YourUserName/data/bin </span>
+<span id="cb3-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">chmod</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-R</span> o+r /home/YourUserName/data/bin </span>
+<span id="cb3-3"></span>
+<span id="cb3-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ls</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-l</span> /home/YourUserName/data/bin/julia </span>
+<span id="cb3-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ls</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-l</span> /home/YourUserName/data/bin/baysor</span>
+<span id="cb3-6"></span>
+<span id="cb3-7"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">LD_LIBRARY_PATH</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span></span>
+<span id="cb3-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">echo</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$LD_LIBRARY_PATH</span></span>
+<span id="cb3-9"></span>
+<span id="cb3-10"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">/home/YourUserName/data/bin/julia</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--help</span></span>
+<span id="cb3-11"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">/home/YourUserName/data/bin/baysor</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--help</span></span></code></pre></div>
+</div>
+</div>
+<ol start="4" type="1">
+<li>Create symbolic links such that one could run with command line without the full path to the binary file.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>create symbolic link</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sudo</span> ln <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-s</span> /home/YourUserName/data/bin/julia /usr/local/bin/julia</span>
+<span id="cb4-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sudo</span> ln <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-s</span> /home/YourUserName/data/bin/baysor /usr/local/bin/baysor</span>
+<span id="cb4-3"></span>
+<span id="cb4-4"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">julia</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--help</span></span>
+<span id="cb4-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">baysor</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--help</span></span></code></pre></div>
+</div>
+</div>
+<p>Now you should be able to run <code>Baysor</code> from command line in your EC2 instance.</p>
+</section>
+<section id="run-baysor" class="level3" data-number="3.1.2">
+<h3 data-number="3.1.2" class="anchored" data-anchor-id="run-baysor"><span class="header-section-number">3.1.2</span> Run Baysor</h3>
+<p>As detailed in Baysor’s <a href="https://kharchenkolab.github.io/Baysor/dev/segmentation/" target="_blank">documentations</a>, <code>baysor</code> segmentation command requires data frame of transcripts’ coordinates and gene type as inputs. One can specify the data format as command arguments and configure the processing in the <code>.toml</code> file.</p>
+<p><strong>Prepare Inputs</strong></p>
+<p>The transcript file (e.g.&nbsp;<code>Pancreas_tx_file.csv</code>) exported by AtoMx<sup>®</sup> SIP has spatial coordinates under pixel unit in global coordinate system and is recommended to convert into micrometer unit before processing. Besides, AtoMx exported transcript file has study-unique cell ID under <code>cell</code> column which could be provided to <code>baysor</code> command as prior segmentation.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># prepare Tx file in R</span></span>
+<span id="cb5-2">fullTx <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> data.table<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">fread</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Pancreas_tx_file.csv"</span>)</span>
+<span id="cb5-3"></span>
+<span id="cb5-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># convert to micrometer </span></span>
+<span id="cb5-5">pixel_size <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.12028</span> <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># micron per pixel </span></span>
+<span id="cb5-6">z_step <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.8</span> <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># micron per z step </span></span>
+<span id="cb5-7"></span>
+<span id="cb5-8">fullTx[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'x_allS_um'</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> fullTx[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'x_global_px'</span>]] <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> pixel_size</span>
+<span id="cb5-9">fullTx[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'y_allS_um'</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> fullTx[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'y_global_px'</span>]] <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> pixel_size</span>
+<span id="cb5-10">fullTx[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'z_allS_um'</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> fullTx[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'z'</span>]] <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> z_step</span>
+<span id="cb5-11"></span>
+<span id="cb5-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># assign unify "cell" ID to extracellular transcripts in tx file </span></span>
+<span id="cb5-13">fullTx[cell_ID <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, cell <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="er" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"0"</span>]</span>
+<span id="cb5-14"></span>
+<span id="cb5-15"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># export the modified transcript file to use with command line </span></span>
+<span id="cb5-16">data.table<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">fwrite</span>(fullTx, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">file =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Pancreas_prepared_tx_file.csv"</span>)</span></code></pre></div>
+</div>
+<p><strong>Run Command</strong></p>
+<p>Below is an example command that performs Baysor segmentation on transcript file (e.g.&nbsp;<code>Pancreas_prepared_tx_file.csv</code>) and output results to folder <code>~/data/baysor_outputs</code>. Optionally, one can disable the polygon outputs for faster processing by passing <code>--polygon-format none</code> to the command.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>run Baysor</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">baysor</span> run Pancreas_prepared_tx_file.csv :cell <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-2">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--output</span> ~/data/baysor_outputs <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-3">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gene-column</span> target <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-4">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--x-column</span> x_allS_um <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-5">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--y-column</span> y_allS_um <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-6">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--z-column</span> z_allS_um <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-7">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--config</span> baysor_cosmx_config.toml <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-8">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--count-matrix-format</span> tsv</span></code></pre></div>
+</div>
+</div>
+<p>An example configuration file for using CosMx data with <code>Baysor</code> is shown below.</p>
+<div class="sourceCode" id="cb7" data-caption="baysor_cosmx_config.toml" style="background: #f1f3f5;"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb7-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">[data]</span></span>
+<span id="cb7-2"><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">gene</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"target"</span></span>
+<span id="cb7-3"><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">min_molecules_per_gene</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb7-4"><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">exclude_genes</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"FalseCode*,NegPrb*,SystemControl*,Negative*,Custom*"</span></span>
+<span id="cb7-5"><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">min_molecules_per_cell</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span></span>
+<span id="cb7-6"></span>
+<span id="cb7-7"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">[segmentation]</span></span>
+<span id="cb7-8"><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">prior_segmentation_confidence</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span> <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Confidence of the prior segmentation. Default: 0.2</span></span>
+<span id="cb7-9"><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">unassigned_prior_label</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"0"</span> <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Label for unassigned cells in the prior segmentation. Default: "0"</span></span>
+<span id="cb7-10"></span>
+<span id="cb7-11"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">[plotting]</span></span>
+<span id="cb7-12"><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">min_pixels_per_cell</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span> <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Number of pixels per cell of minimal size, used to estimate size of the final plot. For most protocols values around 7-30 give enough visualization quality. Default: 15</span></span>
+<span id="cb7-13"><span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">max_plot_size</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3000</span> <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Maximum size of the molecule plot in pixels. Default: 5000A</span></span></code></pre></div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Since a full run can be time-consuming, it’s recommended to perform a quick preview to extract initial insights from the data and to make informed guesses about the parameters for the full analysis. One can achieve this with <code>baysor preview</code> command using the same input arguments. For more details, see <a href="https://kharchenkolab.github.io/Baysor/dev/preview/" target="_blank">here</a> and a discussion on parameter choices could be found <a href="https://kharchenkolab.github.io/Baysor/dev/segmentation/#Choice-of-parameters" target="_blank">here</a>.</p>
+</div>
+</div>
+<p><strong>Outputs</strong></p>
+<p>By default, <code>baysor</code> segmentation generates the following outputs.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>Baysor outputs</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">baysor_outputs/</span></span>
+<span id="cb8-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> segmentation_cell_stats.csv</span>
+<span id="cb8-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> segmentation_counts.tsv</span>
+<span id="cb8-4"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> segmentation.csv</span>
+<span id="cb8-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> segmentation_log.log</span>
+<span id="cb8-6"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> segmentation_params.dump.toml</span>
+<span id="cb8-7"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> segmentation_polygons_2d.json</span>
+<span id="cb8-8"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">└──</span> segmentation_polygons_3d.json</span></code></pre></div>
+</div>
+</div>
+<p>A full description on outputs could be found in Baysor’s <a href="https://kharchenkolab.github.io/Baysor/dev/segmentation/" target="_blank">documentations</a>. Briefly,</p>
+<ul>
+<li><p><code>segmentation_cell_stats.csv</code>: a cell x attributes data frame with new cell ID under <code>cell</code> column, number of transcripts assigned under <code>n_transcripts</code> column, and average assignment confidence per cell under <code>avg_assignment_confidence</code> column.</p></li>
+<li><p><code>segmentation_counts.tsv</code>: the single-cell count matrix with segmented statistics; one could choose to output it as <code>loom</code> format when setting <code>--count-matrix-format loom</code> in command.</p></li>
+<li><p><code>segmentation.csv</code>: the per molecular level information for the full transcript file, with <code>cell</code> column for new cell ID, <code>confidence</code> and <code>is_noise</code> columns for whether the molecule is real (not noise), and <code>assignment_confidence</code> column for the confidence that the particular molecule is assigned to a correct cell.</p>
+<ul>
+<li>We recommend to remove molecules with <code>confidence</code> below <code>0.9</code> or <code>is_nose = True</code> from single-cell expression matrix for downstream analysis.</li>
+</ul></li>
+</ul>
+</section>
+</section>
+<section id="proseg-fast-transcript-simulation-based-segmentation" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="proseg-fast-transcript-simulation-based-segmentation"><span class="header-section-number">3.2</span> ProSeg: Fast Transcript Simulation Based Segmentation</h2>
+<p><a href="https://github.com/dcjones/proseg" target="_blank">ProSeg</a> <span class="citation" data-cites="jones2025cell">(Jones et al. 2025)</span> is a high-speed, Rust-based tool that segments cells using density-based clustering of transcript positions. It is optimized for large datasets from platforms like CosMx.</p>
+<p><strong>Pros</strong></p>
+<ul>
+<li>Much faster and smaller memory footprint than Baysor</li>
+<li>Does not require image inputs to consider prior segmentation with assigned nuclear compartment</li>
+<li>Works on compressed csv.gz files directly</li>
+</ul>
+<p><strong>Cons</strong></p>
+<ul>
+<li>Fewer model-based refinements than Baysor</li>
+<li>A sampling method which runs in non-deterministic way in its current form.</li>
+<li>The direct outputs are posterior expectations instead of integers counts assigned to each cell.</li>
+<li>Prone to merge error and generate abnormally large cells near sample edge next to cell-free region.</li>
+</ul>
+<section id="install-proseg" class="level3" data-number="3.2.1">
+<h3 data-number="3.2.1" class="anchored" data-anchor-id="install-proseg"><span class="header-section-number">3.2.1</span> Install ProSeg</h3>
+<p>To install <code>ProSeg</code>, one would need to first install <code>cargo</code> and then the <code>proseg</code> package. For an AWS EC2 instance, one should first log into the instance as admin (see Baysor installation above Section&nbsp;3.1.1 for details) and then do the following.</p>
+<ol type="1">
+<li>Install <code>cargo</code> as admin <code>root</code> and set it up for all users.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>install cargo</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">curl</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--proto</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'=https'</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--tlsv1.2</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-sSf</span> https://sh.rustup.rs <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">|</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sh</span></span>
+<span id="cb9-2"></span>
+<span id="cb9-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># activate cargo environment or restart session to have PATH change in effect </span></span>
+<span id="cb9-4"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">.</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$HOME</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">/.cargo/env"</span></span>
+<span id="cb9-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">echo</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$HOME</span></span>
+<span id="cb9-6"></span>
+<span id="cb9-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># test installation</span></span>
+<span id="cb9-8"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">which</span> cargo</span>
+<span id="cb9-9"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">cargo</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--version</span></span></code></pre></div>
+</div>
+</div>
+<p>By default, <code>cargo</code> would be installed under <code>/root/.cargo</code> folder. To make it executable for all users, one could copy its binary to local environment.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>setup cargo for all users</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ls</span> /root/.cargo/bin/</span>
+<span id="cb10-2"></span>
+<span id="cb10-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sudo</span> cp /root/.cargo/bin/<span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">*</span> /usr/local/bin/</span>
+<span id="cb10-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sudo</span> chmod 755 /usr/local/bin/<span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">*</span></span></code></pre></div>
+</div>
+</div>
+<p>Now, one could use <code>cargo</code> as non-admin user.</p>
+<ol start="2" type="1">
+<li>Clone and install <code>proseg</code>.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>install proseg</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">git</span> clone https://github.com/dcjones/proseg.git</span>
+<span id="cb11-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">cargo</span> install proseg</span>
+<span id="cb11-3"></span>
+<span id="cb11-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># test installation</span></span>
+<span id="cb11-5"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">which</span> proseg</span>
+<span id="cb11-6"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">proseg</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--version</span></span></code></pre></div>
+</div>
+</div>
+</section>
+<section id="run-proseg" class="level3" data-number="3.2.2">
+<h3 data-number="3.2.2" class="anchored" data-anchor-id="run-proseg"><span class="header-section-number">3.2.2</span> Run ProSeg</h3>
+<p>Same as <code>baysor</code>, the primary input for <code>proseg</code> is the transcript data frame. Since <code>proseg</code> command allows a more flexible data structure and internal conversion between pixel and micrometer units using <code>coordinate-scale</code> argument, the transcript file exported by AtoMx<sup>®</sup> SIP could be used directly without modification or decompression (i.e.&nbsp;working for <code>.csv.gz</code> file).</p>
+<p><strong>Run Command</strong></p>
+<p>Below is an example command that performs ProSeg segmentation on transcript file (e.g.&nbsp;<code>Pancreas_tx_file.csv</code>) and output results to folder <code>~/data/proseg_outputs</code>. In addition to prior segmentation, the assigned nuclear compartments in transcript files are also provided to <code>proseg</code> via arguments <code>--compartment-column CellComp --compartment-nuclear Nuclear</code>.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>run ProSeg</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">proseg</span> Pancreas_tx_file.csv <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-2">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--output-path</span> ~/data/proseg_outputs <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-3">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gene-column</span> target <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-4">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--x-column</span> x_global_px <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-5">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--y-column</span> y_global_px <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-6">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--z-column</span> z <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-7">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--compartment-column</span> CellComp <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-8">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--compartment-nuclear</span> Nuclear <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-9">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--fov-column</span> fov <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-10">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--cell-id-column</span> cell <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-11">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--cell-id-unassigned</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">''</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-12">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--cell-assignment-column</span> cell_ID <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-13">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--cell-assignment-unassigned</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'0'</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-14">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--excluded-genes</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'^(SystemControl|Negative)'</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-15">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--coordinate-scale</span> 0.12028 </span></code></pre></div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>ProSeg performs a z coordinate normalization step to remove sample tilt and cap z coordinates within 1st ~ 99th percentile of original value. Thus, it’s recommended to split your dataset by tissue sections first and then process each one separately. This helps avoid problems that can happen because the sections may have different z-coordinate values. More advice and description on argument options could be found <a href="https://github.com/dcjones/proseg/tree/main?tab=readme-ov-file#modeling-assumptions" target="_blank">here</a>.</p>
+</div>
+</div>
+<p><strong>Outputs</strong></p>
+<p>By default, <code>proseg</code> segmentation generates the following outputs.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>ProSeg outputs</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">proseg_outputs/</span></span>
+<span id="cb13-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> cell-metadata.csv</span>
+<span id="cb13-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> cell-polygons.geojson</span>
+<span id="cb13-4"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> cell-polygons-layers.geojson</span>
+<span id="cb13-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> expected-counts.csv</span>
+<span id="cb13-6"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> transcript-metadata.csv</span>
+<span id="cb13-7"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">└──</span> union-cell-polygons.geojson</span></code></pre></div>
+</div>
+</div>
+<p>A full description on ProSeg’s output format could be found <a href="https://github.com/dcjones/proseg/tree/main?tab=readme-ov-file#output-options" target="_blank">here</a>. Briefly.</p>
+<ul>
+<li><p><code>cell-metadata.csv</code>: a cell x attributes data frame with new cell ID under <code>cell</code> column, cell volume under <code>volume</code> column.</p>
+<ul>
+<li>We recommend to inspect the <code>volume</code> value to remove cells that are abnormally large.</li>
+</ul></li>
+<li><p><code>expected-counts.csv</code>: the single-cell expression matrix with segmented statistics; the reported expression values are posterior expectations shown as fractional counts instead of integers.</p>
+<ul>
+<li>We recommend to calculate the observed single-cell count matrix with the new cell ID assignment from the output <code>transcript-metadata.csv</code> before downstream single-cell analysis for consistency.</li>
+</ul></li>
+<li><p><code>transcript-metadata.csv</code>: the per molecular level information for the full transcript file, with <code>gene</code> column for gene name, <code>assignment</code> column for new cell ID, <code>probability</code> and <code>background</code> columns for whether the molecule is real and confidently assigned.</p>
+<ul>
+<li>We recommend to remove molecules with <code>background = 1</code> before generating the observed single-cell count matrix from transcript file.</li>
+</ul></li>
+</ul>
+<p><strong>Generate Count Matrix</strong></p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># read in ProSeg processed transcript files in R</span></span>
+<span id="cb14-2">dt <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> data.table<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">fread</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"proseg_outputs/transcript-metadata.csv"</span>)</span>
+<span id="cb14-3"></span>
+<span id="cb14-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># remove background transcripts and keep only the needed columns </span></span>
+<span id="cb14-5">dt <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> dt[background <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, .SD, .SDcols <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'assignment'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'gene'</span>)]</span>
+<span id="cb14-6">dt[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'gene'</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">factor</span>(dt[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'gene'</span>]])</span>
+<span id="cb14-7">dt[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'assignment'</span>]] <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.character</span>(dt[[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'assignment'</span>]])</span>
+<span id="cb14-8"></span>
+<span id="cb14-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># get observed cell x gene count matrix </span></span>
+<span id="cb14-10">counts <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> reshape2<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">acast</span>(dt, assignment <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> gene, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fun.aggregate =</span> length)</span>
+<span id="cb14-11">counts <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> Matrix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">Matrix</span>(counts, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">sparse =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>) </span></code></pre></div>
+</div>
+</section>
+</section>
+<section id="fastreseg-transcript-based-segmentation-refinement" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="fastreseg-transcript-based-segmentation-refinement"><span class="header-section-number">3.3</span> FastReseg: Transcript-Based Segmentation Refinement</h2>
+<p><a href="https://github.com/Nanostring-Biostats/FastReseg" target="_blank">FastReseg</a> <span class="citation" data-cites="Wu2024">(Wu, Beechem, and Danaher 2024)</span> is a transcript-informed refinement tool that improves segmentation masks (e.g., from Cellpose or watershed) by leveraging local transcript expression profiles to resolve over-segmentation, under-segmentation, and cell boundaries.</p>
+<p><strong>Pros</strong></p>
+<ul>
+<li>Fast and lightweight</li>
+<li>Enhances biological accuracy without radically redefining cell boundaries</li>
+<li>Supports configurable refinement rules</li>
+</ul>
+<p><strong>Cons</strong></p>
+<ul>
+<li>Requires an existing segmentation mask</li>
+<li>Works best with dense, high-plex data</li>
+</ul>
+<p>Please refer to <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/" target="_blank">earlier post</a> and the <a href="https://nanostring-biostats.github.io/FastReseg/articles/tutorial.html" target="_blank">package tutorial</a> on how to use <code>FastReseg</code> to evaluate segmentation performance and further perform refinement.</p>
+<section id="fastreseg-custom-module-in-atomx" class="level3" data-number="3.3.1">
+<h3 data-number="3.3.1" class="anchored" data-anchor-id="fastreseg-custom-module-in-atomx"><span class="header-section-number">3.3.1</span> FastReseg Custom Module in AtoMx</h3>
+<p>For AtoMx users (version 2.0.1 or later), here we provide a <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/fastReseg-custom-module" target="_blank">custom module</a> designed to perform FastReseg analysis on CosMx RNA studies hosted on the AtoMx SIP platform.</p>
+<p>This module conducts segmentation evaluation on pre-segmented data and introduces a new cell metadata column, <code>lrtest_nlog10P</code>, which quantifies the degree of spatial dependency observed within existing cells. It also enables the removal of flagged transcripts from current cell segments. When the module is executed a second time with the same configuration and <code>overwrite_RNA_soma = TRUE</code>, it allows downstream AtoMx analysis to proceed using the trimmed RNA data. Currently, the FastReseg custom module supports transcript cleanup through trimming only, as this is the primary error mode encountered in thin tissue sections.</p>
+</section>
+</section>
+<section id="ficture-segmentation-free-spatial-transcript-analysis" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="ficture-segmentation-free-spatial-transcript-analysis"><span class="header-section-number">3.4</span> FICTURE: Segmentation-Free Spatial Transcript Analysis</h2>
+<p><a href="https://github.com/seqscope/ficture" target="_blank">FICTURE</a> <span class="citation" data-cites="si2024ficture">(Si et al. 2024)</span> is a segmentation-free spatial factorization method. It models spatial transcript patterns using statistical models to extract biologically meaningful regions and interactions.</p>
+<p><strong>Pros</strong></p>
+<ul>
+<li>No reliance on image or segmentation</li>
+<li>Ideal for spatial transcriptomics data of submicron-resolution (e.g., Seq-Scope, CosMx)</li>
+<li>Avoids biases of segmentation methods</li>
+</ul>
+<p><strong>Cons</strong></p>
+<ul>
+<li>Works on 2D transcript data only</li>
+<li>Doesn’t yield per-cell outputs (i.e., no cell boundaries)</li>
+<li>Interpretation can be abstract for some users</li>
+</ul>
+<section id="install-ficture" class="level3" data-number="3.4.1">
+<h3 data-number="3.4.1" class="anchored" data-anchor-id="install-ficture"><span class="header-section-number">3.4.1</span> Install FICTURE</h3>
+<p><code>FICTURE</code> relies on <code>bgzip</code> and <code>tabix</code> for file processing and one could install those libraries as part of <code>htslib</code> installation. For an AWS EC2 instance, one should first log into the instance as admin (see Baysor installation above Section&nbsp;3.1.1 for details) and then do the following.</p>
+<ol type="1">
+<li>Install <code>htslib</code>C library (<a href="https://www.htslib.org/download/" target="_blank">latest release</a>).</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>install C dependencies of FICTURE</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># download and unzip the release version</span></span>
+<span id="cb15-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">wget</span> https://github.com/samtools/htslib/releases/download/1.20/htslib-1.20.tar.bz2</span>
+<span id="cb15-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">tar</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-xvjf</span> htslib-1.20.tar.bz2</span>
+<span id="cb15-4"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">cd</span> htslib-1.20</span>
+<span id="cb15-5"></span>
+<span id="cb15-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># setup location to install, typically under /usr/local/ for all users</span></span>
+<span id="cb15-7"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">./configure</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--prefix</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>/usr/local/</span>
+<span id="cb15-8"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sudo</span> make</span>
+<span id="cb15-9"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sudo</span> make install</span>
+<span id="cb15-10"></span>
+<span id="cb15-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># test installation</span></span>
+<span id="cb15-12"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">htsfile</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--version</span></span></code></pre></div>
+</div>
+</div>
+<p>If the installation location is not under <code>/usr/local/</code>, one would need to add the installation path to <code>PATH</code> system environment variable when login as non-admin user.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>update PATH</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">PATH</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>/where/to/install/bin/:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$PATH</span></span>
+<span id="cb16-2"></span>
+<span id="cb16-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># test installation</span></span>
+<span id="cb16-4"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">bgzip</span></span>
+<span id="cb16-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">tabix</span></span></code></pre></div>
+</div>
+</div>
+<ol start="2" type="1">
+<li>Set up python virtual environment and install <code>FICTURE</code> package via pip.</li>
+</ol>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>create env and install FICTURE</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">## Create a virtual environment</span></span>
+<span id="cb17-2"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">VENV</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>/path/to/venv/name   <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">## replace it with your desired path</span></span>
+<span id="cb17-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">python</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-m</span> venv <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${VENV}</span></span>
+<span id="cb17-4"></span>
+<span id="cb17-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">## Activate the virtual environment</span></span>
+<span id="cb17-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">source</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${VENV}</span>/bin/activate</span>
+<span id="cb17-7"></span>
+<span id="cb17-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">## Clone the GitHub repository</span></span>
+<span id="cb17-9"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">git</span> clone https://github.com/seqscope/ficture.git</span>
+<span id="cb17-10"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">cd</span> ficture</span>
+<span id="cb17-11"></span>
+<span id="cb17-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">## Install the required packages</span></span>
+<span id="cb17-13"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-r</span> requirements.txt</span>
+<span id="cb17-14"></span>
+<span id="cb17-15"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">## Install FICTURE locally</span></span>
+<span id="cb17-16"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-e</span> .</span></code></pre></div>
+</div>
+</div>
+</section>
+<section id="run-ficture" class="level3" data-number="3.4.2">
+<h3 data-number="3.4.2" class="anchored" data-anchor-id="run-ficture"><span class="header-section-number">3.4.2</span> Run FICTURE</h3>
+<p>A full description on how to run FICTURE could be found <a href="https://seqscope.github.io/ficture/localrun/" target="_blank">here</a>. More information regarding how to submit FICTURE jobs to SLURM cluster is described in FICTURE’s <a href="https://seqscope.github.io/ficture/run/" target="_blank">documents</a>.</p>
+<p><strong>Prepare Inputs</strong></p>
+<p>Below is an example command that prepares AtoMx-exported transcript file (e.g.&nbsp;<code>Pancreas_tx_file.csv</code>) for FICTURE processing using its utility function. See <a href="https://seqscope.github.io/ficture/format_input/cosmx/" target="_blank">here</a> for more details.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>prepare CosMx Tx file for FICTURE</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb18-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># path to input transcript file, working for .csv.gz file too </span></span>
+<span id="cb18-2"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">inputFile</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>/path/to/input/Pancreas_tx_file.csv</span>
+<span id="cb18-3"></span>
+<span id="cb18-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">## set up output folder and identifier </span></span>
+<span id="cb18-5"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">outDir</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>/path/to/preprocess_data</span>
+<span id="cb18-6"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">iden</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>pancreas</span>
+<span id="cb18-7"></span>
+<span id="cb18-8"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">filteredFile</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${outDir}</span>/filtered.matrix.<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${iden}</span>.tsv</span>
+<span id="cb18-9"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">featureFile</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${outDir}</span>/feature.clean.<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${iden}</span>.tsv</span>
+<span id="cb18-10"></span>
+<span id="cb18-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># navigate to the root folder of FICTURE package to use its utilities function</span></span>
+<span id="cb18-12"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">cd</span> ficture </span>
+<span id="cb18-13"></span>
+<span id="cb18-14"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># generate transcript file (required) and gene list (optional)</span></span>
+<span id="cb18-15"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">python</span> misc/format_cosmx.py <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-16">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--input</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${inputFile}</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-17">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--output</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${filteredFile}</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-18">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gcol</span> target <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-19">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--feature</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${featureFile}</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-20">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--dummy_genes</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Negative|SystemControl'</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-21">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--px_to_um</span> 0.12028 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-22">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--precision</span> 2 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb18-23">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--annotation</span> cell fov</span>
+<span id="cb18-24"></span>
+<span id="cb18-25"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># sort the filtered transcript files based on coordinate columns (first 2) and then zip it</span></span>
+<span id="cb18-26"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sort</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-k2,2g</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-k1,1g</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${filteredFile}</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">|</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">gzip</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-c</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${filteredFile}</span>.gz</span>
+<span id="cb18-27"></span>
+<span id="cb18-28"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># remove the unsorted unzip version</span></span>
+<span id="cb18-29"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rm</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${filteredFile}</span></span></code></pre></div>
+</div>
+</div>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>preprocess outputs</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb19-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">preprocess_data/</span></span>
+<span id="cb19-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> coordinate_minmax.tsv</span>
+<span id="cb19-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> feature.clean.pancreas.tsv</span>
+<span id="cb19-4"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">└──</span> filtered.matrix.pancreas.tsv.gz</span></code></pre></div>
+</div>
+</div>
+<p><strong>Run Command</strong></p>
+<p>Below is an example command that perform the complete FICTURE pipeline with 2 different hexagon flat-to-flat widths <code>train-width</code>, 12 and 18 micron, at same time.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>run FICTURE</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># setup pipeline output folder</span></span>
+<span id="cb20-2"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">outDir2</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>/path/to/ficture_outputs</span>
+<span id="cb20-3"></span>
+<span id="cb20-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># generate transcript file and gene list (optional)</span></span>
+<span id="cb20-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">ficture</span> run together <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--in-tsv</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${filteredFile}</span>.gz <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-6">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--in-minmax</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${outDir}</span>/coordinate_minmax.tsv <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-7">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--in-feature</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${featureFile}</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-8">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--out-dir</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">${outDir2}</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-9">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--train-width</span> 12,18 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-10">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--n-factor</span> 12 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-11">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--n-jobs</span> 4<span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-12">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--plot-each-factor</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-13">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--all</span></span></code></pre></div>
+</div>
+</div>
+<p>If the installation path for <code>bgzip</code> and <code>tabix</code> is not under <code>/usr/local/bin/</code>, pass the installation location to the <code>ficture</code> command as well: <code>--bgzip /where/to/install/bin/bgzip --tabix /where/to/install/bin/tabix</code>.</p>
+<p><strong>Outputs</strong></p>
+<p>By default, <code>ficture run together</code> command generates the following outputs when setting number of expression factors <code>n-factor</code> to 12 with 2 different <code>train-width</code> values. A detailed description on the output files are described in FICTURE’s <a href="https://seqscope.github.io/ficture/localrun/#output" target="_blank">documents</a>.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>FICTURE outputs</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb21-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">ficture_outputs</span></span>
+<span id="cb21-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> analysis</span>
+<span id="cb21-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   ├── nF12.d_12</span>
+<span id="cb21-4"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── figure</span>
+<span id="cb21-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │   ├── nF12.d_12.cbar.png</span>
+<span id="cb21-6"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │   ├── nF12.d_12.coarse.png</span>
+<span id="cb21-7"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │   ├── nF12.d_12.coarse.top.png</span>
+<span id="cb21-8"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │   ├── nF12.d_12.decode.prj_12.r_4_5.pixel.png</span>
+<span id="cb21-9"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │   ├── nF12.d_12.rgb.tsv</span>
+<span id="cb21-10"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │   └── sub</span>
+<span id="cb21-11"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_0.png</span>
+<span id="cb21-12"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_10.png</span>
+<span id="cb21-13"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_11.png</span>
+<span id="cb21-14"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_1.png</span>
+<span id="cb21-15"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_2.png</span>
+<span id="cb21-16"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_3.png</span>
+<span id="cb21-17"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_4.png</span>
+<span id="cb21-18"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_5.png</span>
+<span id="cb21-19"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_6.png</span>
+<span id="cb21-20"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_7.png</span>
+<span id="cb21-21"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       ├── nF12.d_12.decode.prj_12.r_4_5.pixel.F_8.png</span>
+<span id="cb21-22"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   │       └── nF12.d_12.decode.prj_12.r_4_5.pixel.F_9.png</span>
+<span id="cb21-23"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.coherence.tsv</span>
+<span id="cb21-24"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.anchor.tsv.gz</span>
+<span id="cb21-25"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.bulk_chisq.tsv</span>
+<span id="cb21-26"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.done</span>
+<span id="cb21-27"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.factor.info.html</span>
+<span id="cb21-28"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.factor.info.tsv</span>
+<span id="cb21-29"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.pixel.sorted.tsv.gz</span>
+<span id="cb21-30"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.pixel.sorted.tsv.gz.tbi</span>
+<span id="cb21-31"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.decode.prj_12.r_4_5.posterior.count.tsv.gz</span>
+<span id="cb21-32"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.done</span>
+<span id="cb21-33"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.fit_result.tsv.gz</span>
+<span id="cb21-34"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.model_matrix.tsv.gz</span>
+<span id="cb21-35"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.model.p</span>
+<span id="cb21-36"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.model_selection_candidates.p</span>
+<span id="cb21-37"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.posterior.count.tsv.gz</span>
+<span id="cb21-38"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   ├── nF12.d_12.prj_12.r_4.fit_result.tsv.gz</span>
+<span id="cb21-39"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   │   └── nF12.d_12.prj_12.r_4.posterior.count.tsv.gz</span>
+<span id="cb21-40"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>   └── nF12.d_18</span>
+<span id="cb21-41"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── figure</span>
+<span id="cb21-42"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │   ├── nF12.d_18.cbar.png</span>
+<span id="cb21-43"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │   ├── nF12.d_18.coarse.png</span>
+<span id="cb21-44"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │   ├── nF12.d_18.coarse.top.png</span>
+<span id="cb21-45"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │   ├── nF12.d_18.decode.prj_18.r_4_5.pixel.png</span>
+<span id="cb21-46"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │   ├── nF12.d_18.rgb.tsv</span>
+<span id="cb21-47"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │   └── sub</span>
+<span id="cb21-48"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_0.png</span>
+<span id="cb21-49"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_10.png</span>
+<span id="cb21-50"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_11.png</span>
+<span id="cb21-51"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_1.png</span>
+<span id="cb21-52"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_2.png</span>
+<span id="cb21-53"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_3.png</span>
+<span id="cb21-54"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_4.png</span>
+<span id="cb21-55"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_5.png</span>
+<span id="cb21-56"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_6.png</span>
+<span id="cb21-57"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_7.png</span>
+<span id="cb21-58"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.F_8.png</span>
+<span id="cb21-59"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       │       └── nF12.d_18.decode.prj_18.r_4_5.pixel.F_9.png</span>
+<span id="cb21-60"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.coherence.tsv</span>
+<span id="cb21-61"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.anchor.tsv.gz</span>
+<span id="cb21-62"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.bulk_chisq.tsv</span>
+<span id="cb21-63"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.done</span>
+<span id="cb21-64"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.factor.info.html</span>
+<span id="cb21-65"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.factor.info.tsv</span>
+<span id="cb21-66"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.sorted.tsv.gz</span>
+<span id="cb21-67"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.pixel.sorted.tsv.gz.tbi</span>
+<span id="cb21-68"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.decode.prj_18.r_4_5.posterior.count.tsv.gz</span>
+<span id="cb21-69"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.done</span>
+<span id="cb21-70"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.fit_result.tsv.gz</span>
+<span id="cb21-71"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.model_matrix.tsv.gz</span>
+<span id="cb21-72"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.model.p</span>
+<span id="cb21-73"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.model_selection_candidates.p</span>
+<span id="cb21-74"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.posterior.count.tsv.gz</span>
+<span id="cb21-75"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       ├── nF12.d_18.prj_18.r_4.fit_result.tsv.gz</span>
+<span id="cb21-76"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">│</span>       └── nF12.d_18.prj_18.r_4.posterior.count.tsv.gz</span>
+<span id="cb21-77"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> batched.matrix.tsv.gz</span>
+<span id="cb21-78"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> hexagon.d_12.tsv.gz</span>
+<span id="cb21-79"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> hexagon.d_18.tsv.gz</span>
+<span id="cb21-80"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> Makefile</span>
+<span id="cb21-81"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">└──</span> sort_decode.sh</span></code></pre></div>
+</div>
+</div>
+
+
+
+</section>
+</section>
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-jones2025cell" class="csl-entry">
+Jones, D. C., A. E. Elz, A. Hadadianpour, et al. 2025. <span>“Cell Simulation as Cell Segmentation.”</span> <em>Nature Methods</em>. <a href="https://doi.org/10.1038/s41592-025-02697-0">https://doi.org/10.1038/s41592-025-02697-0</a>.
+</div>
+<div id="ref-petukhov2021cell" class="csl-entry">
+Petukhov, Vladimir, Rui J. Xu, Ruslan A. Soldatov, Pietro Cadinu, Konstantin Khodosevich, Jeffrey R. Moffitt, and Peter V. Kharchenko. 2021. <span>“Cell Segmentation in Imaging-Based Spatial Transcriptomics.”</span> <em>Nature Biotechnology</em>. <a href="https://doi.org/10.1038/s41587-021-01044-w">https://doi.org/10.1038/s41587-021-01044-w</a>.
+</div>
+<div id="ref-si2024ficture" class="csl-entry">
+Si, Yichen, ChangHee Lee, Yongha Hwang, Jeong H. Yun, Weiqiu Cheng, Chun-Seok Cho, Miguel Quiros, et al. 2024. <span>“FICTURE: Scalable Segmentation-Free Analysis of Submicron-Resolution Spatial Transcriptomics.”</span> <em>Nature Methods</em> 21 (10): 1843–54. <a href="https://doi.org/10.1038/s41592-024-02415-2">https://doi.org/10.1038/s41592-024-02415-2</a>.
+</div>
+<div id="ref-Wu2024" class="csl-entry">
+Wu, Lidan, Joseph M Beechem, and Patrick Danaher. 2024. <span>“FastReseg: Using Transcript Locations to Refine Image-Based Cell Segmentation Results in Spatial Transcriptomics.”</span> <em>bioRxiv</em>. <a href="https://doi.org/10.1101/2024.12.05.627051">https://doi.org/10.1101/2024.12.05.627051</a>.
+</div>
+</div></section></div> ]]></description>
+  <category>segmentation</category>
+  <category>algorithms</category>
+  <category>CosMx 2.0</category>
+  <category>how-tos</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/transcript-segmentation/</guid>
+  <pubDate>Tue, 15 Jul 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/transcript-segmentation/figures/Fig1-transcript-segmentation.png" medium="image" type="image/png" height="98" width="144"/>
+</item>
 <item>
   <title>Recommendations for batch correction</title>
   <dc:creator>Dan McGuire</dc:creator>
@@ -11120,1130 +12777,6 @@ font-style: inherit;">head</span>(ref)</span></code></pre></div>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/</guid>
   <pubDate>Thu, 18 Jul 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/figures/insitucor-tile.png" medium="image" type="image/png" height="148" width="144"/>
-</item>
-<item>
-  <title>Using Squidpy with AtoMx® SIP exports</title>
-  <dc:creator>Evelyn Metzger</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/squidpy-essentials.html</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="introduction" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
-<p>Elucidating the spatial distribution of RNA transcripts and protein is one of the fundamental utilities of the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/single-cell-imaging-overview/" target="_blank">CosMx<sup>®</sup></a> Spatial Molecular Imager (SMI). When it comes to analysis, the <a href="https://nanostring.com/products/atomx-spatial-informatics-platform/atomx-sip-overview/" target="blank">AtoMx<sup>®</sup></a> Spatial Informatics Portal (SIP) is an end-to-end solution that has several advantages including built-in analysis modules, data storage, and the ability to analyze from a browser window. For fully custom analyses, the SIP also has the ability to export the data.</p>
-<p>There are a growing number of open-sourced analysis solutions that can analyze and visualize SMI data. For example, <a href="https://giottosuite.readthedocs.io/en/latest/subsections/datasets/Nanostring_Lung12.html" target="_blank">Giotto</a> <span class="citation" data-cites="Dries2021">(Dries et al. 2021)</span> has been available for a few years, uses a range of algorithms, and has ways to visualize tissue images built in. More recently, Seurat <span class="citation" data-cites="Hao2024">(Hao et al. 2024)</span>, another R package (and another artist!), has added image viewing capabilities into its workflow. For vignettes on how to analyze and visualize SMI data with Seurat, check out <a href="../../posts/seurat-cosmx-basics/index.html" target="_blank">our recent blog post</a> or the vignette from <a href="https://satijalab.org/seurat/articles/seurat5_spatial_vignette_2#human-lung-nanostring-cosmx-spatial-molecular-imager" target="_blank">Seurat’s website</a>.</p>
-<p>For python users, I find <a href="https://squidpy.readthedocs.io/en/stable/" target="_blank">squidpy</a> <span class="citation" data-cites="Palla2022">(Palla et al. 2022)</span> works well, is feature-rich, and is speedy. Part of this efficiency is thanks to the <a href="https://anndata.readthedocs.io/en/stable/" target="_blank">anndata</a> package. For more info on creating anndata objects with SMI data, see <a href="../../posts/h5ad_conversion/index.html">this post</a>. Squidpy also has a built-in function to read in SMI data, <a href="https://squidpy.readthedocs.io/en/stable/api/squidpy.read.nanostring.html" target="_blank"><code>read.nanostring</code></a>, that reads in the counts data, metadata, and optionally the field of view (FOV) file and image data. The developers also have a <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data" target="_blank">vignette</a> that uses a slide from the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/nsclc-ffpe-dataset/" target="_blank">first public data release</a> of SMI data <span class="citation" data-cites="He2022">(He et al. 2022)</span>. Note that the example dataset in that vignette uses a legacy file format that differs slightly compared to AtoMx SIP. For more information on the differences, see <a href="../../posts/flat-file-exports/flat-files-compare.html">this post</a>.</p>
-<p>In this blog post, I’ll show you how to:</p>
-<ul>
-<li>Section&nbsp;2 export the squidpy-relevant files from AtoMx SIP</li>
-<li>Section&nbsp;3 (and Appendix Section&nbsp;7.1) tips for installing squidpy</li>
-<li>Section&nbsp;4 analysis examples without spatial images</li>
-<li>Section&nbsp;5 how to pivot your AtoMx SIP-exported data into a format that can be used with squidpy and image-based analysis examples</li>
-</ul>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>In this blog post I provide some analysis examples but this is not intended to provide recommendations of parameters, clustering approaches, <em>etc</em>. I have not tested my example dataset on all of the squidpy functions so there may be errors.</p>
-<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
-</div>
-</div>
-</section>
-<section id="sec-export" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Exporting data from AtoMx<sup>®</sup> SIP</h1>
-<p>For this post I will be analyzing a single breast cancer slide that has about 80,000 cells, 64 FOVs, and with the <a href="https://nanostring.com/products/cosmx-spatial-molecular-imager/cosmx-rna-assays/human-6k-discovery-panel/">6K Discovery Panel</a>. I’m using the CosMx Data Analysis v1.3.2 software in AtoMx SIP. To take full advantage of squidpy’s functionality, I’ll need to partially export 1) “flat files” and 2) raw data (Figure&nbsp;1).</p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>We call them “flat files” since they are in a human-readable and accessible format (<em>i.e.</em>, comma separated files). These files, like Seurat files and Tiledb files, aren’t actually raw data but rather processed from the raw data. Versions of flat files may change with time and over the course of an analysis (<em>e.g.</em>, cell type column added to the metadata file as highlighted in <a href="../../posts/flat-file-exports/flat-files-compare.html">this post</a>).</p>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-export" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-export-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-export1.png" class="img-fluid figure-img" width="1320">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Selected flat files and raw data for exporting.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>Squidpy uses three of the five flat files:</p>
-<p>The two required input files for squidpy are:</p>
-<ul>
-<li>counts_file - cell (row) by target (column) expression matrix</li>
-<li>meta_file - cell-level metadata file</li>
-</ul>
-<p>And an optional input file is:</p>
-<ul>
-<li>fov_file - containing coordinates of all FOVs.</li>
-</ul>
-<p>Once export is complete, download the data using your SFTP application (<em>e.g.</em>, cyberduck, FileZilla, WinSCP).</p>
-<p>Figure&nbsp;2 shows a screenshot of the data structure in Cyberduck. The flat files are nested within a folder named after the flow cell (<em>e.g.</em>, <code>AUG29_13INTEGR_6k_BRST_PS_S2</code>) and are compressed in <code>gz</code> format. The raw data are in a separate folder and nested within a folder named after the flow cell and another folder named after the slide (<em>e.g.</em>, <code>20230829_212648_S2</code>). Of the subfolders of the raw data, the data that we’ll need for today are in <code>CellStatsDir</code>.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-export2" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-export2.png" class="img-fluid figure-img" width="446">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-export2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Folder structure following AtoMx SIP export.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="sec-install" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Install Squidpy</h1>
-<p>Assuming you have Python3 installed on your system, squidpy can be installed using <code>pip3</code> like this:</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb1-1">pip3 install squidpy</span></code></pre></div>
-</div>
-</div>
-<p>For installing within a virtual environment (recommended), see the Appendix (Section&nbsp;7.1).</p>
-</section>
-<section id="sec-noimage" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> Analysis without imaging data</h1>
-<p>In the simplest form, we can use squidpy without imaging data by reading the expression data, metadata, and optionally the FOV positions data. These analyses include normalization, PCA, umap, <em>etc.</em> I’ll provide some code here but for more details please see the squidpy <a href="https://squidpy.readthedocs.io/en/stable/notebooks/tutorials/tutorial_nanostring.html#analyze-nanostring-data" target="_blank">vignette</a>.</p>
-<section id="reading-expression-and-metadata-only" class="level2" data-number="4.1">
-<h2 data-number="4.1" class="anchored" data-anchor-id="reading-expression-and-metadata-only"><span class="header-section-number">4.1</span> Reading expression and metadata only</h2>
-<p>Create an anndata object like this:</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-from pathlib import Path
-import os
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import scanpy as sc
-import squidpy as sq
-
-flat_file_dir = 'path/to/breast_cancer_example/flatFiles/AUG29_13INTEGR_6K_BRST_PS_S2'
-meta_file = [item for item in os.listdir(flat_file_dir) if 'metadata_file' in item][0]
-counts_file = [item for item in os.listdir(flat_file_dir) if 'exprMat_file' in item][0]
-
-adata0 = sq.read.nanostring(
-    path=flat_file_dir,
-    counts_file=counts_file,
-    meta_file=meta_file
-)
-adata0</code></pre>
-</div>
-<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
-    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
-    uns: 'spatial'
-    obsm: 'spatial', 'spatial_fov'</code></pre>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>The column names that you have may differ from the ones above. That’s because the example dataset has been processed in AtoMx SIP which created additional columns (<em>e.g.</em>, RNA_nbclust_[GUID]_1_clusters). For more information on the expected columns from flat file exports, see the <a href="../../posts/flat-file-exports/flat-files-compare.html#sec-meta">metadata column descriptions</a>.</p>
-</div>
-</div>
-</section>
-<section id="including-the-fov-file" class="level2" data-number="4.2">
-<h2 data-number="4.2" class="anchored" data-anchor-id="including-the-fov-file"><span class="header-section-number">4.2</span> Including the FOV file</h2>
-<p>If we try to read in the optional FOV file generated in AtoMx SIP using squidpy v1.5.0, we might get an error stating “Index fov invalid”.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
-
-adata = sq.read.nanostring(
-    path=flat_file_dir,
-    counts_file=counts_file,
-    meta_file=meta_file,
-    fov_file=fov_file
-)
-</code></pre>
-</div>
-<div class="cell">
-<details class="code-fold">
-<summary>Click to show error</summary>
-<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb5-1">---------------------------------------------------------------------------</span>
-<span id="cb5-2">ValueError                                Traceback (most recent call last)</span>
-<span id="cb5-3">Cell In[23], line 3</span>
-<span id="cb5-4">      1 fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]</span>
-<span id="cb5-5">----&gt; 3 adata = sq.read.nanostring(</span>
-<span id="cb5-6">      4     path=flat_file_dir,</span>
-<span id="cb5-7">      5     counts_file=counts_file,</span>
-<span id="cb5-8">      6     meta_file=meta_file,</span>
-<span id="cb5-9">      7     fov_file=fov_file</span>
-<span id="cb5-10">      8 )</span>
-<span id="cb5-11"></span>
-<span id="cb5-12">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/squidpy/read/_read.py:266, in nanostring(path, counts_file, meta_file, fov_file)</span>
-<span id="cb5-13">    263                     continue</span>
-<span id="cb5-14">    265 if fov_file is not None:</span>
-<span id="cb5-15">--&gt; 266     fov_positions = pd.read_csv(path / fov_file, header=0, index_col=fov_key)</span>
-<span id="cb5-16">    267     for fov, row in fov_positions.iterrows():</span>
-<span id="cb5-17">    268         try:</span>
-<span id="cb5-18"></span>
-<span id="cb5-19">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1026, in read_csv(filepath_or_buffer, sep, delimiter, header, names, index_col, usecols, dtype, engine, converters, true_values, false_values, skipinitialspace, skiprows, skipfooter, nrows, na_values, keep_default_na, na_filter, verbose, skip_blank_lines, parse_dates, infer_datetime_format, keep_date_col, date_parser, date_format, dayfirst, cache_dates, iterator, chunksize, compression, thousands, decimal, lineterminator, quotechar, quoting, doublequote, escapechar, comment, encoding, encoding_errors, dialect, on_bad_lines, delim_whitespace, low_memory, memory_map, float_precision, storage_options, dtype_backend)</span>
-<span id="cb5-20">   1013 kwds_defaults = _refine_defaults_read(</span>
-<span id="cb5-21">   1014     dialect,</span>
-<span id="cb5-22">   1015     delimiter,</span>
-<span id="cb5-23">   (...)</span>
-<span id="cb5-24">   1022     dtype_backend=dtype_backend,</span>
-<span id="cb5-25">   1023 )</span>
-<span id="cb5-26">   1024 kwds.update(kwds_defaults)</span>
-<span id="cb5-27">-&gt; 1026 return _read(filepath_or_buffer, kwds)</span>
-<span id="cb5-28"></span>
-<span id="cb5-29">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:626, in _read(filepath_or_buffer, kwds)</span>
-<span id="cb5-30">    623     return parser</span>
-<span id="cb5-31">    625 with parser:</span>
-<span id="cb5-32">--&gt; 626     return parser.read(nrows)</span>
-<span id="cb5-33"></span>
-<span id="cb5-34">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/readers.py:1923, in TextFileReader.read(self, nrows)</span>
-<span id="cb5-35">   1916 nrows = validate_integer("nrows", nrows)</span>
-<span id="cb5-36">   1917 try:</span>
-<span id="cb5-37">   1918     # error: "ParserBase" has no attribute "read"</span>
-<span id="cb5-38">   1919     (</span>
-<span id="cb5-39">   1920         index,</span>
-<span id="cb5-40">   1921         columns,</span>
-<span id="cb5-41">   1922         col_dict,</span>
-<span id="cb5-42">-&gt; 1923     ) = self._engine.read(  # type: ignore[attr-defined]</span>
-<span id="cb5-43">   1924         nrows</span>
-<span id="cb5-44">   1925     )</span>
-<span id="cb5-45">   1926 except Exception:</span>
-<span id="cb5-46">   1927     self.close()</span>
-<span id="cb5-47"></span>
-<span id="cb5-48">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/c_parser_wrapper.py:333, in CParserWrapper.read(self, nrows)</span>
-<span id="cb5-49">    330     data = {k: v for k, (i, v) in zip(names, data_tups)}</span>
-<span id="cb5-50">    332     names, date_data = self._do_date_conversions(names, data)</span>
-<span id="cb5-51">--&gt; 333     index, column_names = self._make_index(date_data, alldata, names)</span>
-<span id="cb5-52">    335 return index, column_names, date_data</span>
-<span id="cb5-53"></span>
-<span id="cb5-54">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:371, in ParserBase._make_index(self, data, alldata, columns, indexnamerow)</span>
-<span id="cb5-55">    368     index = None</span>
-<span id="cb5-56">    370 elif not self._has_complex_date_col:</span>
-<span id="cb5-57">--&gt; 371     simple_index = self._get_simple_index(alldata, columns)</span>
-<span id="cb5-58">    372     index = self._agg_index(simple_index)</span>
-<span id="cb5-59">    373 elif self._has_complex_date_col:</span>
-<span id="cb5-60"></span>
-<span id="cb5-61">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:403, in ParserBase._get_simple_index(self, data, columns)</span>
-<span id="cb5-62">    401 index = []</span>
-<span id="cb5-63">    402 for idx in self.index_col:</span>
-<span id="cb5-64">--&gt; 403     i = ix(idx)</span>
-<span id="cb5-65">    404     to_remove.append(i)</span>
-<span id="cb5-66">    405     index.append(data[i])</span>
-<span id="cb5-67"></span>
-<span id="cb5-68">File &lt;project path&gt;/.venv/lib/python3.10/site-packages/pandas/io/parsers/base_parser.py:398, in ParserBase._get_simple_index.&lt;locals&gt;.ix(col)</span>
-<span id="cb5-69">    396 if not isinstance(col, str):</span>
-<span id="cb5-70">    397     return col</span>
-<span id="cb5-71">--&gt; 398 raise ValueError(f"Index {col} invalid")</span>
-<span id="cb5-72"></span>
-<span id="cb5-73">ValueError: Index fov invalid</span></code></pre></div>
-</details>
-</div>
-<p>This error arises because of a format change that is detailed in <a href="../../posts/flat-file-exports/flat-files-compare.html#sec-fov-pos">this post</a>. A simple fix is to adjust the column name in the fov file from “FOV” to the legacy “fov” like this:</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>fov_file = [item for item in os.listdir(flat_file_dir) if 'fov_positions_file' in item][0]
-
-fov_df = pd.read_csv(os.path.join(flat_file_dir, fov_file))
-if 'FOV' in fov_df.columns:
-  print("Refactoring file to older format.")
-  # Rename 'FOV' column to 'fov'
-  fov_df.rename(columns={'FOV': 'fov'}, inplace=True)
-  # have fov_file reference the new, formatted file and write it
-  fov_file = os.path.join(flat_file_dir,'fov_positions_formatted.csv')
-  fov_df.to_csv(fov_file, index=False)
-
-adata1 = sq.read.nanostring(
-    path=flat_file_dir,
-    counts_file=counts_file,
-    meta_file=meta_file,
-    fov_file=fov_file
-)
-</code></pre>
-</div>
-<blockquote class="blockquote">
-<p>Refactoring file to older format.</p>
-</blockquote>
-<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
-    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
-    uns: 'spatial'
-    obsm: 'spatial', 'spatial_fov'</code></pre>
-</section>
-<section id="analysis" class="level2" data-number="4.3">
-<h2 data-number="4.3" class="anchored" data-anchor-id="analysis"><span class="header-section-number">4.3</span> Analysis</h2>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Please note that the code in this section is an example and not a recommendation for specific thresholding, QC filtering, clustering parmaterization, <em>etc.</em> of SMI data.</p>
-</div>
-</div>
-<p>With the expression and metadata loaded, we can run exploratory data analysis similar to what was described in the squidpy vignette. There are some adjustments to squidpy’s vignette that are needed. These adjustments reflect the flat file format changes (<a href="../../posts/flat-file-exports/flat-files-compare.html#sec-fov-pos">detailed here</a>).</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-# Place control targets into separate variables
-adata1.var["Negative"] = adata1.var_names.str.startswith("Negative")
-adata1.var["SystemControl"] = adata1.var_names.str.startswith("SystemControl")
-adata1</code></pre>
-</div>
-<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
-    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID'
-    var: 'Negative', 'SystemControl'
-    uns: 'spatial'
-    obsm: 'spatial', 'spatial_fov'</code></pre>
-<p>We can calculate QC metrics with scanpy’s <span class="citation" data-cites="Wolf2018">(Wolf, Angerer, and Theis 2018)</span> pre-processing tool <a href="https://scanpy.readthedocs.io/en/latest/generated/scanpy.pp.calculate_qc_metrics.html" target="_blank"><code>calculate_qc_metrics</code> method</a>. In the code below, we are going to add Negatives and SystemControls as the <code>qc_var</code> argument (which will add cell-level columns to <code>obs</code>). In addition, target-level columns are added to <code>var</code>.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>sc.pp.calculate_qc_metrics(adata1, qc_vars=["Negative", "SystemControl"], inplace=True)
-adata1</code></pre>
-</div>
-<pre><code>AnnData object with n_obs × n_vars = 80073 × 6524
-    obs: 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_clusters', 'RNA_nbclust_132d0e1b.dc7d.48de.814b.a88cd8d14f03_1_posterior_probability', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_clusters', 'RNA_nbclust_9685fc9a.4f00.4267.99c1.ce1cb894807f_1_posterior_probability', 'cell', 'nCount_RNA', 'nFeature_RNA', 'nCount_negprobes', 'nFeature_negprobes', 'fov', 'Area', 'AspectRatio', 'Width', 'Height', 'Mean.PanCK', 'Max.PanCK', 'Mean.CD68_CK8_18', 'Max.CD68_CK8_18', 'Mean.CD298_B2M', 'Max.CD298_B2M', 'Mean.CD45', 'Max.CD45', 'Mean.DAPI', 'Max.DAPI', 'cell_id', 'assay_type', 'version', 'Run_Tissue_name', 'Panel', 'cellSegmentationSetId', 'cellSegmentationSetName', 'slide_ID', 'CenterX_global_px', 'CenterY_global_px', 'unassignedTranscripts', 'nCount_falsecode', 'nFeature_falsecode', 'Area.um2', 'propNegative', 'complexity', 'errorCtEstimate', 'percOfDataFromError', 'qcFlagsRNACounts', 'qcFlagsCellCounts', 'qcFlagsCellPropNeg', 'qcFlagsCellComplex', 'qcFlagsCellArea', 'qcCellsFlagged', 'median_negprobes', 'negprobes_quantile_0.9', 'median_RNA', 'RNA_quantile_0.9', 'nCell', 'nCount', 'nCountPerCell', 'nFeaturePerCell', 'propNegativeCellAvg', 'complexityCellAvg', 'errorCtPerCellEstimate', 'percOfDataFromErrorPerCell', 'qcFlagsFOV', 'i.median_negprobes', 'i.negprobes_quantile_0.9', 'i.median_RNA', 'i.RNA_quantile_0.9', 'cell_ID', 'n_genes_by_counts', 'log1p_n_genes_by_counts', 'total_counts', 'log1p_total_counts', 'pct_counts_in_top_50_genes', 'pct_counts_in_top_100_genes', 'pct_counts_in_top_200_genes', 'pct_counts_in_top_500_genes', 'total_counts_Negative', 'log1p_total_counts_Negative', 'pct_counts_Negative', 'total_counts_SystemControl', 'log1p_total_counts_SystemControl', 'pct_counts_SystemControl'
-    var: 'Negative', 'SystemControl', 'n_cells_by_counts', 'mean_counts', 'log1p_mean_counts', 'pct_dropout_by_counts', 'total_counts', 'log1p_total_counts'
-    uns: 'spatial'
-    obsm: 'spatial', 'spatial_fov'</code></pre>
-<p>We can explore these cell-level and target-level QC metrics with visuals using the <a href="https://seaborn.pydata.org/" target="_blank"><code>seaborn</code></a> package. For example the code below generates Figure&nbsp;3 and shows how the number of unique genes in a cell correlates with the total number of transcripts in a cell.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sns.jointplot(
-    data=adata1.obs,
-    x="total_counts",
-    y="n_genes_by_counts",
-    kind="scatter",
-    alpha=0.2
-)
-plt.savefig("figures/fig-qc.png", dpi=200)
-</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-qc" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc.png" class="img-fluid figure-img" width="600">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;3: Unique genes by total counts. Each dot represents a cell. Y-axis: the number of genes with postive counts in a cell. X-axis the sum of counts for a cell.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>The total Negative probe counts by total counts is shown below and Figure&nbsp;4.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sns.jointplot(
-    data=adata1.obs,
-    x="total_counts",
-    y="total_counts_Negative",
-    kind="scatter",
-    alpha=0.2
-)
-plt.savefig("figures/fig-qc1.png", dpi=200)
-</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-qc1" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-qc1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc1.png" class="img-fluid figure-img" width="600">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;4: The number of negative counts (Y) relative to the total counts (X) per cell.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>We see that the proportion of negative counts relative to total counts is:</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>adata1.obs["total_counts_Negative"].sum() / adata1.obs["total_counts"].sum()</code></pre>
-</div>
-<blockquote class="blockquote">
-<p>0.00041567286608445926 (i.e., 0.04%)</p>
-</blockquote>
-<p>Histograms of total transcripts, total unique genes per cell, and total transcrips per FOV can be seen in Figure&nbsp;5.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>fig, axs = plt.subplots(1, 3, figsize=(15, 4))
-
-axs[0].set_title("Total transcripts per cell")
-sns.histplot(
-    adata1.obs["total_counts"],
-    kde=False,
-    ax=axs[0],
-)
-
-axs[1].set_title("Unique transcripts per cell")
-sns.histplot(
-    adata1.obs["n_genes_by_counts"],
-    kde=False,
-    ax=axs[1],
-)
-
-axs[2].set_title("Transcripts per FOV")
-sns.histplot(
-    adata1.obs.groupby("fov").sum()["total_counts"],
-    kde=False,
-    ax=axs[2],
-)
-plt.savefig("figures/fig-qc2.png", dpi=200)
-</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-qc2" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-qc2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-qc2.png" class="img-fluid figure-img" width="1500">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5: Total counts per cell (left), total unique genes per cell (middle) and total transcripts per FOV (right).
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<p>We can filter, normalize, and cluster with scanpy’s functions. For a full list of available functions, see scanpy’s <a href="https://scanpy.readthedocs.io/en/latest/api/index.html" target="_blank">API documentation</a>.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>adata1.shape</code></pre>
-</div>
-<blockquote class="blockquote">
-<p>(80073, 6524)</p>
-</blockquote>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>sc.pp.filter_cells(adata1, min_counts=250)
-sc.pp.filter_genes(adata1, min_cells=1000)
-adata1.shape</code></pre>
-</div>
-<blockquote class="blockquote">
-<p>(69293, 6177)</p>
-</blockquote>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>adata1.layers["counts"] = adata1.X.copy()
-sc.pp.normalize_total(adata1, inplace=True, exclude_highly_expressed=True)
-sc.pp.log1p(adata1)
-sc.pp.pca(adata1, n_comps=50)
-sc.pp.neighbors(adata1)
-sc.tl.umap(adata1, min_dist=0.2, spread=1)
-sc.tl.leiden(adata1)</code></pre>
-</div>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>adata1.obs["logpMean.PanCK"] = np.log1p(adata1.obs['Mean.PanCK'])
-sc.pl.umap(
-    adata1,
-    color=["logpMean.PanCK","leiden"]
-)</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-umap" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-umap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-umap.png" class="img-fluid figure-img" width="1441">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-umap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;6: UMAP figures with cells colored by natural log Mean PanCK expression (left) and Leiden clusters (right).
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-</section>
-<section id="sec-imageanalysis" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Image and Spatial Analysis</h1>
-<p>Up until this point we haven’t use image data. In this section I’ll show how to prepare a slide exported from AtoMx SIP into squidpy, and touch on some of the image-based analyses that are possible.</p>
-<section id="rearrange-data-files-to-match-squidpys-layout" class="level2" data-number="5.1">
-<h2 data-number="5.1" class="anchored" data-anchor-id="rearrange-data-files-to-match-squidpys-layout"><span class="header-section-number">5.1</span> Rearrange data files to match squidpy’s layout</h2>
-<p>If we take a look one of the NSCLC public datasets from <span class="citation" data-cites="He2022">He et al. (2022)</span> (Lung5_Rep1), we can see the expected file structure has four folders (<code>CellComposite</code>, <code>CellLabels</code>, <code>CellOverlay</code>, and <code>CompartmentLabels</code>) and four flat files.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb20-1">tree -L 3</span>
-<span id="cb20-2"></span>
-<span id="cb20-3">├── Lung5_Rep1-Flat_files_and_images</span>
-<span id="cb20-4">│&nbsp;&nbsp; ├── CellComposite</span>
-<span id="cb20-5">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellComposite_F001.jpg</span>
-<span id="cb20-6">|   |   ...</span>
-<span id="cb20-7">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellComposite_F032.jpg</span>
-<span id="cb20-8">│&nbsp;&nbsp; ├── CellLabels</span>
-<span id="cb20-9">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
-<span id="cb20-10">|   |   ...</span>
-<span id="cb20-11">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellLabels_F032.tif</span>
-<span id="cb20-12">│&nbsp;&nbsp; ├── CellOverlay</span>
-<span id="cb20-13">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellOverlay_F001.jpg</span>
-<span id="cb20-14">|   |   ...</span>
-<span id="cb20-15">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CellOverlay_F032.jpg</span>
-<span id="cb20-16">│&nbsp;&nbsp; ├── CompartmentLabels</span>
-<span id="cb20-17">│&nbsp;&nbsp; │&nbsp;&nbsp; ├── CompartmentLabels_F001.tif</span>
-<span id="cb20-18">|   |   ...</span>
-<span id="cb20-19">│&nbsp;&nbsp; │&nbsp;&nbsp; └── CompartmentLabels_F032.tif</span>
-<span id="cb20-20">│&nbsp;&nbsp; ├── Lung5_Rep1_exprMat_file.csv</span>
-<span id="cb20-21">│&nbsp;&nbsp; ├── Lung5_Rep1_fov_positions_file.csv</span>
-<span id="cb20-22">│&nbsp;&nbsp; ├── Lung5_Rep1_metadata_file.csv</span>
-<span id="cb20-23">│&nbsp;&nbsp; └── Lung5_Rep1_tx_file.csv</span></code></pre></div>
-</div>
-</div>
-<p>This file structure is actually a subset of the raw data and flat files that are exported from AtoMx SIP.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb21-1">tree -L 3</span>
-<span id="cb21-2"></span>
-<span id="cb21-3">├── RawFiles</span>
-<span id="cb21-4">│&nbsp;&nbsp; └── &lt;flow cell&gt;</span>
-<span id="cb21-5">│&nbsp;&nbsp;     └── &lt;slide&gt;</span>
-<span id="cb21-6">│&nbsp;&nbsp;         ├── AnalysisResults</span>
-<span id="cb21-7">│&nbsp;&nbsp;         │&nbsp;&nbsp; └── muy2ybakqy</span>
-<span id="cb21-8">│&nbsp;&nbsp;         ├── CellStatsDir</span>
-<span id="cb21-9">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── &lt;slide&gt;_C902_P02_To_P01_RegStats.csv</span>
-<span id="cb21-10">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── CellComposite</span>
-<span id="cb21-11">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── CellOverlay</span>
-<span id="cb21-12">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── FOV001</span>
-<span id="cb21-13">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellBoundaries_F001.csv</span>
-<span id="cb21-14">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellBoundaries_F001_935.fz</span>
-<span id="cb21-15">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
-<span id="cb21-16">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── CompartmentLabels_F001.tif</span>
-<span id="cb21-17">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; ├── Run_86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Cell_Stats_F001.csv</span>
-<span id="cb21-18">│&nbsp;&nbsp;         │&nbsp;&nbsp; │&nbsp;&nbsp; └── Run_86906312-688f-4f31-9fc5-48b04db5f958_FOV001__complete_code_cell_target_call_coord.cs</span>
-<span id="cb21-19">│&nbsp;&nbsp;         │&nbsp;&nbsp; ...</span>
-<span id="cb21-20">│&nbsp;&nbsp;         │&nbsp;&nbsp; ├── FOV064</span>
-<span id="cb21-21">│&nbsp;&nbsp;         │&nbsp;&nbsp; └── Morphology2D</span>
-<span id="cb21-22">│&nbsp;&nbsp;         └── RunSummary</span>
-<span id="cb21-23">│&nbsp;&nbsp;             ├── 75d021be-b81e-4d7d-ad28-d390a13da7ad.mkit</span>
-<span id="cb21-24">│&nbsp;&nbsp;             ├── Beta15_Affine_Transform_20221118.csv</span>
-<span id="cb21-25">│&nbsp;&nbsp;             ├── Distortion</span>
-<span id="cb21-26">│&nbsp;&nbsp;             ├── FovTracking</span>
-<span id="cb21-27">│&nbsp;&nbsp;             ├── Morphology_ChannelID_Dictionary.txt</span>
-<span id="cb21-28">│&nbsp;&nbsp;             ├── Run86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Beta15_RNA_SpatialBC_Metrics4D.csv</span>
-<span id="cb21-29">│&nbsp;&nbsp;             ├── Run_86906312-688f-4f31-9fc5-48b04db5f958_&lt;slide&gt;_Beta15_ExptConfig.txt</span>
-<span id="cb21-30">│&nbsp;&nbsp;             ├── SampleSlide_PlaneFit_&lt;slide&gt;_History.csv</span>
-<span id="cb21-31">│&nbsp;&nbsp;             ├── Shading</span>
-<span id="cb21-32">│&nbsp;&nbsp;             ├── c902.fovs.csv</span>
-<span id="cb21-33">│&nbsp;&nbsp;             ├── latest.af.fovs.csv</span>
-<span id="cb21-34">│&nbsp;&nbsp;             └── latest.fovs.csv</span>
-<span id="cb21-35">├── flatFiles</span>
-<span id="cb21-36">│&nbsp;&nbsp; └── &lt;flow cell&gt;</span>
-<span id="cb21-37">│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_exprMat_file.csv.gz</span>
-<span id="cb21-38">│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_fov_positions_file.csv.gz</span>
-<span id="cb21-39">│&nbsp;&nbsp;     ├── &lt;flow cell&gt;_metadata_file.csv.gz</span>
-<span id="cb21-40">│&nbsp;&nbsp;     └── fov_positions_formatted.csv</span></code></pre></div>
-</div>
-</div>
-<p>So in order to read in image data into squidpy, we must first rearrange our folders. We can do this manually by moving, copying, or linking files to match the expected format. Normally I am a big fan of symbolic links for just this situation. However, I have noticed that <code>read.nanostring</code> can have an error when using symbolic links for some of the files (error not shown). So for simplicity I will make a copy of the data and place them into a new folder <code>sample_dir_formatted</code>.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb22-1"># Note that this code works for a single slide. If exporting</span>
-<span id="cb22-2"># multiple slides, some modification might be necessary.</span>
-<span id="cb22-3"></span>
-<span id="cb22-4"># cd to parent directory</span>
-<span id="cb22-5"></span>
-<span id="cb22-6"># create a directory adjacent to RawData and flatFiles</span>
-<span id="cb22-7">mkdir -p sample_dir_formatted &amp;&amp; cd $_</span>
-<span id="cb22-8"></span>
-<span id="cb22-9"># Add flat files</span>
-<span id="cb22-10">for file in $(ls ../flatFiles/*/*csv*); do cp $file ./; done</span>
-<span id="cb22-11"></span>
-<span id="cb22-12"># Add folders</span>
-<span id="cb22-13">cp -r ../RawFiles/*/*/CellStatsDir/CellComposite ./</span>
-<span id="cb22-14">cp -r ../RawFiles/*/*/CellStatsDir/CellOverlay ./</span>
-<span id="cb22-15"></span>
-<span id="cb22-16">mkdir -p CellLabels</span>
-<span id="cb22-17">for file in $(ls ../RawFiles/*/*/CellStatsDir/FOV*/CellLabels*); do cp $file ./CellLabels/ ; done</span>
-<span id="cb22-18">rm ./CellLabels/._Cell*</span>
-<span id="cb22-19">  </span>
-<span id="cb22-20">mkdir -p CompartmentLabels</span>
-<span id="cb22-21">for file in $(ls ../RawFiles/*/*/CellStatsDir/FOV*/CompartmentLabels*); do cp $file ./CompartmentLabels/ ; done</span></code></pre></div>
-</div>
-</div>
-<p>The file structure of <code>sample_dir_formatted</code> now looks like this:</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb23-1">tree -L 2</span>
-<span id="cb23-2"></span>
-<span id="cb23-3">.</span>
-<span id="cb23-4">├── &lt;flow cell&gt;_exprMat_file.csv.gz</span>
-<span id="cb23-5">├── &lt;flow cell&gt;_fov_positions_file.csv.gz</span>
-<span id="cb23-6">├── &lt;flow cell&gt;_metadata_file.csv.gz</span>
-<span id="cb23-7">├── CellComposite</span>
-<span id="cb23-8">│&nbsp;&nbsp; ├── CellComposite_F001.jpg</span>
-<span id="cb23-9">|   ├── ...</span>
-<span id="cb23-10">│&nbsp;&nbsp; └── CellComposite_F064.jpg</span>
-<span id="cb23-11">├── CellLabels</span>
-<span id="cb23-12">│&nbsp;&nbsp; ├── CellLabels_F001.tif</span>
-<span id="cb23-13">|   ├── ...</span>
-<span id="cb23-14">│&nbsp;&nbsp; └── CellLabels_F064.tif</span>
-<span id="cb23-15">├── CellOverlay</span>
-<span id="cb23-16">│&nbsp;&nbsp; ├── CellOverlay_F001.jpg</span>
-<span id="cb23-17">|   ├── ...</span>
-<span id="cb23-18">│&nbsp;&nbsp; └── CellOverlay_F064.jpg</span>
-<span id="cb23-19">└── CompartmentLabels</span>
-<span id="cb23-20">    ├── CompartmentLabels_F001.tif</span>
-<span id="cb23-21">    ...</span>
-<span id="cb23-22">    └── CompartmentLabels_F064.tif</span></code></pre></div>
-</div>
-</div>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>If your flow cell was created prior to AtoMx v1.3.2, the CellComposite jpg files may not show the composites but instead just blank images. They will still load into squidpy but will not show the expected tissue structure. This issue was patched for samples created in v1.3.2+. If you have blank images and would like to replace them with composite images, check out <a href="../../posts/composite-images/making-composite-images.html" target="_blank">this post</a>.</p>
-</div>
-</div>
-</section>
-<section id="read-expression-and-image-data-into-squidpy" class="level2" data-number="5.2">
-<h2 data-number="5.2" class="anchored" data-anchor-id="read-expression-and-image-data-into-squidpy"><span class="header-section-number">5.2</span> Read expression and image data into squidpy</h2>
-<p>The block of code below reads the flat files <em>and images</em> now that the image data are in the specified format. The location of the data in the example code below is <code>sample_dir</code> and is provided as the argument for the <code>path</code> parameter of <code>read.nanostring</code>.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-from pathlib import Path
-import os
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import scanpy as sc
-import squidpy as sq
-
-sample_dir = 'path/to/breast_cancer_example/sample_dir_formatted'
-meta_file = [item for item in os.listdir(sample_dir) if 'metadata_file' in item][0]
-counts_file = [item for item in os.listdir(sample_dir) if 'exprMat_file' in item][0]
-fov_file = [item for item in os.listdir(sample_dir) if 'fov_positions_file' in item][0]
- 
-fov_df = pd.read_csv(os.path.join(sample_dir, fov_file))
-if 'FOV' in fov_df.columns:
-  print("Refactoring file to older format.")
-  # Rename 'FOV' column to 'fov'
-  fov_df.rename(columns={'FOV': 'fov'}, inplace=True)
-  # have fov_file reference the new, formatted file and write it
-  fov_file = os.path.join(sample_dir,'fov_positions_formatted.csv')
-  fov_df.to_csv(fov_file, index=False)
-
-adata2 = sq.read.nanostring(
-    path=sample_dir,
-    counts_file=counts_file,
-    meta_file=meta_file,
-    fov_file=fov_file
-)
-
-# This part of the analyis is similar to above
-adata2.var["Negative"] = adata2.var_names.str.startswith("Negative")
-adata2.var["SystemControl"] = adata2.var_names.str.startswith("SystemControl")
-sc.pp.calculate_qc_metrics(adata2, qc_vars=["Negative", "SystemControl"], inplace=True)
-sc.pp.filter_cells(adata2, min_counts=250)
-sc.pp.filter_genes(adata2, min_cells=1000)
-adata2.layers["counts"] = adata2.X.copy()
-sc.pp.normalize_total(adata2, inplace=True, exclude_highly_expressed=True)
-sc.pp.log1p(adata2)
-sc.pp.pca(adata2, n_comps=50)
-sc.pp.neighbors(adata2)
-sc.tl.umap(adata2, min_dist=0.2, spread=1)
-sc.tl.leiden(adata2)
-</code></pre>
-</div>
-</section>
-<section id="spatial-analysis" class="level2" data-number="5.3">
-<h2 data-number="5.3" class="anchored" data-anchor-id="spatial-analysis"><span class="header-section-number">5.3</span> Spatial Analysis</h2>
-<p>In addition to the analysis code we’ve already covered, we can view and analyze our CosMx results with image data. For a full list of features, please see <a href="https://squidpy.readthedocs.io/en/stable/api.html" target="_blank">squidpy’s documentation</a>. For some of the examples below, I’ll use a subset of the data – a single FOV – to speed up computation and to make plotting easier.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>adata_subset = adata2[adata2.obs.fov == "35"].copy()</code></pre>
-</div>
-<section id="viewing-results-in-space" class="level3" data-number="5.3.1">
-<h3 data-number="5.3.1" class="anchored" data-anchor-id="viewing-results-in-space"><span class="header-section-number">5.3.1</span> Viewing results in space</h3>
-<p>Figure&nbsp;7 shows a single FOV image data with cells drawn as contours that are colored based on their Leiden cluster.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>sq.pl.spatial_segment(
-    adata2,
-    color="leiden",
-    seg_contourpx=20,
-    seg_cell_id="cell_ID",
-    library_key="fov",
-    library_id="35",
-    img=True,
-    size=60,
-    figsize = (4, 4),
-    dpi = 200,
-    save = "fig-image1.png"
-)
-
-</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-image1" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-image1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-image1.png" class="img-fluid figure-img" width="412">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-image1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;7: Leiden clusters in space for a single FOV of breast cancer tissue. Clusters are displayed as cell contours overlaid on morphology image (green = PanCK, magenta = DAPI).
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="autocorrelation-with-morans-i" class="level3" data-number="5.3.2">
-<h3 data-number="5.3.2" class="anchored" data-anchor-id="autocorrelation-with-morans-i"><span class="header-section-number">5.3.2</span> Autocorrelation with Moran’s <em>I</em></h3>
-<p>Moran’s <em>I</em> is a useful spatial statistic for measuring the extent that a gene’s expression is clustered in space (verus random or dispersed). Taking a look at the single-FOV subset, we see genes with positive Moran’s <em>I</em>.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sq.gr.spatial_neighbors(adata_subset, coord_type="generic", delaunay=True)
-sq.gr.spatial_autocorr(
-    adata_subset,
-    mode="moran",
-    n_perms=100,
-    n_jobs=1,
-)
-adata_subset.uns["moranI"].head(10)</code></pre>
-</div>
-<pre><code>                I  pval_norm  var_norm  pval_z_sim  pval_sim   var_sim  pval_norm_fdr_bh  pval_z_sim_fdr_bh  pval_sim_fdr_bh
-CRIP1    0.634842        0.0  0.000279         0.0  0.009901  0.000460               0.0                0.0         0.044936
-COX6C    0.624853        0.0  0.000279         0.0  0.009901  0.000496               0.0                0.0         0.044936
-COL1A1   0.616015        0.0  0.000279         0.0  0.009901  0.000476               0.0                0.0         0.044936
-SCGB2A2  0.587074        0.0  0.000279         0.0  0.009901  0.000419               0.0                0.0         0.044936
-COL1A2   0.572189        0.0  0.000279         0.0  0.009901  0.000487               0.0                0.0         0.044936
-COL3A1   0.559603        0.0  0.000279         0.0  0.009901  0.000449               0.0                0.0         0.044936
-SPARC    0.547069        0.0  0.000279         0.0  0.009901  0.000394               0.0                0.0         0.044936
-KRT8     0.516281        0.0  0.000279         0.0  0.009901  0.000427               0.0                0.0         0.044936
-ERBB2    0.509171        0.0  0.000279         0.0  0.009901  0.000458               0.0                0.0         0.044936
-KRT19    0.502475        0.0  0.000279         0.0  0.009901  0.000529               0.0                0.0         0.044936
-</code></pre>
-<p>When we plot the expression of some of these genes (Figure&nbsp;8), we indeed see some how they are aggregated. For example, <em>COX6C</em> expression, which may have clinical significance with breast cancer <span class="citation" data-cites="Tian2021">(Tian et al. 2021)</span>, is autocorrelated and co-occurs with cells high in <em>KRT19</em>.</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sq.pl.spatial_segment(
-    adata_subset,
-    library_id="35",
-    seg_cell_id="cell_ID",
-    library_key="fov",
-    color=["COX6C", "COL1A1", "KRT19"],
-    size=60,
-    img=False,
-    figsize=(4, 4),
-    dpi = 200,
-    save = "fig-nhood-Morans-I.png"
-)</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-morans" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-morans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-nhood-Morans-I.png" class="img-fluid figure-img" width="1142">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-morans-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;8: Expression for select genes showing relatively high Moran’s <em>I</em>.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="spatial-co-occurence" class="level3" data-number="5.3.3">
-<h3 data-number="5.3.3" class="anchored" data-anchor-id="spatial-co-occurence"><span class="header-section-number">5.3.3</span> Spatial co-occurence</h3>
-<p>While Moran’s <em>I</em> quantifies autocorrelation of genes, spatial co-occurence with <code>gr.co_occurence</code> quantifies cell-level co-occurences. In example below, co-occurence of Leiden clusters was used (Figure&nbsp;9).</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sq.gr.co_occurrence(
-    adata_subset,
-    cluster_key="leiden",
-)
-
-sq.pl.co_occurrence(
-    adata_subset,
-    cluster_key="leiden",
-    clusters="1",
-    save = "fig-co-occurence1.png"
-)
-sq.pl.spatial_segment(
-    adata_subset,
-    shape="hex",
-    color="leiden",
-    library_id="35",
-    library_key="fov",
-    seg_cell_id="cell_ID",
-    img=False,
-    size=60,
-    ax = ax[1],
-    save = "fig-co-occurence2.png"
-)</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-co-occurence" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-co-occurence-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-co-occurence1and2.png" class="img-fluid figure-img" width="894">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-co-occurence-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;9: Co-occurence of Leiden clusters. Left: Leiden clusters in space for a single FOV of breast cancer tissue. Right: co-occurence probability ratio (Y) for each cluster relative to Leiden cluster 1 (orange cells in left plot) with increasing radius (X).
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="neighborhood-enrichment" class="level3" data-number="5.3.4">
-<h3 data-number="5.3.4" class="anchored" data-anchor-id="neighborhood-enrichment"><span class="header-section-number">5.3.4</span> Neighborhood enrichment</h3>
-<p>We can take a look at neighborhood enrichment scores using <code>gr.nhood_enrichment</code> and <code>pl.nhood_enrichment</code>(Figure&nbsp;10).</p>
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Python</strong></pre>
-</div>
-<pre data-filename="Python"><code>
-sq.gr.nhood_enrichment(adata2, cluster_key="leiden")
-sq.pl.nhood_enrichment(
-    adata2,
-    cluster_key="leiden",
-    figsize=(5, 5),
-    dpi = 200,
-    title="Neighborhood enrichment",
-    save = "fig-nhood-enrichment.png"
-)
-</code></pre>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div id="fig-neighbors" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-neighbors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-nhood-enrichment.png" class="img-fluid figure-img" width="613">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-neighbors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;10: Neighborhood enrichment across all FOVs for each pairwise combination of Leiden clusters.
-</figcaption>
-</figure>
-</div>
-</div>
-</div>
-<!-- # Saving annData -->
-<!-- ```{filename="Python"} -->
-<!-- adata2.write("./adata2.h5ad") -->
-<!-- ``` -->
-</section>
-</section>
-</section>
-<section id="conclusion" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> Conclusion</h1>
-<p>In this post I showed how to pivot CosMx SMI data that were exported from AtoMx SIP into a format that can be read with the open-sourced python package squidpy. A full analysis of SMI data in squidpy was beyond the scope of this post but look for additional blog post that utilize squidpy’s functions.</p>
-</section>
-<section id="appendix" class="level1" data-number="7">
-<h1 data-number="7"><span class="header-section-number">7</span> Appendix</h1>
-<section id="sec-venv" class="level2" data-number="7.1">
-<h2 data-number="7.1" class="anchored" data-anchor-id="sec-venv"><span class="header-section-number">7.1</span> Create a virtual environment for squidpy</h2>
-<p>I recommend creating a separate virtual environment to run squidpy and to keep packages isolated from the rest of your system. This can be operating system and architecture specific so my (M1 Mac) specific example code below may not work with your configuration.</p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Troubleshooting or assistance with squidpy installation is beyond the scope of this post. Please see <a href="https://squidpy.readthedocs.io/en/stable/api.html" target="_blank">squidpy’s documentation</a>.</p>
-</div>
-</div>
-<p>In general, there are two main package management systems: the default one that ships with python and conda. I’ll use the former for this post. For more information, please see the <a href="https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#create-and-use-virtual-environments" target="_blank">Python Packaging User Guide</a> for examples on Windows and Mac/Linux.</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb32" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb32-1">python3.10 -m venv .venv</span>
-<span id="cb32-2">source .venv/bin/activate</span>
-<span id="cb32-3">python --version</span></code></pre></div>
-</div>
-</div>
-<blockquote class="blockquote">
-<p>Python 3.10.6</p>
-</blockquote>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb33" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb33-1">pip install squidpy</span></code></pre></div>
-</div>
-</div>
-<p>Here are the packages that I used for this post:</p>
-<div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb34" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb34-1">pip freeze &gt; requirements.txt</span></code></pre></div>
-</div>
-</div>
-<div class="cell">
-<details class="code-fold">
-<summary>Click to show contents of requirements.txt</summary>
-<div class="sourceCode cell-code" id="cb35" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb35-1">aiobotocore==2.5.4</span>
-<span id="cb35-2">aiohttp==3.9.5</span>
-<span id="cb35-3">aioitertools==0.11.0</span>
-<span id="cb35-4">aiosignal==1.3.1</span>
-<span id="cb35-5">anndata==0.10.8</span>
-<span id="cb35-6">array_api_compat==1.7.1</span>
-<span id="cb35-7">asciitree==0.3.3</span>
-<span id="cb35-8">async-timeout==4.0.3</span>
-<span id="cb35-9">attrs==23.2.0</span>
-<span id="cb35-10">botocore==1.31.17</span>
-<span id="cb35-11">certifi==2024.6.2</span>
-<span id="cb35-12">charset-normalizer==3.3.2</span>
-<span id="cb35-13">click==8.1.7</span>
-<span id="cb35-14">click-plugins==1.1.1</span>
-<span id="cb35-15">cligj==0.7.2</span>
-<span id="cb35-16">cloudpickle==3.0.0</span>
-<span id="cb35-17">colorcet==3.1.0</span>
-<span id="cb35-18">contourpy==1.2.1</span>
-<span id="cb35-19">cycler==0.12.1</span>
-<span id="cb35-20">dask==2024.6.1</span>
-<span id="cb35-21">dask-expr==1.1.4</span>
-<span id="cb35-22">dask-image==2024.5.3</span>
-<span id="cb35-23">datashader==0.16.2</span>
-<span id="cb35-24">distributed==2024.6.1</span>
-<span id="cb35-25">docrep==0.3.2</span>
-<span id="cb35-26">exceptiongroup==1.2.1</span>
-<span id="cb35-27">fasteners==0.19</span>
-<span id="cb35-28">fiona==1.9.6</span>
-<span id="cb35-29">fonttools==4.53.0</span>
-<span id="cb35-30">frozenlist==1.4.1</span>
-<span id="cb35-31">fsspec==2023.6.0</span>
-<span id="cb35-32">geopandas==0.14.4</span>
-<span id="cb35-33">h5py==3.11.0</span>
-<span id="cb35-34">idna==3.7</span>
-<span id="cb35-35">igraph==0.11.5</span>
-<span id="cb35-36">imageio==2.34.1</span>
-<span id="cb35-37">importlib_metadata==7.2.0</span>
-<span id="cb35-38">inflect==7.2.1</span>
-<span id="cb35-39">Jinja2==3.1.4</span>
-<span id="cb35-40">jmespath==1.0.1</span>
-<span id="cb35-41">joblib==1.4.2</span>
-<span id="cb35-42">kiwisolver==1.4.5</span>
-<span id="cb35-43">lazy_loader==0.4</span>
-<span id="cb35-44">legacy-api-wrap==1.4</span>
-<span id="cb35-45">leidenalg==0.10.2</span>
-<span id="cb35-46">llvmlite==0.43.0</span>
-<span id="cb35-47">locket==1.0.0</span>
-<span id="cb35-48">markdown-it-py==3.0.0</span>
-<span id="cb35-49">MarkupSafe==2.1.5</span>
-<span id="cb35-50">matplotlib==3.9.0</span>
-<span id="cb35-51">matplotlib-scalebar==0.8.1</span>
-<span id="cb35-52">mdurl==0.1.2</span>
-<span id="cb35-53">more-itertools==10.3.0</span>
-<span id="cb35-54">msgpack==1.0.8</span>
-<span id="cb35-55">multidict==6.0.5</span>
-<span id="cb35-56">multipledispatch==1.0.0</span>
-<span id="cb35-57">multiscale_spatial_image==0.11.2</span>
-<span id="cb35-58">natsort==8.4.0</span>
-<span id="cb35-59">networkx==3.3</span>
-<span id="cb35-60">numba==0.60.0</span>
-<span id="cb35-61">numcodecs==0.12.1</span>
-<span id="cb35-62">numpy==1.26.4</span>
-<span id="cb35-63">ome-zarr==0.9.0</span>
-<span id="cb35-64">omnipath==1.0.8</span>
-<span id="cb35-65">packaging==24.1</span>
-<span id="cb35-66">pandas==2.2.2</span>
-<span id="cb35-67">param==2.1.0</span>
-<span id="cb35-68">partd==1.4.2</span>
-<span id="cb35-69">patsy==0.5.6</span>
-<span id="cb35-70">pillow==10.3.0</span>
-<span id="cb35-71">PIMS==0.7</span>
-<span id="cb35-72">psutil==6.0.0</span>
-<span id="cb35-73">pyarrow==16.1.0</span>
-<span id="cb35-74">pyct==0.5.0</span>
-<span id="cb35-75">pygeos==0.14</span>
-<span id="cb35-76">Pygments==2.18.0</span>
-<span id="cb35-77">pynndescent==0.5.13</span>
-<span id="cb35-78">pyparsing==3.1.2</span>
-<span id="cb35-79">pyproj==3.6.1</span>
-<span id="cb35-80">python-dateutil==2.9.0.post0</span>
-<span id="cb35-81">pytz==2024.1</span>
-<span id="cb35-82">PyYAML==6.0.1</span>
-<span id="cb35-83">requests==2.32.3</span>
-<span id="cb35-84">rich==13.7.1</span>
-<span id="cb35-85">s3fs==2023.6.0</span>
-<span id="cb35-86">scanpy==1.10.1</span>
-<span id="cb35-87">scikit-image==0.24.0</span>
-<span id="cb35-88">scikit-learn==1.5.0</span>
-<span id="cb35-89">scipy==1.13.1</span>
-<span id="cb35-90">seaborn==0.13.2</span>
-<span id="cb35-91">session-info==1.0.0</span>
-<span id="cb35-92">shapely==2.0.4</span>
-<span id="cb35-93">six==1.16.0</span>
-<span id="cb35-94">slicerator==1.1.0</span>
-<span id="cb35-95">sortedcontainers==2.4.0</span>
-<span id="cb35-96">spatial_image==0.3.0</span>
-<span id="cb35-97">spatialdata==0.0.15</span>
-<span id="cb35-98">squidpy==1.5.0</span>
-<span id="cb35-99">statsmodels==0.14.2</span>
-<span id="cb35-100">stdlib-list==0.10.0</span>
-<span id="cb35-101">tblib==3.0.0</span>
-<span id="cb35-102">texttable==1.7.0</span>
-<span id="cb35-103">threadpoolctl==3.5.0</span>
-<span id="cb35-104">tifffile==2024.6.18</span>
-<span id="cb35-105">toolz==0.12.1</span>
-<span id="cb35-106">tornado==6.4.1</span>
-<span id="cb35-107">tqdm==4.66.4</span>
-<span id="cb35-108">typeguard==4.3.0</span>
-<span id="cb35-109">typing_extensions==4.12.2</span>
-<span id="cb35-110">tzdata==2024.1</span>
-<span id="cb35-111">umap-learn==0.5.6</span>
-<span id="cb35-112">urllib3==1.26.19</span>
-<span id="cb35-113">validators==0.28.3</span>
-<span id="cb35-114">wrapt==1.16.0</span>
-<span id="cb35-115">xarray==2024.6.0</span>
-<span id="cb35-116">xarray-dataclasses==1.8.0</span>
-<span id="cb35-117">xarray-datatree==0.0.14</span>
-<span id="cb35-118">xarray-schema==0.0.3</span>
-<span id="cb35-119">xarray-spatial==0.4.0</span>
-<span id="cb35-120">yarl==1.9.4</span>
-<span id="cb35-121">zarr==2.18.2</span>
-<span id="cb35-122">zict==3.0.0</span>
-<span id="cb35-123">zipp==3.19.2</span></code></pre></div>
-</details>
-</div>
-
-
-
-</section>
-</section>
-
-<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
-<div id="ref-Dries2021" class="csl-entry">
-Dries, Ruben, Qian Zhu, Rui Dong, Chee-Huat Linus Eng, Huipeng Li, Kan Liu, Yuntian Fu, et al. 2021. <span>“Giotto: A Toolbox for Integrative Analysis and Visualization of Spatial Expression Data.”</span> <em>Genome Biology</em> 22 (December): 78. <a href="https://doi.org/10.1186/s13059-021-02286-2">https://doi.org/10.1186/s13059-021-02286-2</a>.
-</div>
-<div id="ref-Hao2024" class="csl-entry">
-Hao, Yuhan, Tim Stuart, Madeline H. Kowalski, Saket Choudhary, Paul Hoffman, Austin Hartman, Avi Srivastava, et al. 2024. <span>“Dictionary Learning for Integrative, Multimodal and Scalable Single-Cell Analysis.”</span> <em>Nature Biotechnology</em> 42 (February): 293–304. <a href="https://doi.org/10.1038/s41587-023-01767-y">https://doi.org/10.1038/s41587-023-01767-y</a>.
-</div>
-<div id="ref-He2022" class="csl-entry">
-He, Shanshan, Ruchir Bhatt, Carl Brown, Emily A Brown, Derek L Buhr, Kan Chantranuvatana, Patrick Danaher, et al. 2022. <span>“High-Plex Imaging of RNA and Proteins at Subcellular Resolution in Fixed Tissue by Spatial Molecular Imaging.”</span> <em>Nature Biotechnology</em> 40 (December): 1794–1806. <a href="https://doi.org/10.1038/s41587-022-01483-z">https://doi.org/10.1038/s41587-022-01483-z</a>.
-</div>
-<div id="ref-Palla2022" class="csl-entry">
-Palla, Giovanni, Hannah Spitzer, Michal Klein, David Fischer, Anna Christina Schaar, Louis Benedikt Kuemmerle, Sergei Rybakov, et al. 2022. <span>“Squidpy: A Scalable Framework for Spatial Omics Analysis.”</span> <em>Nature Methods</em> 19 (February): 171–78. <a href="https://doi.org/10.1038/s41592-021-01358-2">https://doi.org/10.1038/s41592-021-01358-2</a>.
-</div>
-<div id="ref-Tian2021" class="csl-entry">
-Tian, Bi-Xia, Wei Sun, Shu-Hong Wang, Pei-Jun Liu, and Yao-Chun Wang. 2021. <span>“<a href="https://www.ncbi.nlm.nih.gov/pubmed/33527004">Differential Expression and Clinical Significance of COX6C in Human Diseases.</a>”</span> <em>American Journal of Translational Research</em> 13: 1–10.
-</div>
-<div id="ref-Wolf2018" class="csl-entry">
-Wolf, F Alexander, Philipp Angerer, and Fabian J Theis. 2018. <span>“SCANPY: Large-Scale Single-Cell Gene Expression Data Analysis.”</span> <em>Genome Biology</em> 19: 15. <a href="https://doi.org/10.1186/s13059-017-1382-0">https://doi.org/10.1186/s13059-017-1382-0</a>.
-</div>
-</div></section></div> ]]></description>
-  <category>Squidpy</category>
-  <category>python</category>
-  <category>visualization</category>
-  <category>AnnData</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/squidpy-essentials.html</guid>
-  <pubDate>Wed, 03 Jul 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/squidpy-essentials/figures/fig-image1.png" medium="image" type="image/png" height="125" width="144"/>
 </item>
 </channel>
 </rss>
