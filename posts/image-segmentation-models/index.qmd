@@ -28,11 +28,97 @@ draft: false
 
 Cell segmentation is a foundational step in spatial omics analysis. Inaccurate boundaries can lead to the misassignment of transcripts or proteins, ultimately distorting cellular profiles and downstream interpretations. To address this, we developed a robust image-based segmentation pipeline that leverages deep learning to generate accurate and biologically meaningful cell masks across a wide range of tissue types and imaging conditions.
 
-In this post, we introduce our full segmentation pipeline, describe the three custom-trained models that power it. These models improve segmentation fidelity by tailoring input channels, training data composition, and post-processing workflows to specific biological challenges.
+In this post, we introduce our full segmentation pipeline and describe the three custom-trained models that power it. These models improve segmentation fidelity by tailoring input channels, training data composition, and post-processing workflows to specific biological challenges.
 
 Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
 the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
 
+You can cite this post as electronic materials in various formats shown below. 
+```{r setup, include=FALSE}
+title <- "Advancing cell segmentation in spatial omics: new models for diverse morphologies"
+date <- "2025-07-16"
+url <- "https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/"
+
+# Individual author names
+author1 <- "Lidan Wu"
+author2 <- "Aster Wardhani"
+author3 <- "Joseph-Tin Phan"
+
+# citation style author entries
+authors_apa <- paste(
+  paste0(strsplit(author1, " ")[[1]][2], ", ", substr(author1, 1, 1), "."),
+  paste0(strsplit(author2, " ")[[1]][2], ", ", substr(author2, 1, 1), "."),
+  paste0("& ", strsplit(author3, " ")[[1]][2], ", ", substr(author3, 1, 1), "."),
+  sep = ", "
+)
+
+authors_mla <- paste0(
+  strsplit(author1, " ")[[1]][2], ", ", strsplit(author1, " ")[[1]][1], ", ", 
+  author2, ", and ", author3)
+
+authors_bib <- paste(author1, author2, author3, sep = " and ")
+```
+::: {.panel-tabset}
+### APA
+
+```{r, echo=FALSE, results='asis'}
+cat(paste0(authors_apa, " (", format(as.Date(date), "%Y"), "). ", title, ". Retrieved from ", url))
+```
+
+### MLA
+
+```{r, echo=FALSE, results='asis'}
+cat(paste0(authors_mla, ". ", title, ". ", format(as.Date(date), "%d %b %Y"), ", ", url))
+```
+
+### BibTeX
+
+```{r, echo=FALSE, results='asis'}
+cat("<pre><code>")
+cat(paste0(
+  "@misc{Wu2025CosMxCellSeg\n",
+  "  title = {", title, "},\n",
+  "  author = {", authors_bib, "},\n",
+  "  year = {", format(as.Date(date), "%Y"), "},\n",
+  "  url = {", url, "},\n",
+  "  note = {Accessed: ", Sys.Date(), "}\n",
+  "}"
+))
+cat("</code></pre>")
+```
+
+### RIS
+
+```{r, echo=FALSE, results='asis'}
+cat("<pre><code>")
+cat(paste0(
+"TY  - ELEC\n",
+"TI  - ", title, "\n",
+"AU  - ", author1, "\n",
+"AU  - ", author2, "\n",
+"AU  - ", author3, "\n",
+"PY  - ", format(as.Date(date), "%Y"), "\n",
+"UR  - ", url, "\n",
+"ER  -"
+))
+cat("</code></pre>")
+```
+
+### EndNote
+```{r, echo=FALSE, results='asis'}
+cat("<pre><code>")
+cat(paste0(
+"%0 Electronic Article\n",
+"%T ", title, "\n",
+"%A ", author1, "\n",
+"%A ", author2, "\n",
+"%A ", author3, "\n",
+"%D ", format(as.Date(date), "%Y"), "\n",
+"%U ", url
+))
+cat("</code></pre>")
+```
+:::
 
 # Compartment-Aware Segmentation Pipeline
 
@@ -101,13 +187,13 @@ As shown in @fig-composition-impact, masks predicted by the different models on 
 
 To quantify these differences, we measured sensitivity and precision across a range of IoU (Intersection over Union) thresholds for each model on held-out validation datasets, as shown in @fig-performance-curves. The morphology-balanced models consistently outperformed others across all segmentation types: nuclei, generic cytoplasm, and neural.
 
-* In nuclear segmentation (Panel A), `NucModel#2` (balanced) outperformed both the pretrained model (`nuclei`, `CP`, `Cyto2` and `Cyto3`) and `NucModel#1` (large, unbalanced set).
+* In nuclear segmentation (Panel A), `NucModel#2` (balanced) outperformed both the pretrained models (`nuclei`, `CP`, `Cyto2` and `Cyto3`) and `NucModel#1` (large, unbalanced set).
 * In generic cytoplasm segmentation (Panel B), `CytoModel#3` (balanced) showed the best trade-off between sensitivity and precision.
 * In neural segmentation (Panel C), `NeuModel#3` demonstrated the clearest performance gain, accurately detecting both large neuronal bodies and thin astrocytic projections (@fig-composition-impact).
 
 These results highlight that **more data is not always better**—especially when morphological diversity is limited. Carefully curating a balanced training set allows models to generalize more robustly, particularly on tissue samples with heterogeneous or complex cellular structures.
 
-![Quantitative performance of segmentation models across IoU thresholds. (A) Nuclear segmentation models. (B) Generic whole-cell segmentation models. (C) Neural segmentation models. Each curve shows sensitivity or precision on held-out test sets. Morphology-balanced models (Model #2 or #3) consistently outperform both pretrained baselines and unbalanced large-set models. ](figures/Fig5-performance-curves.png){#fig-performance-curves}
+![Quantitative performance of segmentation models across IoU thresholds. (A) Nuclear segmentation models. (B) Generic whole-cell segmentation models. (C) Neural segmentation models. Each curve shows sensitivity or precision on held-out test sets. Morphology-balanced models (Model #2 or #3) consistently outperform both pretrained baselines [@stringer2021cellpose; @pachitariu2022cellpose; @stringer2025cellpose] and unbalanced large-set models. ](figures/Fig5-performance-curves.png){#fig-performance-curves}
 
 
 # Post-Processing for High-Fidelity Cell Recovery
