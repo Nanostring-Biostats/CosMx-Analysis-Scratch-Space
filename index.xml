@@ -10,7 +10,297 @@
 <atom:link href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/index.xml" rel="self" type="application/rss+xml"/>
 <description>NanoString&#39;s CosMx Analysis Scratch Space</description>
 <generator>quarto-1.6.30</generator>
-<lastBuildDate>Tue, 15 Jul 2025 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Wed, 16 Jul 2025 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Advancing cell segmentation in spatial omics: new models for diverse morphologies</title>
+  <dc:creator>Lidan Wu</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Cell segmentation is a foundational step in spatial omics analysis. Inaccurate boundaries can lead to the misassignment of transcripts or proteins, ultimately distorting cellular profiles and downstream interpretations. To address this, we developed a robust image-based segmentation pipeline that leverages deep learning to generate accurate and biologically meaningful cell masks across a wide range of tissue types and imaging conditions.</p>
+<p>In this post, we introduce our full segmentation pipeline and describe the three custom-trained models that power it. These models improve segmentation fidelity by tailoring input channels, training data composition, and post-processing workflows to specific biological challenges.</p>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+<p>You can cite this post as electronic materials in various formats shown below.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true">APA</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">MLA</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" aria-controls="tabset-1-3" aria-selected="false">BibTeX</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-4" aria-controls="tabset-1-4" aria-selected="false">RIS</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-5-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-5" aria-controls="tabset-1-5" aria-selected="false">EndNote</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
+<p>Wu, L., Wardhani, A., &amp; Phan, J. (2025). Advancing cell segmentation in spatial omics: new models for diverse morphologies. Retrieved from https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/</p>
+</div>
+<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
+<p>Wu, Lidan, Aster Wardhani, and Joseph-Tin Phan. Advancing cell segmentation in spatial omics: new models for diverse morphologies. 16 Jul 2025, https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/</p>
+</div>
+<div id="tabset-1-3" class="tab-pane" aria-labelledby="tabset-1-3-tab">
+<pre><code>@misc{Wu2025CosMxCellSeg
+  title = {Advancing cell segmentation in spatial omics: new models for diverse morphologies},
+  author = {Lidan Wu and Aster Wardhani and Joseph-Tin Phan},
+  year = {2025},
+  url = {https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/},
+  note = {Accessed: 2025-07-28}
+}</code></pre>
+</div>
+<div id="tabset-1-4" class="tab-pane" aria-labelledby="tabset-1-4-tab">
+<pre><code>TY  - ELEC
+TI  - Advancing cell segmentation in spatial omics: new models for diverse morphologies
+AU  - Lidan Wu
+AU  - Aster Wardhani
+AU  - Joseph-Tin Phan
+PY  - 2025
+UR  - https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/
+ER  -</code></pre>
+</div>
+<div id="tabset-1-5" class="tab-pane" aria-labelledby="tabset-1-5-tab">
+<pre><code>%0 Electronic Article
+%T Advancing cell segmentation in spatial omics: new models for diverse morphologies
+%A Lidan Wu
+%A Aster Wardhani
+%A Joseph-Tin Phan
+%D 2025
+%U https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/</code></pre>
+</div>
+</div>
+</div>
+</section>
+<section id="compartment-aware-segmentation-pipeline" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Compartment-Aware Segmentation Pipeline</h1>
+<p>Our pipeline integrates two complementary segmentation models to produce both <strong>cell-level</strong> and <strong>subcellular</strong> compartment labels for each sample:</p>
+<ol type="1">
+<li>A <strong>nuclear segmentation model</strong> detects nuclei with high precision.</li>
+<li>A <strong>whole-cell segmentation model</strong>, which is either a generic <strong>cyto model</strong> or a specific <strong>neural model</strong>, depending on tissue context, identifies the full cell boundaries including cytoplasmic regions.</li>
+<li>These two masks are then <strong>reconciled and merged</strong> to assign:
+<ul>
+<li>A unique cell ID to each detected cell</li>
+<li>Labels for subcellular compartments (nucleus vs.&nbsp;cytoplasm)</li>
+</ul></li>
+</ol>
+<p>This two-model architecture ensures redundancy and resilience: when one compartment is weakly stained or difficult to model, the other can often compensate. The resulting merged masks are more complete and biologically accurate, especially for complex tissues such as brain.</p>
+<div id="fig-seg-pipeline" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-seg-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/figures/Fig1-seg-pipeline.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-seg-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Schematic of full cell segmentation pipeline. Input morphology images feed into two parallel models: nuclear and whole-cell segmentation. Their outputs are merged into a final, compartment-labeled cell mask based on the overlapping behavior.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="segmentation-models" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Segmentation Models</h1>
+<p>All three models in our pipeline are based on the Cellpose-style architecture <span class="citation" data-cites="stringer2021cellpose">(Stringer et al. 2021)</span>, a widely adopted framework for generalist cell segmentation using spatial gradient flows and vector fields. Following the approach described in Cellpose 2.0 <span class="citation" data-cites="pachitariu2022cellpose">(Pachitariu and Stringer 2022)</span>, we trained separate models from scratch to specialize in nuclear, generic, and neural segmentation, respectively. The training datasets and input configurations were tailored to each segmentation task.</p>
+<section id="nuclear-segmentation-model" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="nuclear-segmentation-model"><span class="header-section-number">3.1</span> Nuclear Segmentation Model</h2>
+<p>Designed to work across many tissue types, this model takes a <strong>single-channel nuclear stain</strong> (e.g., DAPI, Histone stain) as input. It prioritizes accuracy in nucleus identification, even in densely packed or noisy imaging conditions. This model forms the backbone for subcellular compartment labeling.</p>
+</section>
+<section id="generic-segmentation-model" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="generic-segmentation-model"><span class="header-section-number">3.2</span> Generic Segmentation Model</h2>
+<p>This model segments complete cell boundaries using <strong>two imaging channels</strong>: a required channel for general cytoplasmic or membrane staining, and an optional channel for nuclear staining. It is optimized for tissues with relatively uniform morphology and minimal extended protrusions, such as non-neural samples.</p>
+</section>
+<section id="neural-segmentation-model" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="neural-segmentation-model"><span class="header-section-number">3.3</span> Neural Segmentation Model</h2>
+<p>To address the unique challenges of brain tissue, including highly irregular cell shapes, long processes, and closely apposed glial and neuronal cells, we developed a neural-specific model that uses <strong>three channels</strong>: nuclear, neuronal, and glial stains. This model more accurately segments astrocytes, neurons with elongated axons, and densely packed cerebellum regions.</p>
+<div id="fig-3ch-model" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-3ch-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/figures/Fig2-3ch-model.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-3ch-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Neural cell segmentation model: input and output overview. Morphological stains from brain tissue—nuclear (green), neuronal (red), and glial (blue) markers—are combined into 3-channel inputs to the neural segmentation model (top panel). The Cellpose-style model processes these inputs to produce cell probability maps and spatial gradients (bottom panel), which are used to reconstruct accurate cell masks, even for complex neural morphologies.
+</figcaption>
+</figure>
+</div>
+</section>
+</section>
+<section id="diverse-and-context-relevant-training-datasets" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Diverse and Context-Relevant Training Datasets</h1>
+<p>To ensure the segmentation models perform robustly on the types of tissues most relevant to spatial omics, we curated a large and diverse set of training data. A cornerstone of our approach was the generation of high-quality ground-truth annotations from CosMx<sup>®</sup> immunofluorescence images, covering a wide range of FFPE and fresh frozen tissue samples. These internal datasets include various tissue types and staining conditions, and are tailored to the real-world complexities encountered in spatial transcriptomic assays. They were essential in enabling the models to achieve high accuracy on primary tissue samples, which are the central use case for spatial omics.</p>
+<p>To complement these internal datasets and further expand morphological and technical diversity, we incorporated a variety of publicly available datasets (Appendix) that span:</p>
+<ul>
+<li><p>Sample types: including 2D cell cultures, organoids, and whole-organism samples</p></li>
+<li><p>Cell types and disease contexts: such as neurons, immune cells, and tumor cells</p></li>
+<li><p>Imaging modalities: beyond immunofluorescence, including H&amp;E, brightfield, and differential interference contrast (DIC) imaging</p></li>
+</ul>
+<p>This hybrid training strategy, anchored in spatial omics–specific imaging and augmented by public data, ensures that the models generalize well across tissue types, imaging conditions, and biological contexts.</p>
+<div id="fig-trainData" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-trainData-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/figures/Fig3-bsb-trainData.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-trainData-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Composition of training datasets used for model development. (A–C) Sunburst charts summarize the distribution of sample sources, image modalities, and staining types used to train the nuclear segmentation model (A), generic cytoplasm segmentation model (B), and neural segmentation model (C). Data were drawn from both internal CosMx assays and diverse public sources. (D) Representative immunofluorescence images from the neural training dataset highlight the complexity of brain tissue morphology, including neurons and glia labeled with various markers.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="the-impact-of-training-dataset-composition-on-segmentation-performance" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> The Impact of Training Dataset Composition on Segmentation Performance</h1>
+<p>Beyond architecture and stain configuration, the composition of training data had a profound effect on segmentation outcomes, particularly for complex tissues like brain. We explored this by training multiple versions of each model type (nuclear, generic whole-cell, and neural), using datasets that varied in their coverage of morphology, staining quality, and tissue types.</p>
+<p>For each model type, we compared:</p>
+<ul>
+<li>A <strong>maximally large dataset</strong> (<code>Model #1</code>), including all available training images regardless of cell type balance.</li>
+<li>One or more <strong>intermediate models</strong> (<code>Model #2</code>).</li>
+<li>A <strong>balanced dataset model</strong> (<code>Model #3</code> for generic whole-cell and neural; <code>Model #2</code> for nuclei), where we carefully selected training samples to represent a diverse spectrum of cell morphologies and tissue structures.</li>
+</ul>
+<p>As shown in Figure&nbsp;4, masks predicted by the different models on neural tissue vary considerably in structure and completeness. Pre-trained models like <code>Cyto2</code> often undersegment neurons or fail to recover glial processes. In contrast, the morphology-balanced models produced more realistic masks, retaining fine structures and reducing erroneous fusions.</p>
+<div id="fig-composition-impact" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-composition-impact-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/figures/Fig4-composition-impact.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-composition-impact-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Segmentation comparison on neural samples. Rows show: (1) input immunofluorescence images, (2) ground-truth labels, (3) Cyto2 predictions, and (4–6) outputs from custom-trained models. Morphology-balanced models (e.g., Model #3) better capture fine structures and generalize across diverse inputs.
+</figcaption>
+</figure>
+</div>
+<p>To quantify these differences, we measured sensitivity and precision across a range of IoU (Intersection over Union) thresholds for each model on held-out validation datasets, as shown in Figure&nbsp;5. The morphology-balanced models consistently outperformed others across all segmentation types: nuclei, generic cytoplasm, and neural.</p>
+<ul>
+<li>In nuclear segmentation (Panel A), <code>NucModel#2</code> (balanced) outperformed both the pretrained models (<code>nuclei</code>, <code>CP</code>, <code>Cyto2</code> and <code>Cyto3</code>) and <code>NucModel#1</code> (large, unbalanced set).</li>
+<li>In generic cytoplasm segmentation (Panel B), <code>CytoModel#3</code> (balanced) showed the best trade-off between sensitivity and precision.</li>
+<li>In neural segmentation (Panel C), <code>NeuModel#3</code> demonstrated the clearest performance gain, accurately detecting both large neuronal bodies and thin astrocytic projections (Figure&nbsp;4).</li>
+</ul>
+<p>These results highlight that <strong>more data is not always better</strong>—especially when morphological diversity is limited. Carefully curating a balanced training set allows models to generalize more robustly, particularly on tissue samples with heterogeneous or complex cellular structures.</p>
+<div id="fig-performance-curves" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-performance-curves-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/figures/Fig5-performance-curves.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-performance-curves-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Quantitative performance of segmentation models across IoU thresholds. (A) Nuclear segmentation models. (B) Generic whole-cell segmentation models. (C) Neural segmentation models. Each curve shows sensitivity or precision on held-out test sets. Morphology-balanced models (Model #2 or #3) consistently outperform both pretrained baselines <span class="citation" data-cites="stringer2021cellpose pachitariu2022cellpose stringer2025cellpose">(Stringer et al. 2021; Pachitariu and Stringer 2022; Stringer and Pachitariu 2025)</span> and unbalanced large-set models.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="post-processing-for-high-fidelity-cell-recovery" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Post-Processing for High-Fidelity Cell Recovery</h1>
+<p>While Cellpose-style models output rich information, including cell probability maps and spatial gradient flows, these predictions must be converted into discrete cell masks for downstream use. The standard Cellpose post-processing pipeline performs this by applying a gradient tracking algorithm. This method first thresholds the cell probability map to define a foreground region. Then, it uses the magnitude and direction of the predicted flow vectors (horizontal and vertical) to trace each pixel along a path toward a “basin” point, interpreted as the cell’s centroid. Pixels with similar destinations are grouped into the same cell.</p>
+<p>However, this method breaks down under biologically realistic conditions. Elongated cells (e.g., neurons with long processes) may have centroids that fall outside their actual boundaries, resulting in flow divergence near the edges and causing the mask to fragment. Similarly, large or highly textured cells can generate noisy or irregular flow fields, leading to mask splitting or partial segmentation. These errors persist even when adjusting thresholds on cell probability or flow magnitudes.</p>
+<p>This challenge is clearly illustrated in Figure&nbsp;6 A, where raw model outputs for a neural tissue sample exhibit ambigous “basin” points. Attempts to tune cutoffs (Figure&nbsp;6 B) fail to reliably recover full cell structures, either missing elongated cells or oversegmenting compact ones.</p>
+<div id="fig-gradient-tracking" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-gradient-tracking-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/figures/Fig6-gradient-tracking.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-gradient-tracking-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Challenges in mask generation from model outputs for irregular cell morphologies. (A) Model outputs for a neural segmentation example, including raw input, predicted cell probability, spatial gradient flow, and gradient magnitude. (B) Attempts to generate masks from these outputs using adjusted cutoffs for flows and/or cell probability show failure to capture large or atypical morphologies.
+</figcaption>
+</figure>
+</div>
+<p>To overcome these limitations, we developed a high-recovery post-processing pipeline (Figure&nbsp;7 A) that supplements the default gradient tracking with two additional strategies:</p>
+<ol type="1">
+<li>Initial mask generation preserves the default method’s confident segmentations (Component <strong>a</strong>).</li>
+<li>Missed cells are recovered by applying auto-thresholding on the residual cell probability and gradient magnitude maps (Component <strong>b</strong>).</li>
+<li>Remaining foreground pixels are assigned to nearby cells using distance-based reassignment or neighbor-consistent flow propagation, resulting in a complete, coherent mask set (Component <strong>c</strong>).</li>
+</ol>
+<p>This hybrid strategy improves mask continuity, structural integrity, and cell recovery, especially in densely packed or morphologically complex tissues like brain.</p>
+<p>As shown in Figure&nbsp;7 B, the resulting masks successfully capture a diverse range of cell types, including large neurons, thin astrocytic processes, and small glia, while minimizing fragmentation and oversegmentation.</p>
+<div id="fig-mask-recovery" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-mask-recovery-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/figures/Fig7-mask-recovery.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-mask-recovery-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Improved post-processing enables high-fidelity mask recovery. (A) Workflow for the high-recovery post-processing method. Default segmentation (a) is supplemented with threshold-based recovery (b) and foreground reassignment (c). (B) Visual comparison of default vs.&nbsp;new masks. Each row shows morphology image, predicted flows, and corresponding masks. The custom method (bottom row) improves segmentation completeness and accuracy across diverse cell shapes.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="integration-into-the-cosmx-platform" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Integration into the CosMx Platform</h1>
+<p>The newly developed segmentation models and high-recovery post-processing pipeline have been fully integrated into the CosMx<sup>®</sup> Spatial Molecular Imager platform to support robust and biologically meaningful cell segmentation across a wide range of samples.</p>
+<p>These capabilities are now available through two complementary systems:</p>
+<ul>
+<li><strong>Control Center 2.0 or higher</strong>: Enables on-instrument execution of the new segmentation pipeline during CosMx image processing runs, ensuring consistency and improved performance at the point of acquisition.</li>
+<li><strong>AtoMx<sup>®</sup> Spatial Informatics Portal (SIP) version 2.0 or higher</strong>: Supports cloud-based analysis workflows that utilize the new models and pipeline for segmentation across large cohorts and multiple users.</li>
+</ul>
+<p>For researchers who wish to customize segmentation to suit specific experimental contexts, AtoMx SIP provides a resegmentation toolkit via an interactive UI. This tool allows users to:</p>
+<ul>
+<li>Choose which trained model to apply for nuclear and whole-cell (Cyto) segmentation steps.</li>
+<li>Specify which morphology channels are used as input for each model.</li>
+<li>Re-segment images on demand with customized configurations for tissue type and staining patterns.</li>
+</ul>
+<p>More details can be found in the <a href="https://university.nanostring.com/cosmx-smi-data-analysis-user-manual" target="_blank">CosMx SMI Data Analysis User Manual (AtoMx v2.0)</a>, available through <a href="https://university.nanostring.com/" target="_blank">NanoU</a>.</p>
+</section>
+<section id="conclusion" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Conclusion</h1>
+<p>Through this work, we’ve shown that better segmentation isn’t just about building a bigger model—it’s about using the right data, asking the right questions, and designing each step of the pipeline with the biology in mind. By training three specialized models for nuclear, generic whole-cell and neural segmentation, and building a smarter post-processing method to handle complex cell shapes, we’ve significantly improved how well we can detect and define cells in spatial omics data.</p>
+<p>What we learned goes beyond just this application. A few key takeaways stood out:</p>
+<ul>
+<li>Balanced, diverse training data matters more than sheer volume, especially when working with real tissue.</li>
+<li>Flow-based models need thoughtful post-processing, particularly when cells are irregular or overlapping.</li>
+<li>A flexible, modular approach makes it easier to adapt segmentation tools across different tissue types and experiments.</li>
+</ul>
+<p>These lessons can apply to many other segmentation problems. And with these improvements now available in CosMx and AtoMx, we’re excited to see how researchers can push their spatial analysis even further.</p>
+<hr>
+</section>
+<section id="appendix-public-datasets" class="level1" data-number="9">
+<h1 data-number="9"><span class="header-section-number">9</span> Appendix</h1>
+<p>Public datasets associated with model training include:</p>
+<ul>
+<li>Deepflash2 neurons <span class="citation" data-cites="matthias_griebel_2023_7653312">(Griebel et al. 2023)</span></li>
+<li>Neural nuclei segmentation (S-BSST265) <span class="citation" data-cites="SabineTaschner-Mandl2020">(Sabine Taschner-Mandl and Kromp 2020)</span></li>
+<li>AMSActa Fluorescent Neuronal Cells <span class="citation" data-cites="amsacta7347">(Clissa et al. 2024)</span></li>
+<li>BBBC collections: 007, 009, 030, 034, 038, 039 <span class="citation" data-cites="jones2005bbbc007 wiegandbbbc009 koos2016bbbc030 thirstrup2018bbbc034 caicedo2019bbbc038 caicedo2019bbbc039">(Jones, Carpenter, et al. 2005; Wiegand, Carpenter, et al. 2012; Koos et al. 2016; Thirstrup et al. 2018; Caicedo, Goodman, et al. 2019; Caicedo, Roth, et al. 2019)</span></li>
+<li>Neuroblastoma images from the Cell Image Library <span class="citation" data-cites="yu2013ccdb6843">(Yu et al. 2013)</span></li>
+</ul>
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-caicedo2019bbbc038" class="csl-entry">
+Caicedo, J. C., A. Goodman, K. W. Karhohs, et al. 2019. <span>“BBBC038v1: 2018 Data Science Bowl Nucleus Segmentation Dataset.”</span> <a href="https://bbbc.broadinstitute.org/BBBC038" class="uri">https://bbbc.broadinstitute.org/BBBC038</a>.
+</div>
+<div id="ref-caicedo2019bbbc039" class="csl-entry">
+Caicedo, J. C., J. Roth, A. Goodman, T. Becker, K. W. Karhohs, M. Broisin, C. Molnar, et al. 2019. <span>“BBBC039v1: Fluorescence Nucleus Segmentation Dataset.”</span> <a href="https://bbbc.broadinstitute.org/BBBC039" class="uri">https://bbbc.broadinstitute.org/BBBC039</a>.
+</div>
+<div id="ref-amsacta7347" class="csl-entry">
+Clissa, Luca, Alessandra Occhinegro, Emiliana Piscitiello, Ludovico Taddei, Antonio Macaluso, Roberto Morelli, Fabio Squarcio, et al. 2024. <span>“Fluorescent Neuronal Cells V2.”</span> University of Bologna. <a href="https://amsacta.unibo.it/id/eprint/7347/">https://amsacta.unibo.it/id/eprint/7347/</a>.
+</div>
+<div id="ref-matthias_griebel_2023_7653312" class="csl-entry">
+Griebel, Matthias, Dennis Segebarth, Nikolai Stein, Nina Schukraft, Philip Tovote, Robert Blum, and Christoph M. Flath. 2023. <span>“Deep Learning-Enabled Segmentation of Ambiguous Bioimages with Deepflash2.”</span> Zenodo. <a href="https://doi.org/10.5281/zenodo.7653312">https://doi.org/10.5281/zenodo.7653312</a>.
+</div>
+<div id="ref-jones2005bbbc007" class="csl-entry">
+Jones, T. R., A. E. Carpenter, et al. 2005. <span>“BBBC007v1: Drosophila Kc167 RNAi Screening Dataset.”</span> <a href="https://bbbc.broadinstitute.org/BBBC007" class="uri">https://bbbc.broadinstitute.org/BBBC007</a>.
+</div>
+<div id="ref-koos2016bbbc030" class="csl-entry">
+Koos, K., J. Molnár, L. Kelemen, G. Tamás, and P. Horvath. 2016. <span>“BBBC030v1: DIC Image Reconstruction Dataset from the Broad Bioimage Benchmark Collection.”</span> <a href="https://bbbc.broadinstitute.org/BBBC030" class="uri">https://bbbc.broadinstitute.org/BBBC030</a>.
+</div>
+<div id="ref-pachitariu2022cellpose" class="csl-entry">
+Pachitariu, Marius, and Carsen Stringer. 2022. <span>“Cellpose 2.0: How to Train Your Own Model.”</span> <em>Nature Methods</em> 19 (12): 1634–41. <a href="https://doi.org/10.1038/s41592-022-01663-4">https://doi.org/10.1038/s41592-022-01663-4</a>.
+</div>
+<div id="ref-SabineTaschner-Mandl2020" class="csl-entry">
+Sabine Taschner-Mandl, Peter F. Ambros, Inge M. Ambros, and Florian Kromp. 2020. <span>“An Annotated Fluorescence Image Dataset for Training Nuclear Segmentation Methods.”</span> <a href="https://www.ebi.ac.uk/biostudies/bioimages/studies/S-BSST265">https://www.ebi.ac.uk/biostudies/bioimages/studies/S-BSST265</a>.
+</div>
+<div id="ref-stringer2025cellpose" class="csl-entry">
+Stringer, Carsen, and Marius Pachitariu. 2025. <span>“Cellpose3: One-Click Image Restoration for Improved Cellular Segmentation.”</span> <em>Nature Methods</em> 22 (3): 592–99. <a href="https://doi.org/10.1038/s41592-025-02595-5">https://doi.org/10.1038/s41592-025-02595-5</a>.
+</div>
+<div id="ref-stringer2021cellpose" class="csl-entry">
+Stringer, Carsen, Tim Wang, Michalis Michaelos, and Marius Pachitariu. 2021. <span>“Cellpose: A Generalist Algorithm for Cellular Segmentation.”</span> <em>Nature Methods</em> 18 (1): 100–106. <a href="https://doi.org/10.1038/s41592-020-01018-x">https://doi.org/10.1038/s41592-020-01018-x</a>.
+</div>
+<div id="ref-thirstrup2018bbbc034" class="csl-entry">
+Thirstrup, D. et al. 2018. <span>“BBBC034v1: Allen Institute Cell Structure Dataset.”</span> <a href="https://bbbc.broadinstitute.org/BBBC034" class="uri">https://bbbc.broadinstitute.org/BBBC034</a>.
+</div>
+<div id="ref-wiegandbbbc009" class="csl-entry">
+Wiegand, R., A. E. Carpenter, et al. 2012. <span>“BBBC009v1: Human Red Blood Cells DIC Dataset.”</span> <a href="https://bbbc.broadinstitute.org/BBBC009" class="uri">https://bbbc.broadinstitute.org/BBBC009</a>.
+</div>
+<div id="ref-yu2013ccdb6843" class="csl-entry">
+Yu, W., H. K. Lee, S. Hariharan, W. Y. Bu, and S. Ahmed. 2013. <span>“CCDB:6843 - Mus Musculus Neuroblastoma Dataset.”</span> <a href="https://www.cellimagelibrary.org/images/CCDB_6843" class="uri">https://www.cellimagelibrary.org/images/CCDB_6843</a>.
+</div>
+</div></section></div> ]]></description>
+  <category>segmentation</category>
+  <category>algorithms</category>
+  <category>CosMx 2.0</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/</guid>
+  <pubDate>Wed, 16 Jul 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/figures/Fig1-seg-pipeline.png" medium="image" type="image/png" height="67" width="144"/>
+</item>
 <item>
   <title>A practical guide to transcript-based cell segmentation in spatial transcriptomics</title>
   <dc:creator>Lidan Wu</dc:creator>
@@ -12734,49 +13024,6 @@ font-style: inherit;">head</span>(ref)</span></code></pre></div>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/</guid>
   <pubDate>Wed, 21 Aug 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/hybrid-reference-profiles/figures/heatmap_tile.png" medium="image" type="image/png" height="126" width="144"/>
-</item>
-<item>
-  <title>InSituCor: an open-source package and AtoMx custom module for exploratory data analysis</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/figures/insitucor-banner.png" class="img-fluid figure-img" width="574"></p>
-</figure>
-</div>
-</div>
-</div>
-<section id="background" class="level1">
-<h1>Background</h1>
-<p>We developed InSituCor as a tool for exploratory analysis of CosMx data; it has since become a mainstay of our in-house analyses. InSituCor reports on modules of “spatially correlated” genes, i.e.&nbsp;genes that tend to be expressed in the same tissue regions as each other. We have found it to be a consistently useful tool for discovering unexpected relationships in CosMx data.</p>
-<p>InSituCor makes one important contribution to the spatial correlation field: it isolates correlations that can’t be explained by the cell type landscape alone. While the results of legacy methods are dominated by uninteresting results (e.g., “all the plasma cell markers are spatially correlated with each other”), InSituCor ignores these trivial findings, returning a more concise, and much more interesting manifest of spatial correlations.</p>
-<p>InSituCor is available as both an R package and a custom module for AtoMx.</p>
-</section>
-<section id="resources" class="level1">
-<h1>Resources</h1>
-<ul>
-<li><a href="https://www.biorxiv.org/content/10.1101/2023.09.19.558514v1" target="_blank">Our very succinct preprint</a></li>
-<li><a href="https://github.com/Nanostring-Biostats/insitucor" target="_blank">The InSituCor R package</a></li>
-<li><a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/insitucor-custom-module" target="_blank">An AtoMx custom module implementing InsituCor</a></li>
-</ul>
-
-
-</section>
-
- ]]></description>
-  <category>AtoMx modules</category>
-  <category>exploratory analysis</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/</guid>
-  <pubDate>Thu, 18 Jul 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/figures/insitucor-tile.png" medium="image" type="image/png" height="148" width="144"/>
 </item>
 </channel>
 </rss>

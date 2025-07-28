@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.30">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Lidan Wu">
+<meta name="dcterms.date" content="2025-07-16">
+<meta name="description" content="This post introduces three newly developed deep learning models for nuclear, whole-cell, and neural segmentation in spatial omics, highlighting innovations in training data diversity, multi-channel input design, and post-processing techniques to improve segmentation accuracy across diverse tissue types.">
+
+<title>Advancing cell segmentation in spatial omics: new models for diverse morphologies – Blog</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../assets/logo_Bruker_black.png" rel="icon" type="image/png">
+<script src="../../site_libs/cookie-consent/cookie-consent.js"></script>
+<link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-3a01e2046221230fdceeea94b1ec5d67.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-a4a11d514c7d463668e07712114998e6.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-4a13e4ba4f9647f177968fa3ed477ad0.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-29W4MW0Y2W"></script>
+
+<script type="text/plain" cookie-consent="tracking">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-29W4MW0Y2W', { 'anonymize_ip': true});
+</script>
+
+<script type="text/javascript" charset="UTF-8">
+document.addEventListener('DOMContentLoaded', function () {
+cookieconsent.run({
+  "notice_banner_type":"simple",
+  "consent_type":"implied",
+  "palette":"light",
+  "language":"en",
+  "page_load_consent_levels":["strictly-necessary","functionality","tracking","targeting"],
+  "notice_banner_reject_button_hide":false,
+  "preferences_center_close_button_hide":false,
+  "website_name":""
+  ,
+"language":"en"
+  });
+});
+</script> 
+  
+
+
+</head>
+
+<body class="floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../.././assets/logo_Bruker_white.png" alt="" class="navbar-logo">
+    </a>
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../license.html"> 
+<span class="menu-text">License</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../link-to-code.html"> 
+<span class="menu-text">Code</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">Browse Posts by Topic</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://www.linkedin.com/company/bruker-spatial"> <i class="bi bi-linkedin" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../index.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Advancing cell segmentation in spatial omics: new models for diverse morphologies</h1>
+                  <div>
+        <div class="description">
+          This post introduces three newly developed deep learning models for nuclear, whole-cell, and neural segmentation in spatial omics, highlighting innovations in training data diversity, multi-channel input design, and post-processing techniques to improve segmentation accuracy across diverse tissue types.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">segmentation</div>
+                <div class="quarto-category">algorithms</div>
+                <div class="quarto-category">CosMx 2.0</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliations</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author">Lidan Wu <a href="https://orcid.org/0000-0003-3150-6170" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              Bruker Spatial Biology
+            </p>
+          <p class="affiliation">
+              Github: <a href="https://github.com/lidanwu" target="_blank">lidanwu</a>
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">July 16, 2025</p>
+      </div>
+    </div>
+    
+      <div>
+      <div class="quarto-title-meta-heading">Modified</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date-modified">July 28, 2025</p>
+      </div>
+    </div>
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="2">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
+  <li><a href="#compartment-aware-segmentation-pipeline" id="toc-compartment-aware-segmentation-pipeline" class="nav-link" data-scroll-target="#compartment-aware-segmentation-pipeline"><span class="header-section-number">2</span> Compartment-Aware Segmentation Pipeline</a></li>
+  <li><a href="#segmentation-models" id="toc-segmentation-models" class="nav-link" data-scroll-target="#segmentation-models"><span class="header-section-number">3</span> Segmentation Models</a>
+  <ul class="collapse">
+  <li><a href="#nuclear-segmentation-model" id="toc-nuclear-segmentation-model" class="nav-link" data-scroll-target="#nuclear-segmentation-model"><span class="header-section-number">3.1</span> Nuclear Segmentation Model</a></li>
+  <li><a href="#generic-segmentation-model" id="toc-generic-segmentation-model" class="nav-link" data-scroll-target="#generic-segmentation-model"><span class="header-section-number">3.2</span> Generic Segmentation Model</a></li>
+  <li><a href="#neural-segmentation-model" id="toc-neural-segmentation-model" class="nav-link" data-scroll-target="#neural-segmentation-model"><span class="header-section-number">3.3</span> Neural Segmentation Model</a></li>
+  </ul></li>
+  <li><a href="#diverse-and-context-relevant-training-datasets" id="toc-diverse-and-context-relevant-training-datasets" class="nav-link" data-scroll-target="#diverse-and-context-relevant-training-datasets"><span class="header-section-number">4</span> Diverse and Context-Relevant Training Datasets</a></li>
+  <li><a href="#the-impact-of-training-dataset-composition-on-segmentation-performance" id="toc-the-impact-of-training-dataset-composition-on-segmentation-performance" class="nav-link" data-scroll-target="#the-impact-of-training-dataset-composition-on-segmentation-performance"><span class="header-section-number">5</span> The Impact of Training Dataset Composition on Segmentation Performance</a></li>
+  <li><a href="#post-processing-for-high-fidelity-cell-recovery" id="toc-post-processing-for-high-fidelity-cell-recovery" class="nav-link" data-scroll-target="#post-processing-for-high-fidelity-cell-recovery"><span class="header-section-number">6</span> Post-Processing for High-Fidelity Cell Recovery</a></li>
+  <li><a href="#integration-into-the-cosmx-platform" id="toc-integration-into-the-cosmx-platform" class="nav-link" data-scroll-target="#integration-into-the-cosmx-platform"><span class="header-section-number">7</span> Integration into the CosMx Platform</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion"><span class="header-section-number">8</span> Conclusion</a></li>
+  <li><a href="#appendix-public-datasets" id="toc-appendix-public-datasets" class="nav-link" data-scroll-target="#appendix-public-datasets"><span class="header-section-number">9</span> Appendix</a></li>
+  </ul>
+</nav>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Cell segmentation is a foundational step in spatial omics analysis. Inaccurate boundaries can lead to the misassignment of transcripts or proteins, ultimately distorting cellular profiles and downstream interpretations. To address this, we developed a robust image-based segmentation pipeline that leverages deep learning to generate accurate and biologically meaningful cell masks across a wide range of tissue types and imaging conditions.</p>
+<p>In this post, we introduce our full segmentation pipeline and describe the three custom-trained models that power it. These models improve segmentation fidelity by tailoring input channels, training data composition, and post-processing workflows to specific biological challenges.</p>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+<p>You can cite this post as electronic materials in various formats shown below.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true">APA</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false">MLA</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" role="tab" aria-controls="tabset-1-3" aria-selected="false">BibTeX</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-4" role="tab" aria-controls="tabset-1-4" aria-selected="false">RIS</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-5-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-5" role="tab" aria-controls="tabset-1-5" aria-selected="false">EndNote</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<p>Wu, L., Wardhani, A., &amp; Phan, J. (2025). Advancing cell segmentation in spatial omics: new models for diverse morphologies. Retrieved from https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/</p>
+</div>
+<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<p>Wu, Lidan, Aster Wardhani, and Joseph-Tin Phan. Advancing cell segmentation in spatial omics: new models for diverse morphologies. 16 Jul 2025, https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/</p>
+</div>
+<div id="tabset-1-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-3-tab">
+<pre><code>@misc{Wu2025CosMxCellSeg
+  title = {Advancing cell segmentation in spatial omics: new models for diverse morphologies},
+  author = {Lidan Wu and Aster Wardhani and Joseph-Tin Phan},
+  year = {2025},
+  url = {https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/},
+  note = {Accessed: 2025-07-28}
+}</code></pre>
+</div>
+<div id="tabset-1-4" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-4-tab">
+<pre><code>TY  - ELEC
+TI  - Advancing cell segmentation in spatial omics: new models for diverse morphologies
+AU  - Lidan Wu
+AU  - Aster Wardhani
+AU  - Joseph-Tin Phan
+PY  - 2025
+UR  - https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/
+ER  -</code></pre>
+</div>
+<div id="tabset-1-5" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-5-tab">
+<pre><code>%0 Electronic Article
+%T Advancing cell segmentation in spatial omics: new models for diverse morphologies
+%A Lidan Wu
+%A Aster Wardhani
+%A Joseph-Tin Phan
+%D 2025
+%U https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/</code></pre>
+</div>
+</div>
+</div>
+</section>
+<section id="compartment-aware-segmentation-pipeline" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Compartment-Aware Segmentation Pipeline</h1>
+<p>Our pipeline integrates two complementary segmentation models to produce both <strong>cell-level</strong> and <strong>subcellular</strong> compartment labels for each sample:</p>
+<ol type="1">
+<li>A <strong>nuclear segmentation model</strong> detects nuclei with high precision.</li>
+<li>A <strong>whole-cell segmentation model</strong>, which is either a generic <strong>cyto model</strong> or a specific <strong>neural model</strong>, depending on tissue context, identifies the full cell boundaries including cytoplasmic regions.</li>
+<li>These two masks are then <strong>reconciled and merged</strong> to assign:
+<ul>
+<li>A unique cell ID to each detected cell</li>
+<li>Labels for subcellular compartments (nucleus vs.&nbsp;cytoplasm)</li>
+</ul></li>
+</ol>
+<p>This two-model architecture ensures redundancy and resilience: when one compartment is weakly stained or difficult to model, the other can often compensate. The resulting merged masks are more complete and biologically accurate, especially for complex tissues such as brain.</p>
+<div id="fig-seg-pipeline" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-seg-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="figures/Fig1-seg-pipeline.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-seg-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Schematic of full cell segmentation pipeline. Input morphology images feed into two parallel models: nuclear and whole-cell segmentation. Their outputs are merged into a final, compartment-labeled cell mask based on the overlapping behavior.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="segmentation-models" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Segmentation Models</h1>
+<p>All three models in our pipeline are based on the Cellpose-style architecture <span class="citation" data-cites="stringer2021cellpose">(<a href="#ref-stringer2021cellpose" role="doc-biblioref">Stringer et al. 2021</a>)</span>, a widely adopted framework for generalist cell segmentation using spatial gradient flows and vector fields. Following the approach described in Cellpose 2.0 <span class="citation" data-cites="pachitariu2022cellpose">(<a href="#ref-pachitariu2022cellpose" role="doc-biblioref">Pachitariu and Stringer 2022</a>)</span>, we trained separate models from scratch to specialize in nuclear, generic, and neural segmentation, respectively. The training datasets and input configurations were tailored to each segmentation task.</p>
+<section id="nuclear-segmentation-model" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="nuclear-segmentation-model"><span class="header-section-number">3.1</span> Nuclear Segmentation Model</h2>
+<p>Designed to work across many tissue types, this model takes a <strong>single-channel nuclear stain</strong> (e.g., DAPI, Histone stain) as input. It prioritizes accuracy in nucleus identification, even in densely packed or noisy imaging conditions. This model forms the backbone for subcellular compartment labeling.</p>
+</section>
+<section id="generic-segmentation-model" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="generic-segmentation-model"><span class="header-section-number">3.2</span> Generic Segmentation Model</h2>
+<p>This model segments complete cell boundaries using <strong>two imaging channels</strong>: a required channel for general cytoplasmic or membrane staining, and an optional channel for nuclear staining. It is optimized for tissues with relatively uniform morphology and minimal extended protrusions, such as non-neural samples.</p>
+</section>
+<section id="neural-segmentation-model" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="neural-segmentation-model"><span class="header-section-number">3.3</span> Neural Segmentation Model</h2>
+<p>To address the unique challenges of brain tissue, including highly irregular cell shapes, long processes, and closely apposed glial and neuronal cells, we developed a neural-specific model that uses <strong>three channels</strong>: nuclear, neuronal, and glial stains. This model more accurately segments astrocytes, neurons with elongated axons, and densely packed cerebellum regions.</p>
+<div id="fig-3ch-model" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-3ch-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="figures/Fig2-3ch-model.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-3ch-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Neural cell segmentation model: input and output overview. Morphological stains from brain tissue—nuclear (green), neuronal (red), and glial (blue) markers—are combined into 3-channel inputs to the neural segmentation model (top panel). The Cellpose-style model processes these inputs to produce cell probability maps and spatial gradients (bottom panel), which are used to reconstruct accurate cell masks, even for complex neural morphologies.
+</figcaption>
+</figure>
+</div>
+</section>
+</section>
+<section id="diverse-and-context-relevant-training-datasets" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Diverse and Context-Relevant Training Datasets</h1>
+<p>To ensure the segmentation models perform robustly on the types of tissues most relevant to spatial omics, we curated a large and diverse set of training data. A cornerstone of our approach was the generation of high-quality ground-truth annotations from CosMx<sup>®</sup> immunofluorescence images, covering a wide range of FFPE and fresh frozen tissue samples. These internal datasets include various tissue types and staining conditions, and are tailored to the real-world complexities encountered in spatial transcriptomic assays. They were essential in enabling the models to achieve high accuracy on primary tissue samples, which are the central use case for spatial omics.</p>
+<p>To complement these internal datasets and further expand morphological and technical diversity, we incorporated a variety of publicly available datasets (<a href="#appendix-public-datasets">Appendix</a>) that span:</p>
+<ul>
+<li><p>Sample types: including 2D cell cultures, organoids, and whole-organism samples</p></li>
+<li><p>Cell types and disease contexts: such as neurons, immune cells, and tumor cells</p></li>
+<li><p>Imaging modalities: beyond immunofluorescence, including H&amp;E, brightfield, and differential interference contrast (DIC) imaging</p></li>
+</ul>
+<p>This hybrid training strategy, anchored in spatial omics–specific imaging and augmented by public data, ensures that the models generalize well across tissue types, imaging conditions, and biological contexts.</p>
+<div id="fig-trainData" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-trainData-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="figures/Fig3-bsb-trainData.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-trainData-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Composition of training datasets used for model development. (A–C) Sunburst charts summarize the distribution of sample sources, image modalities, and staining types used to train the nuclear segmentation model (A), generic cytoplasm segmentation model (B), and neural segmentation model (C). Data were drawn from both internal CosMx assays and diverse public sources. (D) Representative immunofluorescence images from the neural training dataset highlight the complexity of brain tissue morphology, including neurons and glia labeled with various markers.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="the-impact-of-training-dataset-composition-on-segmentation-performance" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> The Impact of Training Dataset Composition on Segmentation Performance</h1>
+<p>Beyond architecture and stain configuration, the composition of training data had a profound effect on segmentation outcomes, particularly for complex tissues like brain. We explored this by training multiple versions of each model type (nuclear, generic whole-cell, and neural), using datasets that varied in their coverage of morphology, staining quality, and tissue types.</p>
+<p>For each model type, we compared:</p>
+<ul>
+<li>A <strong>maximally large dataset</strong> (<code>Model #1</code>), including all available training images regardless of cell type balance.</li>
+<li>One or more <strong>intermediate models</strong> (<code>Model #2</code>).</li>
+<li>A <strong>balanced dataset model</strong> (<code>Model #3</code> for generic whole-cell and neural; <code>Model #2</code> for nuclei), where we carefully selected training samples to represent a diverse spectrum of cell morphologies and tissue structures.</li>
+</ul>
+<p>As shown in <a href="#fig-composition-impact" class="quarto-xref">Figure&nbsp;4</a>, masks predicted by the different models on neural tissue vary considerably in structure and completeness. Pre-trained models like <code>Cyto2</code> often undersegment neurons or fail to recover glial processes. In contrast, the morphology-balanced models produced more realistic masks, retaining fine structures and reducing erroneous fusions.</p>
+<div id="fig-composition-impact" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-composition-impact-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="figures/Fig4-composition-impact.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-composition-impact-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Segmentation comparison on neural samples. Rows show: (1) input immunofluorescence images, (2) ground-truth labels, (3) Cyto2 predictions, and (4–6) outputs from custom-trained models. Morphology-balanced models (e.g., Model #3) better capture fine structures and generalize across diverse inputs.
+</figcaption>
+</figure>
+</div>
+<p>To quantify these differences, we measured sensitivity and precision across a range of IoU (Intersection over Union) thresholds for each model on held-out validation datasets, as shown in <a href="#fig-performance-curves" class="quarto-xref">Figure&nbsp;5</a>. The morphology-balanced models consistently outperformed others across all segmentation types: nuclei, generic cytoplasm, and neural.</p>
+<ul>
+<li>In nuclear segmentation (Panel A), <code>NucModel#2</code> (balanced) outperformed both the pretrained models (<code>nuclei</code>, <code>CP</code>, <code>Cyto2</code> and <code>Cyto3</code>) and <code>NucModel#1</code> (large, unbalanced set).</li>
+<li>In generic cytoplasm segmentation (Panel B), <code>CytoModel#3</code> (balanced) showed the best trade-off between sensitivity and precision.</li>
+<li>In neural segmentation (Panel C), <code>NeuModel#3</code> demonstrated the clearest performance gain, accurately detecting both large neuronal bodies and thin astrocytic projections (<a href="#fig-composition-impact" class="quarto-xref">Figure&nbsp;4</a>).</li>
+</ul>
+<p>These results highlight that <strong>more data is not always better</strong>—especially when morphological diversity is limited. Carefully curating a balanced training set allows models to generalize more robustly, particularly on tissue samples with heterogeneous or complex cellular structures.</p>
+<div id="fig-performance-curves" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-performance-curves-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="figures/Fig5-performance-curves.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-performance-curves-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Quantitative performance of segmentation models across IoU thresholds. (A) Nuclear segmentation models. (B) Generic whole-cell segmentation models. (C) Neural segmentation models. Each curve shows sensitivity or precision on held-out test sets. Morphology-balanced models (Model #2 or #3) consistently outperform both pretrained baselines <span class="citation" data-cites="stringer2021cellpose pachitariu2022cellpose stringer2025cellpose">(<a href="#ref-stringer2021cellpose" role="doc-biblioref">Stringer et al. 2021</a>; <a href="#ref-pachitariu2022cellpose" role="doc-biblioref">Pachitariu and Stringer 2022</a>; <a href="#ref-stringer2025cellpose" role="doc-biblioref">Stringer and Pachitariu 2025</a>)</span> and unbalanced large-set models.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="post-processing-for-high-fidelity-cell-recovery" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Post-Processing for High-Fidelity Cell Recovery</h1>
+<p>While Cellpose-style models output rich information, including cell probability maps and spatial gradient flows, these predictions must be converted into discrete cell masks for downstream use. The standard Cellpose post-processing pipeline performs this by applying a gradient tracking algorithm. This method first thresholds the cell probability map to define a foreground region. Then, it uses the magnitude and direction of the predicted flow vectors (horizontal and vertical) to trace each pixel along a path toward a “basin” point, interpreted as the cell’s centroid. Pixels with similar destinations are grouped into the same cell.</p>
+<p>However, this method breaks down under biologically realistic conditions. Elongated cells (e.g., neurons with long processes) may have centroids that fall outside their actual boundaries, resulting in flow divergence near the edges and causing the mask to fragment. Similarly, large or highly textured cells can generate noisy or irregular flow fields, leading to mask splitting or partial segmentation. These errors persist even when adjusting thresholds on cell probability or flow magnitudes.</p>
+<p>This challenge is clearly illustrated in <a href="#fig-gradient-tracking" class="quarto-xref">Figure&nbsp;6</a> A, where raw model outputs for a neural tissue sample exhibit ambigous “basin” points. Attempts to tune cutoffs (<a href="#fig-gradient-tracking" class="quarto-xref">Figure&nbsp;6</a> B) fail to reliably recover full cell structures, either missing elongated cells or oversegmenting compact ones.</p>
+<div id="fig-gradient-tracking" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-gradient-tracking-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="figures/Fig6-gradient-tracking.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-gradient-tracking-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Challenges in mask generation from model outputs for irregular cell morphologies. (A) Model outputs for a neural segmentation example, including raw input, predicted cell probability, spatial gradient flow, and gradient magnitude. (B) Attempts to generate masks from these outputs using adjusted cutoffs for flows and/or cell probability show failure to capture large or atypical morphologies.
+</figcaption>
+</figure>
+</div>
+<p>To overcome these limitations, we developed a high-recovery post-processing pipeline (<a href="#fig-mask-recovery" class="quarto-xref">Figure&nbsp;7</a> A) that supplements the default gradient tracking with two additional strategies:</p>
+<ol type="1">
+<li>Initial mask generation preserves the default method’s confident segmentations (Component <strong>a</strong>).</li>
+<li>Missed cells are recovered by applying auto-thresholding on the residual cell probability and gradient magnitude maps (Component <strong>b</strong>).</li>
+<li>Remaining foreground pixels are assigned to nearby cells using distance-based reassignment or neighbor-consistent flow propagation, resulting in a complete, coherent mask set (Component <strong>c</strong>).</li>
+</ol>
+<p>This hybrid strategy improves mask continuity, structural integrity, and cell recovery, especially in densely packed or morphologically complex tissues like brain.</p>
+<p>As shown in <a href="#fig-mask-recovery" class="quarto-xref">Figure&nbsp;7</a> B, the resulting masks successfully capture a diverse range of cell types, including large neurons, thin astrocytic processes, and small glia, while minimizing fragmentation and oversegmentation.</p>
+<div id="fig-mask-recovery" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-mask-recovery-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="figures/Fig7-mask-recovery.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-mask-recovery-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Improved post-processing enables high-fidelity mask recovery. (A) Workflow for the high-recovery post-processing method. Default segmentation (a) is supplemented with threshold-based recovery (b) and foreground reassignment (c). (B) Visual comparison of default vs.&nbsp;new masks. Each row shows morphology image, predicted flows, and corresponding masks. The custom method (bottom row) improves segmentation completeness and accuracy across diverse cell shapes.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="integration-into-the-cosmx-platform" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Integration into the CosMx Platform</h1>
+<p>The newly developed segmentation models and high-recovery post-processing pipeline have been fully integrated into the CosMx<sup>®</sup> Spatial Molecular Imager platform to support robust and biologically meaningful cell segmentation across a wide range of samples.</p>
+<p>These capabilities are now available through two complementary systems:</p>
+<ul>
+<li><strong>Control Center 2.0 or higher</strong>: Enables on-instrument execution of the new segmentation pipeline during CosMx image processing runs, ensuring consistency and improved performance at the point of acquisition.</li>
+<li><strong>AtoMx<sup>®</sup> Spatial Informatics Portal (SIP) version 2.0 or higher</strong>: Supports cloud-based analysis workflows that utilize the new models and pipeline for segmentation across large cohorts and multiple users.</li>
+</ul>
+<p>For researchers who wish to customize segmentation to suit specific experimental contexts, AtoMx SIP provides a resegmentation toolkit via an interactive UI. This tool allows users to:</p>
+<ul>
+<li>Choose which trained model to apply for nuclear and whole-cell (Cyto) segmentation steps.</li>
+<li>Specify which morphology channels are used as input for each model.</li>
+<li>Re-segment images on demand with customized configurations for tissue type and staining patterns.</li>
+</ul>
+<p>More details can be found in the <a href="https://university.nanostring.com/cosmx-smi-data-analysis-user-manual" target="_blank">CosMx SMI Data Analysis User Manual (AtoMx v2.0)</a>, available through <a href="https://university.nanostring.com/" target="_blank">NanoU</a>.</p>
+</section>
+<section id="conclusion" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Conclusion</h1>
+<p>Through this work, we’ve shown that better segmentation isn’t just about building a bigger model—it’s about using the right data, asking the right questions, and designing each step of the pipeline with the biology in mind. By training three specialized models for nuclear, generic whole-cell and neural segmentation, and building a smarter post-processing method to handle complex cell shapes, we’ve significantly improved how well we can detect and define cells in spatial omics data.</p>
+<p>What we learned goes beyond just this application. A few key takeaways stood out:</p>
+<ul>
+<li>Balanced, diverse training data matters more than sheer volume, especially when working with real tissue.</li>
+<li>Flow-based models need thoughtful post-processing, particularly when cells are irregular or overlapping.</li>
+<li>A flexible, modular approach makes it easier to adapt segmentation tools across different tissue types and experiments.</li>
+</ul>
+<p>These lessons can apply to many other segmentation problems. And with these improvements now available in CosMx and AtoMx, we’re excited to see how researchers can push their spatial analysis even further.</p>
+<hr>
+</section>
+<section id="appendix-public-datasets" class="level1" data-number="9">
+<h1 data-number="9"><span class="header-section-number">9</span> Appendix</h1>
+<p>Public datasets associated with model training include:</p>
+<ul>
+<li>Deepflash2 neurons <span class="citation" data-cites="matthias_griebel_2023_7653312">(<a href="#ref-matthias_griebel_2023_7653312" role="doc-biblioref">Griebel et al. 2023</a>)</span></li>
+<li>Neural nuclei segmentation (S-BSST265) <span class="citation" data-cites="SabineTaschner-Mandl2020">(<a href="#ref-SabineTaschner-Mandl2020" role="doc-biblioref">Sabine Taschner-Mandl and Kromp 2020</a>)</span></li>
+<li>AMSActa Fluorescent Neuronal Cells <span class="citation" data-cites="amsacta7347">(<a href="#ref-amsacta7347" role="doc-biblioref">Clissa et al. 2024</a>)</span></li>
+<li>BBBC collections: 007, 009, 030, 034, 038, 039 <span class="citation" data-cites="jones2005bbbc007 wiegandbbbc009 koos2016bbbc030 thirstrup2018bbbc034 caicedo2019bbbc038 caicedo2019bbbc039">(<a href="#ref-jones2005bbbc007" role="doc-biblioref">Jones, Carpenter, et al. 2005</a>; <a href="#ref-wiegandbbbc009" role="doc-biblioref">Wiegand, Carpenter, et al. 2012</a>; <a href="#ref-koos2016bbbc030" role="doc-biblioref">Koos et al. 2016</a>; <a href="#ref-thirstrup2018bbbc034" role="doc-biblioref">Thirstrup et al. 2018</a>; <a href="#ref-caicedo2019bbbc038" role="doc-biblioref">Caicedo, Goodman, et al. 2019</a>; <a href="#ref-caicedo2019bbbc039" role="doc-biblioref">Caicedo, Roth, et al. 2019</a>)</span></li>
+<li>Neuroblastoma images from the Cell Image Library <span class="citation" data-cites="yu2013ccdb6843">(<a href="#ref-yu2013ccdb6843" role="doc-biblioref">Yu et al. 2013</a>)</span></li>
+</ul>
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-caicedo2019bbbc038" class="csl-entry" role="listitem">
+Caicedo, J. C., A. Goodman, K. W. Karhohs, et al. 2019. <span>“BBBC038v1: 2018 Data Science Bowl Nucleus Segmentation Dataset.”</span> <a href="https://bbbc.broadinstitute.org/BBBC038" class="uri">https://bbbc.broadinstitute.org/BBBC038</a>.
+</div>
+<div id="ref-caicedo2019bbbc039" class="csl-entry" role="listitem">
+Caicedo, J. C., J. Roth, A. Goodman, T. Becker, K. W. Karhohs, M. Broisin, C. Molnar, et al. 2019. <span>“BBBC039v1: Fluorescence Nucleus Segmentation Dataset.”</span> <a href="https://bbbc.broadinstitute.org/BBBC039" class="uri">https://bbbc.broadinstitute.org/BBBC039</a>.
+</div>
+<div id="ref-amsacta7347" class="csl-entry" role="listitem">
+Clissa, Luca, Alessandra Occhinegro, Emiliana Piscitiello, Ludovico Taddei, Antonio Macaluso, Roberto Morelli, Fabio Squarcio, et al. 2024. <span>“Fluorescent Neuronal Cells V2.”</span> University of Bologna. <a href="https://amsacta.unibo.it/id/eprint/7347/">https://amsacta.unibo.it/id/eprint/7347/</a>.
+</div>
+<div id="ref-matthias_griebel_2023_7653312" class="csl-entry" role="listitem">
+Griebel, Matthias, Dennis Segebarth, Nikolai Stein, Nina Schukraft, Philip Tovote, Robert Blum, and Christoph M. Flath. 2023. <span>“Deep Learning-Enabled Segmentation of Ambiguous Bioimages with Deepflash2.”</span> Zenodo. <a href="https://doi.org/10.5281/zenodo.7653312">https://doi.org/10.5281/zenodo.7653312</a>.
+</div>
+<div id="ref-jones2005bbbc007" class="csl-entry" role="listitem">
+Jones, T. R., A. E. Carpenter, et al. 2005. <span>“BBBC007v1: Drosophila Kc167 RNAi Screening Dataset.”</span> <a href="https://bbbc.broadinstitute.org/BBBC007" class="uri">https://bbbc.broadinstitute.org/BBBC007</a>.
+</div>
+<div id="ref-koos2016bbbc030" class="csl-entry" role="listitem">
+Koos, K., J. Molnár, L. Kelemen, G. Tamás, and P. Horvath. 2016. <span>“BBBC030v1: DIC Image Reconstruction Dataset from the Broad Bioimage Benchmark Collection.”</span> <a href="https://bbbc.broadinstitute.org/BBBC030" class="uri">https://bbbc.broadinstitute.org/BBBC030</a>.
+</div>
+<div id="ref-pachitariu2022cellpose" class="csl-entry" role="listitem">
+Pachitariu, Marius, and Carsen Stringer. 2022. <span>“Cellpose 2.0: How to Train Your Own Model.”</span> <em>Nature Methods</em> 19 (12): 1634–41. <a href="https://doi.org/10.1038/s41592-022-01663-4">https://doi.org/10.1038/s41592-022-01663-4</a>.
+</div>
+<div id="ref-SabineTaschner-Mandl2020" class="csl-entry" role="listitem">
+Sabine Taschner-Mandl, Peter F. Ambros, Inge M. Ambros, and Florian Kromp. 2020. <span>“An Annotated Fluorescence Image Dataset for Training Nuclear Segmentation Methods.”</span> <a href="https://www.ebi.ac.uk/biostudies/bioimages/studies/S-BSST265">https://www.ebi.ac.uk/biostudies/bioimages/studies/S-BSST265</a>.
+</div>
+<div id="ref-stringer2025cellpose" class="csl-entry" role="listitem">
+Stringer, Carsen, and Marius Pachitariu. 2025. <span>“Cellpose3: One-Click Image Restoration for Improved Cellular Segmentation.”</span> <em>Nature Methods</em> 22 (3): 592–99. <a href="https://doi.org/10.1038/s41592-025-02595-5">https://doi.org/10.1038/s41592-025-02595-5</a>.
+</div>
+<div id="ref-stringer2021cellpose" class="csl-entry" role="listitem">
+Stringer, Carsen, Tim Wang, Michalis Michaelos, and Marius Pachitariu. 2021. <span>“Cellpose: A Generalist Algorithm for Cellular Segmentation.”</span> <em>Nature Methods</em> 18 (1): 100–106. <a href="https://doi.org/10.1038/s41592-020-01018-x">https://doi.org/10.1038/s41592-020-01018-x</a>.
+</div>
+<div id="ref-thirstrup2018bbbc034" class="csl-entry" role="listitem">
+Thirstrup, D. et al. 2018. <span>“BBBC034v1: Allen Institute Cell Structure Dataset.”</span> <a href="https://bbbc.broadinstitute.org/BBBC034" class="uri">https://bbbc.broadinstitute.org/BBBC034</a>.
+</div>
+<div id="ref-wiegandbbbc009" class="csl-entry" role="listitem">
+Wiegand, R., A. E. Carpenter, et al. 2012. <span>“BBBC009v1: Human Red Blood Cells DIC Dataset.”</span> <a href="https://bbbc.broadinstitute.org/BBBC009" class="uri">https://bbbc.broadinstitute.org/BBBC009</a>.
+</div>
+<div id="ref-yu2013ccdb6843" class="csl-entry" role="listitem">
+Yu, W., H. K. Lee, S. Hariharan, W. Y. Bu, and S. Ahmed. 2013. <span>“CCDB:6843 - Mus Musculus Neuroblastoma Dataset.”</span> <a href="https://www.cellimagelibrary.org/images/CCDB_6843" class="uri">https://www.cellimagelibrary.org/images/CCDB_6843</a>.
+</div>
+</div></section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/nanostring-biostats\.github\.io\/CosMx-Analysis-Scratch-Space");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+    <a class="nav-link" href="../../license.html">
+<p>License</p>
+</a>
+  </li>  
+</ul>
+    <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
