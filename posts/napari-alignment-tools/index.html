@@ -6,11 +6,12 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="author" content="Yi Cui">
 <meta name="author" content="Lidan Wu">
-<meta name="dcterms.date" content="2024-06-12">
-<meta name="description" content="This post introduces a pipeline for automatic generating GeoMx® Digital Spatial Profiler (DSP)-ready binary masks in batch for marker-based single-cell application. Given the query marker protein of interest, the pipeline would take morphology images and generate binary masks for negative-stained cells and cells connecting to positive-stained regions, respectively. The pipeline runs as a command line and this post would serve as a guide to how it works and how to use it.">
+<meta name="dcterms.date" content="2025-08-11">
+<meta name="description" content="Demonstration of how to align H&amp;E and CosMx images in napari viewer.">
 
-<title>GeoMx® mask generation for marker-based single-cell application – Blog</title>
+<title>Aligning H&amp;E and CosMx Images in napari – Blog</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -199,25 +200,36 @@ cookieconsent.run({
 <header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">GeoMx® mask generation for marker-based single-cell application</h1>
+      <h1 class="title">Aligning H&amp;E and CosMx Images in napari</h1>
                   <div>
         <div class="description">
-          This post introduces a pipeline for automatic generating GeoMx® Digital Spatial Profiler (DSP)-ready binary masks in batch for marker-based single-cell application. Given the query marker protein of interest, the pipeline would take morphology images and generate binary masks for negative-stained cells and cells connecting to positive-stained regions, respectively. The pipeline runs as a command line and this post would serve as a guide to how it works and how to use it.
+          Demonstration of how to align H&amp;E and CosMx images in napari viewer.
         </div>
       </div>
                           <div class="quarto-categories">
-                <div class="quarto-category">GeoMx</div>
-                <div class="quarto-category">how-tos</div>
-                <div class="quarto-category">image processing</div>
+                <div class="quarto-category">napari</div>
+                <div class="quarto-category">visualization</div>
                 <div class="quarto-category">python</div>
+                <div class="quarto-category">how-tos</div>
               </div>
                   </div>
   </div>
     
   <div class="quarto-title-meta-author">
-    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Authors</div>
     <div class="quarto-title-meta-heading">Affiliations</div>
     
+      <div class="quarto-title-meta-contents">
+      <p class="author">Yi Cui <a href="https://orcid.org/0000-0002-8597-0174" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              Bruker Spatial Biology
+            </p>
+          <p class="affiliation">
+              Github: <a href="https://github.com/Yillumination" target="_blank">Yillumination</a>
+            </p>
+        </div>
       <div class="quarto-title-meta-contents">
       <p class="author">Lidan Wu <a href="https://orcid.org/0000-0003-3150-6170" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
     </div>
@@ -237,7 +249,7 @@ cookieconsent.run({
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">June 12, 2024</p>
+        <p class="date">August 11, 2025</p>
       </div>
     </div>
     
@@ -259,14 +271,26 @@ cookieconsent.run({
    
   <ul>
   <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
-  <li><a href="#workflow-description" id="toc-workflow-description" class="nav-link" data-scroll-target="#workflow-description"><span class="header-section-number">2</span> Workflow Description</a></li>
-  <li><a href="#setup-environment" id="toc-setup-environment" class="nav-link" data-scroll-target="#setup-environment"><span class="header-section-number">3</span> Setup Environment</a></li>
-  <li><a href="#command-line-usage" id="toc-command-line-usage" class="nav-link" data-scroll-target="#command-line-usage"><span class="header-section-number">4</span> Command Line Usage</a>
+  <li><a href="#environment-installation" id="toc-environment-installation" class="nav-link" data-scroll-target="#environment-installation"><span class="header-section-number">2</span> Environment &amp; Installation</a>
   <ul class="collapse">
-  <li><a href="#input-image-arguments" id="toc-input-image-arguments" class="nav-link" data-scroll-target="#input-image-arguments"><span class="header-section-number">4.1</span> Input Image Arguments:</a></li>
-  <li><a href="#cell-segmentation-model-arguments" id="toc-cell-segmentation-model-arguments" class="nav-link" data-scroll-target="#cell-segmentation-model-arguments"><span class="header-section-number">4.2</span> Cell Segmentation Model Arguments:</a></li>
-  <li><a href="#positive-stained-cell-arguments" id="toc-positive-stained-cell-arguments" class="nav-link" data-scroll-target="#positive-stained-cell-arguments"><span class="header-section-number">4.3</span> Positive-stained cell Arguments:</a></li>
+  <li><a href="#set-up-general-environment" id="toc-set-up-general-environment" class="nav-link" data-scroll-target="#set-up-general-environment"><span class="header-section-number">2.1</span> Set up general environment</a></li>
+  <li><a href="#sec-plugins" id="toc-sec-plugins" class="nav-link" data-scroll-target="#sec-plugins"><span class="header-section-number">2.2</span> Install alignment-required plugins</a></li>
   </ul></li>
+  <li><a href="#data-prerequisites" id="toc-data-prerequisites" class="nav-link" data-scroll-target="#data-prerequisites"><span class="header-section-number">3</span> Data prerequisites</a></li>
+  <li><a href="#alignment-workflow" id="toc-alignment-workflow" class="nav-link" data-scroll-target="#alignment-workflow"><span class="header-section-number">4</span> Alignment workflow</a>
+  <ul class="collapse">
+  <li><a href="#load-data" id="toc-load-data" class="nav-link" data-scroll-target="#load-data"><span class="header-section-number">4.1</span> Load data</a></li>
+  <li><a href="#coarse-alignment-with-affinder-landmarks" id="toc-coarse-alignment-with-affinder-landmarks" class="nav-link" data-scroll-target="#coarse-alignment-with-affinder-landmarks"><span class="header-section-number">4.2</span> Coarse alignment with <code>affinder</code> (landmarks)</a></li>
+  <li><a href="#finetuning-with-custom-transform-widgets" id="toc-finetuning-with-custom-transform-widgets" class="nav-link" data-scroll-target="#finetuning-with-custom-transform-widgets"><span class="header-section-number">4.3</span> Fine‑tuning with custom transform widgets</a>
+  <ul class="collapse">
+  <li><a href="#use-the-alignment-tool-top-panel" id="toc-use-the-alignment-tool-top-panel" class="nav-link" data-scroll-target="#use-the-alignment-tool-top-panel"><span class="header-section-number">4.3.1</span> Use the Alignment Tool (top panel)</a></li>
+  <li><a href="#use-the-fine-nudge-tool-micro-adjustments-bottom-panel" id="toc-use-the-fine-nudge-tool-micro-adjustments-bottom-panel" class="nav-link" data-scroll-target="#use-the-fine-nudge-tool-micro-adjustments-bottom-panel"><span class="header-section-number">4.3.2</span> Use the Fine Nudge Tool (micro adjustments, bottom panel)</a></li>
+  <li><a href="#verify-save" id="toc-verify-save" class="nav-link" data-scroll-target="#verify-save"><span class="header-section-number">4.3.3</span> Verify &amp; save</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#practical-tips" id="toc-practical-tips" class="nav-link" data-scroll-target="#practical-tips"><span class="header-section-number">5</span> Practical Tips</a></li>
+  <li><a href="#gallery-of-he-aligned-cosmx-datasets" id="toc-gallery-of-he-aligned-cosmx-datasets" class="nav-link" data-scroll-target="#gallery-of-he-aligned-cosmx-datasets"><span class="header-section-number">6</span> Gallery of H&amp;E-aligned CosMx datasets</a></li>
+  <li><a href="#resources" id="toc-resources" class="nav-link" data-scroll-target="#resources"><span class="header-section-number">7</span> Resources</a></li>
   </ul>
 </nav>
 </nav>
@@ -283,197 +307,377 @@ cookieconsent.run({
 
 <section id="introduction" class="level1" data-number="1">
 <h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
-<p>The ability to separate cells based on their relationship to nearby marker protein staining is a desired feature in many biological studies. One such use case would be to study the difference between neurons immediately next to neurofibrillary tangles and neurons that are a little further away. Another example would be to study the immune cells that are at different stages of engulfing microbes. This post introduces a pipeline for automatically generating <a href="https://nanostring.com/products/geomx-digital-spatial-profiler/geomx-dsp-overview/" target="_blank">GeoMx® Digital Spatial Profiler (DSP)</a>-ready binary masks in batch for marker-based single-cell application.</p>
-<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+<p>Aligning Hematoxylin and Eosin (H&amp;E) histology with CosMx<sup>®</sup> Spatial Molecular Imager (SMI) data is more than a cosmetic step: it’s turning two complementary modalities into a single, interpretable picture. H&amp;E provides the spatial scaffold which includes tissue boundaries, cell shapes, and histopathology cues, while CosMx adds the multiplexed molecular profile for each cell. When accurately aligned, these layers reinforce each other: structure informs expression, and expression validates structure. However, it’s a common challenge to align these two kinds of images as they often differ in scale, orientation, or position due to variations in acquisition methods.</p>
+<p>In this tutorial, we’ll walk through how to effectively align H&amp;E and CosMx images in <a href="https://napari.org/stable/" target="_blank"><code>napari</code></a> with a two-part workflow:</p>
+<ol type="1">
+<li>first do a quick landmark-based alignment with <a href="https://github.com/jni/affinder/tree/main" target="_blank"><code>affinder</code></a> plugin,</li>
+<li>then fine tune with custom transformation widgets <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/napari-alignment-tools" target="_blank"><code>napari_alignment_tools</code></a> for controlled micro-nudges.</li>
+</ol>
+<p>By the end, you’ll be able to:</p>
+<ul>
+<li>Load stitched CosMx data and matching H&amp;E images in napari.</li>
+<li>Perform coarse alignment with <code>affinder</code> (affine/similarity/euclidean models).</li>
+<li>Fine-tune transforms with intuitive widgets <code>napari_alignment_tools</code> for pixel-level adjustments.</li>
+<li>Verify results visually and save an aligned H&amp;E ready for analysis.</li>
+</ul>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
 </section>
-<section id="workflow-description" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Workflow Description</h1>
-<p>The pipeline is a python script <code>Generate_scMask_given_query.py</code> that runs as a command line and you can downloaded from <code>_code/GeoMx-scMask-generation</code> <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/GeoMx-scMask-generation" target="_blank">folder</a> in this repository. By passing the file path to image folder to the script, the pipeline would take GeoMx® morphology images and generate binary masks for negative-stained cells and cells connecting to positive-stained regions, respectively.</p>
-<div id="fig-workflow" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="figures/workflow_GeoMx_scMask_given_query.png" class="img-fluid figure-img">
+<section id="environment-installation" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Environment &amp; Installation</h1>
+<section id="set-up-general-environment" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="set-up-general-environment"><span class="header-section-number">2.1</span> Set up general environment</h2>
+<p>It’s recommended to create a dedicated environment for <code>napari</code> applications. If you already have an environment with <code>napari</code> and <code>napari-cosmx</code> plugin installed, you could just activate that environment directly and proceed to <a href="#sec-plugins" class="quarto-xref">Section&nbsp;2.2</a>.</p>
+<p>Below is the example command line to create virtual environment <code>napariEnv</code>.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>setup napari environment</strong></pre>
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: <strong>Workflow schematic</strong>. In neuropathology study, it’s sometimes desired to separate between neurons (stained in red channel) touching the neurofibrillary tangles (stained in green channel) and those that are a little further away. The pipeline described here fullfills the need of separating cells based on additional morphology marker of interest (aka “query channel”) and could also be applied to other single-cell applications like separating immune cells based on their contact with nearby pathogen.
-</figcaption>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># create environment</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> venv /path/to/my/napariEnv</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># activate environment</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> /path/to/my/napariEnv/bin/activate   <span class="co"># Windows: /path/to/my/napariEnv/Scripts/activate</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">--upgrade</span> pip</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co"># install napari viewer</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"napari[all]"</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>Following the instructions in earlier <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/#part-2-installing-napari-cosmx" target="_blank">post</a>, one should next install the <code>napari-cosmx</code> plugin from the latest <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/napari-cosmx%20releases" target="_blank">wheel file</a> for interacting with CosMx data.</p>
+<p>With <code>napari-cosmx</code> plugin installed, one could start to prepare CosMx napari dataset and overlaying single-cell and transcriptional analysis results on top of morphological images. Please refer to earlier <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/#category=napari" target="_blank"><code>napari</code> post series</a> for more details.</p>
+</section>
+<section id="sec-plugins" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="sec-plugins"><span class="header-section-number">2.2</span> Install alignment-required plugins</h2>
+<p>Two plugins are required for this tutorial:</p>
+<ul>
+<li><a href="https://github.com/jni/affinder/tree/main" target="_blank"><code>affinder</code></a> and</li>
+<li>custom transformation widgets <code>napari_alignment_tools</code>, whose wheel file <code>.whl</code> needs to be downloaded from <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/napari-alignment-tools" target="_blank">here</a>.</li>
+</ul>
+<p>You can either install them via command line or in <code>napari</code> GUI.</p>
+<p><strong>Option 1</strong>: install via command line.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>install alignment plugins</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install affinder</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install /path/to/wheel/file/napari_alignment_tools-<span class="op">&lt;</span>version<span class="op">&gt;</span>-py3-none-any.whl</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p><strong>Option 2</strong>: install via <code>napari</code> GUI.</p>
+<p>First launch <code>napari</code> GUI by typing <code>napari</code> in command line, and then go to <code>Plugins</code> menu and follow the steps below.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true"><code>affinder</code></a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false">custom <code>napari-alignment-tools</code></a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/Fig2p1-plugin-install01.png" class="img-fluid figure-img" width="1262"></p>
+<figcaption>(A) Launch plugin manager; (B) Locate <code>affinder</code> in search box and install (red arrows). (C) The installed plugin would show up under <code>Plugins</code> menu when launching napari next time.</figcaption>
 </figure>
 </div>
-<ol type="1">
-<li>The process starts with color-channel reordering of morphology images that user downloads from <a href="https://nanostring.com/products/geomx-digital-spatial-profiler/geomx-dsp-overview/" target="_blank">GeoMx® DSP</a> instrument for the region of interest (ROI). The pipeline script would take those images and rearrange the channel order to have cytoplasm stain as 1st channel, query marker stain as 2nd channel, and optionally nuclear stain as 3rd channel.
+</div>
+</div>
+</div>
+<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/Fig2p1-plugin-install02.png" class="img-fluid figure-img" width="1316"></p>
+<figcaption>For cutom plugin, (A) launch plugin manger under <code>Plugins</code> menu; (B) Drag the downloaded wheel file to the bottom field and click <code>install</code> (yellow arrows) and watch <code>Show Status</code> (C) for the installation progress.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="data-prerequisites" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Data prerequisites</h1>
 <ul>
-<li>The rearranged images would be saved in <code>2chan_res</code> (or <code>3chan_res</code> if including nuclear stain as 3rd channel) sub folder of the user-designated output root folder.</li>
-</ul></li>
-<li>After rearrangement, the pipeline script would perform cell segmentation using cytoplasm stain and optionally nuclear stain as well.
+<li><p><strong>CosMx (stitched) dataset</strong>: See the <code>napari</code> <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-stitching/napari-cosmx-stitching.html" target="_blank">stitching tutorial</a> on how to create it for your dataset. Example file path at <code>~/data/cosmx/Napari</code>.</p></li>
+<li><p><strong>H&amp;E image</strong>: Example file path at <code>~/data/cosmx/WTx_Exp-25_Colon_HE.png</code>.</p>
 <ul>
-<li>The resulting cell label images with pixel value indicates cell ID would be saved under <code>cellLabels</code> sub folder within the step (1) result folder.</li>
+<li>Napari supports various other image formats, including <code>TIFF</code>and <code>Zarr</code>.</li>
+<li>If your file format is not supported, you could convert it to the supported formats with other tools like <code>QuPath</code> (see <a href="https://qupath.readthedocs.io/en/stable/docs/advanced/exporting_images.html" target="_blank">here</a>).</li>
 </ul></li>
-<li>The pipeline script also takes the query marker stain of each image and performs auto-threshold to identify individual objects with positive stain and <strong>bigger</strong> than user-defined size cutoff, <code>min_positive_area</code>.
-<ul>
-<li>You can adjust the size cutoff based on your particular application to get a cleaner isolation of objects of interest. For example, if you are only interested in mature tangles, you can use higher size cutoff to select only the query-positive objects of big size.</li>
-</ul></li>
-<li>With label images from both cell segmentation and query-stained object segmentation, the pipeline script would then perform connectivity analysis between the 2 sets of label images and output 2 sets of binary masks in separate folders under user-designated output root folder.
-<ol type="i">
-<li><code>negative_cell_masks</code>: binary masks for cells that do <strong>NOT</strong> have valid overlapping with any of positive-stained object.
-<ul>
-<li>A valid overlapping is defined by whether the intersected area between cell and positive-stained object is <strong>bigger</strong> than user-defined size cutoff, <code>min_intersect_area</code>.</li>
-<li>The ability to define valid overlapping based on area cutoff could help to separate between barely touching events and more significant overlapping events. This could be useful if you want to separate between immune cells just contacting a microbe stained in query channel and immune cells that have engulfed an invading microbe.</li>
-</ul></li>
-<li><code>positive_ROI_masks</code>: binary masks for cells with valid overlapping event <strong>AND</strong> their connected positive-stained objects.</li>
-</ol></li>
-</ol>
-<p>Once complete, user can upload these binary masks back to GeoMx® DSP instrument for the corresponding ROI selection and initiate the sample collection.</p>
-<div class="callout callout-style-default callout-tip callout-titled" title="Use manually modified cell label images">
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Use manually modified cell label images
+Tip
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>You can use <a href="https://imagej.net/" target="_blank">ImageJ</a> or similar viewer to inspect and modify the outcomes of both cell segmentation and binary mask generation. We recommend <code>cellpose</code> <a href="https://cellpose.readthedocs.io/en/latest/gui.html" target="_blank">GUI</a> for visualization and modification on cell segmentation outcomes.</p>
-<p>To use the modified cell label images which must be under <strong>same</strong> names and folder structure as original outputs, simply <strong>rerunning</strong> the pipeline script with same configuration would skip the step (1) and (2) above but instead perform identification of positive-stained objects and binary mask generation using the modified cell label images.</p>
+<p>For H&amp;E of large file size, prefer Zarr-backed images and avoid loading every layer at full resolution. Use the minimum layers you need for alignment.</p>
 </div>
 </div>
 </section>
-<section id="setup-environment" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Setup Environment</h1>
-<p>The pipeline script uses <a href="https://cellpose.readthedocs.io/en/latest/index.html" target="_blank">cellpose</a> python package for cell segmentation. Please refer to <code>cellpose</code> guide on <a href="https://github.com/MouseLand/cellpose/tree/main?tab=readme-ov-file#installation" target="_blank">installation instruction</a> for best usage, especially if you want to enable GPU for faster processing.</p>
-<p>In addition, you would also need the following python packages in your environment. Below shows how to install them in terminal via <code>pip</code>.</p>
+<section id="alignment-workflow" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Alignment workflow</h1>
+<section id="load-data" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="load-data"><span class="header-section-number">4.1</span> Load data</h2>
+<ol type="1">
+<li>Start <code>napari</code>.</li>
+<li>Load H&amp;E: Drag the H&amp;E file into <code>napari</code> GUI (it will be a 2D image layer), choose <code>napari builtins</code> reader if prompted.</li>
+<li>Load CosMx dataset: Drag the pre-stitched cosmx data folder (which contents morphology image, cell segmentation, cell‑type metadata, etc.) into <code>napari</code> GUI, choose <code>napari CosMx</code> reader if prompted.</li>
+</ol>
 <div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Terminal</strong></pre>
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/Fig3p1_load_HnE.png" class="img-fluid figure-img" width="328"></p>
+<figcaption>Choose reader based on image/data type.</figcaption>
+</figure>
 </div>
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>pip install numpy scipy opencv-python scikit-image</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </div>
 </section>
-<section id="command-line-usage" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> Command Line Usage</h1>
-<p>The pipeline script in use, <code>Generate_scMask_given_query.py</code>, assumes you have multi-channel single-slice images in one folder. Those images should be downloaded for the ROIs you choose in GeoMx® study. The required inputs for the pipeline include:</p>
+<section id="coarse-alignment-with-affinder-landmarks" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="coarse-alignment-with-affinder-landmarks"><span class="header-section-number">4.2</span> Coarse alignment with <code>affinder</code> (landmarks)</h2>
+<p>Goal: Compute a transform that maps the <strong>Moving</strong> H&amp;E layer onto the <strong>Reference</strong> CosMx layer by clicking corresponding landmarks.</p>
+<ol type="1">
+<li><p>Open <code>affinder</code>: <strong>Plugins → affinder → Start affinder</strong>. A right‑dock widget appears with drop-downs listing your layers.</p>
 <ul>
-<li><code>in_dir</code>: the <strong>absolute</strong> path to your GeoMx® DSP morphology image folder.</li>
-<li><code>cyto_chan</code>, <code>query_chan</code>, <code>nuc_chan</code>: channel index for cytoplasm, query marker and nucleus stain, respectively.
+<li><p>You can further click on the <code>Select file</code> field next to <code>Save transformation as</code> line of the widget to export the transformation matrix for future usage.</p></li>
+<li><p>The widget allows 3 different transform models:</p>
 <ul>
-<li>The channel index should start from 1, so if your cytoplasm stain is at 4th channel, you use <code>--cyto_chan 4</code> with the script.</li>
-<li>By default, <code>nuc_chan</code> is set to <code>0</code> such that it would not be included in cell segmentation downstream. But if you would like to use stains for both cytoplasm and nucleus for cell segmentation, you can pass the corresponding channel index of nucleus stain to the script.</li>
+<li><strong>affine</strong> <em>(default)</em>: translation, rotation, scale, shear, reflection (most flexible).</li>
+<li><strong>similarity</strong>: translation, rotation, uniform scale (shape‑preserving).</li>
+<li><strong>euclidean</strong>: translation + rotation only (most rigid).</li>
 </ul></li>
-<li><code>cell_diameter</code>: median cell diameter in pixel unit within your images, default to <code>30</code>. For best cell segmentation results, it’s recommended to set this parameter based on your sample.</li>
+</ul></li>
+<li><p>Select layers:</p>
+<ul>
+<li><strong>Reference Layer</strong> = your CosMx image (e.g., morphology or <code>cell_type</code> metadata image that has clear features).</li>
+<li><strong>Moving Layer</strong> = your H&amp;E image.</li>
+</ul></li>
+<li><p>Start point selection: Click <strong>Start</strong> in the <code>affinder</code> widget.</p>
+<ul>
+<li><code>affinder</code> adds two <code>Points</code> layers—one for the reference, one for the moving image.</li>
+<li>The viewer would focuse you on the <strong>Reference</strong> layer first. Click at least <strong>three</strong> distinct, clearly identifiable landmarks (features visible in both images) in the <strong>Reference</strong> layer.</li>
+<li>The viewer would then switch focus to the <strong>Moving</strong> (H&amp;E) layer. Click the <strong>corresponding</strong> points in the <strong>same order</strong>.</li>
+</ul></li>
+<li><p>Transform application: After the third pair is placed, <code>affinder</code> computes and applies the transform so the <strong>H&amp;E (Moving)</strong> aligns onto the <strong>CosMx (Reference)</strong>. Continue adding additional pairs (alternating layers) to refine the alignment iteratively. The more points you add, the more accurate the alignment.</p></li>
+<li><p>Click <strong>Finish</strong> when the coarse alignment looks good. The transformation matrix used would be saved to the file defined in step (1).</p></li>
+</ol>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Order matters! Always click correspondence points in the same order across <strong>Reference</strong> and <strong>Moving</strong> images.</p>
+</div>
+</div>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true">load data and launch <code>affinder</code></a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false">point selection</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-3" role="tab" aria-controls="tabset-2-3" aria-selected="false">aligned image</a></li></ul>
+<div class="tab-content">
+<div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/Fig3p2_affinder01.png" class="img-fluid figure-img" width="1808"></p>
+<figcaption>The <code>napari</code> viewer has both kinds of image data loaded before starting the <code>affinder</code>. CosMx data layer <code>cell_type</code> is choosen as <code>reference</code> layer, while H&amp;E image <code>WTx_Exp-25_Colon_HE</code> is chosen as <code>moving layer</code>.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-2-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-2-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/Fig3p2_affinder02.png" class="img-fluid figure-img" width="1072"></p>
+<figcaption>Pairs of points are selected in the 2 layers before applying the transformation.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-2-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-3-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/Fig1-cosmx-he-align.png" class="img-fluid figure-img" width="297"></p>
+<figcaption>Upon clicking <code>Finish</code>, the <strong>Moving</strong> layer (H&amp;E) is now displayed in a way aligned to the <strong>Reference</strong> layer (CosMx cell_type metadata) based on the anchor points selected.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="finetuning-with-custom-transform-widgets" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="finetuning-with-custom-transform-widgets"><span class="header-section-number">4.3</span> Fine‑tuning with custom transform widgets</h2>
+<p>Use the widgets from <code>napari_alignment_tools</code> to make controlled adjustments after <code>affinder</code>’s coarse alignment.</p>
+<p>As shown in figure below, one should go to the the console <code>&gt;</code> at bottom left corner of the dataset-loaded <code>napari</code> viewer and run:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>add custom widgets in napari console</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">from</span> napari_alignment_tools.widgets import add_widgets_to_viewer</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">add_widgets_to_viewer</span><span class="er">(</span><span class="ex">viewer</span><span class="kw">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<p>This adds two dock widgets to the right dock: <strong>Alignment Tool</strong> (coarse parameters) and <strong>Fine Nudge</strong> (small increments). Both widgets allow you to put in defined numbers (instead of adding points) for transformation and thus allow the alignment occur in a more controlled way.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/Fig2p1-plugin-install03.png" class="img-fluid figure-img" width="2076"></p>
+<figcaption>After loading a pre-stitched cosmx dataset in <code>napari</code>, one could add the custm widgets (to the right dock) by running short python command in <code>napari</code> console.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<section id="use-the-alignment-tool-top-panel" class="level3" data-number="4.3.1">
+<h3 data-number="4.3.1" class="anchored" data-anchor-id="use-the-alignment-tool-top-panel"><span class="header-section-number">4.3.1</span> Use the Alignment Tool (top panel)</h3>
+<ol type="1">
+<li><p>Layer selection: In <em>Alignment Tool</em>, choose your <strong>H&amp;E</strong> image layer (the <strong>Moving</strong> layer you want to adjust).</p></li>
+<li><p>Adjust as needed:</p>
+<ul>
+<li><strong>Rotation</strong> (−180 to 180°)</li>
+<li><strong>Scale Verti/Horiz</strong> (0.0001 to 1000)</li>
+<li><strong>Shift Verti/Horiz</strong> (−1000 to 1000 px)</li>
+<li><strong>Flip Horiz/Verti</strong> (checkboxes)</li>
+</ul></li>
+<li><p>Apply: Click <strong>Apply Alignment</strong>. Inspect by toggling visibility and using opacity sliders.</p></li>
+</ol>
+</section>
+<section id="use-the-fine-nudge-tool-micro-adjustments-bottom-panel" class="level3" data-number="4.3.2">
+<h3 data-number="4.3.2" class="anchored" data-anchor-id="use-the-fine-nudge-tool-micro-adjustments-bottom-panel"><span class="header-section-number">4.3.2</span> Use the Fine Nudge Tool (micro adjustments, bottom panel)</h3>
+<ol type="1">
+<li>Layer selection: Choose the <strong>H&amp;E</strong> layer.</li>
+<li>Direction &amp; step size:</li>
+</ol>
+<ul>
+<li>Pick a direction—left (Y−), right (Y+), up (X−), down (X+), rotate counter‑clockwise (Rotate−), rotate clockwise (Rotate+).</li>
+<li>Set the <strong>Step</strong> (e.g., 1 px for translation; 0.5–1° for rotation).</li>
 </ul>
-<p>To use the pipeline, run <code>python Generate_scMask_given_query.py</code> and specify parameters as desired.</p>
-<p>For instance to run on a folder with images where the 4th and 3rd channels of each image are cytoplasm and query marker stain, respectively while defining positive-stained objects (in query marker channel) to have at least 500 squared pixel area (using default values for all other parameters):</p>
+<ol start="3" type="1">
+<li>Apply <strong>Nudge</strong>, repeat this until alignment is precise.</li>
+</ol>
 <div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Command Line Interface (CLI) example to run in Terminal</strong></pre>
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/Fig4_custom.png" class="img-fluid figure-img" width="1466"></p>
+<figcaption>(A) Custom widgets from <code>napari_alignment_tools</code>; (B) Overlay of cell_type metadata on top of H&amp;E image before vs.&nbsp;after fine-tuning; (C) Side-by-side view of the post-fine-tuned images.</figcaption>
+</figure>
 </div>
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>python Generate_scMask_given_query.py --in_dir imageFolder --cyto_chan 4 --query_chan 3 --out_dir outputFolder --min_positive_area 500</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </div>
-<p>The resulting output folder structure looks like this:</p>
-<pre><code>outputFolder 
-├── 20240612_pipeline_run_log.txt
-│
-├── 2chan_res 
-│  ├── 001.tiff 
-│  ├── 002.tiff 
-│  └──cellLabels
-│     ├── 001_cp_masks.tif 
-│     └── 002_cp_masks.tif 
-│
-├── negative_cell_masks 
-│     ├── 001_neg_2.tif
-│     └── 002_neg_2.tif 
-│
-└── positive_ROI_masks 
-      ├── 001_pos_1.tif
-      └── 002_pos_1.tif</code></pre>
-<p>There are other additional arguments providing fine control of different steps of the pipeline. Please use <code>-h</code> argument to see a full list of options allowed by the pipeline script.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Use <strong>opacity</strong> on the H&amp;E layer to blend with the CosMx background.</li>
+<li>Toggle layer visibility (<code>V</code>) to quickly inspect.</li>
+<li>Link pan/zoom across layers by multi‑selecting layers and enabling <strong>Link Layers</strong> (chain icon) in the layer controls.</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="verify-save" class="level3" data-number="4.3.3">
+<h3 data-number="4.3.3" class="anchored" data-anchor-id="verify-save"><span class="header-section-number">4.3.3</span> Verify &amp; save</h3>
+<ol type="1">
+<li><strong>Visual checks</strong>: Zoom into salient structures (tissue boundaries, lumen edges, sharp features) and ensure edges coincide across layers.</li>
+<li><strong>Save</strong> the transformed H&amp;E: <strong>File → Save Selected Layer(s)</strong> and pick your desired format (e.g., TIFF or Zarr). Consider also saving the <strong>Points</strong> layers or the transform matrix if your widget exposes it.</li>
+</ol>
+</section>
+</section>
+</section>
+<section id="practical-tips" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Practical Tips</h1>
+<ul>
+<li>Either <code>affinder</code> or the custom transformation widgets can be <strong>used independently</strong> to achieve the same alignment outcome. The former uses point inputs, while the later uses the numeric inputs.</li>
+<li><strong>Pre‑stitch CosMx FOVs</strong> before alignment so both widgets sees a continuous reference image (see <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-stitching/napari-cosmx-stitching.html" target="_blank">stitching tutorial</a>).</li>
+<li><strong>Mind the scale.</strong> If CosMx and H&amp;E pixel sizes differ greatly, start with <code>Affine</code> model in <code>affinder</code>, then refine scale with the custom Alignment Tool.</li>
+<li><strong>Avoid overfitting.</strong> Don’t spam too many landmarks at once; add a few, check, then add more if needed.</li>
+<li><strong>Work on downsampled data</strong> to prove the transform, then apply at full resolution if your workflow supports it.</li>
+</ul>
+</section>
+<section id="gallery-of-he-aligned-cosmx-datasets" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Gallery of H&amp;E-aligned CosMx datasets</h1>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true">Colon</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" role="tab" aria-controls="tabset-3-2" aria-selected="false">Pancreas</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-3-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-3" role="tab" aria-controls="tabset-3-3" aria-selected="false">Brain</a></li></ul>
+<div class="tab-content">
+<div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
 <div class="cell">
-<div class="code-with-filename">
-<div class="code-with-filename-file">
-<pre><strong>Command Line Parameters</strong></pre>
-</div>
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>usage: Generate_scMask_given_query.py [-h] [--in_dir IN_DIR] [--out_dir OUT_DIR] [--cyto_chan CYTO_CHAN]</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                                      [--query_chan QUERY_CHAN] [--nuc_chan NUC_CHAN]</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>                                      [--cell_seg_model CELL_SEG_MODEL] [--cell_diameter CELL_DIAMETER]</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                                      [--min_cell_area MIN_CELL_AREA] [--thresh_method THRESH_METHOD]</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>                                      [--fill_holes] [--min_positive_area MIN_POSITIVE_AREA]</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>                                      [--min_intersect_area MIN_INTERSECT_AREA] [--clean_export]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/FIgure5p1_Colon_ADC.png" class="img-fluid figure-img" width="715"></p>
+<figcaption>Human Colon Adenocarcinoma.</figcaption>
+</figure>
 </div>
 </div>
-<section id="input-image-arguments" class="level2" data-number="4.1">
-<h2 data-number="4.1" class="anchored" data-anchor-id="input-image-arguments"><span class="header-section-number">4.1</span> Input Image Arguments:</h2>
-<dl>
-<dt>in_dir</dt>
-<dd>
-absolute path to folder containing multi-channel images to evaluate
-</dd>
-<dt>out_dir</dt>
-<dd>
-output parent folder for intermediate results and final masks. (default to use input image folder)
-</dd>
-<dt>cyto_chan</dt>
-<dd>
-input channel index for cytoplasm or membrane stain of cells (starting from 1); Default: 1
-</dd>
-<dt>query_chan</dt>
-<dd>
-input channel index for the stain in query to define positive vs.&nbsp;negative staining (starting from 1); Default: 2
-</dd>
-<dt>nuc_chan</dt>
-<dd>
-input channel index for nuclear stain of cells (starting from 1); default to 0 to exclude nuclear stain from cell segmentation; Default: 0
-</dd>
-</dl>
+</div>
+</div>
+<div id="tabset-3-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-2-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/FIgure5p2_Pancreas.png" class="img-fluid figure-img" width="715"></p>
+<figcaption>Human Pancreas.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-3-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-3-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figures/FIgure5p3_Hippocampus.png" class="img-fluid figure-img" width="715"></p>
+<figcaption>Human Hippocampus.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
 </section>
-<section id="cell-segmentation-model-arguments" class="level2" data-number="4.2">
-<h2 data-number="4.2" class="anchored" data-anchor-id="cell-segmentation-model-arguments"><span class="header-section-number">4.2</span> Cell Segmentation Model Arguments:</h2>
-<dl>
-<dt>cell_seg_model</dt>
-<dd>
-cell segmentation model in use, ok to pass a file path of custom model; Default: <code>cyto3</code>
-</dd>
-<dt>cell_diameter</dt>
-<dd>
-median cell diameter of input images, in pixel unit; Default: 30
-</dd>
-<dt>min_cell_area</dt>
-<dd>
-minimal area of a valid cell, in squared pixel unit; can turn off with -1; Default: 15
-</dd>
-</dl>
-</section>
-<section id="positive-stained-cell-arguments" class="level2" data-number="4.3">
-<h2 data-number="4.3" class="anchored" data-anchor-id="positive-stained-cell-arguments"><span class="header-section-number">4.3</span> Positive-stained cell Arguments:</h2>
-<dl>
-<dt>thresh_method</dt>
-<dd>
-auto-threshold method to define positive-stained object in query channel, use either <code>triangle</code> or <code>otsu</code>; Default: <code>triangle</code>
-</dd>
-<dt>fill_holes</dt>
-<dd>
-fill holes in positive-stained object before area filtering; if <code>True</code>, use 0.1x of input cell diameter as kernel size and output roundish borders; Default: <code>False</code>
-</dd>
-<dt>min_positive_area</dt>
-<dd>
-minimal area of a positive-stained object in query channel, in squared pixel unit; recommend to be 0.5x of expected cell area; Default: 50
-</dd>
-<dt>min_intersect_area</dt>
-<dd>
-minimal intersection area between a positive-stained cell with nearest positive-stained object in query channel, in squared pixel unit; recommend to be 0.1x of expected cell area; Default: 500
-</dd>
-<dt>clean_export</dt>
-<dd>
-export masks into file only when there are cells selected in either case; Default: <code>False</code>
-</dd>
-</dl>
+<section id="resources" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Resources</h1>
+<ul>
+<li><a href="https://github.com/jni/affinder/tree/main?tab=readme-ov-file#how-to-guide" target="_blank"><code>affinder</code> usage</a></li>
+<li>The<code>.whl</code> file for custom widgets in <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/napari-alignment-tools" target="_blank"><code>napari_alignment_tools</code></a></li>
+<li><code>napari‑cosmx</code>: <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/" target="_blank">Getting started</a></li>
+<li><code>napari‑cosmx</code> <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/using-napari-cosmx.html" target="_blank">essentials</a></li>
+<li>CosMx napari <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-stitching/napari-cosmx-stitching.html" target="_blank">stitching tutorial</a></li>
+</ul>
 
 
-</section>
 </section>
 
 </main> <!-- /main -->

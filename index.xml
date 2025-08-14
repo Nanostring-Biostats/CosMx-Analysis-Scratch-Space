@@ -96,6 +96,442 @@
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/subcellular/figures/CPA.png" medium="image" type="image/png" height="86" width="144"/>
 </item>
 <item>
+  <title>Aligning H&amp;E and CosMx Images in napari</title>
+  <dc:creator>Yi Cui</dc:creator>
+  <dc:creator>Lidan Wu</dc:creator>
+  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>Aligning Hematoxylin and Eosin (H&amp;E) histology with CosMx<sup>®</sup> Spatial Molecular Imager (SMI) data is more than a cosmetic step: it’s turning two complementary modalities into a single, interpretable picture. H&amp;E provides the spatial scaffold which includes tissue boundaries, cell shapes, and histopathology cues, while CosMx adds the multiplexed molecular profile for each cell. When accurately aligned, these layers reinforce each other: structure informs expression, and expression validates structure. However, it’s a common challenge to align these two kinds of images as they often differ in scale, orientation, or position due to variations in acquisition methods.</p>
+<p>In this tutorial, we’ll walk through how to effectively align H&amp;E and CosMx images in <a href="https://napari.org/stable/" target="_blank"><code>napari</code></a> with a two-part workflow:</p>
+<ol type="1">
+<li>first do a quick landmark-based alignment with <a href="https://github.com/jni/affinder/tree/main" target="_blank"><code>affinder</code></a> plugin,</li>
+<li>then fine tune with custom transformation widgets <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/napari-alignment-tools" target="_blank"><code>napari_alignment_tools</code></a> for controlled micro-nudges.</li>
+</ol>
+<p>By the end, you’ll be able to:</p>
+<ul>
+<li>Load stitched CosMx data and matching H&amp;E images in napari.</li>
+<li>Perform coarse alignment with <code>affinder</code> (affine/similarity/euclidean models).</li>
+<li>Fine-tune transforms with intuitive widgets <code>napari_alignment_tools</code> for pixel-level adjustments.</li>
+<li>Verify results visually and save an aligned H&amp;E ready for analysis.</li>
+</ul>
+<p>Like other items in our <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">CosMx Analysis Scratch Space</a>, the usual <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html" target="_blank">caveats</a> and <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html" target="_blank">license</a> applies.</p>
+</section>
+<section id="environment-installation" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Environment &amp; Installation</h1>
+<section id="set-up-general-environment" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="set-up-general-environment"><span class="header-section-number">2.1</span> Set up general environment</h2>
+<p>It’s recommended to create a dedicated environment for <code>napari</code> applications. If you already have an environment with <code>napari</code> and <code>napari-cosmx</code> plugin installed, you could just activate that environment directly and proceed to Section&nbsp;2.2.</p>
+<p>Below is the example command line to create virtual environment <code>napariEnv</code>.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>setup napari environment</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># create environment</span></span>
+<span id="cb1-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">python</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-m</span> venv /path/to/my/napariEnv</span>
+<span id="cb1-3"></span>
+<span id="cb1-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># activate environment</span></span>
+<span id="cb1-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">source</span> /path/to/my/napariEnv/bin/activate   <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Windows: /path/to/my/napariEnv/Scripts/activate</span></span>
+<span id="cb1-6"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--upgrade</span> pip</span>
+<span id="cb1-7"></span>
+<span id="cb1-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># install napari viewer</span></span>
+<span id="cb1-9"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"napari[all]"</span></span></code></pre></div>
+</div>
+</div>
+<p>Following the instructions in earlier <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/#part-2-installing-napari-cosmx" target="_blank">post</a>, one should next install the <code>napari-cosmx</code> plugin from the latest <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/assets/napari-cosmx%20releases" target="_blank">wheel file</a> for interacting with CosMx data.</p>
+<p>With <code>napari-cosmx</code> plugin installed, one could start to prepare CosMx napari dataset and overlaying single-cell and transcriptional analysis results on top of morphological images. Please refer to earlier <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/#category=napari" target="_blank"><code>napari</code> post series</a> for more details.</p>
+</section>
+<section id="sec-plugins" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="sec-plugins"><span class="header-section-number">2.2</span> Install alignment-required plugins</h2>
+<p>Two plugins are required for this tutorial:</p>
+<ul>
+<li><a href="https://github.com/jni/affinder/tree/main" target="_blank"><code>affinder</code></a> and</li>
+<li>custom transformation widgets <code>napari_alignment_tools</code>, whose wheel file <code>.whl</code> needs to be downloaded from <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/napari-alignment-tools" target="_blank">here</a>.</li>
+</ul>
+<p>You can either install them via command line or in <code>napari</code> GUI.</p>
+<p><strong>Option 1</strong>: install via command line.</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>install alignment plugins</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install affinder</span>
+<span id="cb2-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install /path/to/wheel/file/napari_alignment_tools-<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;</span>version<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span>-py3-none-any.whl</span></code></pre></div>
+</div>
+</div>
+<p><strong>Option 2</strong>: install via <code>napari</code> GUI.</p>
+<p>First launch <code>napari</code> GUI by typing <code>napari</code> in command line, and then go to <code>Plugins</code> menu and follow the steps below.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true"><code>affinder</code></a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">custom <code>napari-alignment-tools</code></a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/Fig2p1-plugin-install01.png" class="img-fluid figure-img" width="1262"></p>
+<figcaption>(A) Launch plugin manager; (B) Locate <code>affinder</code> in search box and install (red arrows). (C) The installed plugin would show up under <code>Plugins</code> menu when launching napari next time.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/Fig2p1-plugin-install02.png" class="img-fluid figure-img" width="1316"></p>
+<figcaption>For cutom plugin, (A) launch plugin manger under <code>Plugins</code> menu; (B) Drag the downloaded wheel file to the bottom field and click <code>install</code> (yellow arrows) and watch <code>Show Status</code> (C) for the installation progress.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="data-prerequisites" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Data prerequisites</h1>
+<ul>
+<li><p><strong>CosMx (stitched) dataset</strong>: See the <code>napari</code> <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-stitching/napari-cosmx-stitching.html" target="_blank">stitching tutorial</a> on how to create it for your dataset. Example file path at <code>~/data/cosmx/Napari</code>.</p></li>
+<li><p><strong>H&amp;E image</strong>: Example file path at <code>~/data/cosmx/WTx_Exp-25_Colon_HE.png</code>.</p>
+<ul>
+<li>Napari supports various other image formats, including <code>TIFF</code>and <code>Zarr</code>.</li>
+<li>If your file format is not supported, you could convert it to the supported formats with other tools like <code>QuPath</code> (see <a href="https://qupath.readthedocs.io/en/stable/docs/advanced/exporting_images.html" target="_blank">here</a>).</li>
+</ul></li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>For H&amp;E of large file size, prefer Zarr-backed images and avoid loading every layer at full resolution. Use the minimum layers you need for alignment.</p>
+</div>
+</div>
+</section>
+<section id="alignment-workflow" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Alignment workflow</h1>
+<section id="load-data" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="load-data"><span class="header-section-number">4.1</span> Load data</h2>
+<ol type="1">
+<li>Start <code>napari</code>.</li>
+<li>Load H&amp;E: Drag the H&amp;E file into <code>napari</code> GUI (it will be a 2D image layer), choose <code>napari builtins</code> reader if prompted.</li>
+<li>Load CosMx dataset: Drag the pre-stitched cosmx data folder (which contents morphology image, cell segmentation, cell‑type metadata, etc.) into <code>napari</code> GUI, choose <code>napari CosMx</code> reader if prompted.</li>
+</ol>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/Fig3p1_load_HnE.png" class="img-fluid figure-img" width="328"></p>
+<figcaption>Choose reader based on image/data type.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="coarse-alignment-with-affinder-landmarks" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="coarse-alignment-with-affinder-landmarks"><span class="header-section-number">4.2</span> Coarse alignment with <code>affinder</code> (landmarks)</h2>
+<p>Goal: Compute a transform that maps the <strong>Moving</strong> H&amp;E layer onto the <strong>Reference</strong> CosMx layer by clicking corresponding landmarks.</p>
+<ol type="1">
+<li><p>Open <code>affinder</code>: <strong>Plugins → affinder → Start affinder</strong>. A right‑dock widget appears with drop-downs listing your layers.</p>
+<ul>
+<li><p>You can further click on the <code>Select file</code> field next to <code>Save transformation as</code> line of the widget to export the transformation matrix for future usage.</p></li>
+<li><p>The widget allows 3 different transform models:</p>
+<ul>
+<li><strong>affine</strong> <em>(default)</em>: translation, rotation, scale, shear, reflection (most flexible).</li>
+<li><strong>similarity</strong>: translation, rotation, uniform scale (shape‑preserving).</li>
+<li><strong>euclidean</strong>: translation + rotation only (most rigid).</li>
+</ul></li>
+</ul></li>
+<li><p>Select layers:</p>
+<ul>
+<li><strong>Reference Layer</strong> = your CosMx image (e.g., morphology or <code>cell_type</code> metadata image that has clear features).</li>
+<li><strong>Moving Layer</strong> = your H&amp;E image.</li>
+</ul></li>
+<li><p>Start point selection: Click <strong>Start</strong> in the <code>affinder</code> widget.</p>
+<ul>
+<li><code>affinder</code> adds two <code>Points</code> layers—one for the reference, one for the moving image.</li>
+<li>The viewer would focuse you on the <strong>Reference</strong> layer first. Click at least <strong>three</strong> distinct, clearly identifiable landmarks (features visible in both images) in the <strong>Reference</strong> layer.</li>
+<li>The viewer would then switch focus to the <strong>Moving</strong> (H&amp;E) layer. Click the <strong>corresponding</strong> points in the <strong>same order</strong>.</li>
+</ul></li>
+<li><p>Transform application: After the third pair is placed, <code>affinder</code> computes and applies the transform so the <strong>H&amp;E (Moving)</strong> aligns onto the <strong>CosMx (Reference)</strong>. Continue adding additional pairs (alternating layers) to refine the alignment iteratively. The more points you add, the more accurate the alignment.</p></li>
+<li><p>Click <strong>Finish</strong> when the coarse alignment looks good. The transformation matrix used would be saved to the file defined in step (1).</p></li>
+</ol>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Order matters! Always click correspondence points in the same order across <strong>Reference</strong> and <strong>Moving</strong> images.</p>
+</div>
+</div>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" aria-controls="tabset-2-1" aria-selected="true">load data and launch <code>affinder</code></a></li><li class="nav-item"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" aria-controls="tabset-2-2" aria-selected="false">point selection</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-3" aria-controls="tabset-2-3" aria-selected="false">aligned image</a></li></ul>
+<div class="tab-content">
+<div id="tabset-2-1" class="tab-pane active" aria-labelledby="tabset-2-1-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/Fig3p2_affinder01.png" class="img-fluid figure-img" width="1808"></p>
+<figcaption>The <code>napari</code> viewer has both kinds of image data loaded before starting the <code>affinder</code>. CosMx data layer <code>cell_type</code> is choosen as <code>reference</code> layer, while H&amp;E image <code>WTx_Exp-25_Colon_HE</code> is chosen as <code>moving layer</code>.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-2-2" class="tab-pane" aria-labelledby="tabset-2-2-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/Fig3p2_affinder02.png" class="img-fluid figure-img" width="1072"></p>
+<figcaption>Pairs of points are selected in the 2 layers before applying the transformation.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-2-3" class="tab-pane" aria-labelledby="tabset-2-3-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/Fig1-cosmx-he-align.png" class="img-fluid figure-img" width="297"></p>
+<figcaption>Upon clicking <code>Finish</code>, the <strong>Moving</strong> layer (H&amp;E) is now displayed in a way aligned to the <strong>Reference</strong> layer (CosMx cell_type metadata) based on the anchor points selected.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="finetuning-with-custom-transform-widgets" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="finetuning-with-custom-transform-widgets"><span class="header-section-number">4.3</span> Fine‑tuning with custom transform widgets</h2>
+<p>Use the widgets from <code>napari_alignment_tools</code> to make controlled adjustments after <code>affinder</code>’s coarse alignment.</p>
+<p>As shown in figure below, one should go to the the console <code>&gt;</code> at bottom left corner of the dataset-loaded <code>napari</code> viewer and run:</p>
+<div class="cell">
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>add custom widgets in napari console</strong></pre>
+</div>
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">from</span> napari_alignment_tools.widgets import add_widgets_to_viewer</span>
+<span id="cb3-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">add_widgets_to_viewer</span><span class="er" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">(</span><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">viewer</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">)</span></span></code></pre></div>
+</div>
+</div>
+<p>This adds two dock widgets to the right dock: <strong>Alignment Tool</strong> (coarse parameters) and <strong>Fine Nudge</strong> (small increments). Both widgets allow you to put in defined numbers (instead of adding points) for transformation and thus allow the alignment occur in a more controlled way.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/Fig2p1-plugin-install03.png" class="img-fluid figure-img" width="2076"></p>
+<figcaption>After loading a pre-stitched cosmx dataset in <code>napari</code>, one could add the custm widgets (to the right dock) by running short python command in <code>napari</code> console.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<section id="use-the-alignment-tool-top-panel" class="level3" data-number="4.3.1">
+<h3 data-number="4.3.1" class="anchored" data-anchor-id="use-the-alignment-tool-top-panel"><span class="header-section-number">4.3.1</span> Use the Alignment Tool (top panel)</h3>
+<ol type="1">
+<li><p>Layer selection: In <em>Alignment Tool</em>, choose your <strong>H&amp;E</strong> image layer (the <strong>Moving</strong> layer you want to adjust).</p></li>
+<li><p>Adjust as needed:</p>
+<ul>
+<li><strong>Rotation</strong> (−180 to 180°)</li>
+<li><strong>Scale Verti/Horiz</strong> (0.0001 to 1000)</li>
+<li><strong>Shift Verti/Horiz</strong> (−1000 to 1000 px)</li>
+<li><strong>Flip Horiz/Verti</strong> (checkboxes)</li>
+</ul></li>
+<li><p>Apply: Click <strong>Apply Alignment</strong>. Inspect by toggling visibility and using opacity sliders.</p></li>
+</ol>
+</section>
+<section id="use-the-fine-nudge-tool-micro-adjustments-bottom-panel" class="level3" data-number="4.3.2">
+<h3 data-number="4.3.2" class="anchored" data-anchor-id="use-the-fine-nudge-tool-micro-adjustments-bottom-panel"><span class="header-section-number">4.3.2</span> Use the Fine Nudge Tool (micro adjustments, bottom panel)</h3>
+<ol type="1">
+<li>Layer selection: Choose the <strong>H&amp;E</strong> layer.</li>
+<li>Direction &amp; step size:</li>
+</ol>
+<ul>
+<li>Pick a direction—left (Y−), right (Y+), up (X−), down (X+), rotate counter‑clockwise (Rotate−), rotate clockwise (Rotate+).</li>
+<li>Set the <strong>Step</strong> (e.g., 1 px for translation; 0.5–1° for rotation).</li>
+</ul>
+<ol start="3" type="1">
+<li>Apply <strong>Nudge</strong>, repeat this until alignment is precise.</li>
+</ol>
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/Fig4_custom.png" class="img-fluid figure-img" width="1466"></p>
+<figcaption>(A) Custom widgets from <code>napari_alignment_tools</code>; (B) Overlay of cell_type metadata on top of H&amp;E image before vs.&nbsp;after fine-tuning; (C) Side-by-side view of the post-fine-tuned images.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Use <strong>opacity</strong> on the H&amp;E layer to blend with the CosMx background.</li>
+<li>Toggle layer visibility (<code>V</code>) to quickly inspect.</li>
+<li>Link pan/zoom across layers by multi‑selecting layers and enabling <strong>Link Layers</strong> (chain icon) in the layer controls.</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="verify-save" class="level3" data-number="4.3.3">
+<h3 data-number="4.3.3" class="anchored" data-anchor-id="verify-save"><span class="header-section-number">4.3.3</span> Verify &amp; save</h3>
+<ol type="1">
+<li><strong>Visual checks</strong>: Zoom into salient structures (tissue boundaries, lumen edges, sharp features) and ensure edges coincide across layers.</li>
+<li><strong>Save</strong> the transformed H&amp;E: <strong>File → Save Selected Layer(s)</strong> and pick your desired format (e.g., TIFF or Zarr). Consider also saving the <strong>Points</strong> layers or the transform matrix if your widget exposes it.</li>
+</ol>
+</section>
+</section>
+</section>
+<section id="practical-tips" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Practical Tips</h1>
+<ul>
+<li>Either <code>affinder</code> or the custom transformation widgets can be <strong>used independently</strong> to achieve the same alignment outcome. The former uses point inputs, while the later uses the numeric inputs.</li>
+<li><strong>Pre‑stitch CosMx FOVs</strong> before alignment so both widgets sees a continuous reference image (see <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-stitching/napari-cosmx-stitching.html" target="_blank">stitching tutorial</a>).</li>
+<li><strong>Mind the scale.</strong> If CosMx and H&amp;E pixel sizes differ greatly, start with <code>Affine</code> model in <code>affinder</code>, then refine scale with the custom Alignment Tool.</li>
+<li><strong>Avoid overfitting.</strong> Don’t spam too many landmarks at once; add a few, check, then add more if needed.</li>
+<li><strong>Work on downsampled data</strong> to prove the transform, then apply at full resolution if your workflow supports it.</li>
+</ul>
+</section>
+<section id="gallery-of-he-aligned-cosmx-datasets" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Gallery of H&amp;E-aligned CosMx datasets</h1>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" aria-controls="tabset-3-1" aria-selected="true">Colon</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" aria-controls="tabset-3-2" aria-selected="false">Pancreas</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-3" aria-controls="tabset-3-3" aria-selected="false">Brain</a></li></ul>
+<div class="tab-content">
+<div id="tabset-3-1" class="tab-pane active" aria-labelledby="tabset-3-1-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/FIgure5p1_Colon_ADC.png" class="img-fluid figure-img" width="715"></p>
+<figcaption>Human Colon Adenocarcinoma.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-3-2" class="tab-pane" aria-labelledby="tabset-3-2-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/FIgure5p2_Pancreas.png" class="img-fluid figure-img" width="715"></p>
+<figcaption>Human Pancreas.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-3-3" class="tab-pane" aria-labelledby="tabset-3-3-tab">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/FIgure5p3_Hippocampus.png" class="img-fluid figure-img" width="715"></p>
+<figcaption>Human Hippocampus.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="resources" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Resources</h1>
+<ul>
+<li><a href="https://github.com/jni/affinder/tree/main?tab=readme-ov-file#how-to-guide" target="_blank"><code>affinder</code> usage</a></li>
+<li>The<code>.whl</code> file for custom widgets in <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/napari-alignment-tools" target="_blank"><code>napari_alignment_tools</code></a></li>
+<li><code>napari‑cosmx</code>: <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/" target="_blank">Getting started</a></li>
+<li><code>napari‑cosmx</code> <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-basics/using-napari-cosmx.html" target="_blank">essentials</a></li>
+<li>CosMx napari <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-stitching/napari-cosmx-stitching.html" target="_blank">stitching tutorial</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>napari</category>
+  <category>visualization</category>
+  <category>python</category>
+  <category>how-tos</category>
+  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/</guid>
+  <pubDate>Mon, 11 Aug 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-alignment-tools/figures/Fig1-cosmx-he-align.png" medium="image" type="image/png" height="145" width="144"/>
+</item>
+<item>
   <title>Advancing cell segmentation in spatial omics: new models for diverse morphologies</title>
   <dc:creator>Lidan Wu</dc:creator>
   <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/</link>
@@ -126,7 +562,7 @@
   author = {Lidan Wu and Aster Wardhani and Joseph-Tin Phan},
   year = {2025},
   url = {https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/image-segmentation-models/},
-  note = {Accessed: 2025-08-11}
+  note = {Accessed: 2025-08-14}
 }</code></pre>
 </div>
 <div id="tabset-1-4" class="tab-pane" aria-labelledby="tabset-1-4-tab">
@@ -12706,230 +13142,6 @@ font-style: inherit;">"</span>)</span></code></pre></div>
   <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/</guid>
   <pubDate>Thu, 17 Oct 2024 00:00:00 GMT</pubDate>
   <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/rss/figures/rss-thumbnail.jpeg" medium="image" type="image/jpeg"/>
-</item>
-<item>
-  <title>How does background impact CosMx data, and when does it matter?</title>
-  <dc:creator>Patrick Danaher</dc:creator>
-  <link>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="introduction" class="level2">
-<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>CosMx data includes off-target “background” counts from off-target probe binding, appearing randomly at a low frequency across the dataset. In this article, we’ll discuss how background impacts data analysis. Many details follow, but our main findings are simple:</p>
-<ol type="1">
-<li>For analyses where statistics are calculated across many cells, for example differential expression or spatial correlation analysis, the impact of background approaches zero.</li>
-<li>For analyses of single cell profiles, for example cell typing or UMAP projections, background contributes a small amount of noise/error. But by far the major driver of noise in single cell profiles is sensitivity / readout sparsity, not background.</li>
-<li>Analyses of single genes in single cells, for example calling cells as +/- for a marker gene, perform poorly regardless of background levels, except for perhaps the top ~10% high-expressing genes. We recommend <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/" target="_blank">a smoothing / imputation approach</a> to make this kind of analysis reliable.</li>
-</ol>
-<p>Note: For details of the origins of background counts, see Appendix 1.</p>
-<p>Note: This document focuses on background. But always worth bearing in mind is that segmentation errors have a far more deleterious impact on data quality. See Appendix 2 for a brief discussion.</p>
-</section>
-<section id="how-much-background-is-there" class="level2">
-<h2 class="anchored" data-anchor-id="how-much-background-is-there">How much background is there?</h2>
-<p>In most 6000-plex datasets, background is somewhere between 0.01 and 0.05 counts per plex per cell. To get a fuller sense of the range of background, see below for results from a set of 6k datasets of varying quality.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/signal vs. bg 2.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p><strong><em>Figure 1: signal and background across 6k datasets of widely varying data quality.</em></strong> <strong><em>a.</em></strong> <em>Datasets’ mean background (mean counts per negprobe per cell) plotted against mean signal (mean RNA counts per cell).</em> <strong><em>b.</em></strong> <em>Datasets’ proportion of background counts plotted against mean signal. Proportion of background counts is estimated with: (mean counts per negprobe per cell)(plex)/(mean RNA counts per cell).</em></p>
-<p>From Figure 1, we see that datasets with more signal (raw counts) tend to also have more background, but that background does not rise as quickly as signal. For a nuanced discussion of how background behaves within a dataset, see Appendix 3.</p>
-</section>
-<section id="case-1-impact-of-background-when-calculating-summary-statistics-over-many-cells" class="level2">
-<h2 class="anchored" data-anchor-id="case-1-impact-of-background-when-calculating-summary-statistics-over-many-cells">Case 1: Impact of background when calculating summary statistics over many cells</h2>
-<p>CosMx datasets tend to be large, containing hundreds of thousands of cells in total, and at least thousands of cells from most individual cell types. This high sample size gives us high statistical power and precision whenever we calculate summary statistics over cells, for example when performing differential expression or computing spatial correlations. The law of large numbers assures us that as N increases, the noise in our data averages out, leaving us with precise estimates. Thus background, which mainly acts to add random noise to the data, does not obscure trends that occur over large numbers of cells.</p>
-<p>To demonstrate what statistical theory assures us, we’ll simulate CosMx data for which we can attribute each count to real RNA or background. Our simulation is simple: using a CosMx dataset, we’ll take a gene for which only a very small percentage of counts are background, i.e.&nbsp;one of our highest expressers. Then we’ll down-sample it until it has half as many counts as the average gene. This down-sampled data will behave like a low-expression gene with near-zero background. Finally, we’ll take background counts from a negative control gene and use them as simulated background atop the down-sampled values, producing data akin to a low-expressing gene with typical background, for which 22.3% of counts are background.</p>
-<p>First, let’s get a visceral feel for what background looks like by plotting our simulated counts across space:</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/COL1A1 with downsampling and background - plus traces.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p><strong><em>Figure 2: spatial plots of simulated real and background counts from a typical gene in a typical 6k dataset.</em></strong> <strong><em>Top row:</em></strong> <em>single cell expression in space. The right three plots are on the same color scale.</em> <strong><em>Bottom row:</em></strong> <em>total expression in a sliding window along the highlighted regions in the spatial plots. The right three plots are on the same vertical scale.</em> <strong><em>Left:</em></strong> <em>COL1A1 is a high expresser in this dataset.</em> <strong><em>Center left:</em></strong> <em>COL1A1 counts were down-sampled 42-fold to create a simulated gene of average expression level and negligible background.</em> <strong><em>Center right:</em></strong> <em>background counts (from a negative control gene).</em> <strong><em>Right:</em></strong> <em>Background added to the down-sampled data to simulate a gene of average expression and average background, for which 22.4% of counts are background.</em></p>
-<p>The spatial pattern of this gene’s expression is equally clear with and without background. This example serves to demonstrate a general principle: since background occurs randomly, it does little to obscure spatial trends in gene expression. We can also demonstrate this without use of simulation. Figure 3 below shows two low expressers displaying clear spatial patterns.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/low expressers.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p><strong><em>Figure 3: spatial plots of two low expressers.</em></strong></p>
-<p>Now let’s see how background impacts hard statistics. Using the same simulation, we’ll perform a differential expression analysis. Mimicking (somewhat simplisticly) a typical use case, in which we study how a single cell type modules gene expression across spatial context, we’ll measure how gene expression in fibroblasts changes between the top vs.&nbsp;bottom halves of the tissue. To do this, we’ll run a simple t-test on normalized expression. We run this toy analysis on the downsampled / “negligible background” data, and on the data with simulated background added back in. When we analyze all 18871 fibroblasts, we find that adding background leaves our point estimate and confidence interval essentially intact:</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 30%">
-<col style="width: 15%">
-<col style="width: 18%">
-<col style="width: 18%">
-<col style="width: 18%">
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: right;"></th>
-<th>Estimate</th>
-<th>Lower 95% conf interval</th>
-<th>Upper 95% conf interval</th>
-<th>p-value</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: right;">Downsampled to simulate near-zero background</td>
-<td>0.000107</td>
-<td>7.35e-05</td>
-<td>0.000140</td>
-<td>3.4e-10</td>
-</tr>
-<tr class="even">
-<td style="text-align: right;">With simulated background</td>
-<td>0.000108</td>
-<td>7.4e-05</td>
-<td>0.000143</td>
-<td>6.91e-10</td>
-</tr>
-</tbody>
-</table>
-<p><strong><em>Table 1: Differential expression results from 18871 fibroblasts.</em></strong> <em>A linear model comparing expression in the upper vs.&nbsp;lower half of the tissue was run for two expression vectors.</em> <strong><em>Top row:</em></strong> <em>COL1A1 counts were down-sampled 85-fold to create a simulated gene of low expression level and negligible background.</em> <strong><em>Bottom row:</em></strong> <em>Background was added to the down-sampled data to simulate a gene of low expression and average background.</em></p>
-<p>To simulate a rare cell type where our sample size is less overpowering, we can re-run our analysis on a random subset of merely 1000 fibroblasts. When we do so, the fundamental finding remains: adding background to the data barely budges our estimates, confidence intervals and p-values. Remember, this is a gene for which 22.3% of counts are background.</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 30%">
-<col style="width: 15%">
-<col style="width: 18%">
-<col style="width: 18%">
-<col style="width: 18%">
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: right;"></th>
-<th>Estimate</th>
-<th>Lower 95% conf interval</th>
-<th>Upper 95% conf interval</th>
-<th>p-value</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: right;">Downsampled to simulate near-zero background</td>
-<td>0.000165</td>
-<td>8.14e-06</td>
-<td>0.000321</td>
-<td>0.0392</td>
-</tr>
-<tr class="even">
-<td style="text-align: right;">With simulated background</td>
-<td>0.000175</td>
-<td>1.64e-05</td>
-<td>0.000334</td>
-<td>0.0307</td>
-</tr>
-</tbody>
-</table>
-<p><strong><em>Table 2: Differential expression results from 1000 fibroblasts, simulating a rare cell type.</em></strong> <em>For a random subset of 1000 fibroblasts, a linear model comparing expression in the upper vs.&nbsp;lower half of the tissue was run for two expression vectors.</em> <strong><em>Top row:</em></strong> <em>COL1A1 counts were down-sampled 85-fold to create a simulated gene of average expression level and negligible background.</em> <strong><em>Bottom row:</em></strong> <em>Background was added to the down-sampled data to simulate a gene of average expression and average background.</em></p>
-<p>Code for the above simulation can be found <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/background_simulations/" target="_blank">here</a>.</p>
-</section>
-<section id="case-2-impact-of-background-when-analyzing-single-cell-expression-profiles" class="level2">
-<h2 class="anchored" data-anchor-id="case-2-impact-of-background-when-analyzing-single-cell-expression-profiles">Case 2: Impact of background when analyzing single-cell expression profiles</h2>
-<p>Now, instead of analyzing one gene over many cells, we’ll see what happens when we analyze all the genes in a single cell. For this, we’ll need a new simulation. We first define a “true” expression profile as the average expression of macrophages in a scRNA-seq study (taken from the “ioprofiles” data from the InSituType R package). Then, we use this “true” profile to simulate a single cell’s non-background counts. Specifically, we sample from a multinomial distribution, with N equal to 590 (the average per-cell non-background count level in a typical 6k dataset), and with probabilities proportional to the expression levels of the 6k panel in our “true” profile. Finally, we simulate background atop the single cell profile, using a Poisson distribution with rate = 0.017.</p>
-<p>These simulation settings mimic a middle-of-the-road 6k dataset selected from the datasets in Figure 1, with an expected 698 counts per cell, of which 15.5% are background. Simulating a single cell under this setting, we obtained 676 counts, of which 12.9% were background. This represents a typical cell from a typical 6k dataset (Figure 4).</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/1cell_barplot.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p><strong><em>Figure 4: simulated real and background counts for a typical cell in 6k data.</em></strong> <em>Bars show the counts from all genes in the 6k panel. Red vs.&nbsp;blue portions of bars denote background vs.&nbsp;real counts.</em></p>
-<p>For the definitive parts of the profile, i.e.&nbsp;the highly-expressed genes, background does not distort our impression. Rather, it primarily contributes single-count values across a random selection of truly 0-count genes.</p>
-<p>Figure 3 gives us a gestalt for what a single cell profile with background looks like. But we truly care about is how well that observed profile reflects the cell’s true expression profile. A perfect assay would of course count every one of the ~300,000 mRNA molecules in a cell. In real-world settings where we measure closer to 1,000 molecules, we can measure a single cell profile’s accuracy by comparing its N observed counts to the expected counts obtained by sampling N mRNA molecules at random from the cell. With that in mind, let’s see how background impacts the fidelity of our measured gene expression profiles to the ground truth. First, we plot our simulated expression profile, with and without background, against the expected counts:</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/1cell_scatterplots.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p><strong><em>Figure 5. Simulated single-cell profile for a cell with 589 real counts, with and without an additional 87 background counts, in linear (top row) and log-scale (bottom row). (For log-scale plots, zeroes have been rounded up to 0.5.)</em></strong></p>
-<p>The simulated “observed” profiles with and without background have almost the same correlation to the ground truth. In other words, background contributes little to the error.</p>
-<p>Notice that even the profile without background is not terribly close to the truth. This divergence can’t be caused by background; rather, it’s caused by sampling error: because the counts are so sparse, they are noisy.</p>
-<p>(A brief digression into theory: because we’re sampling such a low percentage of the cell’s RNA molecules, each gene’s counts are effectively Poisson-distributed. The CV (sd / mean) of a Poisson distribution with mean µ is 1/sqrt(µ). In English: Poisson data with low means is noisy.)</p>
-<p>To see how sparsity drives error, we can re-run our simulation for a cell with 20,000 RNA counts:</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/1cell_scatterplots_highcount.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p><strong><em>Figure 6. Simulated single-cell profile for a cell with 20,000 real counts and 2971 background counts (12.9% of the total), in linear and log-scale.</em></strong></p>
-<p>The observed profile now correlates closely with the ground truth. We can conclude that sparsity more than background leads our observed counts to diverge from cells’ true profiles. Code for the above simulation can be found <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/background_simulations/" target="_blank">here</a>.</p>
-</section>
-<section id="case-3-impact-of-background-on-analyses-of-single-genes-in-single-cells." class="level2">
-<h2 class="anchored" data-anchor-id="case-3-impact-of-background-on-analyses-of-single-genes-in-single-cells.">Case 3: Impact of background on analyses of single genes in single cells.</h2>
-<p>In analyses of this sort, e.g.&nbsp;trying to declare a cell as +/- for a marker gene, background does act as a headwind. If we see only 1 count of a gene in a cell, the existence of background means we cannot be confident that the gene is truly expressed in the cell. We can calculate the impact of background in this setting directly, without simulation. (We assume that both real and background counts arise from Poisson distributions with different rates.) Figure 7 below shows how our ability to call gene presence/absence varies based on expression level, background, and the count threshold at which we call presence.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/marker detection performance.png" style="width:100.0%;height:100.0%" class="figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<p><strong><em>Figure 7. performance metrics for calling cells as +/- for a gene.</em></strong> <strong><em>(top left):</em></strong> <em>sensitivity to call a cell as positive for a gene vs.&nbsp;the gene’s expected expression level per cell. This relationship is shown for thresholds of 1 count (cells with &gt;=1 counts are called positive) and 2 counts.</em> <strong><em>(other panels)</em></strong> <em>The true positive rate for cells called positive for a gene vs.&nbsp;the gene’s expected expression level per cell. Curves are shown for two count thresholds and for typical background (0.02 counts/plex/cell) and 40-fold lower background (0.005 counts/plex/cell). Vertical position indicates the percent of cells that are called positive are truly positive. The three panels correspond to (b) common cell types (50% of cells are positive), (c) somewhat rare cell types (10%) and (d) rare cell types (1%). Code for this simulation is available <a href="https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/background_simulations/" target="_blank">here</a></em>.</p>
-<p>From Figure 7, we get a broad picture of the performance of calling marker gene positivity. Panel (a) conveys a few important if unsurprising lessons. First, sensitivity rises with expression level; second, it drops when we require more counts to make a cell. Third, sensitivity to detect a gene is quite poor until expected counts rise to ~3 per cell. In high-plex spatial transcriptomics in 2024, genes at this level are uncommon and would be considered high expressers. Put another way: sensitivity to detect gene positivity within a single cell is generally poor, regardless of background level. In panel (b), we see that for common cell types, background causes a low but acceptable rate of false positive calls. For cell types with 10% prevalence (panel c), background results in a 20% false detection rate using a threshold of 1 count, forcing a tradeoff between loss in sensitivity or the admission of some false positive cells to our positive calls. For cell types with 1% prevalence (panel d), a threshold of 1 count produces unacceptable levels of false positives, forcing a threshold of 2 counts and therefore a lower sensitivity.</p>
-<p>Note: keep in mind that prevalence can be contextual: a tiny proportion of all cells may be FOXP3+, but looking within T-cells, FOXP3 positivity could reach 10%. Thus by looking for gene positivity within a sensible subset of cells we can improve our detection performance.</p>
-<p>There is a powerful countermeasure to this limitation, described <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/marker-gene-smoothing/" target="_blank">here</a>. To summarize briefly, we can derive smoothed/imputed gene expression values for crucial marker genes by borrowing information from similar cells. For a given cell, we identify the 50 cells most closely resembling its expression profile, and we replace the cell’s observed expression profile with the average expression profile of those 50 most similar cells. This negotiates a favorable variance/bias tradeoff: we bias the cell to look like its neighbors in expression space, but we squash noise due to sparsity and background. (In particular, a cell may contain a background count of a marker gene, but it’s vanishingly unlikely that very many of its expression space neighbors will have background in that same gene.) This approach works for any gene that correlates with other aspects of a cell’s expression state. For example, Treg cells aren’t just CD4 T cells with some FOXP3; FOXP3+ and FOXP3- T-cells have more extensive expression differences that allow this smoothing approach to attribute FOXP3 expression to Tregs and not to other CD4 T cells.</p>
-<p>In summary, regardless of background level, analyses of single genes in single cells (e.g.&nbsp;of marker genes) have low sensitivity except for high expressing genes. Background increases the false positive rate of marker gene detection, mainly in rare cell types. To overcome inaccuracy resulting from both low expression and background, use imputed marker gene expression.</p>
-</section>
-<section id="appendix1" class="level2">
-<h2 class="anchored" data-anchor-id="appendix1">Appendix 1: Origins of background in spatial transcriptomics</h2>
-<p>Background counts are simply instances where the instrument calls an RNA transcript that isn’t there. In CosMx data, background happens through two mechanisms.</p>
-<p>First, in “FalseCode” style background, reporter probes can colocalize with each other in space by random chance and then be misconstrued as a gene’s barcode. This kind of background is very rare, on the order of 0.005 counts per plex per cell. It can arise from false spot detection, from off-target binding of reporter probes, or from reporter codes from two closely adjacent transcripts combining to form the barcode of a third gene. This kind of background can be measured with our FalseCode negative controls, which are barcodes with no corresponding probes in hybridization reaction.</p>
-<p>Second, in “NegProbe” style background, a hybridization probe binds to the wrong target, then is correctly detected through reporter probes. This is the dominant form of background, occurring at 0.01-0.04 counts per plex per cell in most datasets. Our “NegProbe” controls, which are standard hybridization probes targeting sequences not found in any known genome, measure both this kind of background and FalseCode style background. Because they capture both sources of background, our analyses only need consider NegProbes levels.</p>
-</section>
-<section id="appendix2" class="level2">
-<h2 class="anchored" data-anchor-id="appendix2">Appendix 2: contrasting the harm of background vs.&nbsp;of segmentation errors</h2>
-<p>Background arises at random, and so impacts the data as noise. Segmentation errors, on the other hand, are not random: cells in different spatial contexts will be contaminated by different genes. This causes bias in the data. And while noise averages out at high sample sizes, bias does not. Thus segmentation errors are a far more pernicious influence on data quality than background and sparsity. For further discussion, see <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error/" target="_blank">here</a>.</p>
-</section>
-<section id="appendix3" class="level2">
-<h2 class="anchored" data-anchor-id="appendix3">Appendix 3: How is background distributed?</h2>
-<p>As a first-order approximation, negprobe-style background happens with equal probability to all genes. (Beyond the first-order view, we have observed small subsets of negprobes with elevated background, usually not dramatically above the other negprobes.) We usually see cells’ background rising in proportion to their total expression: a tumor cell with twice the counts of another tumor cell is probably experiencing twice the background. Areas of necrosis will generate higher background, likely due to a more charged and thus more sticky surface for nucleic acid probes. Negprobes also seem to appear more densely outside of cells.</p>
-</section>
-<section id="appendix4" class="level2">
-<h2 class="anchored" data-anchor-id="appendix4">Appendix 4: Measuring cells’ background</h2>
-<p>Because background is so low, averaging around 0.01-0.04 counts per cell in the 6000plex panel across all the 20 NegProbes, a single cell’s negprobe signal is too unstable to give a precise estimate of its background rate. (Most cells have 0 NegProbe counts, while their true background rate is surely greater than zero.) When we need to estimate single cells’ background levels, we estimate this from their total counts: we calculate the mean background counts per total counts across the dataset, then apply this ratio to each individual cell’s total counts.</p>
-
-
-</section>
-
- ]]></description>
-  <category>quality control</category>
-  <category>overview</category>
-  <guid>https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/</guid>
-  <pubDate>Wed, 21 Aug 2024 00:00:00 GMT</pubDate>
-  <media:content url="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/background/figures/background_tile.png" medium="image" type="image/png" height="146" width="144"/>
 </item>
 </channel>
 </rss>
