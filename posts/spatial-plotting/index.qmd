@@ -18,7 +18,7 @@ toc-expand: 1
 toc-location: left
 number-sections: true
 number-depth: 4
-date: "2025-06-30"
+date: "2025-08-20"
 date-modified: last-modified
 categories:
   - visualization
@@ -105,6 +105,7 @@ import matplotlib.colors as mcolors
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from sklearn.neighbors import NearestNeighbors
 import string
+import math
 
 
 # Define paths
@@ -121,13 +122,188 @@ fov_positions = pd.read_csv(raw_data_dir / f"{slide_name}_fov_positions_file.csv
 
 :::
 
+
+### Scale Bar Function
+
+Because the majority of these plots are spatial plots, we'll often want to include a scale bar. Rather than showing how to make that scale bar for every plot, we write two quick general functions (`R` and `python` versions) here at the beginning to make a nice scale bar and reuse these functions throughout this post.
+
+Additionally, all the code here is designed to work from positions given in pixels, as they are in default flat files. If you have positions in mm you'll want to adjust accordingly, primarily in the scale bar function.
+
+::: {.panel-tabset}
+
+### R
+
+```{r echo = TRUE, eval = FALSE}
+## Set up scale bar function
+
+make_scale_bar_r <- function(x_vals, y_vals, microns_per_pixel = 0.12028) {
+  
+  # Adds a scale bar to a ggplot.
+
+    #Parameters:
+      #x_vals: vector of x coordinates in pixels
+      #y_vals: vector of y coordinates in pixels
+      #microns_per_pixel: conversion factor from pixels to microns. Default is conversion factor for commercial CosMx instrument
+   
+  # Example usage:
+    # scale_bar = make_scale-bar_r(x_vals = cell_meta$CenterX_global_px, y_vals = cell_meta$CenterY_global_px)
+    # ggplot() + scale_bar$bg + scale_bar$rect + scale_bar$label
+  
+  
+  # Calculate x-axis range
+  x_range <- range(x_vals, na.rm = TRUE)
+  x_length <- diff(x_range)
+  x_length_um <- x_length * microns_per_pixel
+  
+  # Target scale length ~1/4 of the x-axis
+  target <- x_length_um / 4
+  
+  # Compute order of magnitude
+  order <- 10^floor(log10(target))
+  mantissa <- target / order
+  
+  # Round mantissa to nearest 1, 2, or 5
+  nice_mantissa <- if (mantissa < 1.5) {
+    1
+  } else if (mantissa < 3.5) {
+    2
+  } else if (mantissa < 7.5) {
+    5
+  } else {
+    10
+  }
+  
+  # Final scale length in pixels
+  scale_length_um <- nice_mantissa * order
+  scale_length_px <- scale_length_um / microns_per_pixel
+  
+  # Format label
+  scale_label <- if (scale_length_um >= 1000) {
+    paste0(scale_length_um / 1000, " mm")
+  } else {
+    paste0(scale_length_um, " µm")
+  }
+  
+  # Set coordinates for the scale bar 
+  x_start <- x_range[2] - scale_length_px * 1.1
+  x_end <- x_range[2] - scale_length_px * 0.1
+  y_pos <- min(y_vals, na.rm = TRUE) + scale_length_px * 0.1
+
+  # Generate scale bar background, scale bar and annotation to return
+  list(
+    bg = annotation_custom(
+    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
+    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
+    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
+  ),
+    rect = annotation_custom(
+      grob = rectGrob(gp = gpar(fill = "black")),
+      xmin = x_start, xmax = x_end,
+      ymin = y_pos, ymax = y_pos + scale_length_px * 0.05
+    ),
+    label = annotation_custom(
+      grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
+      xmin = (x_start + x_end)/2, xmax = (x_start + x_end)/2,
+      ymin = y_pos + scale_length_px * 0.1, ymax = y_pos + scale_length_px * 0.1
+    )
+  )
+}
+
+```
+
+
+### Python
+
+```{python echo = TRUE, eval = FALSE}
+## Set up scale bar function
+
+def make_scale_bar_py(ax, x_coords, y_coords, microns_per_pixel=0.12028):
+    """
+    Adds a scale bar to a matplotlib plot.
+
+    Parameters:
+    - ax: matplotlib Axes object
+    - x_coords: list or array of x coordinates
+    - y_coords: list or array of y coordinates
+    - microns_per_pixel: conversion factor from pixels to microns. Default is conversion factor for commercial CosMx instrument
+    
+    Example usage:
+    - fig, ax = plt.subplots()
+    - ax.scatter(x, y)
+    - make_scale_bar_py(ax, microns_per_pixel, x, y)
+
+    """
+    # Calculate x-axis range
+    x_range = [min(x_coords), max(x_coords)]
+    x_length = x_range[1] - x_range[0]
+    x_length_um = x_length * microns_per_pixel
+
+    # Target scale length ~1/4 of the x-axis
+    target = x_length_um / 4
+
+    # Compute order of magnitude
+    order = 10 ** np.floor(np.log10(target))
+    mantissa = target / order
+
+    # Round mantissa to nearest 1, 2, or 5
+    if mantissa < 1.5:
+        nice_mantissa = 1
+    elif mantissa < 3.5:
+        nice_mantissa = 2
+    elif mantissa < 7.5:
+        nice_mantissa = 5
+    else:
+        nice_mantissa = 10
+
+    # Final scale length in pixels
+    scale_length_um = nice_mantissa * order
+    scale_length_px = scale_length_um / microns_per_pixel
+
+    # Format label
+    if scale_length_um >= 1000:
+        scale_label = f"{scale_length_um / 1000:.1f} mm"
+    else:
+        scale_label = f"{scale_length_um:.0f} µm"
+
+    # Set coordinates for the scale bar
+    x_start = x_range[1] - scale_length_px * 1.1
+    x_end = x_range[1] - scale_length_px * 0.1
+    y_pos = min(y_coords) + scale_length_px * 0.1
+    
+    # Set up background for scale bar
+    scale_bg = mpatches.Rectangle(
+        (x_start - scale_length_px * 0.05, y_pos - scale_length_px * 0.05),
+        width=(x_end - x_start) + scale_length_px * 0.1,
+        height=scale_length_px * 0.4,
+        color='white', alpha=0.8,
+        zorder = 10
+    )
+    
+    # Add background
+    ax.add_patch(scale_bg)
+
+    # Draw scale bar
+    ax.plot([x_start, x_end], [y_pos, y_pos], color='black', linewidth=2, zorder=11)
+    ax.text((x_start + x_end) / 2, y_pos + scale_length_px * 0.1, scale_label,
+            color='black', ha='center', va='bottom', zorder=12)
+
+
+```
+
+
+:::
+
+
 ## Plotting Data in Space
 
 Spatial transcriptomics unlocks the ability to visualize gene expression in its native tissue context. In this section, we explore a variety of spatial plots, from full tissue views to single FOVs or smaller, and from cell outlines to transcript overlays, highlighting different ways to represent spatial data.
 
+
+
+
 ### Cell Positions
 
-Visualize cell centroids from the cell metadata file. This shows a broad overview of the tissue structure. We start with all cells colored grey. We also set up a scale bar using generalized code that will be reused in each spatial plot.
+Visualize cell centroids from the cell metadata file. This shows a broad overview of the tissue structure. We start with all cells colored grey.
 
 ::: {.panel-tabset}
 
@@ -135,64 +311,19 @@ Visualize cell centroids from the cell metadata file. This shows a broad overvie
 
 ```{r echo = TRUE, eval = FALSE}
 ## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
-
-#Calculate x-axis range
-x_range <- range(cell_meta$CenterX_global_px, na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(cell_meta$CenterY_global_px, na.rm = TRUE) + scale_length_px*0.1
+scale_bar <- make_scale_bar_r(x_vals = cell_meta$CenterX_global_px,
+                            y_vals = cell_meta$CenterY_global_px)
 
 ## Plot it
 ggplot(cell_meta,
        aes(x = CenterX_global_px, y = CenterY_global_px)) +
   geom_point(color = "grey", size = 0.1, alpha = 0.05) +
-  coord_fixed() +
+  coord_fixed() + # Fix aspect ratio
   theme_void() +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  )
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
+  
 ggsave(paste0(out_dir, "cell_positions.png"),
        width = 4, height = 6, units = "in")
 ```
@@ -204,37 +335,6 @@ knitr::include_graphics(paste0(out_dir, "cell_positions.png"))
 ### Python
 
 ```{python echo = TRUE, eval = FALSE}
-## Set up scale bar
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = cell_meta['CenterX_global_px'].max() - cell_meta['CenterX_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = cell_meta['CenterX_global_px'].max() - scale_length_px * 1.1
-x_end = cell_meta['CenterX_global_px'].max() - scale_length_px * 0.1
-y_pos = cell_meta['CenterY_global_px'].min() + scale_length_px * 0.1
 
 ## Create the scatter plot
 fig, ax = plt.subplots(figsize=(4, 6))
@@ -245,26 +345,11 @@ ax.scatter(
     s=0.1,
     alpha=0.05
 )
-ax.set_aspect('equal', adjustable='box')
+ax.set_aspect('equal', adjustable='box') # Fix aspect ratio
 ax.axis('off')  # Removes axes and grid
 
-# Add scale bar background
-scale_bg = mpatches.Rectangle((x_start - scale_length_px * 0.05, y_pos - scale_length_px * 0.05),
-                              width=(x_end - x_start) + scale_length_px * 0.1,
-                              height=scale_length_px * 0.4,
-                              color='white', alpha=0.8)
-ax.add_patch(scale_bg)
-
 # Add scale bar
-scale_bar = mpatches.Rectangle((x_start, y_pos),
-                               width=(x_end - x_start),
-                               height=scale_length_px * 0.05,
-                               color='black')
-ax.add_patch(scale_bar)
-
-# Add scale label
-ax.text((x_start + x_end) / 2, y_pos + scale_length_px * 0.1,
-        scale_label, ha='center', va='bottom', color='black')
+make_scale_bar_py(ax, cell_meta["CenterX_global_px"], cell_meta["CenterY_global_px"])
 
 # Save the figure
 plt.savefig(os.path.join(out_dir, "python_cell_positions.png"), bbox_inches='tight', pad_inches=0, dpi=300)
@@ -297,70 +382,18 @@ For precise cell boundaries, refer to the `CellLabels_F#####.TIF` file, which de
 
 ```{r echo = TRUE, eval = FALSE}
 ## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
-
-#Calculate x-axis range
-x_range <- range(cell_polygons %>% filter(fov == 100) %>% select(x_global_px), na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(cell_polygons %>% filter(fov == 100) %>% select(y_global_px), na.rm = TRUE) + scale_length_px*0.1
-
+scale_bar <- make_scale_bar_r(x_vals = cell_polygons %>% filter(fov == 100) %>% pull(x_global_px),
+                            y_vals =  cell_polygons %>% filter(fov == 100) %>% pull(y_global_px))
 ## Plot it
-ggplot(cell_polygons %>% filter(fov == 100),
+ggplot(cell_polygons %>% filter(fov == 100), # Select cells in FOV 100
        aes(x = x_global_px, y = y_global_px, group = cell)) +
   geom_polygon(fill = NA, color = "black") +
   coord_fixed() +
   theme_void() +
-  # Add a transparent rectangle to help the scale bar appear on a busy background
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-  ) +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  )
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
+  
 ggsave(paste0(out_dir, "cell_outlines_singleFOV.png"),
        width = 4, height = 4, units = "in")
 ```
@@ -375,38 +408,6 @@ knitr::include_graphics(paste0(out_dir, "cell_outlines_singleFOV.png"))
 # Filter data for FOV 100
 filtered_data = cell_polygons[cell_polygons["fov"] == 100]
 
-## Set up scale bar
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = filtered_data['x_global_px'].max() - filtered_data['x_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = filtered_data['x_global_px'].max() - scale_length_px * 1.1
-x_end = filtered_data['x_global_px'].max() - scale_length_px * 0.1
-y_pos = filtered_data['y_global_px'].min() + scale_length_px * 0.1
-
 ## Create the polygon plot
 fig, ax = plt.subplots(figsize=(4, 4))
 
@@ -416,25 +417,8 @@ for key, group in filtered_data.groupby("cell"):
 ax.set_aspect('equal', adjustable='box')
 ax.axis('off')  # Removes axes and grid
 
-# Add scale bar background
-scale_bg = mpatches.Rectangle((x_start - scale_length_px * 0.05, y_pos - scale_length_px * 0.05),
-                              width=(x_end - x_start) + scale_length_px * 0.1,
-                              height=scale_length_px * 0.4,
-                              color='white', alpha=0.8, zorder=2)
-ax.add_patch(scale_bg)
-
 # Add scale bar
-scale_bar = mpatches.Rectangle((x_start, y_pos),
-                               width=(x_end - x_start),
-                               height=scale_length_px * 0.05,
-                               color='black',
-                               zorder=3)
-ax.add_patch(scale_bar)
-
-# Add scale label
-ax.text((x_start + x_end) / 2, y_pos + scale_length_px * 0.1,
-        scale_label, ha='center', va='bottom', color='black',
-        zorder=4)
+make_scale_bar_py(ax, filtered_data["x_global_px"], filtered_data["y_global_px"])
 
 # Save the figure
 plt.savefig(os.path.join(out_dir, "python_cell_outlines_singleFOV.png"), bbox_inches='tight', pad_inches=0, dpi=300)
@@ -449,7 +433,7 @@ knitr::include_graphics(paste0(out_dir, "python_cell_outlines_singleFOV.png"))
 
 ### Color Cells by Metadata
 
-Overlay polygons with metadata such as cell type. Here we're using Leiden clustering results. 
+Overlay polygons with metadata such as cell type. Here, we use results from Leiden clustering. Throughout the post, we showcase a variety of color palettes. When only a few colors are needed, we aim for consistency between `R` and `Python` plots. In cases requiring many colors, we highlight diverse palette options, which may differ across the two languages.
 
 ::: {.callout-note}
 There are a small number of cells with no associated cell type as they got flagged in QC. These show up as `NA` in the plots.
@@ -467,72 +451,23 @@ row.names(meta) <- meta$cell
 plot.df$cell_type <- as.data.frame(meta)[plot.df$cell, "leiden_cluster"]
 
 ## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
-
-#Calculate x-axis range
-x_range <- range(plot.df %>% select(x_global_px), na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(plot.df %>% select(y_global_px), na.rm = TRUE) + scale_length_px*0.1
+scale_bar <- make_scale_bar_r(x_vals = plot.df %>% pull(x_global_px),
+                            y_vals =  plot.df %>% pull(y_global_px))
 
 ## Plot it
 ggplot(plot.df,
-       aes(x = x_global_px, y = y_global_px, group = cell,
-           fill = as.factor(cell_type))) +
-  geom_polygon(color = "black") +
+       aes(x = x_global_px, y = y_global_px, 
+           group = cell, # Group cells for polygons
+           fill = as.factor(cell_type))) + # Polygon fill by cell type
+  geom_polygon(color = "black", linewidth = 0.3) +
+  scale_fill_ucscgb() + #Palette inspired by UCSB Genome Browser
   coord_fixed() +
   theme_void() +
   labs(fill = "Cell type") +
-  # Add a transparent rectangle to help the scale bar appear on a busy background
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-  ) +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  )
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
+  
 ggsave(paste0(out_dir, "celltype_polygons_singleFOV.png"),
        width = 6, height = 4, units = "in")
 ```
@@ -563,70 +498,22 @@ cluster_to_color = {cluster: cmap(i) for i, cluster in enumerate(valid_clusters)
 #Add color for NA values
 cluster_to_color[np.nan] = "lightgrey"
 
-## Set up scale bar
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = plot_df['x_global_px'].max() - plot_df['x_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = plot_df['x_global_px'].max() - scale_length_px * 1.1
-x_end = plot_df['x_global_px'].max() - scale_length_px * 0.1
-y_pos = plot_df['y_global_px'].min() + scale_length_px * 0.1
-
 ## Create the polygon plot
 fig, ax = plt.subplots(figsize=(6, 4))
 
-for key, group in plot_df.groupby("cell"):
+for key, group in plot_df.groupby("cell"): # Iterate through each cell
     cluster = group["leiden_cluster"].iloc[0]
     color = cluster_to_color[np.nan] if pd.isna(cluster) else cluster_to_color[cluster]
     coords = group[["x_global_px", "y_global_px"]].values
     coords = np.vstack([coords, coords[0]])  # close the polygon
-    ax.fill(coords[:, 0], coords[:, 1], color=color, zorder=1)
+    ax.fill(coords[:, 0], coords[:, 1], facecolor=color, edgecolor="black", linewidth=0.5, zorder=1)
+
 
 ax.set_aspect('equal', adjustable='box')
 ax.axis('off')  # Removes axes and grid
 
-# Add scale bar background
-scale_bg = mpatches.Rectangle((x_start - scale_length_px * 0.05, y_pos - scale_length_px * 0.05),
-                              width=(x_end - x_start) + scale_length_px * 0.1,
-                              height=scale_length_px * 0.4,
-                              color='white', alpha=0.8, zorder=2)
-ax.add_patch(scale_bg)
-
 # Add scale bar
-scale_bar = mpatches.Rectangle((x_start, y_pos),
-                               width=(x_end - x_start),
-                               height=scale_length_px * 0.05,
-                               color='black',
-                               zorder=3)
-ax.add_patch(scale_bar)
-
-# Add scale label
-ax.text((x_start + x_end) / 2, y_pos + scale_length_px * 0.1,
-        scale_label, ha='center', va='bottom', color='black',
-        zorder=4)
+make_scale_bar_py(ax, plot_df["x_global_px"], plot_df["y_global_px"])
 
 # Create legend handles
 legend_handles = [
@@ -656,234 +543,6 @@ knitr::include_graphics(paste0(out_dir, "python_celltype_polygons_singleFOV.png"
 
 :::
 
-### Polygon Fill and Border in Different Colors
-
-As an example, we set fill to total counts per cell and border to cell type.
-
-:::{.panel-tabset}
-
-### R
-
-```{r echo = TRUE, eval = FALSE}
-## Add cell type to polygons
-plot.df <- cell_polygons %>% filter(fov == 100) %>% as.data.frame()
-meta <- as.data.frame(cell_meta)
-row.names(meta) <- meta$cell
-plot.df$cell_type <- as.data.frame(meta)[plot.df$cell, "leiden_cluster"]
-plot.df$nCount_RNA <- as.data.frame(meta)[plot.df$cell, "nCount_RNA"]
-
-## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
-
-#Calculate x-axis range
-x_range <- range(plot.df %>% select(x_global_px), na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(plot.df %>% select(y_global_px), na.rm = TRUE) + scale_length_px*0.1
-
-## Plot it
-ggplot(plot.df,
-       aes(x = x_global_px, y = y_global_px, group = cell,
-           color = as.factor(cell_type), fill = log10(nCount_RNA))) +
-  geom_polygon() +
-  coord_fixed() +
-  theme_void() +
-  labs(color = "Cell type", fill = expression(log[10](total~counts))) +
-  # Add a transparent rectangle to help the scale bar appear on a busy background
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-  ) +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  )
-ggsave(paste0(out_dir, "celltype_polygons_singleFOV_fillColor.png"),
-       width = 6, height = 5, units = "in")
-```
-
-```{r echo = FALSE, eval = TRUE}
-knitr::include_graphics(paste0(out_dir, "celltype_polygons_singleFOV_fillColor.png"))
-```
-
-### Python
-
-```{python echo = TRUE, eval = FALSE}
-# Filter for FOV 100
-plot_df = cell_polygons[cell_polygons["fov"] == 100]
-
-# Merge only the 'leiden_cluster' and 'nCount_RNA' columns
-meta_subset = cell_meta[['cell', 'leiden_cluster', 'nCount_RNA']]
-plot_df = plot_df.merge(meta_subset, on='cell', how='left')
-
-# Create a colormap
-clusters = plot_df["leiden_cluster"].unique()
-
-# Filter out NA values first
-valid_clusters = [c for c in clusters if pd.notna(c)]
-
-cmap = cm.get_cmap("tab20", len(valid_clusters))
-cluster_to_color = {cluster: cmap(i) for i, cluster in enumerate(valid_clusters)}
-
-#Add color for NA values
-cluster_to_color[np.nan] = "lightgrey"
-
-cmap_counts = cm.get_cmap("viridis")
-norm_counts = mcolors.LogNorm(vmin=plot_df["nCount_RNA"].min(), vmax=plot_df["nCount_RNA"].max())
-
-## Set up scale bar
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = plot_df['x_global_px'].max() - plot_df['x_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = plot_df['x_global_px'].max() - scale_length_px * 1.1
-x_end = plot_df['x_global_px'].max() - scale_length_px * 0.1
-y_pos = plot_df['y_global_px'].min() + scale_length_px * 0.1
-
-## Plot
-fig, ax = plt.subplots(figsize=(6, 5))
-
-for key, group in plot_df.groupby("cell"):
-    cluster = group["leiden_cluster"].iloc[0]
-    count = group["nCount_RNA"].iloc[0]
-    edge_color = cluster_to_color[np.nan] if pd.isna(cluster) else cluster_to_color[cluster]
-    fill_color = cmap_counts(norm_counts(count))
-    coords = group[["x_global_px", "y_global_px"]].values
-    coords = np.vstack([coords, coords[0]])  # close the polygon
-    ax.fill(coords[:, 0], coords[:, 1], facecolor=fill_color, edgecolor=edge_color)
-
-ax.set_aspect('equal', adjustable='box')
-ax.axis('off')
-
-# Add scale bar background
-scale_bg = mpatches.Rectangle((x_start - scale_length_px * 0.05, y_pos - scale_length_px * 0.05),
-                              width=(x_end - x_start) + scale_length_px * 0.1,
-                              height=scale_length_px * 0.4,
-                              color='white', alpha=0.8, zorder=2)
-ax.add_patch(scale_bg)
-
-# Add scale bar
-scale_bar = mpatches.Rectangle((x_start, y_pos),
-                               width=(x_end - x_start),
-                               height=scale_length_px * 0.05,
-                               color='black',
-                               zorder=3)
-ax.add_patch(scale_bar)
-
-# Add scale label
-ax.text((x_start + x_end) / 2, y_pos + scale_length_px * 0.1,
-        scale_label, ha='center', va='bottom', color='black',
-        zorder=4)
-
-# Add legends
-# Legend for cell types (outline)
-legend_handles = [
-    mpatches.Patch(
-      color=color, 
-      label=f"Cluster {int(cluster)}" if pd.notna(cluster) else "Cluster NA")
-    for cluster, color in cluster_to_color.items()
-]
-ax.legend(
-  handles=legend_handles, 
-  title="Cell type", 
-  bbox_to_anchor=(1.01, 0.95), 
-  loc='upper left',
-  fontsize=6,
-  title_fontsize=8)
-
-# Colorbar for fill (log10 counts), placed next to the cell type legend as inset axis
-sm = cm.ScalarMappable(cmap=cmap_counts, norm=norm_counts)
-sm.set_array([])
-
-cbar_ax = inset_axes(
-  ax,
-  width="5%", # width of colorbar
-  height="80%", # height of colorbar
-  loc='upper left',
-  bbox_to_anchor=(1.25, -0.05, 1, 1),
-  bbox_transform=ax.transAxes,
-  borderpad=0)
-
-# Add the colorbar to the inset axes
-cbar = fig.colorbar(sm, cax=cbar_ax)
-cbar.set_label(r'$\log_{10}(\mathrm{total\ counts})$')
-
-# Save
-plt.savefig(os.path.join(out_dir, "python_celltype_polygons_singleFOV_fillColor.png"), bbox_inches='tight', pad_inches=0, dpi=300)
-plt.close()
-```
-
-```{r echo = FALSE, eval = TRUE}
-knitr::include_graphics(paste0(out_dir, "python_celltype_polygons_singleFOV_fillColor.png"))
-```
-
-:::
-
-
 
 ### Highlight One Cell Type
 Here we change the color on a single cell type, designated as tumor subtype A, to highlight these cells.
@@ -903,73 +562,23 @@ plot.df$cell_type <- as.data.frame(meta)[plot.df$cell, "leiden_cluster"]
 plot.df$highlight <- ifelse(plot.df$cell_type == "5", "Tumor A", "Other")
 
 ## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
+scale_bar <- make_scale_bar_r(x_vals = plot.df %>% pull(x_global_px),
+                            y_vals =  plot.df %>% pull(y_global_px))
 
-#Calculate x-axis range
-x_range <- range(plot.df %>% select(x_global_px), na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(plot.df %>% select(y_global_px), na.rm = TRUE) + scale_length_px*0.1
 
 ## Plot it
 ggplot(plot.df,
        aes(x = x_global_px, y = y_global_px, group = cell,
            fill = highlight)) +
-  geom_polygon(color = "darkgrey") +
-  scale_fill_jco() +
+  geom_polygon(color = "darkgrey", linewidth = 0.3) +
+  scale_fill_jco() + # Use a color palette from JCO (Journal of Clinical Oncology)
   coord_fixed() +
   theme_void() +
   labs(fill = "Cell type") +
-  # Add a transparent rectangle to help the scale bar appear on a busy background
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-  ) +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  )
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
+ 
 ggsave(paste0(out_dir, "celltypeHighlight_polygons_singleFOV.png"),
        width = 6, height = 4, units = "in")
 
@@ -992,74 +601,25 @@ plot_df = plot_df.merge(meta_subset, on='cell', how='left')
 # Add highlight column
 plot_df['highlight'] = np.where(plot_df['leiden_cluster'] == 5, 'Tumor A', 'Other')
 
-## Set up scale bar
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = plot_df['x_global_px'].max() - plot_df['x_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = plot_df['x_global_px'].max() - scale_length_px * 1.1
-x_end = plot_df['x_global_px'].max() - scale_length_px * 0.1
-y_pos = plot_df['y_global_px'].min() + scale_length_px * 0.1
-
 ## Plot
 fig, ax = plt.subplots(figsize=(6, 6))
 for key, group in plot_df.groupby("cell"):
     highlight = group["highlight"].iloc[0]
-    fill_color = 'red' if highlight == 'Tumor A' else 'lightgrey'
+    fill_color = '#EFC000' if highlight == 'Tumor A' else '#0073C2' # Fill color logic, matching blue / yellow shown in R plot
     coords = group[["x_global_px", "y_global_px"]].values
     coords = np.vstack([coords, coords[0]])  # close the polygon
-    ax.fill(coords[:, 0], coords[:, 1], facecolor=fill_color, edgecolor='darkgrey', zorder = 1)
+    ax.fill(coords[:, 0], coords[:, 1], facecolor=fill_color, edgecolor='darkgrey', linewidth=0.5, zorder = 1)
 
 ax.set_aspect('equal')
 ax.axis('off')
 
-# Add scale bar background
-scale_bg = mpatches.Rectangle((x_start - scale_length_px * 0.05, y_pos - scale_length_px * 0.05),
-                              width=(x_end - x_start) + scale_length_px * 0.1,
-                              height=scale_length_px * 0.4,
-                              color='white', alpha=0.8, zorder=2)
-ax.add_patch(scale_bg)
-
 # Add scale bar
-scale_bar = mpatches.Rectangle((x_start, y_pos),
-                               width=(x_end - x_start),
-                               height=scale_length_px * 0.05,
-                               color='black',
-                               zorder=3)
-ax.add_patch(scale_bar)
-
-# Add scale label
-ax.text((x_start + x_end) / 2, y_pos + scale_length_px * 0.1,
-        scale_label, ha='center', va='bottom', color='black',
-        zorder=4)
+make_scale_bar_py(ax, plot_df["x_global_px"], plot_df["y_global_px"])
 
 # Legend
 legend_handles = [
-    mpatches.Patch(color='red', label='Tumor A'),
-    mpatches.Patch(color='lightgrey', label='Other')
+    mpatches.Patch(color='#0073C2', label='Tumor A'),
+    mpatches.Patch(color='#EFC000', label='Other')
 ]
 ax.legend(handles=legend_handles, title="Cell type", bbox_to_anchor=(1.05, 1), loc='upper left')
 
@@ -1075,7 +635,7 @@ knitr::include_graphics(paste0(out_dir, "python_celltypeHighlight_polygons_singl
 
 ### Mute Background Cells
 
-As an alternative, we can highlight one cell type by muting the color for all others.
+As an alternative, we can highlight one cell type by muting the color for all others. However, keep in mind that when many colors are present, muting can reduce contrast and make distinctions harder to perceive. To improve interpretability, consider grouping cells into 5–10 major types or manually assigning similar hues to related cell types. As another option, color the cells of interest black, which may allow you to mute other colors less.
 
 :::{.panel-tabset}
 
@@ -1094,73 +654,23 @@ names(alpha_vals) <- c(unique(plot.df$cell_type))
 alpha_vals["5"] <- 1
 
 ## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
-
-#Calculate x-axis range
-x_range <- range(plot.df %>% select(x_global_px), na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(plot.df %>% select(y_global_px), na.rm = TRUE) + scale_length_px*0.1
+scale_bar <- make_scale_bar_r(x_vals = plot.df %>% pull(x_global_px),
+                            y_vals =  plot.df %>% pull(y_global_px))
 
 ## Plot it
 ggplot(plot.df,
        aes(x = x_global_px, y = y_global_px, group = cell,
            fill = as.factor(cell_type), alpha = as.factor(cell_type))) +
-  geom_polygon(color = "darkgrey") +
+  geom_polygon(color = "darkgrey", linewidth = 0.3) +
+  scale_fill_d3(palette = "category20", na.value = "lightgrey") + # Inspired by colors in the D3 visualization library
   coord_fixed() +
   theme_void() +
   labs(fill = "Cell type", alpha = "Cell type") +
-  scale_alpha_manual(values = alpha_vals, na.value = 0.2) +
-  # Add a transparent rectangle to help the scale bar appear on a busy background
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-  ) +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  )
+  scale_alpha_manual(values = alpha_vals, na.value = 0.2) + # Adjust opacity by cell type
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
+  
 ggsave(paste0(out_dir, "celltypeAlphaHighlight_polygons_singleFOV.png"),
        width = 6, height = 4, units = "in")
 
@@ -1176,7 +686,7 @@ knitr::include_graphics(paste0(out_dir, "celltypeAlphaHighlight_polygons_singleF
 # Filter for FOV 100
 plot_df = cell_polygons[cell_polygons["fov"] == 100]
 
-# Merge only the 'leiden_cluster' and 'nCount_RNA' columns
+# Merge only the 'leiden_cluster' column
 meta_subset = cell_meta[['cell', 'leiden_cluster']]
 plot_df = plot_df.merge(meta_subset, on='cell', how='left')
 
@@ -1186,7 +696,7 @@ clusters = plot_df["leiden_cluster"].unique()
 # Filter out NA values first
 valid_clusters = [c for c in clusters if pd.notna(c)]
 
-cmap = cm.get_cmap("tab20", len(valid_clusters))
+cmap = cm.get_cmap("Set3", len(valid_clusters)) #Use matplotlib's Set3 palette
 cluster_to_color = {cluster: cmap(i) for i, cluster in enumerate(valid_clusters)}
 
 #Add color for NA values
@@ -1195,72 +705,21 @@ cluster_to_color[np.nan] = "lightgrey"
 # Add alpha column
 plot_df['alpha'] = np.where(plot_df['leiden_cluster'] == 5, 1, 0.3)
 
-## Set up scale bar
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = plot_df['x_global_px'].max() - plot_df['x_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = plot_df['x_global_px'].max() - scale_length_px * 1.1
-x_end = plot_df['x_global_px'].max() - scale_length_px * 0.1
-y_pos = plot_df['y_global_px'].min() + scale_length_px * 0.1
-
 ## Plot
 fig, ax = plt.subplots(figsize=(6, 6))
 for key, group in plot_df.groupby("cell"):
     cell_type = group["leiden_cluster"].iloc[0]
     alpha = group["alpha"].iloc[0]
-    #cluster_to_color[np.nan] if pd.isna(cluster) else cluster_to_color[cluster]
     fill_color = cluster_to_color[np.nan] if pd.isna(cell_type) else cluster_to_color[cell_type]
-    #fill_color = "lightgrey" if pd.isna(cell_type) else plt.cm.tab20(int(cell_type) % 20)  # Use a colormap for fill color
     coords = group[["x_global_px", "y_global_px"]].values
     coords = np.vstack([coords, coords[0]])  # close the polygon
-    ax.fill(coords[:, 0], coords[:, 1], facecolor=fill_color, edgecolor='darkgrey', alpha=alpha, zorder=1)
+    ax.fill(coords[:, 0], coords[:, 1], facecolor=fill_color, edgecolor='darkgrey', linewidth=0.5, alpha=alpha, zorder=1)
 
 ax.set_aspect('equal')
 ax.axis('off')
 
-# Add scale bar background
-scale_bg = mpatches.Rectangle((x_start - scale_length_px * 0.05, y_pos - scale_length_px * 0.05),
-                              width=(x_end - x_start) + scale_length_px * 0.1,
-                              height=scale_length_px * 0.4,
-                              color='white', alpha=0.8, zorder=2)
-ax.add_patch(scale_bg)
-
 # Add scale bar
-scale_bar = mpatches.Rectangle((x_start, y_pos),
-                               width=(x_end - x_start),
-                               height=scale_length_px * 0.05,
-                               color='black',
-                               zorder=3)
-ax.add_patch(scale_bar)
-
-# Add scale label
-ax.text((x_start + x_end) / 2, y_pos + scale_length_px * 0.1,
-        scale_label, ha='center', va='bottom', color='black',
-        zorder=4)
+make_scale_bar_py(ax, plot_df["x_global_px"], plot_df["y_global_px"])
 
 # Legend for fill colors
 unique_clusters = plot_df["leiden_cluster"].unique()
@@ -1288,6 +747,207 @@ knitr::include_graphics(paste0(out_dir, "python_celltypeAlphaHighlight_polygons_
 ```
 
 :::
+
+### Dynamically Color One Cell Type
+
+Sometimes we want to highlight metadata about a single cell type, such as counts per cell specifically for tumor cells. To do this, we can set all other cells to a background color such as light grey and then dynamically color the cells of interest.
+
+:::{.panel-tabset}
+
+### R
+
+```{r echo = TRUE, eval = FALSE}
+## Add cell type and counts to polygons
+plot.df <- cell_polygons %>% filter(fov == 100) %>% as.data.frame()
+meta <- as.data.frame(cell_meta)
+row.names(meta) <- meta$cell
+plot.df$cell_type <- as.data.frame(meta)[plot.df$cell, "leiden_cluster"]
+plot.df$nCount_RNA <- as.data.frame(meta)[plot.df$cell, "nCount_RNA"]
+
+## Set up scale bar
+scale_bar <- make_scale_bar_r(x_vals = plot.df %>% pull(x_global_px),
+                            y_vals =  plot.df %>% pull(y_global_px))
+
+## Plot it
+ggplot(plot.df,
+       aes(x = x_global_px, y = y_global_px, group = cell,
+           fill = ifelse(cell_type == "5", nCount_RNA, NA))) + #Logic to color only cells of one type by total counts
+  geom_polygon(color = "darkgrey", linewidth = 0.3) +
+  scale_fill_viridis(option = "magma", trans = "log10", na.value = "lightgrey") + # Use viridis color palette
+  coord_fixed() +
+  theme_void() +
+  labs(fill = "Transcripts per cell") +
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
+  
+ggsave(paste0(out_dir, "celltypeHighlightTxperCell_polygons_singleFOV.png"),
+       width = 6, height = 4, units = "in")
+
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics(paste0(out_dir, "celltypeHighlightTxperCell_polygons_singleFOV.png"))
+```
+
+### Python
+
+```{python echo = TRUE, eval = FALSE}
+# Filter for FOV 100
+plot_df = cell_polygons[cell_polygons["fov"] == 100]
+
+# Merge only the 'leiden_cluster' and 'nCount_RNA' columns
+meta_subset = cell_meta[['cell', 'leiden_cluster', 'nCount_RNA']]
+plot_df = plot_df.merge(meta_subset, on='cell', how='left')
+
+# Prepare log10-transformed values for cluster 5
+highlight_df = plot_df[plot_df['leiden_cluster'] == 5].copy()
+highlight_df['log_nCount_RNA'] = np.log10(highlight_df['nCount_RNA'].replace(0, np.nan)) # Log10 transform
+vmin, vmax = highlight_df['log_nCount_RNA'].min(), highlight_df['log_nCount_RNA'].max()
+norm = mcolors.Normalize(vmin=vmin, vmax=vmax) # Normalize to 0 - 1 range as expected by matplotlib colormap
+cmap = cm.get_cmap("magma") # Use the magma palette
+
+# Assign colors dynamically
+cell_to_color = {}
+for _, row in plot_df.iterrows():
+    if row['leiden_cluster'] == 5 and pd.notna(row['nCount_RNA']) and row['nCount_RNA'] > 0:
+        log_val = np.log10(row['nCount_RNA'])
+        scaled_val = norm(log_val)
+        cell_to_color[row['cell']] = cmap(scaled_val)
+    else:
+        cell_to_color[row['cell']] = "lightgrey"
+
+
+
+## Plot
+fig, ax = plt.subplots(figsize=(6, 6))
+for key, group in plot_df.groupby("cell"):
+    fill_color = cell_to_color[key]
+    coords = group[["x_global_px", "y_global_px"]].values
+    coords = np.vstack([coords, coords[0]])  # close the polygon
+    ax.fill(coords[:, 0], coords[:, 1], facecolor=fill_color, edgecolor='darkgrey', linewidth=0.5, zorder=1)
+
+ax.set_aspect('equal')
+ax.axis('off')
+
+# Add scale bar
+make_scale_bar_py(ax, plot_df["x_global_px"], plot_df["y_global_px"])
+
+
+# Add colorbar with original transcript counts
+sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array([])
+cbar = fig.colorbar(sm, ax=ax)
+tick_vals = np.linspace(vmin, vmax, num=5)
+cbar.set_ticks(tick_vals)
+cbar.set_ticklabels([f"{int(10**val):,}" for val in tick_vals])
+cbar.set_label("Transcripts per cell", fontsize=8)
+
+
+plt.savefig(os.path.join(out_dir, "python_celltypeHighlightTxperCell_polygons_singleFOV.png"), bbox_inches='tight', pad_inches=0, dpi=300)
+plt.close()
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics(paste0(out_dir, "python_celltypeHighlightTxperCell_polygons_singleFOV.png"))
+```
+
+:::
+
+### Gallery of single cell type highlighting
+Similar to above, here we highlight one cell type at a time. However, we now do this for each cell type separately and show a tiled gallery of all cell types. For this example, we show the whole tissue to give the broader context of where each cell type appears.
+
+::: {.callout-note}
+In making this gallery, plotting all cells in every facet causes many cells to be plotted if you're looking at a large slide. Here, we instead show 5% of cells in our background to give a tissue overview and all 100% of cells of the type of interest in the foreground.
+:::
+
+:::{.panel-tabset}
+
+### R
+
+```{r echo = TRUE, eval = FALSE}
+
+## Set up scale bar
+scale_bar <- make_scale_bar_r(x_vals = cell_meta$CenterX_global_px,
+                            y_vals = cell_meta$CenterY_global_px)
+
+# Make a copy of metadata that lacks the cell type
+df2 <- dplyr::select(cell_meta, -leiden_cluster)
+
+# Sample 5% of cells for background
+set.seed(2025)
+df2 <- df2[sample(1:nrow(df2), nrow(df2)/20),]
+
+## Plot it
+ggplot(cell_meta,
+       aes(x = CenterX_global_px, y = CenterY_global_px)) +
+  geom_point(data = df2, color = "grey80", size = 0.01, alpha = 0.05) + # Background cells
+  geom_point(color = "red", size = 0.01, alpha = 0.1)+ # Foreground highlighted cells
+  coord_fixed() +
+  theme_void() +
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label +
+  facet_wrap(~leiden_cluster)
+  
+ggsave(paste0(out_dir, "gallery_celltype_positions.png"),
+       width = 8, height = 12, units = "in")
+
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics(paste0(out_dir, "gallery_celltype_positions.png"))
+```
+
+### Python
+
+```{python echo = TRUE, eval = FALSE}
+
+# Create a 5% random sample for background
+df2 = cell_meta.drop(columns='leiden_cluster').sample(frac=0.05, random_state=2025)
+
+# Create faceted plots by leiden_cluster
+unique_clusters = cell_meta['leiden_cluster'].unique()
+unique_clusters.sort()
+n_clusters = len(unique_clusters)
+n_cols = math.ceil(math.sqrt(n_clusters))
+n_rows = int(np.ceil(n_clusters / n_cols))
+
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(8, 12), squeeze=False)
+
+for ax, cluster in zip(axes.flat, unique_clusters):
+    # Background layer
+    ax.scatter(df2['CenterX_global_px'], df2['CenterY_global_px'],
+               color='grey', s=0.01, alpha=0.05)
+
+    # Foreground red points for this cluster
+    cluster_data = cell_meta[cell_meta['leiden_cluster'] == cluster]
+    ax.scatter(cluster_data['CenterX_global_px'], cluster_data['CenterY_global_px'],
+               color='red', s=0.01, alpha=0.1)
+
+    # Add scale bar
+    make_scale_bar_py(ax, cell_meta['CenterX_global_px'], cell_meta['CenterY_global_px'])
+    
+    ax.set_title(f"Cluster {cluster}")
+    ax.set_aspect('equal')
+    ax.axis('off')
+
+# Hide any unused subplots
+for ax in axes.flat[n_clusters:]:
+    ax.axis('off')
+
+plt.tight_layout()
+plt.savefig(os.path.join(out_dir, "python_gallery_celltype_positions.png"), dpi=300)
+plt.close()
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics(paste0(out_dir, "python_gallery_celltype_positions.png"))
+```
+
+:::
+
+
 
 ### Plot One Cell and Its 20 Nearest Neighbors
 
@@ -1323,47 +983,8 @@ row.names(meta) <- meta$cell
 plot.df$cell_type <- as.data.frame(meta)[plot.df$cell, "leiden_cluster"] 
 
 ## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
-
-#Calculate x-axis range
-x_range <- range(plot.df %>% select(x_global_px), na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(plot.df %>% select(y_global_px), na.rm = TRUE) + scale_length_px*0.1
+scale_bar <- make_scale_bar_r(x_vals = plot.df %>% pull(x_global_px),
+                            y_vals =  plot.df %>% pull(y_global_px))
 
 ## Plot it
 ggplot(plot.df,
@@ -1374,27 +995,16 @@ ggplot(plot.df,
   geom_polygon() +
     scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.5)) +
     scale_color_manual(values = c("TRUE" = "black", "FALSE" = "darkgrey")) +
+  scale_fill_npg() + # Use palette inspired by nature publishing group
   coord_fixed() +
   theme_void() +
   labs(fill = "Cell type") +
   guides(alpha = "none") +
   guides(color = "none")  +
-  # Add a transparent rectangle to help the scale bar appear on a busy background
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-  ) +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  )
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
+
 ggsave(paste0(out_dir, "celltype_polygons_cell20neighbors.png"),
        width = 4, height = 3, units = "in")
 ```
@@ -1428,42 +1038,10 @@ plot_df['alpha'] = np.where(plot_df['cell'] == coi, 1, 0.3)
 
 # Set up color mapping
 unique_clusters = sorted(plot_df["leiden_cluster"].dropna().unique())
-cmap = plt.cm.get_cmap("tab20", len(unique_clusters))
+cmap = plt.cm.get_cmap("Accent", len(unique_clusters)) # Matplotlib's accent color palette
 cluster_to_color = {cluster: cmap(i) for i, cluster in enumerate(unique_clusters)}
 if plot_df["leiden_cluster"].isna().any():
   cluster_to_color[np.nan] = "lightgrey"
-
-## Set up scale bar
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = plot_df['x_global_px'].max() - plot_df['x_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = plot_df['x_global_px'].max() - scale_length_px * 1.1
-x_end = plot_df['x_global_px'].max() - scale_length_px * 0.1
-y_pos = plot_df['y_global_px'].min() + scale_length_px * 0.1
 
 ## Plot
 fig, ax = plt.subplots(figsize=(6, 6))
@@ -1479,25 +1057,8 @@ for key, group in plot_df.groupby("cell"):
 ax.set_aspect('equal')
 ax.axis('off')
 
-# Add scale bar background
-scale_bg = mpatches.Rectangle((x_start - scale_length_px * 0.05, y_pos - scale_length_px * 0.05),
-                              width=(x_end - x_start) + scale_length_px * 0.1,
-                              height=scale_length_px * 0.4,
-                              color='white', alpha=0.8, zorder=2)
-ax.add_patch(scale_bg)
-
 # Add scale bar
-scale_bar = mpatches.Rectangle((x_start, y_pos),
-                               width=(x_end - x_start),
-                               height=scale_length_px * 0.05,
-                               color='black',
-                               zorder=3)
-ax.add_patch(scale_bar)
-
-# Add scale label
-ax.text((x_start + x_end) / 2, y_pos + scale_length_px * 0.1,
-        scale_label, ha='center', va='bottom', color='black',
-        zorder=4)
+make_scale_bar_py(ax, plot_df["x_global_px"], plot_df["y_global_px"])
 
 # Legend for fill colors
 legend_handles = [
@@ -1557,47 +1118,10 @@ meta <- as.data.frame(cell_meta)
 row.names(meta) <- meta$cell
 plot.df$cell_type <- as.data.frame(meta)[plot.df$cell, "leiden_cluster"] 
 
-## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
+## Set up scale bar, adding min / max values directly because we'll be showing a subset of the data
+scale_bar <- make_scale_bar_r(x_vals = c(coi_x - square_edge_px/2, coi_x + square_edge_px/2),
+                            y_vals =  c(coi_y - square_edge_px/2, coi_y + square_edge_px/2))
 
-#Calculate x-axis range based on set edge size
-x_length <- square_edge_px
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- coi_x + square_edge_px/2 - scale_length_px*1.1
-x_end <- coi_x + square_edge_px/2 - scale_length_px*0.1
-y_pos <- coi_y - square_edge_px/2 + scale_length_px*0.1
 
 ## Plot it
 ggplot(plot.df,
@@ -1608,29 +1132,18 @@ ggplot(plot.df,
   geom_polygon() +
     scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.5)) +
     scale_color_manual(values = c("TRUE" = "black", "FALSE" = "darkgrey")) +
+  scale_fill_d3(palette = "category20c") + # Inspired by colors in the D3 visualization library
   theme_void() +
   labs(fill = "Cell type") +
   guides(alpha = "none") +
   guides(color = "none")  +
-  # Add a transparent rectangle to help the scale bar appear on a busy background
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-  ) +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  ) +
+  # Set reduced coordinates
   coord_fixed(ratio = 1,
               xlim=c(coi_x - square_edge_px/2, coi_x + square_edge_px/2), 
-                  ylim=c(coi_y - square_edge_px/2, coi_y + square_edge_px/2))
+                  ylim=c(coi_y - square_edge_px/2, coi_y + square_edge_px/2)) +
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
 ggsave(paste0(out_dir, "celltype_polygons_cell100umsquare.png"),
        width = 6, height = 6, units = "in")
 ```
@@ -1641,7 +1154,7 @@ knitr::include_graphics(paste0(out_dir, "celltype_polygons_cell100umsquare.png")
 
 ### Python
 ```{python echo = TRUE, eval = FALSE}
-## Set up scale bar
+
 # Constants
 microns_per_pixel = 0.12028
 coi = "c_1_100_555"
@@ -1667,34 +1180,10 @@ plot_df['cell_type'] = plot_df['cell'].map(meta['leiden_cluster'])
 
 # Set up color mapping
 unique_clusters = sorted(plot_df["cell_type"].dropna().unique())
-cmap = plt.cm.get_cmap("tab20", len(unique_clusters))
+cmap = plt.cm.get_cmap("tab20b", len(unique_clusters)) # Matplotlib's tab20b palette
 cluster_to_color = {cluster: cmap(i) for i, cluster in enumerate(unique_clusters)}
 if plot_df["cell_type"].isna().any():
   cluster_to_color[np.nan] = "lightgrey"
-
-## Compute scale bar
-x_length = square_edge_px
-x_length_um = x_length * microns_per_pixel
-target = x_length_um / 4
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = coi_x + square_edge_px / 2 - scale_length_px * 1.1
-x_end = coi_x + square_edge_px / 2 - scale_length_px * 0.1
-y_pos = coi_y - square_edge_px / 2 + scale_length_px * 0.1
 
 # Plotting
 fig, ax = plt.subplots(figsize=(6,6))
@@ -1708,24 +1197,10 @@ for cell_id, group in plot_df.groupby('cell'):
                       edgecolor='black' if cell_id == coi else 'darkgrey',
                       alpha=1.0 if cell_id == coi else 0.5)
     ax.add_patch(polygon)
+    
 
-# Add scale bar background
-scale_bg = mpatches.Rectangle((x_start - scale_length_px * 0.05, y_pos - scale_length_px * 0.05),
-                     width=(x_end - x_start) + scale_length_px * 0.1,
-                     height=scale_length_px * 0.4,
-                     color='white', alpha=0.8)
-ax.add_patch(scale_bg)
-
-# Add scale bar
-scale_bar = mpatches.Rectangle((x_start, y_pos),
-                      width=(x_end - x_start),
-                      height=scale_length_px * 0.05,
-                      color='black')
-ax.add_patch(scale_bar)
-
-# Add scale label
-ax.text((x_start + x_end) / 2, y_pos + scale_length_px * 0.1,
-        scale_label, ha='center', va='bottom', color='black')
+# Add scale bar, setting up arrays that are the axis limits since we'll be reducing the plotting window
+make_scale_bar_py(ax, np.array([coi_x - square_edge_px / 2, coi_x + square_edge_px / 2]), np.array([coi_y - square_edge_px / 2, coi_y + square_edge_px / 2]))  
 
 # Set plot limits and aspect
 ax.set_xlim(coi_x - square_edge_px / 2, coi_x + square_edge_px / 2)
@@ -1807,72 +1282,21 @@ cmd <- sprintf("zcat %s | awk -F',' 'NR==1 || ($1==\"100\" && $9==\"KRT8\")'", f
 filtered_tx <- fread(cmd = cmd)
 
 ## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
-
-#Calculate x-axis range
-x_range <- range(cell_polygons %>% filter(fov == 100) %>% select(x_global_px), na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(cell_polygons %>% filter(fov == 100) %>% select(y_global_px), na.rm = TRUE) + scale_length_px*0.1
+scale_bar <- make_scale_bar_r(x_vals = cell_polygons %>% filter(fov == 100) %>% pull(x_global_px),
+                            y_vals =  cell_polygons %>% filter(fov == 100) %>% pull(y_global_px))
 
 ## Plot it
 ggplot(cell_polygons %>% filter(fov == 100),
        aes(x = x_global_px, y = y_global_px, group = cell)) +
-  geom_polygon(fill = "lightgrey", color = "darkgrey") +
-  geom_point(data = filtered_tx, aes(x = x_global_px, y = y_global_px),
+  geom_polygon(fill = "lightgrey", color = "darkgrey", linewidth = 0.3) +
+  geom_point(data = filtered_tx, aes(x = x_global_px, y = y_global_px), #Overlay transcript points
              color = "red", size = 0.3) +
   coord_fixed() +
   theme_void()  +
-  # Add a transparent rectangle to help the scale bar appear on a busy background
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-  ) +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  )
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
+  
 ggsave(paste0(out_dir, "polygons_singleFOV_singleTx.png"),
        width = 6, height = 4, units = "in")
 
@@ -1903,44 +1327,12 @@ filtered_tx = pd.read_csv(io.StringIO(result.stdout))
 # Filter cell polygons to focus on one fov
 plot_df = cell_polygons[cell_polygons["fov"] == 100]
 
-## Set up scale bar
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = plot_df['x_global_px'].max() - plot_df['x_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = plot_df['x_global_px'].max() - scale_length_px * 1.1
-x_end = plot_df['x_global_px'].max() - scale_length_px * 0.1
-y_pos = plot_df['y_global_px'].min() + scale_length_px * 0.1
-
 # Plot
 fig, ax = plt.subplots(figsize=(6, 4))
 for _, group in plot_df.groupby("cell"):
     coords = group[["x_global_px", "y_global_px"]].values
     coords = np.vstack([coords, coords[0]])  # close the polygon
-    ax.fill(coords[:, 0], coords[:, 1], facecolor="lightgrey", edgecolor="darkgrey", zorder=1)
+    ax.fill(coords[:, 0], coords[:, 1], facecolor="lightgrey", edgecolor="darkgrey", linewidth=0.5, zorder=1)
 
 # Overlay transcript dots
 ax.scatter(filtered_tx["x_global_px"], filtered_tx["y_global_px"], color="red", s=0.3, zorder=2)
@@ -1948,25 +1340,8 @@ ax.scatter(filtered_tx["x_global_px"], filtered_tx["y_global_px"], color="red", 
 ax.set_aspect('equal', adjustable='box')
 ax.axis('off')
 
-# Add scale bar background
-scale_bg = mpatches.Rectangle((x_start - scale_length_px * 0.05, y_pos - scale_length_px * 0.05),
-                              width=(x_end - x_start) + scale_length_px * 0.1,
-                              height=scale_length_px * 0.4,
-                              color='white', alpha=0.8, zorder=3)
-ax.add_patch(scale_bg)
-
 # Add scale bar
-scale_bar = mpatches.Rectangle((x_start, y_pos),
-                               width=(x_end - x_start),
-                               height=scale_length_px * 0.05,
-                               color='black',
-                               zorder=4)
-ax.add_patch(scale_bar)
-
-# Add scale label
-ax.text((x_start + x_end) / 2, y_pos + scale_length_px * 0.1,
-        scale_label, ha='center', va='bottom', color='black',
-        zorder=5)
+make_scale_bar_py(ax, plot_df["x_global_px"], plot_df["y_global_px"])
 
 # Save
 plt.savefig(os.path.join(out_dir, "python_polygons_singleFOV_singleTx.png"), bbox_inches='tight', pad_inches=0, dpi=300)
@@ -2124,48 +1499,9 @@ row.names(fov_positions) <- as.character(fov_positions$FOV)
 qc$x_global_px <- fov_positions[as.character(qc$fov), "x_global_px"]
 qc$y_global_px <- fov_positions[as.character(qc$fov), "y_global_px"]
 
-## Set up scale bar that can be used for all plots
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
-
-#Calculate x-axis range
-x_range <- range(qc %>% select(x_global_px), na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(qc %>% select(y_global_px), na.rm = TRUE) + scale_length_px*0.1
+## Set up scale bar for all plots
+scale_bar <- make_scale_bar_r(x_vals = qc %>% pull(x_global_px),
+                            y_vals =  qc %>% pull(y_global_px))
 
 ## Plot each per FOV metric in space
 for(fov_metric in fov_metrics){
@@ -2174,29 +1510,17 @@ for(fov_metric in fov_metrics){
              fill = get(fov_metric))) +
     geom_tile(width = 4254, height = 4254) + #CosMx FOVs are 4254x4254 pixels
     scale_fill_gradient(low = "blue", high = "magenta") +
-    geom_label(aes(label = fov)) +
+    geom_label(aes(label = fov)) + # Label each FOV in space
     theme_void() +
     labs(title = gsub("_", " ", fov_metric),
          fill = gsub("_", " ", fov_metric)) +
     theme(axis.title.x = element_blank(),
           axis.title.y = element_blank()) +
     coord_fixed() +
-    # Add a transparent rectangle to help the scale bar appear on a busy background
-    annotation_custom(
-      grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-      xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-      ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-    ) +
-    annotation_custom(
-      grob = rectGrob(gp = gpar(fill = "black")),
-      xmin = x_start, xmax = x_end,
-      ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-    ) +
-    annotation_custom(
-      grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-      xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-      ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-    )
+    scale_bar$bg +
+    scale_bar$rect +
+    scale_bar$label
+    
   
   ggsave(paste0(out_dir, "/XY_qc_", fov_metric, ".png"),
          width = 12, height = 16, units = "in")
@@ -2237,38 +1561,6 @@ fov_positions.set_index('FOV', inplace=True)
 qc['x_global_px'] = qc['fov'].map(fov_positions['x_global_px'])
 qc['y_global_px'] = qc['fov'].map(fov_positions['y_global_px'])
 
-## Set up scale bar to be shared by all plots
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = qc['x_global_px'].max() - qc['x_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = qc['x_global_px'].max() - scale_length_px * 1.1
-x_end = qc['x_global_px'].max() - scale_length_px * 0.1
-y_pos = qc['y_global_px'].min() + scale_length_px * 0.1
-
 # Set up a color scale to use
 blue_magenta = mcolors.LinearSegmentedColormap.from_list("blue_magenta", ["blue", "magenta"])
 
@@ -2286,29 +1578,9 @@ for fov_metric in fov_metrics:
     ax.set_title(fov_metric.replace('_', ' '))
     ax.set_aspect('equal', adjustable='box')
     ax.axis('off')
-    scale_bg = mpatches.Rectangle(
-      (x_start - scale_length_px * 0.05,
-      y_pos - scale_length_px * 0.05),
-      width=(x_end - x_start) + scale_length_px * 0.1,
-      height=scale_length_px * 0.4,
-      color='white', alpha=0.8, zorder=3)
-    ax.add_patch(scale_bg)
-
     # Add scale bar
-    scale_bar = mpatches.Rectangle(
-      (x_start, y_pos),
-      width=(x_end - x_start),
-      height=scale_length_px * 0.05,
-      color='black',
-      zorder=4)
-    ax.add_patch(scale_bar)
-    # Add scale label
-    ax.text(
-      (x_start + x_end) / 2, 
-      y_pos + scale_length_px * 0.1,
-      scale_label, ha='center', va='bottom',
-      color='black',
-      zorder=5)
+    make_scale_bar_py(ax, qc["x_global_px"], qc["y_global_px"])
+    
     plt.savefig(f"{out_dir}/python_XY_qc_{fov_metric}.png", dpi=300)
     plt.close()
 ```
@@ -2374,11 +1646,17 @@ knitr::include_graphics(paste0(out_dir, "/BarPlot_qc_txPerCell_cellType.png"))
 
 ```{python echo = TRUE, eval = FALSE}
 # Convert leiden_cluster to string and assign to cell_type
-cell_meta['cell_type'] = cell_meta['leiden_cluster'].astype(str)
+# Fill NaNs with a placeholder (e.g., -1) before converting
+cell_meta['leiden_cluster'] = cell_meta['leiden_cluster'].fillna(-1)
+cell_meta['cell_type'] = cell_meta['leiden_cluster'].astype(int).astype(str)
+
+# Convert NA values back
+cell_meta['leiden_cluster'] = cell_meta['leiden_cluster'].replace(-1, np.nan)
+cell_meta['cell_type'] = cell_meta['cell_type'].replace({'-1': 'Not assigned'})
 
 # Get unique cell types and assign colors
-unique_cell_types = sorted(cell_meta['cell_type'].unique())
-colors = plt.cm.get_cmap('tab20', len(unique_cell_types))
+unique_cell_types = sorted(cell_meta['cell_type'].unique(), key=lambda x: float(x) if x.isdigit() else float('inf'))
+colors = plt.cm.get_cmap('tab20c', len(unique_cell_types)) #Use tab20c palette
 color_dict = {cell_type: colors(i) for i, cell_type in enumerate(unique_cell_types)}
 
 # Prepare data for boxplot
@@ -2415,81 +1693,31 @@ knitr::include_graphics(paste0(out_dir, "/python_BarPlot_qc_txPerCell_cellType.p
 
 ### Per cell QC metrics in space
 
-Another QC metric in the meta data is whether a cell has been 'flagged' by any of the QC steps in AtoMx. We can plot each cell's 'qcCellsFlagged' status in space to look for spatial patterns in the cells get flagged.
+Another QC metric in the meta data is whether a cell has been 'flagged' by any of the QC steps in AtoMx. We can plot each cell's 'qcCellsFlagged' status in space to look for spatial patterns in the cells get flagged. Keep an eye out for overplotting here, which can lead to the incorrect conclusion that all cells in a region have been lost. We reduce the opacity to counter this impression.
 
 :::{.panel-tabset}
 
 ### R
 
 ```{r echo = TRUE, eval = FALSE}
+
 ## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
-
-#Calculate x-axis range
-x_range <- range(cell_meta$CenterX_global_px, na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(cell_meta$CenterY_global_px, na.rm = TRUE) + scale_length_px*0.1
+scale_bar <- make_scale_bar_r(x_vals = cell_meta$CenterX_global_px,
+                            y_vals =  cell_meta$CenterY_global_px)
 
 ## Plot it
 ggplot(cell_meta[order(cell_meta$qcCellsFlagged),], #Ordering plots 'false' cells first
        aes(CenterX_global_px, CenterY_global_px)) + 
-  geom_point(aes(color = qcCellsFlagged), size = 0.01) + 
+  geom_point(aes(color = qcCellsFlagged), size = 0.01, alpha = 0.1) + 
   scale_color_manual(values=c("#D6DBDF", "#D86769")) + 
-  guides(colour = guide_legend(override.aes = list(size=3))) + 
+  guides(colour = guide_legend(override.aes = list(size=3, alpha = 1))) + 
   labs(color = "Flagged") + 
   coord_fixed() + 
   theme_void()  +
-  # Add a transparent rectangle to help the scale bar appear on a busy background
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-  ) +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  )
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
+  
 ggsave(paste0(out_dir, "/qc_flaggedCells.png"),
        width = 4, height = 6, units = "in")
 ```
@@ -2504,38 +1732,6 @@ knitr::include_graphics(paste0(out_dir, "/qc_flaggedCells.png"))
 # Define color mapping for flagged status
 color_map = {True: "#D86769", False: "#D6DBDF"}
 
-## Set up scale bar
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = cell_meta['CenterX_global_px'].max() - cell_meta['CenterX_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = cell_meta['CenterX_global_px'].max() - scale_length_px * 1.1
-x_end = cell_meta['CenterX_global_px'].max() - scale_length_px * 0.1
-y_pos = cell_meta['CenterY_global_px'].min() + scale_length_px * 0.1
-
 # To increase the visibility of the flagged cells, we split the data frame and plot the flagged cells second
 false_cells = cell_meta[cell_meta['qcCellsFlagged'] == False]
 true_cells = cell_meta[cell_meta['qcCellsFlagged'] == True]
@@ -2548,7 +1744,7 @@ ax.scatter(
     false_cells['CenterY_global_px'],
     c=false_cells['qcCellsFlagged'].map(color_map),
     s=0.01,
-    marker='o',
+    alpha =0.2,
     zorder=1
 )
 
@@ -2558,34 +1754,12 @@ ax.scatter(
     true_cells['CenterY_global_px'],
     c=true_cells['qcCellsFlagged'].map(color_map),
     s=0.01,
-    marker='o',
+    alpha = 0.2,
     zorder=2
 )
 
-# Add scale background
-scale_bg = mpatches.Rectangle(
-  (x_start - scale_length_px * 0.05,
-  y_pos - scale_length_px * 0.05),
-  width=(x_end - x_start) + scale_length_px * 0.1,
-  height=scale_length_px * 0.4,
-  color='white', alpha=0.8, zorder=3)
-ax.add_patch(scale_bg)
-
 # Add scale bar
-scale_bar = mpatches.Rectangle(
-  (x_start, y_pos),
-  width=(x_end - x_start),
-  height=scale_length_px * 0.05,
-  color='black',
-  zorder=4)
-ax.add_patch(scale_bar)
-# Add scale label
-ax.text(
-  (x_start + x_end) / 2,
-  y_pos + scale_length_px * 0.1,
-  scale_label, ha='center', va='bottom',
-  color='black',
-  zorder=5)
+make_scale_bar_py(ax, cell_meta["CenterX_global_px"], cell_meta["CenterY_global_px"])
 
 # Add a legend with larger marker size
 from matplotlib.lines import Line2D
@@ -2627,7 +1801,7 @@ We find that often we're interested in examining how close a given cell is to a 
 ```{r echo = TRUE, eval = FALSE}
 
 # Separate macrophages and other cells
-macrophages <- cell_meta %>% filter(cell_type == 3) %>% select(CenterX_global_px, CenterY_global_px)
+macrophages <- cell_meta %>% filter(leiden_cluster == 3) %>% select(CenterX_global_px, CenterY_global_px)
 all_cells <- cell_meta %>% select(CenterX_global_px, CenterY_global_px)
 
 # Find nearest macrophage for each cell
@@ -2639,13 +1813,17 @@ distances <- nn$nn.dist[, 1]
 # Add to original data
 cell_meta$nearest_macrophage_distance <- distances
 
+# Convert to distance in microns
+microns_per_pixel = 0.12028
+cell_meta$nearest_macrophage_distance_um <- cell_meta$nearest_macrophage_distance * microns_per_pixel
+
 # There are a few outliers in distance, so we cap the distance plotted
 
 # Calculate the 90th percentile cap
-cap_value <- quantile(cell_meta$nearest_macrophage_distance, 0.9, na.rm = TRUE)
+cap_value <- quantile(cell_meta$nearest_macrophage_distance_um, 0.9, na.rm = TRUE)
 
 # Cap the values
-cell_meta$distance_capped <- pmin(cell_meta$nearest_macrophage_distance, cap_value)
+cell_meta$distance_capped <- pmin(cell_meta$nearest_macrophage_distance_um, cap_value)
 
 # Define breaks and labels
 breaks <- pretty(c(0, cap_value), n = 5)
@@ -2654,74 +1832,25 @@ labels <- as.character(breaks)
 labels[length(labels)] <- paste0("> ", round(cap_value))
 
 ## Set up scale bar
-# Conversion factor for commercial CosMx instrument.
-microns_per_pixel <- 0.12028
+scale_bar <- make_scale_bar_r(x_vals = cell_meta$CenterX_global_px,
+                            y_vals =  cell_meta$CenterY_global_px)
 
-#Calculate x-axis range
-x_range <- range(cell_meta$CenterX_global_px, na.rm = TRUE)
-x_length <- diff(x_range)
-x_length_um <- x_length * microns_per_pixel
 
-# Target scale length ~1/4 of the x-axis
-target <- x_length_um / 4
-
-# Compute order of magnitude
-order <- 10^floor(log10(target))
-mantissa <- target / order
-
-# Round mantissa to nearest 1, 2, or 5
-nice_mantissa <- if (mantissa < 1.5) {
-  1
-} else if (mantissa < 3.5) {
-  2
-} else if (mantissa < 7.5) {
-  5
-} else {
-  10
-}
-
-# Final scale length in pixels
-scale_length_um <- nice_mantissa * order
-scale_length_px <- scale_length_um / microns_per_pixel
-
-# Format label
-scale_label <- if (scale_length_um >= 1000) {
-  paste0(scale_length_um / 1000, " mm")
-} else {
-  paste0(scale_length_um, " µm")
-}
-
-# Set coordinates for the scale bar 
-x_start <- x_range[2] - scale_length_px*1.1
-x_end <- x_range[2] - scale_length_px*0.1
-y_pos <- min(cell_meta$CenterY_global_px, na.rm = TRUE) + scale_length_px*0.1
 
 ## Plot it
 ggplot(cell_meta,
        aes(x = CenterX_global_px, y = CenterY_global_px,
            color = distance_capped)) +
   geom_point(size = 0.1, alpha = 0.1) +
-  scale_color_viridis(name = "Distance to\nnearest mac.\n(Pixels)",
+  scale_color_viridis(name = "Distance to\nnearest mac.\n(µm)",
                       breaks = breaks,
                       labels = labels) + 
   coord_fixed() +
   theme_void()  +
-  # Add a transparent rectangle to help the scale bar appear on a busy background
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "white", alpha = 0.8, col = NA)),
-    xmin = x_start- scale_length_px*0.05, xmax = x_end+ scale_length_px*0.05,
-    ymin = y_pos- scale_length_px*0.05, ymax = y_pos + scale_length_px*0.3
-  ) +
-  annotation_custom(
-    grob = rectGrob(gp = gpar(fill = "black")),
-    xmin = x_start, xmax = x_end,
-    ymin = y_pos, ymax = y_pos + scale_length_px*0.05
-  ) +
-  annotation_custom(
-    grob = textGrob(scale_label, gp = gpar(col = "black"), just = "center", vjust = 0),
-    xmin = (x_start + x_end)/2, xmax =(x_start + x_end)/2,
-    ymin = y_pos + scale_length_px*0.1, ymax = y_pos + scale_length_px*0.1
-  )
+  scale_bar$bg +
+  scale_bar$rect +
+  scale_bar$label
+
 ggsave(paste0(out_dir, "nearest_cell.png"),
        width = 4, height = 6, units = "in")
 ```
@@ -2746,46 +1875,18 @@ distances, _ = nn_model.kneighbors(all_cells)
 # Add distances to the original DataFrame
 cell_meta['nearest_macrophage_distance'] = distances[:, 0]
 
+# Convert to microns
+microns_per_pixel = 0.12028
+cell_meta['nearest_macrophage_distance_um'] = cell_meta['nearest_macrophage_distance'] * microns_per_pixel
+
 # Cap the 'nearest_macrophage_distance' at the 90th percentile
-cap_value = cell_meta['nearest_macrophage_distance'].quantile(0.9)
-cell_meta['distance_capped'] = np.minimum(cell_meta['nearest_macrophage_distance'], cap_value)
+cap_value = cell_meta['nearest_macrophage_distance_um'].quantile(0.9)
+cell_meta['distance_capped'] = np.minimum(cell_meta['nearest_macrophage_distance_um'], cap_value)
 
 # Define breaks and labels similar to R's pretty function
 breaks = np.linspace(0, cap_value, 5)
 labels = [f"{int(b)}" for b in breaks]
 labels[-1] = f"> {int(cap_value)}"
-
-## Set up scale bar
-# Constants
-microns_per_pixel = 0.12028
-
-#Calculate x-axis range
-x_length = cell_meta['CenterX_global_px'].max() - cell_meta['CenterX_global_px'].min()
-x_length_um = x_length * microns_per_pixel
-
-# Target scale length ~1/4 of the x-axis
-target = x_length_um / 4
-
-# Compute scale bar
-order = 10 ** np.floor(np.log10(target))
-mantissa = target / order
-
-if mantissa < 1.5:
-    nice_mantissa = 1
-elif mantissa < 3.5:
-    nice_mantissa = 2
-elif mantissa < 7.5:
-    nice_mantissa = 5
-else:
-    nice_mantissa = 10
-
-scale_length_um = nice_mantissa * order
-scale_length_px = scale_length_um / microns_per_pixel
-scale_label = f"{scale_length_um / 1000:.1f} mm" if scale_length_um >= 1000 else f"{int(scale_length_um)} µm"
-
-x_start = cell_meta['CenterX_global_px'].max() - scale_length_px * 1.1
-x_end = cell_meta['CenterX_global_px'].max() - scale_length_px * 0.1
-y_pos = cell_meta['CenterY_global_px'].min() + scale_length_px * 0.1
 
 ## Plot
 fig, ax = plt.subplots(figsize=(4, 6))
@@ -2798,37 +1899,15 @@ scatter = ax.scatter(
     alpha=0.1,
     zorder=1
 )
-cbar = fig.colorbar(scatter, ax=ax, label='Distance to\nnearest mac.\n(Pixels)')
+cbar = fig.colorbar(scatter, ax=ax, label='Distance to\nnearest mac.\n(µm)')
 cbar.set_ticks(breaks)
 cbar.set_ticklabels(labels)
 cbar.solids.set(alpha=1)
 ax.set_aspect('equal', adjustable='box')
 ax.axis('off')
 
-# Add scale background
-scale_bg = mpatches.Rectangle(
-  (x_start - scale_length_px * 0.05,
-  y_pos - scale_length_px * 0.05),
-  width=(x_end - x_start) + scale_length_px * 0.1,
-  height=scale_length_px * 0.4,
-  color='white', alpha=0.8, zorder=2)
-ax.add_patch(scale_bg)
-
 # Add scale bar
-scale_bar = mpatches.Rectangle(
-  (x_start, y_pos),
-  width=(x_end - x_start),
-  height=scale_length_px * 0.05,
-  color='black',
-  zorder=3)
-ax.add_patch(scale_bar)
-# Add scale label
-ax.text(
-  (x_start + x_end) / 2,
-  y_pos + scale_length_px * 0.1,
-  scale_label, ha='center', va='bottom',
-  color='black',
-  zorder=4)
+make_scale_bar_py(ax, cell_meta["CenterX_global_px"], cell_meta["CenterY_global_px"])
 
 plt.savefig(f"{out_dir}/python_nearest_cell.png", dpi=300, bbox_inches='tight')
 plt.close()
@@ -2857,11 +1936,16 @@ cell_meta$lobe <- ifelse(cell_meta$CenterY_global_px > 50000, "upper", "lower")
 cell_meta <- cell_meta %>%
   mutate(fov_group = letters[ceiling(fov / 20)])
 
+# Use polychrome palette
+my_pal <- pals::polychrome(n = length(unique(cell_meta$leiden_cluster)))
+names(my_pal) <- unique(cell_meta$leiden_cluster)
+
+
 # Plot cell composition by niche, split by lobe
 ggplot(cell_meta,
-       aes(x = fov_group, fill = cell_type)) +
+       aes(x = fov_group, fill = as.factor(leiden_cluster))) +
   geom_bar(position = "fill") +
-  scale_fill_manual(values = my_pal, name = "Cell type") + # Use alphabet palette from above
+  scale_fill_manual(values = my_pal, name = "Cell type") + 
   facet_wrap(~lobe, scales = "free_x") +
   ylab("Fraction of cells") +
   xlab("FOV group (niche)") +
