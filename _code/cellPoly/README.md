@@ -26,7 +26,9 @@ it computes their polygons and saves them to the ever-growing \code{polys} list.
 
 ### Installation
 ```
-devtools::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space/_code/cellPoly@Main")
+remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space", 
+                        subdir = "_code/cellPoly", ref = "Main")
+
 ```
 Installation should take < 1 min on a normal desktop computer. 
 
