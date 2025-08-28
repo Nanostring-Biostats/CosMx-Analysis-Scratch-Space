@@ -1,0 +1,26 @@
+# .github/workflows/cleanup.yml
+name: Cleanup PR Preview
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [Main]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout preview repository
+        uses: actions/checkout@v4
+        with:
+          repository: Nanostring-Biostats/blog-previews
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Remove PR preview directory
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          rm -rf pr-${{ github.event.pull_request.number }}
+          git add .
+          git commit -m "Remove preview for PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
+          git push
