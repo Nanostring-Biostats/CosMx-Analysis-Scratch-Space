@@ -2,25 +2,30 @@
 name: PR Preview
 
 on:
-  pull_request:
-    # Only run on pull requests targeting the main branch
-    branches: [Main] 
+  pull_request_target:
+    types: [opened, synchronize, reopened]
 
-# This ensures that only one workflow run is triggered for a given PR.
-# If you push new commits, it will cancel the previous run.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # Job to build the Quarto site
-  build:
-    if: contains(fromJSON(secrets.APPROVED_USERS), github.actor)
+  authorize:
     runs-on: ubuntu-latest
+    steps:
+      - name: Check if user is approved
+        run: |
+          if ! contains(fromJSON('${{ secrets.APPROVED_USERS }}'), '${{ github.actor }}'); then
+            echo "User is not approved. Aborting workflow."
+            exit 1
+          fi
+          echo "User is approved. Proceeding."
+
+  build:
+    runs-on: ubuntu-latest
+    needs: authorize
     permissions:
-      # Grant permissions to write to the pages artifact
       pages: write
-      # Grant permissions to create a deployment and post a comment
       pull-requests: write
     
     steps:
@@ -62,7 +67,6 @@ jobs:
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # This is the folder where Quarto builds the site by default
           path: _site/
           
       - name: Find Comment
@@ -87,10 +91,7 @@ jobs:
             > [!NOTE]
             > This URL will be updated with every new push to this PR. The preview will be automatically deleted when the PR is closed.
 
-
-  # Job to deploy the artifact to GitHub Pages
   deploy:
-    if: contains(fromJSON(secrets.APPROVED_USERS), github.actor)
     runs-on: ubuntu-latest
     # This job needs the 'build' job to finish successfully
     needs: build
