@@ -1,0 +1,132 @@
+# .github/workflows/preview.yml
+name: PR Preview
+
+on:
+  pull_request:
+    # Only run on pull requests targeting the main branch
+    branches: [Main] 
+
+# This ensures that only one workflow run is triggered for a given PR.
+# If you push new commits, it will cancel the previous run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job to build the Quarto site
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      # Grant permissions to write to the pages artifact
+      pages: write
+      # Grant permissions to create a deployment and post a comment
+      pull-requests: write
+    
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: 1.6.30
+
+      - name: Install GLPK development
+        run: |
+          sudo apt-get update
+          sudo apt install libglpk-dev
+
+      - name: Install libgsl
+        run: |
+          sudo apt-get install libgsl-dev
+
+      - name: Install R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.5.0'
+      
+      - name: Install tinytex
+        run: |
+          quarto install tinytex
+      
+      - name: Install R Dependencies (from renv.lock)
+        uses: r-lib/actions/setup-renv@v2
+        with:
+          cache-version: 1
+
+      - name: Render Quarto Website
+        run: |
+          quarto render
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # This is the folder where Quarto builds the site by default
+          path: _site/
+          
+      - name: Find Comment
+        uses: peter-evans/find-comment@v3
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 'Your PR preview is ready!'
+          
+      - name: Create or Update Comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          edit-mode: replace
+          body: |
+            ### Your PR preview is ready! 🚀
+            
+            Once the 'deploy' job finishes, your preview will be available at the URL below.
+            
+            > [!NOTE]
+            > This URL will be updated with every new push to this PR. The preview will be automatically deleted when the PR is closed.
+
+
+  # Job to deploy the artifact to GitHub Pages
+  deploy:
+    runs-on: ubuntu-latest
+    # This job needs the 'build' job to finish successfully
+    needs: build
+    
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an authentic source
+      pull-requests: write # to update the PR comment
+
+    # Deploy to the GitHub Pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        
+      - name: Find Comment
+        uses: peter-evans/find-comment@v3
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 'Your PR preview is ready!'
+          
+      - name: Update Comment with Preview URL
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          edit-mode: replace
+          body: |
+            ### Your PR preview is ready! 🚀
+            
+            You can view the live preview of your changes here:
+            **${{ steps.deployment.outputs.page_url }}**
+            
+            > [!NOTE]
+            > This URL will be updated with every new push to this PR. The preview will be automatically deleted when the PR is closed.
