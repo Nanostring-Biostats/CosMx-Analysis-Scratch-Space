@@ -10,19 +10,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # JOB 1: THE GATEKEEPER
   authorize:
     runs-on: ubuntu-latest
     steps:
       - name: Check if user is approved
         run: |
-          if ! contains(fromJSON('${{ secrets.APPROVED_USERS }}'), '${{ github.actor }}'); then
+          if ! ${{ contains(fromJSON(secrets.APPROVED_USERS), github.actor) }}; then
             echo "User '${{ github.actor }}' is not approved. Aborting."
             exit 1
           fi
           echo "User '${{ github.actor }}' is approved. Proceeding."
 
-  # JOB 2: BUILD THE SITE
   build:
     runs-on: ubuntu-latest
     needs: authorize
@@ -98,7 +96,6 @@ jobs:
             > [!NOTE]
             > This URL will be updated with every new push to this PR. The preview will be automatically deleted when the PR is closed.
 
-  # JOB 3: DEPLOY THE PREVIEW
   deploy:
     runs-on: ubuntu-latest
     needs: build
