@@ -35,86 +35,348 @@ CosMx analyses often culminate in a differential expression (DE) analysis. Explo
 -	How are macrophages different in inflamed tissue regions?
 -	How do beta cells in pancreatic islets respond to local inflammation? 
 
+Or, in the general form:
+
+"How does <my favorite cell type> change in response to <some aspect of its environment>?"
+
 The goal of this post is to review major topics in DE in spatial transcriptomics, and to provide code when necessary. 
 
 
-## Data set up
+## Setting up a DE question
 
-First, let's pull in data in a standard format. We'll assume you're starting with flat files exported from AtoMx. 
+Our experience suggests that most studies demand a highly custom DE question whose framing depends on the investigator’s primary questions and working assumptions about the biological system. To assist with this framing, we present below a collection of examples which, with slight modifications and remixing, covers most DE investigations you are likely to find productive. In each case we'll define a variable that can be used as a predictor in DE models.
 
-For our examples, we'll look at a subset of data from a breast tumor. 
-Our metadata picks up midway through an analysis: we already have cell types and niche calls in the metadata.
+### Example data
 
+First, let's pull in data in a standard format. We'll assume you're starting with flat files exported from AtoMx, 
+loaded with code similar to the below.
 
-
-
-
-
-
-
-data needed:
-- x,y
-- clust
-- niche
-- IF
-(above all in metadata)
-- expression (just a few genes)
-
-
-
-
-For demonstration in this
-post, we use data from a breast cancer sample that has been analyzed in AtoMx<sup>&#174;</sup> SIP
-through unsupervised cell typing. Many of the below plots rely on the same data objects. 
-For convenience, we show
-how each of these objects are read in here and will use them in later code blocks.
-We also load in libraries that will be used in later sections.
-
-```{r echo = FALSE, eval = TRUE}
-out_dir <- "./figures/"
-```
-
-::: {.panel-tabset}
-
-### R
 
 ```{r echo = TRUE, eval = FALSE}
-library(ggplot2)
-library(grid)
-library(data.table)
-library(R.utils)
-library(dplyr)
-library(ggsci)
-library(pals)
-library(FNN)
-library(viridis)
-library(scales)
-
 # Define paths
 raw_data_dir <- "/path/to/raw/data"
 out_dir <- "/path/to/out/dir"
 slide_name <- "slideName" # Set this to your slide name, i.e. the identifier at the front of each flat file
 
-# Read data
-cell_meta <- read.csv(paste0(raw_data_dir, "/", slide_name, "_metadata_file.csv.gz")) #Note this is a small file and we read it into a data frame for convenience
-cell_polygons <- fread(paste0(raw_data_dir, "/", slide_name, "-polygons.csv.gz"))
-fov_positions <- fread(paste0(raw_data_dir, "/", slide_name, "_fov_positions_file.csv.gz"))
+# Read flat file exports: 
+meta_data <- read.csv(paste0(raw_data_dir, "/", slide_name, "_metadata_file.csv.gz")) #Note this is a small file and we read it into a data frame for convenience
+xy <- meta_data[, c("y_slide_mm", "x_slide_mm")]  # note we're transposing the axes to make the plots fit better in this doc
+counts <- read.csv(paste0(raw_data_dir, "/", slide_name, "_exprMat_file.csv.gz")) 
+```
+
+For our examples, we'll look at a subset of data from a breast tumor. 
+Our metadata picks up midway through an analysis: we already have cell types and niche calls in the metadata. 
+Here's a glance at all the metadata we'll use:
+
+```{r echo = TRUE, eval = FALSE}
+head(meta_data)
+```
+
+...and the sample itself:
+
+
+```{r echo = TRUE, eval = FALSE}
+clustcols  <- c(Tumor="#C4B7A6",Macrophage="#D55E00",Fibroblast="#009E73",dendritic="#CC79A7",`Necrotic cells`="#999999",Tcell="#0072B2",Plasma="#56B4E9",neutrophil="#E69F00",innate_lymphoid="#F0E442",Vasculature="#800000",nk="#117733",mast="#A65628",bcell="#6A3D9A",Unknown="#666666")
+
+par(mar = c(0,0,0,0))
+plot(xy, pch = 16, cex = 0.3, asp = 1,
+     col = clustcols[meta_data$celltype], xlab = "", ylab = "")
+legend("topleft", pch = 16, col = clustcols, legend = names(clustcols), cex = 0.7)
 ```
 
 
-## Setting up a DE question
+### Gallery of Differential Expression setups
 
-Our experience suggests that most studies demand a highly custom DE question whose framing depends on the investigator’s primary questions and working assumptions about the biological system. To assist with this framing, we present below a collection of examples which, with slight modifications and remixing, can 
+Below are examples of variables useful for DE. 
+In each case, we'll plot the variable spatially and provide code for defining it. 
+
+#### Niche / spatial domain (unsupervised)
+
+A great many algorithms exist for clustering cellular neighborhoods into niches / spatial domains. 
+Lately we favor the Novae algorithm. 
+However you define niches, they're often a reasonable basis for a DE analysis. 
+
+```{r echo = TRUE, eval = FALSE}
+## (use pre-calculated niche)
+## plot niche:
+inds <- meta_data$celltype == "Tumor"
+par(mar = c(0,0,2,0))
+plot(xy[inds, ], pch = 16, cex = 0.3, asp = 1,
+     main = "Tumor cells colored by niche",
+     col = c("dodgerblue3", "orange")[as.numeric(as.factor(meta_data$niche[inds]))],
+     xlab = "", ylab = "")
+points(xy[!inds, ], pch = 16, cex = 0.1, col = "grey80")
+legend("topleft", pch = 16, col = c("dodgerblue3", "orange"), legend = paste0("niche = ", levels(as.factor(meta_data$niche))), cex = 0.7)
+```
+
+
+### Custom-defined niche
+
+Niches defined through a spatial clustering algorithm are useful for exploring a dataset, 
+but often they are not perfectly aligned to your understanding of a tissue. 
+It is therefore often necessary to define niches by hand, to capture precisely the biology you want.
+Examples include anatomical structures like cortical layers in the brain, 
+disease states like areas of inflammation, or custom constructs like "near vs. far from glomeruli". 
+
+In general, such partitions of the data can be built by applying the code of the following examples,
+using thresholds to dichotomize continuous variables as needed.
+
+
+### Distance to nearest <cell type>
+
+Below, we score tumor cells by distance to the nearest T-cell:
+
+```{r echo = TRUE, eval = FALSE}
+## Calculate tumor cells' distance to nearest T-cell:
+inds.tumor <- meta_data$celltype == "Tumor"
+inds.t <- meta_data$celltype == "Tcell"
+dist2tcell <- FNN::get.knnx(
+  data = xy[inds.t, ], # 2-column matrix of xy locations
+  query = xy[inds.tumor, ], 
+  k = 1)$nn.dist
+
+## plot tumor cells, coloring by distance to T-cell:
+
+par(mar = c(0,0,2,0))
+plot(xy[inds.tumor, ], pch = 16, cex = 0.3, asp = 1,
+     main = "Tumor cells colored by distance to T-cell",
+     col = colorRampPalette(c(c("#A6CEE3","#1F78B4","#081D58", "black")))(101)[
+       1 + round(100 * dist2tcell / max(dist2tcell))
+     ],
+     xlab = "", ylab = "")
+points(xy[!inds.tumor, ], pch = 16, cex = 0.1, col = "wheat")
+points(xy[inds.t, ], pch = 16, cex = 0.3, col = "red")
+
+legend("topleft", pch = 16, col = c("#1F78B4", "red", "wheat"), 
+       legend = c("Tumor cells (colored by distance to T-cells)", "T-cells", "other cells"), cex = 0.7)
+```
+
+### Distance to nearest <anatomical structure>
+
+Many cell types fall in structures, e.g. blood vessels, tumor glands, or glomeruli. 
+When calculating distance to a structure, it is tempting to simply record distance to the nearest
+ relevant cell type, e.g. endothelial cells for blood vessels, or tumor cells for tumor glands, or podocytes and mesangial cells for glomeruli. However, this approach is easily distorted by sporadic cell typing errors. 
+It is more robust to look at distance to the nearest *spatially contiguous group* of the target cell type.
+
+Below, we demonstrate how the DBSCAN algorithm can isolate cells in contiguous groups and remove singletons. DBSCAN is an incredibly fast algorithm that clusters together any points within a given radius of each other. We'll keep only cells that fall in clusters of at least 3. 
+
+
+```{r echo = TRUE, eval = FALSE}
+## show the target cell type: endothelial cells:
+inds <- meta_data$celltype == "Vasculature"
+par(mar = c(0,0,2,0))
+plot(xy[, ], pch = 16, cex = 0.1, asp = 1,
+     main = "Vasculature", col = "grey80",
+     xlab = "", ylab = "")
+points(xy[inds, ], pch = 16, cex = 0.3, col = "darkred")
+
+## use dbscan to isolate clusters of Vasculature cells:
+db <- dbscan::dbscan(xy[inds, ],
+                     eps = 0.05, # very small radius
+                     minPts = 3)$cluster
+inds.in.clusters <- db != 0
+is.vessel <- inds
+is.vessel[which(inds)] <- inds.in.clusters
+
+## show the result:
+par(mar = c(0,0,2,0))
+plot(xy[, ], pch = 16, cex = 0.1, asp = 1,
+     main = "Vasculature after filter with dbscan", col = "grey80",
+     xlab = "", ylab = "")
+points(xy[inds & !is.vessel,], pch = 16, cex = 0.3, col = "blue")
+points(xy[is.vessel, ], pch = 16, cex = 0.3, col = "red")
+legend("topleft", pch = 16, col = c("red", "blue"), 
+       legend = c("Blood vessel cells", "Vasculature cells excluded by dbscan"))
+```
+
+### Number of <cell type> in a neighborhood
+
+Another common question: how does a cell type change in response to the abundance of another cell type in its neighborhood? Here we'll log-transform our predictor to acknowledge the probability of diminishing effects of each new T-cell in a tumor cell's neighborhood. 
+
+```{r echo = TRUE, eval = FALSE}
+## Calculate the number of T-cells in each tumor cell's neighborhood:
+inds.tumor <- meta_data$celltype == "Tumor"
+inds.t <- meta_data$celltype == "Tcell"
+
+# get the 50 nearest neighbors of each cell:
+neighbors <- InSituCor:::nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50)
+# (or alternatively, get neighbors within a radius of 0.1mm):
+neighbors.radius <- InSituCor:::radiusBasedGraph(x = xy[, 1], y = xy[, 2], R = 0.1)
+
+# count the T-cells among cells' neighbors:
+neighboring.tcells <- InSituCor:::neighbor_sum(x = 1 * (meta_data$celltype == "Tcell"),
+                                               neighbors = neighbors)
+log.neighboring.tcells <- log2(1 + neighboring.tcells)
+# color tumor cells by the number of T-cell neighbors:
+par(mar = c(0,0,2,0))
+plot(xy[inds.tumor, ], pch = 16, cex = 0.3, asp = 1,
+     main = "Tumor cells colored by log2(number of T-cell neighbors)",
+     col = colorRampPalette(c(c("#A6CEE3","#1F78B4","#081D58", "black")))(101)[
+       1 + round(100 * log.neighboring.tcells[inds.tumor] / max(log.neighboring.tcells[inds.tumor]))
+     ],
+     xlab = "", ylab = "")
+points(xy[!inds.tumor, ], pch = 16, cex = 0.1, col = "wheat")
+points(xy[inds.t, ], pch = 16, cex = 0.3, col = "red")
+legend("topleft", pch = 16, col = c("#1F78B4", "red", "wheat"), 
+       legend = c("Tumor cells colored by log2(number of neighboring T-cells)", "T-cells", "other cells"), cex = 0.7)
+```
+
+
+### Gene expression in cells' neighborhoods
+
+To investigate how a gene impacts nearby cells, we can run differential expression against the gene's total expression in each cell's neighborhood. 
+Below, we score macrophages for the total abundance of CXCL14 in their neighborhoods.
+This sets us up for DE studies of how macrophages respond to signaling from CXCL14.
+In the below example, we take the additional step of log-transforming neighborhood CXCL14.
+
+```{r echo = TRUE, eval = FALSE}
+## get average CXCL14 expression in each cell's neighborhood:
+
+# get the 50 nearest neighbors of each cell:
+neighbors <- InSituCor:::nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50)
+# (or alternatively, get neighbors within a radius of 0.1mm):
+neighbors.radius <- InSituCor:::radiusBasedGraph(x = xy[, 1], y = xy[, 2], R = 0.1)
+
+# normalized CXCL14:
+normvals <- counts[, "CXCL14"] / meta_data$nCount_RNA
+# get average CXCL14 expression in each cell's neighborhood:
+neighboring.cxcl14 <- InSituCor:::neighbor_sum(x = normvals,
+                                               neighbors = neighbors)
+log2.neighboring.cxcl14 <- log2(1 + neighboring.cxcl14)
+## plot macrophages, coloring by local CXCL14 expression:
+inds.mac <- meta_data$celltype == "Macrophage"
+par(mar = c(0,0,2,0))
+plot(xy, pch = 16, cex = 0.1, asp = 1, col = "wheat",
+     main = "Macrophages colored by log2(neighborhood CXCL14 expression)",
+     xlab = "", ylab = "")
+points(xy[inds.mac, ], pch = 16, cex = 0.4, 
+            col = colorRampPalette(c(c("#A6CEE3","#1F78B4","#081D58", "black")))(101)[
+       1 + round(100 * log2.neighboring.cxcl14[inds.mac] / max(log2.neighboring.cxcl14[inds.mac]))
+     ])
+legend("topleft", pch = 16, col = c("#1F78B4", "wheat"), 
+       legend = c("Macrophages colored by log2(neighborhood CXCL14 expression)", "other cells"), cex = 0.7)
+
+
+```
+
+### 
+
+### Projection along an axis
+
+Often tissues have a clear orientation, e.g. from the surface to the interior, 
+ or 
+
+
+### Distance to a hand-selected region
+
+Sometimes it's easier to select a region of a tissue by hand than to devise a computational rule to do so. 
+If your study has e.g. hundreds of glomeruli, you probably want a rule to define in/out of a glomerulus. 
+But if your study has e.g. just a few tertiary lymphoid structures, it's probably simpler to circle them by hand. 
+Below is code for hand-drawing Regions Of Interest (ROIs) and flagging cells as in/out of them:
+
+```{r echo = TRUE, eval = FALSE}
+#' Define roi's by Clicking on cells in a graphics window
+#' 
+#' How to use:
+#' \itemize{
+#' \item Plot your cells in xy space. Use asp = 1. 
+#' \item Click cells around the boundary of your roi.
+#' \item Hit enter or escape when done with your selection.
+#' }
+#' Other details:
+#' \itemize{
+#' \item Uses graphics::identify() to select points. 
+#' \item Only works for base graphics, not ggplots.
+#' \item Can go wrong (draw rois in the wrong place) if the plot doesn't have asp = 1. 
+#' }
+#' @param xy Matrix of xy positions used in the plot. 
+#' @param show Logical, for whether to show the selected roi when you're done. 
+#' @param type One of:
+#' \itemize{
+#' \item "direct" to define the boundary points in order, exactly as you click
+#' \item "ahull" to draw an alpha hull around your selection
+#' } 
+#' @return A list with 3 elements:
+#' \itemize{
+#' \item roi: The indices of the points in the roi
+#' \item selected: The indices of the user-selected points
+#' \item hull: The hull of the roi, either the user-selected polygon or the results of alphahull:ahull}
+#' @importFrom graphics identify
+#' @importFrom alphahull ahull
+#' @
+defineROI <- function(xy, type = "direct", show = TRUE) {
+  # user identifies boundary:
+  identifyres <- identify(xy, plot = FALSE, order = TRUE)
+  inds <- identifyres$ind[order(identifyres$order)]
+  if (type == "direct") {
+    # The hull is just the polygon you've selected:
+    hull <- inds
+    # get points in the boundary:
+    roi <- sp::point.in.polygon(point.x = xy[, 1], point.y = xy[, 2], 
+                                pol.x = xy[hull, 1], pol.y = xy[hull, 2]) > 0
+    # plot:
+    if (show) {
+      points(xy[inds, ], col = "red", cex = 0.5, pch = 16)
+      polygon(xy[hull, ])
+      points(xy[roi, ], pch = 16, cex = 1, col = scales::alpha("gold", 0.3))
+    }
+  }
+  
+  if (type == "ahull") {
+    # get ahull of boundary:
+    hull <- alphahull::ahull(xy[inds, 1], xy[inds, 2], alpha = 0.05)
+    # get points in the boundary:
+    roi <- alphahull::inahull(ahull.obj = hull, xy)
+    # plot:
+    if (show) {
+      points(xy[inds, ], col = "red", cex = 0.2, pch = 16)
+      plot(hull, add = TRUE)
+      points(xy[roi, ], pch = 16, cex = 1, col = scales::alpha("gold", 0.3))
+    }
+  }
+  
+  out = list(roi = roi, selected = inds, hull = hull)
+  return(out)
+}
+
+
+## example usage:
+clustcols  <- c(Tumor="#C4B7A6",Macrophage="#D55E00",Fibroblast="#009E73",dendritic="#CC79A7",`Necrotic cells`="#999999",Tcell="#0072B2",Plasma="#56B4E9",neutrophil="#E69F00",innate_lymphoid="#F0E442",Vasculature="#800000",nk="#117733",mast="#A65628",bcell="#6A3D9A",Unknown="#666666")
+
+par(mar = c(0,0,0,0))
+plot(xy, pch = 16, cex = 0.3, asp = 1,
+     col = clustcols[meta_data$celltype], xlab = "", ylab = "")
+
+roi <- defineROI(xy, type = "direct", show = TRUE) 
 
 
 
+```
 
 
 
+## Important note: treatment of continuous variables
 
+Say we want to run DE against a continuous variable like distance to a cell type, or the expression level of a cytokine in a cell's neighbors. 
+We can calculate that distance (or expression level) and use it as a predictor in our model. 
+However, in doing so we implicitly assume a linear relationship between the variable and our outcome. 
+Other models might be more appropriate: we could consider transforming the variable, 
+ or we could break it into bins for a non-parametric approach. 
 
+#### Transformations:
+- If you think distance to a feature matters because of some diffused signals, then concentration of those molecules will vary with $distance^{-1}$.
+- If neighborhood expression of a molecule is strongly right-tailed, which is likely, then a log transformation could prevent the end of the tail from having undue influence.
 
+#### Binning / discretizing:
+You can avoid assumptions about the shape of a variable by binning it, e.g. assigning cells to 20 bins of "distance to nearest T-cell". 
+Then, you can use a likelihood ratio test to test the compound null hypothesis that "this variable predicts expression." 
+Because we usually have so many cells to work with, the slight loss in statistical power that 
+ comes with this approach is usually a cheap tradeoff to make for its flexibility.
+Also nice: you can use plots like the below to show how each gene changes expression across bins:
 
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/bins.png")
+```
 
 
 
