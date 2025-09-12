@@ -26,13 +26,21 @@ clusterwise_foldchange_metrics <- function(counts=NULL, normed = NULL, totalcoun
   stopifnot(cluster_column %in% colnames(metadata)) 
   metainfo <- data.table::copy(data.table::data.table(metadata))
   stopifnot("provided 'cellid_column' are not all unique in metadata " = 
-              length(unique(metainfo[[cellid_column]])) == nrow(metadata))
-   
-  stopifnot(length(totalcounts) == ncol(counts))
-  if(!is.null(names(totalcounts)) && !is.null(colnames(counts))){
-    stopifnot("ids of 'totalcounts' dont match ids in 'counts'" = 
-                all(names(totalcounts) %in% colnames(counts))) 
-    totalcounts <- totalcounts[colnames(counts)] 
+              length(unique(metainfo[[cellid_column]])) == nrow(metainfo))
+  
+  if(!is.null(counts)){
+    if(!is.null(totalcounts)){
+      stopifnot(length(totalcounts) == ncol(counts))
+      if(!is.null(names(totalcounts)) && !is.null(colnames(counts))){
+        stopifnot("ids of 'totalcounts' dont match ids in 'counts'" = 
+                    all(names(totalcounts) %in% colnames(counts))) 
+        totalcounts <- totalcounts[colnames(counts)] 
+      }
+    }
+  }  else {
+    if(missing(normed)){
+        stop("either 'normed' or 'counts' argument must be provided")
+    }
   }
    
   if(missing(normed)){
