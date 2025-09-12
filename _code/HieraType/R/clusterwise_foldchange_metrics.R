@@ -15,16 +15,30 @@
 #' If you desire to use raw counts for computing fold change, use like `normed=my_raw_counts`.
 #' @param metadata metadata including (at minimum) 'cellid_column' and a 'cluster_column'
 #' @param cluster_column column in metadata corresponding to cell type 
+#' @param cellid_column column in metadata corresponding to cell id. Should also correspond to the column names of the `counts` and `normed` expression matrices.
 #' @param totalcounts optional user-specified vector of totalcounts used for normalizing the counts matrix.  
 #' (useful if a subsetted counts matrix is passed)
 #' 
 #' @export
-clusterwise_foldchange_metrics <- function(counts=NULL, normed = NULL, totalcounts = NULL, metadata, cluster_column){
+clusterwise_foldchange_metrics <- function(counts=NULL, normed = NULL, totalcounts = NULL, metadata, cluster_column, cellid_column = "cell_ID"){
+ 
+  stopifnot(cellid_column %in% colnames(metadata)) 
+  stopifnot(cluster_column %in% colnames(metadata)) 
+  metainfo <- data.table::copy(data.table::data.table(metadata))
+  stopifnot("provided 'cellid_column' are not all unique in metadata " = 
+              length(unique(metainfo[[cellid_column]])) == nrow(metadata))
+   
+  stopifnot(length(totalcounts) == ncol(counts))
+  if(!is.null(names(totalcounts)) && !is.null(colnames(counts))){
+    stopifnot("ids of 'totalcounts' dont match ids in 'counts'" = 
+                all(names(totalcounts) %in% colnames(counts))) 
+    totalcounts <- totalcounts[colnames(counts)] 
+  }
+   
   if(missing(normed)){
     normed <- Matrix::t(totalcount_norm(Matrix::t(counts), totalcounts))
   }
  
-  metainfo <- data.table::copy(data.table::data.table(metadata))
   
   pb <- txtProgressBar(min =0, max = length(unique(metainfo[[cluster_column]])), style = 3)
   idx <- 0

@@ -10,7 +10,8 @@ clusterwise_foldchange_metrics(
   normed = NULL,
   totalcounts = NULL,
   metadata,
-  cluster_column
+  cluster_column,
+  cellid_column = "cell_ID"
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ If you desire to use raw counts for computing fold change, use like \code{normed
 \item{metadata}{metadata including (at minimum) 'cellid_column' and a 'cluster_column'}
 
 \item{cluster_column}{column in metadata corresponding to cell type}
+
+\item{cellid_column}{column in metadata corresponding to cell id. Should also correspond to the column names of the \code{counts} and \code{normed} expression matrices.}
 }
 \description{
 This function computes metrics by gene by cluster which can be passed as input to the \code{marker_heatmap()} function.
