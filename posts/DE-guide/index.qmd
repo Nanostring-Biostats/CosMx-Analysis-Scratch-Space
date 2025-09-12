@@ -443,3 +443,37 @@ legend("topleft", pch = 16,
 
 ```
 
+## Considerations for running DE
+
+Above we showed how to set up a variable to run DE against. 
+Now we turn to the mechanics of actually running DE.
+We'll discuss 3 important topics:
+- How to handle bias arising from cell segmentation errors
+- How to account for possible spatial correlation in your data
+- The choice of statistical model
+All three of these topics are discussed in great depth in [this preprint](https://www.biorxiv.org/content/10.1101/2024.08.02.606405v2.abstract){target="_blank"},
+which accompanies our differential expression package [smiDE](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/){target="_blank"}.
+Here we'll merely summarize. 
+
+### Bias from segmentation errors:
+
+Until the day that cell segmentation algorithms become perfectly accurate, 
+ cells' expression profiles will occasionally be assigned transcripts from neighboring cells.
+Because the gene identity of these misassigned transcripts isn't random across space, 
+ they can act as a powerful unmodeled confounding variable. 
+For example: if we're comparing T-cells in the stroma to T-cells in the tumor,
+ the stroma T-cell profiles will contain transcripts from fibroblasts, and 
+ the tumor T-cell profiles will contain transcripts from tumor cells. 
+DE will then discover many highly significant genes: fibroblast genes will appear up-regulated 
+ in stroma T-cells, and tumor genes will appear up in tumor-residing T-cells. 
+These spurious hits waste analyst time and compromise analysis quality.  
+
+We propose two countermeasures to this bias, both implemented in the smiDE package:
+
+1. **Don't even analyze the genes at greatest risk of this bias.**
+If you're running DE on T-cells, don't include genes like EPCAM, which is highly abundant in tumor cells and nearly absent in T-cells. smiDE implements a simple filter to flag genes based on their risk of cell segmentation bias - see the function ```overlap_ratio_metric()```.
+
+2. **In the remaining genes, adjust for minor bias.** We measure a gene's potential to suffer 
+ misassignment into a cell using its mean expression around the cell. This then becomes a term in
+ DE models. Taking this step mitigates, though does not fully remove, bias from segmentation errors. 
+ 
