@@ -447,11 +447,10 @@ legend("topleft", pch = 16,
 
 Above we showed how to set up a variable to run DE against. 
 Now we turn to the mechanics of actually running DE.
-We'll discuss 3 important topics:
+We'll discuss 2 important topics:
 - How to handle bias arising from cell segmentation errors
 - How to account for possible spatial correlation in your data
-- The choice of statistical model
-All three of these topics are discussed in great depth in [this preprint](https://www.biorxiv.org/content/10.1101/2024.08.02.606405v2.abstract){target="_blank"},
+Both of these topics are discussed in great depth in [this preprint](https://www.biorxiv.org/content/10.1101/2024.08.02.606405v2.abstract){target="_blank"},
 which accompanies our differential expression package [smiDE](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/){target="_blank"}.
 Here we'll merely summarize. 
 
@@ -476,4 +475,42 @@ If you're running DE on T-cells, don't include genes like EPCAM, which is highly
 2. **In the remaining genes, adjust for minor bias.** We measure a gene's potential to suffer 
  misassignment into a cell using its mean expression around the cell. This then becomes a term in
  DE models. Taking this step mitigates, though does not fully remove, bias from segmentation errors. 
+
+ 
+### Accounting for spatial correlation
+
+Due to the large number of cells in most experiments, it's common for DE analyses 
+ to produce infinitesimal p-values, e.g. 10^-60. 
+This seems intuitively wrong: how can a dataset hold such strong evidence for expression changes? 
+Where traditional models differ from our intuition (and from common sense) is the assumption 
+ that every cell is *independent* from every other cell. 
+This is almost never true: cells nearby each other are subject to similar environmental influences
+ unrelated to our design variables, so so their standard errors will be dependent, or correlated. 
+In practice, this means that p-values from models assuming independence will be profoundly over-excitable.
+
+The field of spatial statistics has long grappled with inference in the presence of spatial correlation such as this,
+ and a sizeable arsenal of methods has been developed.
+In Vasconcelos & McGuire et al., the aforementioned preprint, we characterize the performance of many of these methods, along with some new ones we propose. 
+We find a tradeoff between accuracy and computational efficiency, with the best methods taking unacceptably 
+ long to run in large datasets. 
+Our key finding is that ignoring spatial correlation, i.e. running a traditional DE method,
+ leads to large numbers of false positive hits, often far in excess of the presumed true positive hits whose p-values survive accounting for spatial correlation.
+Whichever method in the paper seems suitable for your study, you can run it using  
+[our R package smiDE](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE){target="_blank"}. 
+
+### Other model choice considerations
+
+We find that negative binomial models outperform Gaussian models, but at a cost in computational time. 
+Poisson models offer a middle ground. 
+The performance of Gaussian models is generally acceptable, making them a reasonable choice
+ when computation time is a limitation. 
+smiDE implements all these options under a variety of spatial correlation-aware methods. 
+
+
+
+
+ 
+ 
+ 
+ 
  
