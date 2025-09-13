@@ -87,6 +87,9 @@ slide_name <- "slideName" # Set this to your slide name, i.e. the identifier at 
 meta_data <- read.csv(paste0(raw_data_dir, "/", slide_name, "_metadata_file.csv.gz")) #Note this is a small file and we read it into a data frame for convenience
 xy <- meta_data[, c("y_slide_mm", "x_slide_mm")]  # note we're transposing the axes to make the plots fit better in this doc
 counts <- read.csv(paste0(raw_data_dir, "/", slide_name, "_exprMat_file.csv.gz")) 
+# normalize:
+norm_factors <- mean(meta_data$nCount_RNA) / meta_data$nCount_RNA 
+norm <- Matrix::Diagonal(x = norm_factors) %*% counts
 ```
 
 For our examples, we'll look at a subset of data from a breast tumor. 
@@ -507,9 +510,107 @@ The performance of Gaussian models is generally acceptable, making them a reason
 smiDE implements all these options under a variety of spatial correlation-aware methods. 
 
 
+## Approaches for maximal speed
+
+### Simultaneous fitting of all genes using linear algebra
+
+Unfortunately, there’s a cost in compute time and money to many of the more theoretically optimal DE approaches
+(e.g. using a NB distribution, accounting for spatial correlation, adjusting for bias from segmentation errors). 
+An analysis of 19k genes in hundreds of thousands of cells can take a reasonably powerful EC2 instance a day or more to complete. 
+When computation time is a concern, or when simply pursuing exploratory analysis, we recommend using a less optimal but much faster approach. 
+In the code below, we demonstrate how to run a basic Gaussian / “ordinary least squares” regression simultaneously across all genes at once. This code returns reasonable DE results in seconds. 
+This approach cannot model spatial correlation, nor can it even adjust for confounding from cell segmentation errors.
+But its speed makes it very useful for exploratory analyses. 
+It could also be used to prioritize genes for more computationally expensive models. 
+
+```{r echo = TRUE, eval = FALSE}
+#' Very fast DE without best practices
+#' Runs simple OLS regression on all genes at once using matrix algebra
+#' @param y the normalized counts matrix (cells x genes)
+#' @param df a data frame of the variables to be modeled
+#' @return A list with:
+#'   - effect: matrix of effect sizes (genes x predictors)
+#'   - se:     matrix of standard errors
+#'   - p:      matrix of p-values
+#'   - df_resid: residual degrees of freedom
+hastyDE <- function(y, df) {
+  if (!is.matrix(y) && !inherits(y, "Matrix")) {
+    y <- as.matrix(y)
+  }
+  X <- model.matrix(~ ., df)  # intercept + predictors
+  if (nrow(X) != nrow(y)) stop("nrow(y) must equal nrow(df).")
+
+  n <- nrow(X); p <- ncol(X)
+  coef_names <- colnames(X)[-1]  # drop intercept
+  k <- length(coef_names)
+  if (k == 0) stop("No predictors found.")
+
+  # Crossproducts
+  XtX <- crossprod(X)
+  XtY <- crossprod(X, y)
+
+  # Inverse (with fallback)
+  XtX_inv <- tryCatch(
+    chol2inv(chol(XtX)),
+    error = function(e) solve(XtX)
+  )
+
+  # Coefficients: p x G
+  B <- XtX_inv %*% XtY
+  rownames(B) <- colnames(X)
+
+  # Residual variance
+  yty   <- colSums(y * y)
+  RSS   <- yty - colSums(B * XtY)
+  dfres <- n - p
+  sigma2 <- RSS / dfres  # length G
+
+  # Standard errors: for each predictor j, sqrt(sigma2 * V_jj)
+  Vdiag <- diag(XtX_inv)
+  SE <- vapply((2:p), function(j) sqrt(sigma2 * Vdiag[j]), numeric(length(sigma2)))
+  colnames(SE) <- coef_names
+
+  # Effects and p-values
+  Effect <- as.matrix(t(B[-1, , drop = FALSE]))   # G x k
+  Tstat  <- as.matrix(Effect / SE)
+  Pval   <- 2 * pt(abs(Tstat), df = dfres, lower.tail = FALSE)
+
+  list(
+    effect     = Effect,
+    se         = SE,
+    p          = Pval,
+    df_resid   = dfres
+  )
+}
 
 
- 
+### Example usage:
+# run DE:
+inds.tumor <- meta_data$celltype == "Tumor"
+inds.t <- meta_data$celltype == "Tcell"
+dist2tcell <- FNN::get.knnx(
+  data = xy[inds.t, ], # 2-column matrix of xy locations
+  query = xy[inds.tumor, ], 
+  k = 1)$nn.dist
+
+out <- hastyDE(y = norm[inds.tumor, ], 
+               df = data.frame("dist2tcell" = dist2tcell)) 
+str(out)
+```
+
+### Using subsets to reduce spatial correlation for hasty DE
+
+We can optionally take a modestly effective if statistically wasteful countermeasure to spatial correlation: 
+ rather than including all cells of our cell type, we use a subset of cells sampled to ensure some reasonable spatial distance between all cells. 
+In other words, we can weaken the effect of spatial correlation by tanking our sample size, and therefore our statistical power. In studies involving large numbers of cells over a large tissue, this can be effective.
+E.g., in a whole slide study of ~400 FOVs, we can sample just 12 cells per FOV, leaving a sizeable spatial buffer between cells while still keeping 4800 cells for analysis, an ample number to detect genes with reasonable effect sizes.
+Because of this approach's statistical wastefulness, we recommend it for exploratory analysis only,
+ not for publication. 
+
+```{r echo = TRUE, eval = FALSE}
+
+
+```
  
  
  
