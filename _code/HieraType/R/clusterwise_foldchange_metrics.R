@@ -21,12 +21,21 @@
 #' 
 #' @export
 clusterwise_foldchange_metrics <- function(counts=NULL, normed = NULL, totalcounts = NULL, metadata, cluster_column, cellid_column = "cell_ID"){
- 
+
   stopifnot(cellid_column %in% colnames(metadata)) 
   stopifnot(cluster_column %in% colnames(metadata)) 
   metainfo <- data.table::copy(data.table::data.table(metadata))
+  if(!(cellid_column) %in% colnames(metainfo)){
+    stopifnot(!is.null(rownames(metadata)))
+    cellid_column <- "cell_ID"
+    metainfo[[cellid_column]] <- rownames(metadata)
+  }
+  if(cellid_column!="cell_ID" & ("cell_ID" %in% names(metainfo))) metainfo[["cell_ID"]] <- NULL
+  data.table::setnames(metainfo, old=cellid_column, new="cell_ID")
+  rm(metadata); gc()
+  
   stopifnot("provided 'cellid_column' are not all unique in metadata " = 
-              length(unique(metainfo[[cellid_column]])) == nrow(metainfo))
+              length(unique(metainfo[["cell_ID"]])) == nrow(metainfo))
   
   if(!is.null(counts)){
     if(!is.null(totalcounts)){
