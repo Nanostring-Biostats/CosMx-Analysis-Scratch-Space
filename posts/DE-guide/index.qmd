@@ -612,6 +612,84 @@ Because of this approach's statistical wastefulness, we recommend it for explora
 
 ```
  
+## Multi-tissue analyses 
+
+So far we have only discussed the case of a single-tissue analysis. 
+When analyzing multiple tissues, we have a simple recommendation: 
+ instead of running one giant DE model across all tissues at once, 
+ run your model separately for each tissue. 
+This approach has a few benefits. First, it's easier to manage computationally - you don't need to load several large datasets into memory at once. 
+Second, it's scientifically appealing: we'll usually have relatively few tissues and a whole lot of cells per tissue. 
+This means we're powered to run DE within each tissue, and there are few enough tissues that we have the cognitive ability to understand their results individually rather than averaged together. This per-tissue approach lets you see conclusions like, "T-cells react strongly to tumor cells in these three tissues, but not in these other two." 
+If you want to reduce a DE relationship to a single number, you can always use metaanalysis techniques to get the average relationship across all tissues.
+
+Our favorite way to display a multi-tissue DE analysis is with a heatmap of per-tissue results, 
+ coloring by effect size when results meet a p-value threshold:
  
+ ```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/per_tissue_heatmap.png")
+```
+
+This approach lets you see which DE trends are universal and which are tissue-specific. 
+
+### Best practices for multi-tissue DE:
+
+1. Choose an appropriate single-tissue DE approach as described earlier. We recommend the smiDE library for most cases. 
+2. As with all DE analyses, remove genes failing smiDE's cell overlap ratio metric. 
+3. Display results in a heatmap of genes x tissues. Color by effect size, and only give color to results with p < 0.001 (or choose your own threshold). Show only genes that meet a strong effect size / p-value threshold in at least one tissue.
+4. Summarize each gene's total evidence with a meta-analysis. Wew have had luck with the metafor package. 
+
  
+## Experimental approach: stratifying DE across tissue patches
+
+Here we describe an alternative, experimental approach to DE that we have found to be useful. 
+
+Our motivation is twofold:
+
+1. Biology: we'll often expect a DE relationship to vary across space, or to only occur locally. For example, perhaps T-cells only respond to nearby tumor cells when they're in the nutrient-rich stroma rather than the tumor interior. When we look across the whole tissue for this relationship, we have a harder time discovering it since we model both regions where it occurs and regions where it doesn't. 
+In statistical terminology: unobserved variables across the span of the tissue are acting as effect modifiers. 
+2. Convenience: because accounting for spatial correlation can be slow, running DE on a highly abundant cell type often means making a choice between extreme compute times or using sub-optimal methods that ignore spatial correlation. 
+
+Our solution is to divide the tissue into small patches, then to run DE separately within each patch. 
+This produces a matrix of DE results across genes X patches. 
+Then looking at patch-specific results, we can discover strong relationships that only occur in a few places. 
+And using metaanalysis techniques across all patches, we recover our ability to discover relationships that exist broadly. 
+In short, we get a more nuanced picture of DE behavior within a diverse tissue. 
+
+This approach has one other benefit: when we analyze small patches, spatial correlation becomes less important, 
+ as the spatial context within a given patch will be less variable than spatial context across a whole tissue.
+This lets us run the super-fast \code{hastyDE} algorithm above within each path. 
+The speed benefit of this approach is so great that even in a large WTX dataset we obtain full DE results 
+ across all patches in minutes, while running just a single tissue-wide model for each gene might take a day. 
+
+To support patch-based DE. We have created an algorithm to partition a tissue into patches. 
+This algorithm, "varrymander", attempts to build patches that achieve a balance between the following goals:
+
+- Ensure each patch has reasonable statistical power 
+- Prevent overly large patches
+- Build as many patches as possible
+
+In other words, we seek to gerrymander the tissue into districts of similar size and with high variance 
+ of the predictor variable. 
  
+The varrymander algorithm is available as a .R script [here](___________){target="_blank"}.
+Below is a demonstration of its use:
+
+
+```{r echo = TRUE, eval = FALSE}
+### use varrymander to partition the tissue into patches:
+res <- varrymander()
+
+### run DE in each patch, using hastyDE, which computationally-efficient but ignores spatial correlation:
+
+
+### explore the results:
+
+# find genes with strong results in any region
+
+# use meta-analysis to summarize genes' trends across patches
+
+
+```
+ 
+
