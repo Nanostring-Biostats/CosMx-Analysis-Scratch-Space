@@ -85,7 +85,7 @@ slide_name <- "slideName" # Set this to your slide name, i.e. the identifier at 
 
 # Read flat file exports: 
 meta_data <- read.csv(paste0(raw_data_dir, "/", slide_name, "_metadata_file.csv.gz")) #Note this is a small file and we read it into a data frame for convenience
-xy <- meta_data[, c("y_slide_mm", "x_slide_mm")]  # note we're transposing the axes to make the plots fit better in this doc
+xy <- meta_data[, c("x_slide_mm", "y_slide_mm")]  # note we're transposing the axes to make the plots fit better in this doc
 counts <- read.csv(paste0(raw_data_dir, "/", slide_name, "_exprMat_file.csv.gz")) 
 # normalize:
 norm_factors <- mean(meta_data$nCount_RNA) / meta_data$nCount_RNA 
@@ -112,6 +112,10 @@ plot(xy, pch = 16, cex = 0.3, asp = 1,
 legend("topleft", pch = 16, col = clustcols, legend = names(clustcols), cex = 0.7)
 ```
 
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/celltypemap.png")
+```
+
 
 ### Gallery of Differential Expression setups
 
@@ -135,6 +139,9 @@ plot(xy[inds, ], pch = 16, cex = 0.3, asp = 1,
      xlab = "", ylab = "")
 points(xy[!inds, ], pch = 16, cex = 0.1, col = "grey80")
 legend("topleft", pch = 16, col = c("dodgerblue3", "orange"), legend = paste0("niche = ", levels(as.factor(meta_data$niche))), cex = 0.7)
+```
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/niche.png")
 ```
 
 
@@ -179,6 +186,11 @@ legend("topleft", pch = 16, col = c("#1F78B4", "red", "wheat"),
        legend = c("Tumor cells (colored by distance to T-cells)", "T-cells", "other cells"), cex = 0.7)
 ```
 
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/dist2tcell.png")
+```
+
+
 ### Distance to nearest <anatomical structure>
 
 Many cell types fall in structures, e.g. blood vessels, tumor glands, or glomeruli. 
@@ -217,6 +229,10 @@ legend("topleft", pch = 16, col = c("red", "blue"),
        legend = c("Blood vessel cells", "Vasculature cells excluded by dbscan"))
 ```
 
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/dist2vessel.png")
+```
+
 ### Number of <cell type> in a neighborhood
 
 Another common question: how does a cell type change in response to the abundance of another cell type in its neighborhood? Here we'll log-transform our predictor to acknowledge the probability of diminishing effects of each new T-cell in a tumor cell's neighborhood. 
@@ -247,6 +263,10 @@ points(xy[!inds.tumor, ], pch = 16, cex = 0.1, col = "wheat")
 points(xy[inds.t, ], pch = 16, cex = 0.3, col = "red")
 legend("topleft", pch = 16, col = c("#1F78B4", "red", "wheat"), 
        legend = c("Tumor cells colored by log2(number of neighboring T-cells)", "T-cells", "other cells"), cex = 0.7)
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/ntcells.png")
 ```
 
 
@@ -287,12 +307,9 @@ legend("topleft", pch = 16, col = c("#1F78B4", "wheat"),
 
 ```
 
-### 
-
-### Projection along an axis
-
-Often tissues have a clear orientation, e.g. from the surface to the interior, 
- or 
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/cxcl14.png")
+```
 
 
 ### Distance to a hand-selected region
@@ -693,3 +710,27 @@ res <- varrymander()
 ```
  
 
+## Comment on statistical power and false discoveries
+
+Very large numbers of cells give us very high statistical power to detect even tiny effect sizes. 
+Paradoxically, this creates a hazard for analysts,
+as our high statistical power applies both to real effects **and** to the effects of unmeasured confounding variables. Now it's usually a safe assumption that a given gene is being influences by a variety of factors in a tissue, many 
+ of them unmeasured and at least lightly correlated with your design variable. 
+In other words, any given gene is likely subject to unmeasured confounding, meaning there's a false positive signal that we are well-powered to find significant and get fooled by. 
+
+The countermeasure to this phenomenon is simple: don't get excited by p-values, but rather focus on effect sizes. 
+The stronger a gene's fold-change with your design variable, the more likely the change you see is driven by your design variable rather than unobserved confounders. You should still apply a reasonable p-value or FDR cutoff, but beyond that cutoff you should rank genes by effect size.  
+
+
+## The limitations of DE
+
+DE analyses have a tidy framework: you specify variables that you hypothesize will impact gene 
+ expression, then you look for which genes correlate with those variables. 
+But when we look at gene expression in space, we often find variability far beyond the explanatory ability of 
+ any variables we known enough to specify. 
+In other words, the spatial determinants of gene expression are far more complicated than the DE models 
+ our limited biological knowledge is able to produce. 
+This does not mean the DE is futile - we still consider it the primary tool for wringing biology from spatial data - but it's worth keeping some implications of this phenomenon in mind: 
+
+1. When DE identifies a gene, look at its expression in space and evaluate: how much of its variability is due to your design variable? Are there other strong spatial trends that suggest a different explanation? 
+2. To understand a tissue, you should also pursue approaches that are not limited by the design variables you specify. Look for spatial variable genes, or for [spatially correlated genes](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/){target="_blank"}, or for perturbed spatial neighborhoods(https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitudiff/){target="_blank"}. These unsupervised, exploratory approaches will reveal the strongest spatial signals in your data without requiring you to know the full set of explanatory variables a priori. 
