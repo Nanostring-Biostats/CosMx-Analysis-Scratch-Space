@@ -161,10 +161,21 @@ disease states like areas of inflammation, or custom constructs like "near vs. f
 In general, such partitions of the data can be built by applying the code of the following examples,
 using thresholds to dichotomize continuous variables as needed.
 
+For example, in a past anaylsis of a kidney, we defined niches as follows:
+
+- "glomeruli": cells with >30% of their nearest neighbors being glomerulus-specific cell types (podocyte, mesangial cell, glomerular endothelial cells).
+- "glomerular boundary": cells within a fixes distance of glomeruli
+- "tubulointerstitium": everything else
+- "immune hotspots": cells with >10 immune cells in their nearest neighbors. This overrode all the above annotations. 
+
+This approach was driven by our knowledge of the tissue and by our biological questions. 
+
 
 ### Distance to nearest <cell type>
 
-Below, we score tumor cells by distance to the nearest T-cell:
+A common and productive DE question is: how does my favorite cell type change with proximity to another cell type? 
+
+To demonstrate how to ask this kind of question, below we score tumor cells by their distance to the nearest T-cell:
 
 ```{r echo = TRUE, eval = FALSE}
 ## Calculate tumor cells' distance to nearest T-cell:
@@ -217,7 +228,14 @@ plot(xy[, ], pch = 16, cex = 0.1, asp = 1,
      main = "Vasculature", col = "grey80",
      xlab = "", ylab = "")
 points(xy[inds, ], pch = 16, cex = 0.3, col = "darkred")
+```
 
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/vessel.png")
+```
+
+```{r echo = FALSE, eval = TRUE}
 ## use dbscan to isolate clusters of Vasculature cells:
 db <- dbscan::dbscan(xy[inds, ],
                      eps = 0.05, # very small radius
@@ -237,9 +255,13 @@ legend("topleft", pch = 16, col = c("red", "blue"),
        legend = c("Blood vessel cells", "Vasculature cells excluded by dbscan"))
 ```
 
+
 ```{r echo = FALSE, eval = TRUE}
-knitr::include_graphics("figures/dist2vessel.png")
+knitr::include_graphics("figures/vesseldb.png")
 ```
+
+After obtaining this cleaned up annotation, we could then take the distance to it using  
+ code from the tumor distance to T-cell example earlier. 
 
 ### Number of <cell type> in a neighborhood
 
@@ -551,9 +573,7 @@ The performance of Gaussian models is generally acceptable, making them a reason
 smiDE implements all these options under a variety of spatial correlation-aware methods. 
 
 
-## Approaches for maximal speed
-
-### Simultaneous fitting of all genes using linear algebra
+## Approach for maximal speed: simultaneous fitting of all genes using linear algebra
 
 Unfortunately, there’s a cost in compute time and money to many of the more theoretically optimal DE approaches
 (e.g. using a NB distribution, accounting for spatial correlation, adjusting for bias from segmentation errors). 
@@ -700,7 +720,7 @@ This algorithm, "varrymander", attempts to build patches that achieve a balance 
 In other words, we seek to gerrymander the tissue into districts of similar size and with high variance 
  of the predictor variable. 
  
-The varrymander algorithm is available as a .R script [here](___________){target="_blank"}.
+The varrymander algorithm is available as a .R script [here](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/varrymander/varrymander.R){target="_blank"}.
 
 Below is a demonstration of varrymander's use in DE. 
 
@@ -739,8 +759,6 @@ plot(xy[inds.tumor, ], pch = 16, cex = 0.3, asp = 1,
        1 + round(100 * dist2tcell / max(dist2tcell))
      ],
      xlab = "", ylab = "")
-# points(xy[!inds.tumor, ], pch = 16, cex = 0.1, col = "wheat")
-# points(xy[inds.t, ], pch = 16, cex = 0.3, col = "red")
 for (i in 1:length(polys)) {
   plot(polys[[i]], add = TRUE, wpoints = F, col = "black")
 }
@@ -754,17 +772,43 @@ And now we run DE within each patch:
 
 ```{r echo = TRUE, eval = FALSE}
 ### run DE in each patch, using hastyDE, which computationally-efficient but ignores spatial correlation:
-
+deresults <- list()
+for (bin in setdiff(unique(res), NA)) {
+  thisbininds <- (res == bin) & !is.na(res)
+  deresults[[bin]] <- hastyDE(
+    y = norm[inds.tumor, ][thisbininds, ],
+    df = data.frame("dist2tcell" = dist2tcell[thisbininds])
+  )
+}
 
 ### explore the results:
+pvals <- sapply(deresults, function(tmp){tmp$p})
+ests <- sapply(deresults, function(tmp){tmp$effect})
+ses <- sapply(deresults, function(tmp){tmp$se})
+rownames(pvals) <- rownames(ests) <- rownames(ses) <- colnames(norm)
 
 # find genes with strong results in any region
+lowestp <- apply(pvals, 1, min)
+topgenes1 <- names(lowestp)[order(lowestp, decreasing = TRUE)[1:50]]
 
 # use meta-analysis to summarize genes' trends across patches
+metapvals <- sapply(rownames(pvals), function(gene) {
+  fit <- metafor::rma.uni(yi = ests[gene, ], sei = ses[gene, ], method = "REML")
+  return(fit$pval)
+})
+topgenes2 <- names(metapvals)[order(metapvals, decreasing = TRUE)[1:50]]
 
-
+## now use a heatmap to plot results from either list of top genes:
+pheatmap::pheatmap((ests * (pvals < 1e-3))[topgenes1, ],
+         col = colorRampPalette(c("darkblue", "white", "darkred"))(100),
+         breaks = seq(-1, 1, length.out = 101))
 ```
  
+Below is an example snippet of a heatmap of DE results on varrymander patches from a larger study:
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/deheatmap.png")
+```
 
 ## Comment on statistical power and false discoveries
 
@@ -784,8 +828,8 @@ DE analyses have a tidy framework: you specify variables that you hypothesize wi
  expression, then you look for which genes correlate with those variables. 
 But when we look at gene expression in space, we often find variability far beyond the explanatory ability of 
  any variables we known enough to specify. 
-In other words, the spatial determinants of gene expression are far more complicated than the DE models 
- our limited biological knowledge is able to produce. 
+In other words, the spatial determinants of gene expression are far more complicated than the DE models
+we build from our limited biological knowledge. 
 This does not mean the DE is futile - we still consider it the primary tool for wringing biology from spatial data - but it's worth keeping some implications of this phenomenon in mind: 
 
 1. When DE identifies a gene, look at its expression in space and evaluate: how much of its variability is due to your design variable? Are there other strong spatial trends that suggest a different explanation? 
