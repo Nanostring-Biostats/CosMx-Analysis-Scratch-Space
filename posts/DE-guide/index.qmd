@@ -701,13 +701,58 @@ In other words, we seek to gerrymander the tissue into districts of similar size
  of the predictor variable. 
  
 The varrymander algorithm is available as a .R script [here](___________){target="_blank"}.
-Below is a demonstration of its use:
+
+Below is a demonstration of varrymander's use in DE. 
+
+First we use varrymander to define patches:
 
 
 ```{r echo = TRUE, eval = FALSE}
 ### use varrymander to partition the tissue into patches:
-res <- varrymander()
 
+# define your design variable:
+inds.tumor <- meta_data$celltype == "Tumor"
+inds.t     <- meta_data$celltype == "Tcell"
+stopifnot(any(inds.tumor), any(inds.t))
+dist2tcell <- FNN::get.knnx(
+  data  = as.matrix(xy[inds.t, , drop=FALSE]),
+  query = as.matrix(xy[inds.tumor, , drop=FALSE]),
+  k = 1
+)$nn.dist[, 1]
+res <- varrymander(xy = xy[inds.tumor, ], 
+                   X = dist2tcell, 
+                   dbscan_eps = 0.05, maxdbsize = 50, 
+                   maxradius = 0.25,
+                   totvarthresh = .25  # recommend default of 100 for most cases 
+)
+str(res)
+
+# to view, draw polygon boundaries around each patch:
+polys <- list()
+for (patch in setdiff(unique(res), NA)) {
+  inds <- (res == patch) & !is.na(res)
+  polys[[as.character(patch)]] <- alphahull::ahull(xy[inds.tumor, ][inds, ], alpha = 0.5)
+}
+plot(xy[inds.tumor, ], pch = 16, cex = 0.3, asp = 1,
+     main = "Tumor cells colored by distance to T-cell",
+     col = colorRampPalette(c(c("#A6CEE3","#1F78B4","#081D58", "black")))(101)[
+       1 + round(100 * dist2tcell / max(dist2tcell))
+     ],
+     xlab = "", ylab = "")
+# points(xy[!inds.tumor, ], pch = 16, cex = 0.1, col = "wheat")
+# points(xy[inds.t, ], pch = 16, cex = 0.3, col = "red")
+for (i in 1:length(polys)) {
+  plot(polys[[i]], add = TRUE, wpoints = F, col = "black")
+}
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/varrymander.png")
+```
+
+And now we run DE within each patch:
+
+```{r echo = TRUE, eval = FALSE}
 ### run DE in each patch, using hastyDE, which computationally-efficient but ignores spatial correlation:
 
 
