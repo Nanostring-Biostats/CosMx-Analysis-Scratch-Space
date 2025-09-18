@@ -71,6 +71,9 @@ Also nice: you can use plots like the below to show how each gene changes expres
 knitr::include_graphics("figures/bins.png")
 ```
 
+Note: When binning, examine the number of cells per bin. If some bins have too few cells to produce stable results, either consider discarding them, or take wider bins. 
+
+
 ### Example data
 
 First, let's pull in data in a standard format. We'll assume you're starting with flat files exported from AtoMx, 
@@ -85,8 +88,10 @@ slide_name <- "slideName" # Set this to your slide name, i.e. the identifier at 
 
 # Read flat file exports: 
 meta_data <- read.csv(paste0(raw_data_dir, "/", slide_name, "_metadata_file.csv.gz")) #Note this is a small file and we read it into a data frame for convenience
-xy <- meta_data[, c("x_slide_mm", "y_slide_mm")]  # note we're transposing the axes to make the plots fit better in this doc
-counts <- read.csv(paste0(raw_data_dir, "/", slide_name, "_exprMat_file.csv.gz")) 
+xy <- meta_data[, c("x_slide_mm", "y_slide_mm")]  
+counts <- as.matrix(data.table::fread(  
+  file.path(raw_data_dir, paste0(slide_name, "_exprMat_file.csv.gz"))
+))  # <-------------------------------- PROBABLY WRONG ------------------------ #
 # normalize:
 norm_factors <- mean(meta_data$nCount_RNA) / meta_data$nCount_RNA 
 norm <- Matrix::Diagonal(x = norm_factors) %*% counts
@@ -138,7 +143,7 @@ plot(xy[inds, ], pch = 16, cex = 0.3, asp = 1,
      col = c("dodgerblue3", "orange")[as.numeric(as.factor(meta_data$niche[inds]))],
      xlab = "", ylab = "")
 points(xy[!inds, ], pch = 16, cex = 0.1, col = "grey80")
-legend("topleft", pch = 16, col = c("dodgerblue3", "orange"), legend = paste0("niche = ", levels(as.factor(meta_data$niche))), cex = 0.7)
+legend("topleft", pch = 16, col = c("dodgerblue3", "orange"), legend = paste0("niche = ", levels(as.factor(meta_data$niche[inds]))), cex = 0.7)
 ```
 ```{r echo = FALSE, eval = TRUE}
 knitr::include_graphics("figures/niche.png")
@@ -164,11 +169,14 @@ Below, we score tumor cells by distance to the nearest T-cell:
 ```{r echo = TRUE, eval = FALSE}
 ## Calculate tumor cells' distance to nearest T-cell:
 inds.tumor <- meta_data$celltype == "Tumor"
-inds.t <- meta_data$celltype == "Tcell"
+inds.t     <- meta_data$celltype == "Tcell"
+stopifnot(any(inds.tumor), any(inds.t))
 dist2tcell <- FNN::get.knnx(
-  data = xy[inds.t, ], # 2-column matrix of xy locations
-  query = xy[inds.tumor, ], 
-  k = 1)$nn.dist
+  data  = as.matrix(xy[inds.t, , drop=FALSE]),
+  query = as.matrix(xy[inds.tumor, , drop=FALSE]),
+  k = 1
+)$nn.dist[, 1]
+
 
 ## plot tumor cells, coloring by distance to T-cell:
 
@@ -428,8 +436,7 @@ plot(xy, pch = 16, cex = 0.3, asp = 1,
      col = clustcols[meta_data$celltype], xlab = "", ylab = "")
 
 # place a grid over it to determine where to pick boudnary points:
-abline(h = round(xy[, 2], 1))
-abline(v = round(xy[, 1], 1))
+abline(h = pretty(range(xy[,2]), n=30), v = pretty(range(xy[,1]), n=30), lty=3, col="grey20")
 
 # select points by hand:
 boundary_points <- t(matrix(c(
@@ -510,8 +517,8 @@ We propose two countermeasures to this bias, both implemented in the smiDE packa
 If you're running DE on T-cells, don't include genes like EPCAM, which is highly abundant in tumor cells and nearly absent in T-cells. smiDE implements a simple filter to flag genes based on their risk of cell segmentation bias - see the function ```overlap_ratio_metric()```.
 
 2. **In the remaining genes, adjust for minor bias.** We measure a gene's potential to suffer 
- misassignment into a cell using its mean expression around the cell. This then becomes a term in
- DE models. Taking this step mitigates, though does not fully remove, bias from segmentation errors. 
+ misassignment into a cell using its mean expression *in other cell types* around the cell. This then becomes a term in DE models. 
+Taking this step mitigates bias from segmentation errors, though does not fully remove it. 
 
  
 ### Accounting for spatial correlation
@@ -632,20 +639,7 @@ out <- hastyDE(y = norm[inds.tumor, ],
 str(out)
 ```
 
-### Using subsets to reduce spatial correlation for hasty DE
 
-We can optionally take a modestly effective if statistically wasteful countermeasure to spatial correlation: 
- rather than including all cells of our cell type, we use a subset of cells sampled to ensure some reasonable spatial distance between all cells. 
-In other words, we can weaken the effect of spatial correlation by tanking our sample size, and therefore our statistical power. In studies involving large numbers of cells over a large tissue, this can be effective.
-E.g., in a whole slide study of ~400 FOVs, we can sample just 12 cells per FOV, leaving a sizeable spatial buffer between cells while still keeping 4800 cells for analysis, an ample number to detect genes with reasonable effect sizes.
-Because of this approach's statistical wastefulness, we recommend it for exploratory analysis only,
- not for publication. 
-
-```{r echo = TRUE, eval = FALSE}
-
-
-```
- 
 ## Multi-tissue analyses 
 
 So far we have only discussed the case of a single-tissue analysis. 
@@ -671,7 +665,7 @@ This approach lets you see which DE trends are universal and which are tissue-sp
 1. Choose an appropriate single-tissue DE approach as described earlier. We recommend the smiDE library for most cases. 
 2. As with all DE analyses, remove genes failing smiDE's cell overlap ratio metric. 
 3. Display results in a heatmap of genes x tissues. Color by effect size, and only give color to results with p < 0.001 (or choose your own threshold). Show only genes that meet a strong effect size / p-value threshold in at least one tissue.
-4. Summarize each gene's total evidence with a meta-analysis. Wew have had luck with the metafor package. 
+4. Summarize each gene's total evidence with a meta-analysis. We have had luck with the metafor package. 
 
  
 ## Experimental approach: stratifying DE across tissue patches
@@ -692,7 +686,7 @@ In short, we get a more nuanced picture of DE behavior within a diverse tissue.
 
 This approach has one other benefit: when we analyze small patches, spatial correlation becomes less important, 
  as the spatial context within a given patch will be less variable than spatial context across a whole tissue.
-This lets us run the super-fast \code{hastyDE} algorithm above within each path. 
+This lets us run the super-fast \code{hastyDE} algorithm above within each patch. 
 The speed benefit of this approach is so great that even in a large WTX dataset we obtain full DE results 
  across all patches in minutes, while running just a single tissue-wide model for each gene might take a day. 
 
@@ -750,4 +744,15 @@ In other words, the spatial determinants of gene expression are far more complic
 This does not mean the DE is futile - we still consider it the primary tool for wringing biology from spatial data - but it's worth keeping some implications of this phenomenon in mind: 
 
 1. When DE identifies a gene, look at its expression in space and evaluate: how much of its variability is due to your design variable? Are there other strong spatial trends that suggest a different explanation? 
-2. To understand a tissue, you should also pursue approaches that are not limited by the design variables you specify. Look for spatial variable genes, or for [spatially correlated genes](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/){target="_blank"}, or for perturbed spatial neighborhoods(https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitudiff/){target="_blank"}. These unsupervised, exploratory approaches will reveal the strongest spatial signals in your data without requiring you to know the full set of explanatory variables a priori. 
+Taking the Moran's I stat of a gene's residuals could also be useful:
+
+```{r echo = TRUE, eval = FALSE}
+inds.tumor <- meta_data$celltype == "Tumor"
+W <- spdep::dnearneigh(xy[inds.tumor, ], 0, quantile(FNN::get.knn(xy[inds.tumor, ], k=1)$nn.dist[,1], .95))
+Wl <- spdep::nb2listw(W, style="W", zero.policy = TRUE)
+outcome <- norm[inds.tumor, "VEGFA"]
+predictor <- dist2tcell
+spdep::moran.test(residuals(lm(outcome ~ predictor)), Wl)
+```
+
+2. To understand a tissue, you should also pursue approaches that are not limited by the design variables you specify. Look for spatial variable genes, or for [spatially correlated genes](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitucor/){target="_blank"}, or for [perturbed spatial neighborhoods](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitudiff/){target="_blank"}. These unsupervised, exploratory approaches will reveal the strongest spatial signals in your data without requiring you to know the full set of explanatory variables a priori. 
