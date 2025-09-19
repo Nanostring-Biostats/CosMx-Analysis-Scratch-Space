@@ -17,7 +17,7 @@ number-depth: 4
 date: "2025-09-20"
 date-modified: last-modified
 categories:
-  - visualization
+  - differential expression
 image: figures/thumbnail.png
 description: "A broad review of topics in differential expression, including extensive examples of how to set up well-crafted DE questions."
 draft: false
@@ -37,7 +37,7 @@ CosMx analyses often culminate in a differential expression (DE) analysis. Explo
 
 Or, in the general form:
 
-"How does <my favorite cell type> change in response to <some aspect of its environment>?"
+"How does *my favorite cell type* change in response to *some aspect of its environment*?"
 
 The goal of this post is to review major topics in DE in spatial transcriptomics, and to provide code when necessary. 
 
@@ -67,7 +67,7 @@ Because we usually have so many cells to work with, the slight loss in statistic
  comes with this approach is usually a cheap tradeoff to make for its flexibility.
 Also nice: you can use plots like the below to show how each gene changes expression across bins:
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "110%}
 knitr::include_graphics("figures/bins.png")
 ```
 
@@ -105,6 +105,11 @@ Here's a glance at all the metadata we'll use:
 head(meta_data)
 ```
 
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
+knitr::include_graphics("figures/metadatatable.png")
+```
+
+
 ...and the sample itself:
 
 
@@ -117,7 +122,7 @@ plot(xy, pch = 16, cex = 0.3, asp = 1,
 legend("topleft", pch = 16, col = clustcols, legend = names(clustcols), cex = 0.7)
 ```
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/celltypemap.png")
 ```
 
@@ -145,7 +150,7 @@ plot(xy[inds, ], pch = 16, cex = 0.3, asp = 1,
 points(xy[!inds, ], pch = 16, cex = 0.1, col = "grey80")
 legend("topleft", pch = 16, col = c("dodgerblue3", "orange"), legend = paste0("niche = ", levels(as.factor(meta_data$niche[inds]))), cex = 0.7)
 ```
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/niche.png")
 ```
 
@@ -171,7 +176,7 @@ For example, in a past anaylsis of a kidney, we defined niches as follows:
 This approach was driven by our knowledge of the tissue and by our biological questions. 
 
 
-### Distance to nearest <cell type>
+### Distance to nearest cell from a given cluster / group
 
 A common and productive DE question is: how does my favorite cell type change with proximity to another cell type? 
 
@@ -184,19 +189,19 @@ inds.t     <- meta_data$celltype == "Tcell"
 stopifnot(any(inds.tumor), any(inds.t))
 dist2tcell <- FNN::get.knnx(
   data  = as.matrix(xy[inds.t, , drop=FALSE]),
-  query = as.matrix(xy[inds.tumor, , drop=FALSE]),
+  query = as.matrix(xy),
   k = 1
 )$nn.dist[, 1]
-
+# store in metadata:
+meta_data$dist2tcell <- dist2tcell
 
 ## plot tumor cells, coloring by distance to T-cell:
-
 par(mar = c(0,0,2,0))
 plot(xy[inds.tumor, ], pch = 16, cex = 0.3, asp = 1,
      main = "Tumor cells colored by distance to T-cell",
      col = colorRampPalette(c(c("#A6CEE3","#1F78B4","#081D58", "black")))(101)[
        1 + round(100 * dist2tcell / max(dist2tcell))
-     ],
+     ][inds.tumor],
      xlab = "", ylab = "")
 points(xy[!inds.tumor, ], pch = 16, cex = 0.1, col = "wheat")
 points(xy[inds.t, ], pch = 16, cex = 0.3, col = "red")
@@ -205,12 +210,12 @@ legend("topleft", pch = 16, col = c("#1F78B4", "red", "wheat"),
        legend = c("Tumor cells (colored by distance to T-cells)", "T-cells", "other cells"), cex = 0.7)
 ```
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/dist2tcell.png")
 ```
 
 
-### Distance to nearest <anatomical structure>
+### Distance to nearest cell from an anatomical structure
 
 Many cell types fall in structures, e.g. blood vessels, tumor glands, or glomeruli. 
 When calculating distance to a structure, it is tempting to simply record distance to the nearest
@@ -231,7 +236,7 @@ points(xy[inds, ], pch = 16, cex = 0.3, col = "darkred")
 ```
 
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/vessel.png")
 ```
 
@@ -243,6 +248,8 @@ db <- dbscan::dbscan(xy[inds, ],
 inds.in.clusters <- db != 0
 is.vessel <- inds
 is.vessel[which(inds)] <- inds.in.clusters
+# store in metadata:
+meta_data$is.vessel <- is.vessel
 
 ## show the result:
 par(mar = c(0,0,2,0))
@@ -256,14 +263,14 @@ legend("topleft", pch = 16, col = c("red", "blue"),
 ```
 
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/vesseldb.png")
 ```
 
 After obtaining this cleaned up annotation, we could then take the distance to it using  
  code from the tumor distance to T-cell example earlier. 
 
-### Number of <cell type> in a neighborhood
+### Number of a given cell type in a neighborhood
 
 Another common question: how does a cell type change in response to the abundance of another cell type in its neighborhood? Here we'll log-transform our predictor to acknowledge the probability of diminishing effects of each new T-cell in a tumor cell's neighborhood. 
 
@@ -281,13 +288,16 @@ neighbors.radius <- InSituCor:::radiusBasedGraph(x = xy[, 1], y = xy[, 2], R = 0
 neighboring.tcells <- InSituCor:::neighbor_sum(x = 1 * (meta_data$celltype == "Tcell"),
                                                neighbors = neighbors)
 log.neighboring.tcells <- log2(1 + neighboring.tcells)
+# store in metadata:
+meta_data$log.neighboring.tcells <- log.neighboring.tcells
+
 # color tumor cells by the number of T-cell neighbors:
 par(mar = c(0,0,2,0))
 plot(xy[inds.tumor, ], pch = 16, cex = 0.3, asp = 1,
      main = "Tumor cells colored by log2(number of T-cell neighbors)",
      col = colorRampPalette(c(c("#A6CEE3","#1F78B4","#081D58", "black")))(101)[
-       1 + round(100 * log.neighboring.tcells[inds.tumor] / max(log.neighboring.tcells[inds.tumor]))
-     ],
+       1 + round(100 * log.neighboring.tcells / max(log.neighboring.tcells))
+     ][inds.tumor],
      xlab = "", ylab = "")
 points(xy[!inds.tumor, ], pch = 16, cex = 0.1, col = "wheat")
 points(xy[inds.t, ], pch = 16, cex = 0.3, col = "red")
@@ -295,7 +305,7 @@ legend("topleft", pch = 16, col = c("#1F78B4", "red", "wheat"),
        legend = c("Tumor cells colored by log2(number of neighboring T-cells)", "T-cells", "other cells"), cex = 0.7)
 ```
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/ntcells.png")
 ```
 
@@ -321,6 +331,9 @@ normvals <- counts[, "CXCL14"] / meta_data$nCount_RNA
 neighboring.cxcl14 <- InSituCor:::neighbor_sum(x = normvals,
                                                neighbors = neighbors)
 log2.neighboring.cxcl14 <- log2(1 + neighboring.cxcl14)
+# add to metadata:
+meta_data$log2.neighboring.cxcl14 <- log2.neighboring.cxcl14
+
 ## plot macrophages, coloring by local CXCL14 expression:
 inds.mac <- meta_data$celltype == "Macrophage"
 par(mar = c(0,0,2,0))
@@ -329,15 +342,15 @@ plot(xy, pch = 16, cex = 0.1, asp = 1, col = "wheat",
      xlab = "", ylab = "")
 points(xy[inds.mac, ], pch = 16, cex = 0.4, 
             col = colorRampPalette(c(c("#A6CEE3","#1F78B4","#081D58", "black")))(101)[
-       1 + round(100 * log2.neighboring.cxcl14[inds.mac] / max(log2.neighboring.cxcl14[inds.mac]))
-     ])
+       1 + round(100 * log2.neighboring.cxcl14 / max(log2.neighboring.cxcl14))
+     ][inds.mac])
 legend("topleft", pch = 16, col = c("#1F78B4", "wheat"), 
        legend = c("Macrophages colored by log2(neighborhood CXCL14 expression)", "other cells"), cex = 0.7)
 
 
 ```
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/cxcl14.png")
 ```
 
@@ -439,7 +452,7 @@ roi <- defineROI(xy, type = "direct", show = TRUE)
 ```
 
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/ROI.png")
 ```
 
@@ -474,7 +487,7 @@ roi <- defineROI(xy, type = NULL, boundary_points = boundary_points, show = TRUE
 ```
 
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/gridROI.png")
 ```
 
@@ -486,16 +499,20 @@ inds.mac <- meta_data$celltype == "Macrophage"
 inds.roi <- roi$roi
 dist2roi <- FNN::get.knnx(
   data = xy[inds.roi, ], # 2-column matrix of xy locations
-  query = xy[inds.mac, ], 
+  query = xy, 
   k = 1)$nn.dist
+# add to metadata:
+meta_data$dist2roi <- dist2roi
 
+
+## plot:
 par(mar = c(0,0,0,0))
 plot(xy, pch = 16, cex = 0.1, asp = 1,
      col = "wheat", xlab = "", ylab = "")
 points(xy[inds.roi, ], pch = 16, col = "orange", cex = 0.5)
 points(xy[inds.mac, ], pch = 16, cex = 0.5,
        col = colorRampPalette(c("#A6CEE3","#1F78B4","#081D58", "black"))(101)[
-       1 + round(100 * dist2roi / max(dist2roi))])
+       1 + round(100 * dist2roi / max(dist2roi))][inds.mac])
 legend("topleft", pch = 16,
        col = c("#1F78B4", "orange", "wheat"),
        legend = c("Macrophages colored by distance to ROI",
@@ -505,7 +522,7 @@ legend("topleft", pch = 16,
 ```
 
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/dist2roi.png")
 ```
 
@@ -674,8 +691,8 @@ If you want to reduce a DE relationship to a single number, you can always use m
 Our favorite way to display a multi-tissue DE analysis is with a heatmap of per-tissue results, 
  coloring by effect size when results meet a p-value threshold:
  
-```{r echo = FALSE, eval = TRUE}
-knitr::include_graphics("figures/deheatmap.png")
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
+knitr::include_graphics("figures/per_tissue_heatmap.png")
 ```
 
 This approach lets you see which DE trends are universal and which are tissue-specific. 
@@ -729,6 +746,7 @@ First we use varrymander to define patches:
 
 ```{r echo = TRUE, eval = FALSE}
 ### use varrymander to partition the tissue into patches:
+source("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/varrymander/varrymander.R")
 
 # define your design variable:
 inds.tumor <- meta_data$celltype == "Tumor"
@@ -764,7 +782,7 @@ for (i in 1:length(polys)) {
 }
 ```
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/varrymander.png")
 ```
 
@@ -806,7 +824,7 @@ pheatmap::pheatmap((ests * (pvals < 1e-3))[topgenes1, ],
  
 Below is an example snippet of a heatmap of DE results on varrymander patches from a larger study:
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
 knitr::include_graphics("figures/deheatmap.png")
 ```
 
