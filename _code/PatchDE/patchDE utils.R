@@ -1,11 +1,11 @@
-#' Gerrymander cells into districts with high statistical power to study 
+#' Divide cells into spatially contiguous patches with high statistical power to study a variable of interest.
 #' @param xy Matrix of cells' positions
 #' @param X Vector to be studied within each district, i.e. vector to optimize power to study.
 #' @param dbscan_eps arg for dbscan clustering of hotspot cells
 #' @param maxdbsize break up dbclusts bigger than this
 #' @param maxradius cells must be at least this close to a hotspot cell to be included in a cluster
 #' @return A vector of district assignments. Can be NA. 
-varrymander <- function(xy, X, dbscan_eps = 0.05, maxdbsize = 50, maxradius = 0.3, totvarthresh = 100) {
+drawPatches <- function(xy, X, dbscan_eps = 0.05, maxdbsize = 50, maxradius = 0.3, totvarthresh = 100) {
   
   ## Get local X, X^2, var:
   neighbors <- InSituCor:::nearestNeighborGraph(x = xy[, 1], y = xy[, 2], N = 50)
@@ -172,21 +172,31 @@ cluster_by_threshold <- function(adj, X, X2, N, thresh) {
   return(paste0("bin", cluster_id))
 }
 
-
-getpolys <- function(xy, clust) {
+#' Find rough polygon boundaries of patches for visualizations
+#' @param xy Cells' xy positions
+#' @param patch Vector of patch assignments, aligned to the rows of xy
+#' @return A named list of polygons, one per patch
+#' @export
+getPatchPolys <- function(xy, patch) {
   polys <- list()
-  cluster_levels <- unique(clust)
-  for (i in seq_along(unique(clust))) {
+  cluster_levels <- unique(patch)
+  for (i in seq_along(unique(patch))) {
     k <- cluster_levels[i]
-    idx <- which(clust == k)
+    idx <- which(patch == k)
     
     # Only attempt hull if >= 3 points
     if (length(idx) >= 3) {
       pts_k <- xy[idx, , drop = FALSE]       # M_k × 2 matrix of points in cluster k
       hull_indices <- chull(pts_k)           # indices (1..M_k) along the convex hull
       polys[[i]]  <- pts_k[hull_indices, ]       # hull vertices, in order
-      names(polys)[i] <- unique(clust)[i]
+      names(polys)[i] <- unique(patch)[i]
     }
   }
   return(polys)
+}
+
+
+#' patchDE: run DE over all patches
+patchDE <- function(y, df, patch) {
+  
 }

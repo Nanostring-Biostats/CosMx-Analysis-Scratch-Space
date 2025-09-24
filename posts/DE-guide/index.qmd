@@ -25,7 +25,7 @@ draft: false
 
 ## Introduction
 
-CosMx analyses often culminate in a differential expression (DE) analysis. Exploratory analyses uncover all manner of interesting trends, and then these trends suggest hypotheses that can be tested with DE. A surprising breadth of questions can be framed as DE problems. To give a few examples:
+CosMx (R) SMI analyses often culminate in a differential expression (DE) analysis. Exploratory analyses uncover all manner of interesting trends, and then these trends suggest hypotheses that can be tested with DE. A surprising breadth of questions can be framed as DE problems. To give a few examples:
 
 -	How do tumor cells respond to the presence of T-cells?
 -	How do microglia activate in regions of inflammation? 
@@ -50,8 +50,8 @@ Our experience suggests that most studies demand a highly custom DE question who
 ### Important note: treatment of continuous variables
 
 Say we want to run DE against a continuous variable like distance to a cell type, or the expression level of a cytokine in a cell's neighbors. 
-We can calculate that distance (or expression level) and use it as a predictor in our model. 
-However, in doing so we implicitly assume a linear relationship between the variable and our outcome. 
+We can calculate that distance (or neighborhood expression level) and use it as a predictor in our model. 
+However, in doing so we implicitly assume a linear relationship between the variable and our outcome (either linear or log-scale gene expression, depending on the model). 
 Other models might be more appropriate: we could consider transforming the variable, 
  or we could break it into bins for a non-parametric approach. 
 In particular, we have often found that binning of continuous variables produces satisfactory results.
@@ -59,10 +59,12 @@ In particular, we have often found that binning of continuous variables produces
 #### Transformations:
 - If you think distance to a feature matters because of some diffused signals, then concentration of those molecules will vary with $distance^{-1}$.
 - If neighborhood expression of a molecule is strongly right-tailed, which is likely, then a log transformation could prevent the end of the tail from having undue influence.
+- To make effect sizes more interpretable, scale the variable from 0-1. 
+- For variables with strong skew or long tails, a quantile transformation can prevent extreme values from exerting excess influence on DE results.
 
 #### Binning / discretizing:
 You can avoid assumptions about the shape of a variable by binning it, e.g. assigning cells to 20 bins of "distance to nearest T-cell". 
-Then, you can use a likelihood ratio test to test the compound null hypothesis that "this variable predicts expression." 
+Then, you can use a likelihood ratio test against a null model (intercept-only) to test the compound null hypothesis that "this variable predicts expression." 
 Because we usually have so many cells to work with, the slight loss in statistical power that 
  comes with this approach is usually a cheap tradeoff to make for its flexibility.
 Also nice: you can use plots like the below to show how each gene changes expression across bins:
@@ -73,6 +75,36 @@ knitr::include_graphics("figures/bins.png")
 
 Note: When binning, examine the number of cells per bin. If some bins have too few cells to produce stable results, either consider discarding them, or take wider bins. 
 
+#### Splines: flexibility without bins
+
+Discretizing / binning has one drawback: the fit to discretized variables can be highly discontinuous, 
+ e.g. with a single bin having a large estimated effect size. 
+It often makes sense to assume your design variable's impact on gene expression varies smoothly 
+ across its range. 
+To achieve this, you can use splines:
+
+```{r echo = TRUE, eval = FALSE, out.width = "110%}
+# define a continuous variable:
+x <- rnorm(5000)
+# fit splines to it, producing a matrix of 10 dimensions:
+splinex <- as.matrix(splines::ns(x, df = 20))
+# the "splinex" matrix can now be input into DE models
+
+# how splinex relates to x:
+o = order(x)
+plot(x, splinex[,1], col = 0, xlab = "variable", ylab = "spline values", cex.lab = 1.3)
+# draw each spline as a line:
+for (i in 1:ncol(splinex)) {
+  lines(x[o], splinex[o, i], col = scales::alpha("darkblue", 0.3))
+}
+```
+
+```{r echo = FALSE, eval = TRUE, out.width = "170%}
+knitr::include_graphics("figures/splines.png")
+```
+
+As with DE models fitting to bins, use a likelihood ratio test against an intercept-only null model, just as you would with a binned variable.
+To explore your results, plot mean values across bins for your most significant genes.
 
 ### Example data
 
@@ -222,7 +254,8 @@ When calculating distance to a structure, it is tempting to simply record distan
  relevant cell type, e.g. endothelial cells for blood vessels, or tumor cells for tumor glands, or podocytes and mesangial cells for glomeruli. However, this approach is easily distorted by sporadic cell typing errors. 
 It is more robust to look at distance to the nearest *spatially contiguous group* of the target cell type.
 
-Below, we demonstrate how the DBSCAN algorithm can isolate cells in contiguous groups and remove singletons. DBSCAN is an incredibly fast algorithm that clusters together any points within a given radius of each other. We'll keep only cells that fall in clusters of at least 3. 
+Below, we'll define an annotation for 'vascular structure', based on contiguous groups of endothelial cells. 
+We use DBSCAN algorithm, an incredibly fast algorithm which can cluster together cells within a fixed radius of each other. We'll keep only cells that fall in clusters of at least 3. 
 
 
 ```{r echo = TRUE, eval = FALSE}
@@ -531,10 +564,12 @@ knitr::include_graphics("figures/dist2roi.png")
 Above we showed how to set up a variable to run DE against. 
 Now we turn to the mechanics of actually running DE.
 We'll discuss 2 important topics:
+
 - How to handle bias arising from cell segmentation errors
 - How to account for possible spatial correlation in your data
+
 Both of these topics are discussed in great depth in [this preprint](https://www.biorxiv.org/content/10.1101/2024.08.02.606405v2.abstract){target="_blank"},
-which accompanies our differential expression package [smiDE](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/){target="_blank"}.
+which accompanies our differential expression package smiDE ([blog post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/){target="_blank"})  ([package](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE){target="_blank"}).
 Here we'll merely summarize. 
 
 ### Bias from segmentation errors:
@@ -584,7 +619,8 @@ Whichever method in the paper seems suitable for your study, you can run it usin
 ### Other model choice considerations
 
 We find that negative binomial models outperform Gaussian models, but at a cost in computational time. 
-Poisson models offer a middle ground. 
+Poisson models offer a middle ground in terms of computational time, but typically underestimate standard errors, leading to inflated Type I errors.
+
 The performance of Gaussian models is generally acceptable, making them a reasonable choice
  when computation time is a limitation. 
 smiDE implements all these options under a variety of spatial correlation-aware methods. 
@@ -624,8 +660,8 @@ hastyDE <- function(y, df) {
   if (k == 0) stop("No predictors found.")
 
   # Crossproducts
-  XtX <- crossprod(X)
-  XtY <- crossprod(X, y)
+  XtX <- Matrix::crossprod(X)
+  XtY <- Matrix::crossprod(X, y)
 
   # Inverse (with fallback)
   XtX_inv <- tryCatch(
@@ -638,8 +674,8 @@ hastyDE <- function(y, df) {
   rownames(B) <- colnames(X)
 
   # Residual variance
-  yty   <- colSums(y * y)
-  RSS   <- yty - colSums(B * XtY)
+  yty   <- Matrix::colSums(y * y)
+  RSS   <- yty - Matrix::colSums(B * XtY)
   dfres <- n - p
   sigma2 <- RSS / dfres  # length G
 
