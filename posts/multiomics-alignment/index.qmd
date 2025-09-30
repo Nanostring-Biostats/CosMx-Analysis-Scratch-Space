@@ -18,7 +18,7 @@ toc-expand: 1
 toc-location: left
 number-sections: true
 number-depth: 4
-date: "2025-09-29"
+date: "2025-09-30"
 date-modified: last-modified
 categories:
   - multiomics
@@ -34,7 +34,7 @@ draft: false
 
 # CosMx Multiomics Data
 
-CosMx<sup>&#174;</sup> SMI allows users to acquire protein and RNA data from the same tissue as consecutive experiments. These data are acquired as independent runs and therefore need to be aligned, post-acquisition, to combine them into a multiomic study. This alignment process brings the decoded RNA transcripts into the co-ordinate system of protein data. To accomplish this, we have developed a standalone alignment tool that can be used to align CosMx data exported from AtoMx<sup>&#174;</sup> SIP. The tool has a 2-step workflow represented in @fig-align-workflow:
+CosMx<sup>&#174;</sup> SMI allows users to acquire protein and RNA data from the same tissue as consecutive experiments. These data are acquired as independent runs and therefore need to be aligned, post-acquisition, to combine them into a multiomic study. This alignment process brings the decoded RNA transcripts into the coordinate system of protein data. To accomplish this, we have developed a standalone alignment tool that can be used to align CosMx data exported from AtoMx<sup>&#174;</sup> SIP. The tool has a 2-step workflow represented in @fig-align-workflow:
 
 Step 1: Align the RNA morphology fields of view (FOVs) to protein references.
 
@@ -48,6 +48,11 @@ Step 2: Assign the RNA transcripts to the protein cell segmentation labels.
 
 knitr::include_graphics("./figures/Figure1.png")
 ```
+
+:::{callout-note}
+Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"},
+the multiomics alignment tool presented here is experimental so the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} applies.
+:::
 
 # Export CosMx Multiomics Data from AtoMx SIP
 
@@ -75,15 +80,23 @@ knitr::include_graphics("./figures/Figure3.png")
 
 Check the exported data to confirm the following contents:
 
-- Protein CellStatsDir folder and Morphology2D folder within
+- Protein `CellStatsDir` folder and `Morphology2D` folder within
 
-- RNA CellStatsDir folder and Morphology2D folder within
+- RNA `CellStatsDir` folder and `Morphology2D` folder within
 
-- RNA AnalysisResults folder
+- RNA `AnalysisResults` folder
 
 # Download and Use Alignment Tool
 
-Download and unzip the “MultiO_Alignment_Tool_SEP2025.zip” file available [here](https://bruker-my.sharepoint.com/:u:/p/s_korukonda/EX2d6Itfh09Kp0OvqmIcOAcB_hgorv0IuxBA7siL0AFz_Q?e=5wI6bI){target='_blank'}. Once the file has been unzipped, launch the tool by double-clicking the “MultiOAligmentUI.bat” file. The executable will launch an interactive graphical user interface (GUI) as shown in @fig-gui.
+Download and unzip the `MultiO_Alignment_Tool_SEP2025.zip` file available [here](https://bruker-my.sharepoint.com/:u:/p/s_korukonda/EX2d6Itfh09Kp0OvqmIcOAcB_hgorv0IuxBA7siL0AFz_Q?e=5wI6bI){target='_blank'}. Once the file has been unzipped, launch the tool by double-clicking the `MultiOAligmentUI.bat` file. The executable will launch an interactive graphical user interface (GUI) as shown in @fig-gui.
+
+::: {.callout-note}
+This multiomics alignment tool is actively and continuously under development in the RnD groups at
+Bruker Spatial Biology. 
+Please be aware that there may be bugs and that it has not gone through the regular
+level of quality and testing. Our goal here is to bring the capabilities of multiomics
+to CosMx SMI users as fast as possible.
+:::
 
 ```{r}
 #| label: fig-gui
@@ -96,9 +109,9 @@ knitr::include_graphics("./figures/Figure4.png")
 
 ## Step 1: Calculate 2D Shift
 
-To launch image alignment, select the Morphology2D folders for both the protein and RNA runs and click Perform Alignment. The standard search area used for the alignment is by default 500 pixels or roughly 60 microns. This range is large enough to account for shifts introduced by slide replacement. This search area is editable and can be increased to 750 if the user suspects a larger shift (though adjustment is typically not needed – the software makes an assessment of search range need prior to alignment).
+To launch image alignment, select the `Morphology2D` folders for both the protein and RNA runs and click `Perform Alignment`. The standard search area used for the alignment is by default 500 pixels or roughly 60 microns. This range is large enough to account for shifts introduced by slide replacement. This search area is editable and can be increased to 750 if the user suspects a larger shift (though adjustment is typically not needed – the software makes an assessment of search range need prior to alignment).
 
-During alignment a new folder called “AlignmentQC” is created within the RNA data folder structure and is populated with the outputs from the alignment. Occasionally, certain FOVs may be discarded from the multiomic analysis if they fail alignment. This can happen in cases of tissue peeling or significant cell loss. These FOVs, identified as outliers, are recorded in the “Alignment_Stats_Curated.csv” file and are excluded from the transcript re-assignment process. Refer to the table below for a list of AlignmentQC folder outputs and descriptions of the individual files.
+During alignment a new folder called `AlignmentQC` is created within the RNA data folder structure and is populated with the outputs from the alignment. Occasionally, certain FOVs may be discarded from the multiomic analysis if they fail alignment. This can happen in cases of tissue peeling or significant cell loss. These FOVs, identified as outliers, are recorded in the `Alignment_Stats_Curated.csv` file and are excluded from the transcript re-assignment process. Refer to @tbl-alignment-qc-outputs for a list of `AlignmentQC` folder outputs and descriptions of the individual files.
 
 | AlignmentQC Folder Outputs | Description of individual files |
 |---------|:-----|
@@ -109,7 +122,7 @@ During alignment a new folder called “AlignmentQC” is created within the RNA
 | Alignment_Stats_Curated.csv | Updated Stats file with associated cluster label and outlier flag. |
 | Stats_Report.txt | Reports the percentage of FOVs that were successfully aligned, along with a list of FOVs that failed alignment and were excluded from target re-assignment. |
 
-: Folder outputs and descriptions
+: Folder outputs and descriptions {#tbl-alignment-qc-outputs tbl-colwidths="[40,60]"}
 
 ## Step 2: Shift and Assign Transcripts
 
@@ -124,7 +137,7 @@ knitr::include_graphics("./figures/Figure5.png")
 ```
 
 
-Once the image registration is complete, the next step is to apply the computed shifts to transcripts and re-assign them to protein segmentation labels. For this step, select the Protein CellStatsDir and the location of the RNA transcripts folder (@fig-final-output ). If the original folder structure of export is maintained, these folders will be automatically populated when the RNA and protein Morphology folders are selected. Once the inputs have been chosen, click Assign transcripts as shown in @fig-final-output (a).
+Once the image registration is complete, the next step is to apply the computed shifts to transcripts and re-assign them to protein segmentation labels. For this step, select the Protein `CellStatsDir` and the location of the RNA transcripts folder (@fig-final-output ). If the original folder structure of export is maintained, these folders will be automatically populated when the RNA and protein morphology folders are selected. Once the inputs have been chosen, click `Assign transcripts` as shown in @fig-final-output (a).
 
 ```{r}
 #| label: fig-final-output
@@ -143,6 +156,8 @@ After using the off-AtoMx alignment tool to apply protein cell segmentation boun
 
 If you prefer to integrate the aligned RNA data into an existing data object, you can do so by starting with the protein run object and either replacing the protein expression matrix with an aligned RNA matrix or appending the RNA data as an additional assay.
 
-**Important Reminder**: Once the raw protein and RNA data are exported from AtoMx and modified through alignment, the updated data cannot be re-imported into AtoMx. As of AtoMx v2.2 and earlier, the platform retains only the original, pre-aligned data.
+::: {.callout-important}
+Once the protein and RNA data are exported from AtoMx and modified through alignment, the updated data cannot be re-imported into AtoMx. As of AtoMx v2.2 and earlier, the platform retains only the original, pre-aligned data.
+:::
 
 For technical support, please contact support.spatial@bruker.com.
