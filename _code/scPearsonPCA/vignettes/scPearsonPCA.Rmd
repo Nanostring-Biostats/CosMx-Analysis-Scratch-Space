@@ -1,0 +1,204 @@
+---
+title: "scPearsonPCA"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{scPearsonPCA}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+#### Load example dataset
+
+```{r setup}
+library(scPearsonPCA)
+library(Seurat)
+library(ggplot2)
+library(ggrepel)
+library(data.table)
+library(RColorBrewer)
+
+datadir <- system.file("extdata", package="scPearsonPCA")
+sem <- readRDS(paste0(datadir, "/seurat_obj_nsclc.rds"))
+
+```
+
+Pearson residual normalization generates a *dense* cells x genes normalized matrix, which can be a burden on memory when the number of cells is large.  The method implemented in `scPearsonPCA` computes the principal component (PC) decomposition without ever calculating the dense normalized matrix.  
+
+This is done by decomposing the covariance matrix of pearson residuals, which can be computed from a sparse counts matrix + summary statistics.
+
+Below, we have a small sample dataset with ~1k genes and ~116k cells.
+Only ~12% of the elements in the counts matrix are non-zero.
+
+The number of elements in the covariance matrix (1k x 1k) is around 1% of the number of elements in a full (dense) (1k x 116k) normalized data matrix.
+
+```{r}
+dim(sem[["RNA"]]@counts) ## dimension of sparse counts matrix
+
+length(sem[["RNA"]]@counts@x) / ## proportion of non-zero elements 
+  prod(dim(sem[["RNA"]]@counts))
+
+nrow(sem[["RNA"]]@counts)^2 / prod(dim(sem[["RNA"]]@counts)) ## size of covariance matrix vs. full normalized matrix
+
+```
+
+
+
+#### Generate PCA feature loadings and cell emebeddings from sparse counts matrix
+
+Below, we generate the PCA result from pearson residuals normalization, followed by centering, scaling, and clipping residuals more than 10 standard deviations above the mean.
+
+The `quasi_poisson_variance_inflation=1.01` specifies a fixed level of over-dispersion assumed across genes, in this case that the variance is 1% larger than the mean.  In practice, this hyper-parameter has not been observed to have a strong impact on downstream applications.
+
+```{r}
+
+pearson_reduc <- 
+scPearsonPCA:::sparse_quasipoisson_pca_seurat(sem[["RNA"]]@counts
+                                              ,scale.max = 10
+                                              ,do.scale = TRUE
+                                              ,do.center = TRUE
+                                              ,quasi_poisson_variance_inflation = 1.01
+                                              ,return_seurat_reduction = TRUE
+                                              )
+
+
+```
+
+The returned object includes the means and standard deviations of pearson residuals (potentially useful for feature selection or identifying highly variable genes), as well as the gene expression rate "grate" of each gene, calculated as the proportion that each gene is expressed across all transcripts. 
+
+```{r}
+names(pearson_reduc)
+sort(pearson_reduc$grate, decreasing = TRUE)[1:10] ## expected expression rate under the NULL (sums to 1)
+sum(pearson_reduc$grate)
+sort(pearson_reduc$sd.pearson_residual, decreasing = TRUE)[1:10] ## variance of pearson residuals by gene 
+```
+
+The option `return_seurat_reduction=TRUE` returns a `reduction.data` object which can be added to Seurat, which downstream utilities like 'UMAP' and clustering can access.
+```{r}
+sem[["pearsonpca"]] <- pearson_reduc$reduction.data
+sem <- Seurat::RunUMAP(sem, reduction.name="pearsonumap", reduction="pearsonpca", min.dist = 0.01, dims=1:50)
+sem <- Seurat::FindNeighbors(sem, reduction="pearsonpca")
+sem <- Seurat::FindClusters(sem)
+sem@meta.data$pearsonpca_clusters <- sem@meta.data$seurat_clusters
+```
+
+```{r, umap_visualization_function, eval=TRUE}
+#| code-fold: true
+
+umapf <- function(umapreduc
+                  ,clustercol
+                  ,semuse
+                  ,cls=NULL
+                  ,xlim = NULL
+                  ,ylim = NULL){
+  
+  umapd <-  
+    data.table(semuse@reductions[[umapreduc]]@cell.embeddings
+               ,keep.rownames = TRUE)
+  setnames(umapd, c(names(umapd)[2:3]), c("UMAP_1", "UMAP_2"))
+  obsmrk <- merge(data.table(semuse@meta.data), umapd
+                  ,by.x="cell_ID"
+                  , by.y="rn")
+  
+  obstxt <- obsmrk[,lapply(.SD, median),by=c(clustercol),.SDcols=paste0("UMAP_",1:2)]
+  
+    p <- 
+      ggplot(obsmrk, aes(UMAP_1, UMAP_2, color=.data[[clustercol]])) + 
+      geom_point(size=0.2) + 
+      theme_bw() + coord_fixed(xlim=xlim, ylim=ylim) + 
+      geom_label_repel(data=obstxt, aes(x=UMAP_1, y=UMAP_2, label=.data[[clustercol]]),show.legend=FALSE
+                       ,inherit.aes=FALSE,color='black')
+    
+  if(is.null(cls)){
+    p <- p +  
+      scale_color_manual(values=rep(unname(pals::alphabet()), 3)
+                         ,guide=guide_legend(override.aes=list(size=4)))
+    
+  } else {
+    p <- p +  
+      scale_color_manual(values=cls
+                         ,guide=guide_legend(override.aes=list(size=4)))
+  }
+  return(p)
+}
+
+```
+
+```{r, fig.width = 12, fig.height=12}
+umapp <- umapf("pearsonumap", "pearsonpca_clusters", sem)
+print(umapp)
+
+```
+
+
+
+#### Example projecting PC's calculated on a subset of cells.  (if data is still extremely large)
+
+It may be useful to take an existing PC decomposition and project it onto an independent set of data.
+This could be useful, for example, if working with an extremely large number of cells on a machine with limited memory.
+Below is an illustrative example using the feature loadings from the `pearson_reduc` object, to project onto the first 10k cells.
+We can verify in this case (sense the projected cells overlap), that the cell embeddings are the same.
+
+```{r}
+### project 10k cells using the feature loadings calculated above
+pearson_projection <- 
+scPearsonPCA:::project_sparse_quasipoisson_pca_seurat(sem[["RNA"]]@counts[,1:10**4] ## subset of the counts
+                                                      ,pcaobj = pearson_reduc
+                                                      )
+
+all.equal(pearson_projection$reduction.data@cell.embeddings, pearson_reduc$reduction.data@cell.embeddings[1:10**4,])
+
+
+```
+
+
+#### PCA from pearson residuals normalized 'by batch'
+
+If significant batch effects appear to be present across a single categorical factor, we can specify a `batch_variable`, to obtain PCA from pearson residuals, where the residuals are obtained from a quasi-poisson generalized linear model with the batch variable as a predictor.
+
+This example dataset has cells from 3 patients, named 'Lung5', 'Lung6', and 'Lung12'.
+For demonstration, we show the results of PCA from batch normalization, and how the patients compare in terms of UMAP decomposition.
+
+```{r}
+
+pcabatch <- scPearsonPCA::sparse_quasipoisson_pca_seurat_batch(sem[["RNA"]]@counts
+                                                               ,obs = sem@meta.data
+                                                               ,batch_variable = "patient"
+                                                               ,cellid_colname = "cell_ID"
+                                                               ,scale.max = 10
+                                                               ,do.scale = TRUE
+                                                               ,do.center = TRUE
+                                                              )
+
+sem[["pbatchpca"]] <- pcabatch$reduction.data
+sem <- Seurat::RunUMAP(sem, reduction.name="pbatchumap", reduction="pbatchpca", min.dist = 0.01, dims=1:50)
+
+
+```
+
+```{r, fig.width = 12, fig.height=12}
+
+umapb <- umapf("pbatchumap", "patient", sem) + labs(title = "PCA with batch variable 'patient'")
+umapp <- umapf("pearsonumap", "patient", sem) + labs(title = "original PCA")
+print(umapp)
+print(umapb)
+
+```
+
+
+```{r}
+sessionInfo()
+```
+
+
+
+
+
+
