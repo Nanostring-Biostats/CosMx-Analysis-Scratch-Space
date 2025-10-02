@@ -105,101 +105,14 @@ Then, we’ll create a UMAP from these PC results using a helper function
 `make_umap`, which will also return a cells x cells nearest-neighbors
 graph we’ll use for unsupervised clustering.
 
-<details>
-<summary>Code</summary>
-
 ``` r
-#' UMAP helper function: includes returning the nearest-neighbors graph used to 
-#' build the UMAP.
-#' 
-make_umap <- function(pcaobj, min_dist=0.01, n_neighbors=30, metric="cosine",key ="UMAP_" ){
-  ump <- 
-    uwot::umap(pcaobj$reduction.data@cell.embeddings
-               ,n_neighbors = n_neighbors
-               ,nn_method = "annoy"
-               ,metric = metric
-               ,min_dist = min_dist
-               ,ret_extra = c("fgraph","nn")
-               ,verbose = TRUE)
-  
-  umpgraph <- ump$fgraph
-  dimnames(umpgraph) <- list(rownames(ump$nn[[1]]$idx), rownames(ump$nn[[1]]$idx))
-  colnames(ump$embedding) <- paste0(key, c(1,2)) 
-  ump <- Seurat::CreateDimReducObject(embeddings = ump$embedding, key = key)
-  return(list(grph = umpgraph
-              ,ump = ump))
-}
-
-#' 
-#' UMAP plotting utility function
-#' 
-plot_umap <- function(umapreduc,clustercol, semuse, cls=NULL,plotfirst=NULL,alpha=1,max.overlaps = 100,lblsize = 4){
-  
-  umapd <-  
-    data.table(semuse@reductions[[umapreduc]]@cell.embeddings
-               ,keep.rownames = TRUE)
-  setnames(umapd, c(names(umapd)[2:3]), c("UMAP_1", "UMAP_2"))
-  obsmrk <- merge(data.table(semuse@meta.data), umapd
-                  ,by.x="cell_ID"
-                  , by.y="rn")
-  
-  obstxt <- obsmrk[,lapply(.SD, median),by=c(clustercol),.SDcols=paste0("UMAP_",1:2)]
-  
-  clusters <- unique(obsmrk[[clustercol]])
-  
-  if(!is.null(plotfirst)){
-    p <- 
-      ggplot(obsmrk[obsmrk[[clustercol]] %in% plotfirst]
-             , aes(UMAP_1, UMAP_2, color=.data[[clustercol]])) + 
-      geom_point(size=0.2,alpha=alpha) + 
-      geom_point(data=obsmrk[!obsmrk[[clustercol]] %in% plotfirst]
-                 ,aes(UMAP_1, UMAP_2, color=.data[[clustercol]]), size=0.2,alpha=alpha) + 
-      theme_bw() + coord_fixed() + 
-      geom_label_repel(data=obstxt, aes(x=UMAP_1, y=UMAP_2, label=.data[[clustercol]]),show.legend=FALSE
-                       ,inherit.aes=FALSE,color='black', max.overlaps = max.overlaps, size = lblsize)
-    
-  } else {
-    p <- 
-      ggplot(obsmrk, aes(UMAP_1, UMAP_2, color=.data[[clustercol]])) + 
-      geom_point(size=0.2,alpha=alpha) + 
-      theme_bw() + coord_fixed() + 
-      geom_label_repel(data=obstxt, aes(x=UMAP_1, y=UMAP_2, label=.data[[clustercol]]),show.legend=FALSE
-                       ,inherit.aes=FALSE,color='black', max.overlaps = max.overlaps, size = lblsize)
-    
-  }
-  if(is.null(cls)){
-    cls <- rep(unname(pals::alphabet()), 10)
-    if(any(is.na(suppressWarnings(as.numeric(as.character(clusters)))))){
-      clnames <- clusters 
-    } else {
-      clnames <- sort(as.numeric(as.character(clusters)))
-    }
-    #if(any(is.na(clnames))) clnames <- clusters
-    cls <- cls[1:length(clusters)]
-    names(cls) <- clnames
-    p <- p +  
-      scale_color_manual(values=cls # rep(unname(pals::alphabet()), 3)
-                         ,guide=guide_legend(override.aes=list(size=4,alpha=1)))
-    
-  } else {
-    p <- p +  
-      scale_color_manual(values=cls
-                         ,guide=guide_legend(override.aes=list(size=4,alpha=1)))
-  }
-  return(p)
-}
-```
-
-</details>
-
-``` r
-umapobj <- make_umap(pcaobj)
+umapobj <- scPearsonPCA::make_umap(pcaobj)
 sem[["pearsonpca"]] <- pcaobj$reduction.data
 sem[["pearsonumap"]] <- umapobj$ump  ## umap
 sem[["pearsongraph"]] <- Seurat::as.Graph(umapobj$grph) ## nearest neighbors / adjacency matrix used for unsupervised clustering
 sem <- Seurat::FindClusters(sem, graph = "pearsongraph")
 sem@meta.data$pearson_clusters <- sem@meta.data$seurat_clusters
-umapplot <- plot_umap(umapreduc = "pearsonumap", clustercol = "pearson_clusters", semuse = sem)
+umapplot <- scPearsonPCA::plot_umap(umapreduc = "pearsonumap", clustercol = "pearson_clusters", semuse = sem)
 print(umapplot)
 ```
 
@@ -242,13 +155,13 @@ Here again we’ll take the `pcaobj_batch` object and use it to create a
 UMAP and perform unsupervised clustering.
 
 ``` r
-umapobj_batch <- make_umap(pcaobj_batch)
+umapobj_batch <- scPearsonPCA::make_umap(pcaobj_batch)
 sem[["pearsonbatchpca"]] <- pcaobj_batch$reduction.data
 sem[["pearsonbatchumap"]] <- umapobj_batch$ump
 sem[["pearsonbatchgraph"]] <- Seurat::as.Graph(umapobj_batch$grph) ## nearest neighbors / adjacency matrix used for unsupervised clustering
 sem <- Seurat::FindClusters(sem, graph = "pearsonbatchgraph")
 sem@meta.data$pearson_clusters_batch <- sem@meta.data$seurat_clusters
-umapplotbatch <- plot_umap(umapreduc = "pearsonbatchumap", clustercol = "pearson_clusters_batch", semuse = sem)
+umapplotbatch <- scPearsonPCA::plot_umap(umapreduc = "pearsonbatchumap", clustercol = "pearson_clusters_batch", semuse = sem)
 print(umapplotbatch)
 ```
 
@@ -270,8 +183,8 @@ dataset. One alternative recommended method which often works well is
 [post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/).
 
 ``` r
-umapplot_patient_batch <- plot_umap(umapreduc = "pearsonbatchumap", clustercol = "patient", semuse = sem,alpha=0.1)
-umapplot_patient <- plot_umap(umapreduc = "pearsonumap", clustercol = "patient", semuse = sem,alpha=0.1)
+umapplot_patient_batch <- scPearsonPCA::plot_umap(umapreduc = "pearsonbatchumap", clustercol = "patient", semuse = sem,alpha=0.1)
+umapplot_patient <- scPearsonPCA::plot_umap(umapreduc = "pearsonumap", clustercol = "patient", semuse = sem,alpha=0.1)
 
 cp <- 
 cowplot::plot_grid(umapplot_patient_batch + labs(title = "UMAP using batch-corrected pearson PC's")
