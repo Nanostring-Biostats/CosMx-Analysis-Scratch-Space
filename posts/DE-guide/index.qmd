@@ -741,14 +741,17 @@ dist2tcell <- FNN::get.knnx(
 
 patches <- getPatches(xy = xy[inds.tumor, ], 
                       X = dist2tcell[inds.tumor], 
-                      dbscan_eps = 0.025, maxdbsize = 50, 
-                      maxradius = 0.1,
-                      totvarthresh = 100  # main driver of patch size
+                      npatches,
+                      bitesize = 0.1,
+                      maxradius = 0.5,
+                      roundness = 0.5,
+                      initwithhotspots = TRUE,
+                      n_iters = 25
 ) # produces a vector of patch assigments, potentially including NA's for cells not given a patch
 
 
 # to view, draw polygon boundaries around each patch:
-polys <- getPatchPolys(xy = xy[inds.tumor, ], patch = patches)
+patchhulls <- getPatchHulls(xy = xy[inds.tumor, ], patch = patches) 
 
 # plot patches:
 par(mar = c(0,0,2,0))
@@ -759,7 +762,7 @@ plot(xy[inds.tumor, ], pch = 16, cex = 0.3, asp = 1,
      ],
      xlab = "", ylab = "")
 for (i in 1:length(polys)) {
-  polygon(polys[[i]], border = "black")
+  plot(patchhulls[[i]], border = "black", wpoints = FALSE)
 }
 ```
 
@@ -797,11 +800,18 @@ pheatmap::pheatmap((ests * (pvals < 1e-3))[topgenes1, ],
          breaks = seq(-1, 1, length.out = 101))
 ```
  
-Below is an example snippet of a heatmap of DE results on varrymander patches from a larger study:
+Below is an example snippet of a heatmap of DE results on patches from a larger study:
 
 ```{r echo = FALSE, eval = TRUE, out.width = "170%"}
 knitr::include_graphics("figures/deheatmap.png")
 ```
+
+A note on multiplicity: when we run DE across dozens of patches, the problem of multiple testing gets even worse. 
+So, before getting excited about a single gene in a single patch, take one of these countermeasures to multiplicity:
+
+- Confirm the gene x patch has a strong adjusted p-value *considering all the p-values from all the genes x patches*.
+- Confirm the gene has a strong adjusted p-value from the metaanalysis, considering the p-values from all the genes' metaanalysis results.
+
 
 ## Comment on statistical power and false discoveries
 

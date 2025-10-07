@@ -5,7 +5,7 @@
 # - getPatchPolys: get polygons circling patches, for use in plots
 # - patchDE: algorithm to loop hastyDE over patches
 
-# libraries used: Matrix, InSituCor, spdep, FNN, dbscan, ClusterR
+# libraries used: Matrix, InSituCor, spdep, FNN, dbscan, ClusterR, alphahull
 
 #' Very fast DE without best practices
 #' Runs simple OLS regression on all genes at once using matrix algebra
@@ -66,12 +66,6 @@ hastyDE <- function(y, df) {
   )
 }
 
-##############################
-##############################
-# TODO:
-# - record per-patch var over iters
-##############################
-##############################
 
 
 #' Assign cells to "patches" for stratified differential expression analysis.
@@ -108,7 +102,7 @@ getPatches <- function(xy, X, npatches,
                        bitesize = 0.1,
                        maxradius = 0.5,
                        roundness = 0.5,
-                       initwithhotspots = FALSE,
+                       initwithhotspots = TRUE,
                        n_iters = 25,
                        alpha = 0.5,
                        effectivezerodist = 0.025,
@@ -224,7 +218,7 @@ getPatches <- function(xy, X, npatches,
       plot(xy, asp = 1, pch = 16, cex = 0.1, col = "grey80", main = iter)
       points(xy, pch = 16, cex = 0.4, col = patchcols[celldf$patch])
       
-      barplot(patchdf$totvar, col = patchcols[rownames(patchdf)], ylim = c(0,1000))
+      barplot(patchdf$totvar, col = patchcols[rownames(patchdf)], ylim = c(0,1000), ylab = "Total var", xlab = "Patches")
     }
   }
   out <- celldf$patch
@@ -308,6 +302,30 @@ getPatchPolys <- function(xy, patch) {
   return(polys)
 }
 
+
+
+#' Get polygon borders of patches for visualizations
+#' Uses alphahull::ashape()
+#' @param xy Cells' xy positions
+#' @param patch Vector of patch assignments, aligned to the rows of xy
+#' @return A named list of alphahull::ashape objects, one per patch
+#' @export
+getPatchHulls <- function(xy, patch) {
+  hulls <- list()
+  cluster_levels <- unique(patch)
+  for (i in seq_along(unique(patch))) {
+    k <- cluster_levels[i]
+    idx <- which(patch == k)
+    
+    # Only attempt hull if >= 3 points
+    if (length(idx) >= 3) {
+      pts_k <- xy[idx, , drop = FALSE]       # M_k × 2 matrix of points in cluster k
+      hulls[[i]] <- alphahull::ashape(pts_k, alpha = 0.1)
+      names(hulls)[i] <- unique(patch)[i]
+    }
+  }
+  return(hulls)
+}
 
 #' patchDE: run DE over all patches
 #' @param y Expression matrix, cells * genes
