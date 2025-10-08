@@ -310,7 +310,7 @@ getPatchPolys <- function(xy, patch) {
 #' @param patch Vector of patch assignments, aligned to the rows of xy
 #' @return A named list of alphahull::ashape objects, one per patch
 #' @export
-getPatchHulls <- function(xy, patch) {
+getPatchHulls <- function(xy, patch, alpha = 0.1) {
   hulls <- list()
   cluster_levels <- unique(patch)
   for (i in seq_along(unique(patch))) {
@@ -320,7 +320,7 @@ getPatchHulls <- function(xy, patch) {
     # Only attempt hull if >= 3 points
     if (length(idx) >= 3) {
       pts_k <- xy[idx, , drop = FALSE]       # M_k × 2 matrix of points in cluster k
-      hulls[[i]] <- alphahull::ashape(pts_k, alpha = 0.1)
+      hulls[[i]] <- alphahull::ashape(pts_k, alpha = alpha)
       names(hulls)[i] <- unique(patch)[i]
     }
   }
