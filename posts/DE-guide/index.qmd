@@ -741,7 +741,7 @@ dist2tcell <- FNN::get.knnx(
 
 patches <- getPatches(xy = xy[inds.tumor, ], 
                       X = dist2tcell[inds.tumor], 
-                      npatches,
+                      npatches = 12,
                       bitesize = 0.1,
                       maxradius = 0.5,
                       roundness = 0.5,
@@ -761,8 +761,8 @@ plot(xy[inds.tumor, ], pch = 16, cex = 0.3, asp = 1,
        1 + round(100 * dist2tcell / max(dist2tcell))[inds.tumor]
      ],
      xlab = "", ylab = "")
-for (i in 1:length(polys)) {
-  plot(patchhulls[[i]], border = "black", wpoints = FALSE)
+for (i in 1:length(patchhulls)) {
+  plot(patchhulls[[i]], border = "black", wpoints = FALSE, add = TRUE)
 }
 ```
 
@@ -783,7 +783,7 @@ deresults <- patchDE(y = norm[inds.tumor, ],
 
 # find genes with strong results in any region
 lowestp <- apply(deresults$dist2tcell$pvals, 1, min)
-topgenes1 <- names(lowestp)[order(lowestp, decreasing = TRUE)[1:50]]
+topgenes1 <- setdiff(names(lowestp)[order(lowestp, decreasing = TRUE)[1:50]], NA)
 
 # use meta-analysis to summarize genes' trends across patches
 metapvals <- sapply(rownames(deresults$dist2tcell$pvals), function(gene) {
@@ -792,10 +792,10 @@ metapvals <- sapply(rownames(deresults$dist2tcell$pvals), function(gene) {
                           method = "REML")
   return(fit$pval)
 })
-topgenes2 <- names(metapvals)[order(metapvals, decreasing = TRUE)[1:50]]
+topgenes2 <- setdiff(names(metapvals)[order(metapvals, decreasing = TRUE)[1:50]], NA)
 
 ## now use a heatmap to plot results from either list of top genes:
-pheatmap::pheatmap((ests * (pvals < 1e-3))[topgenes1, ],
+pheatmap::pheatmap((deresults$dist2tcell$ests * (deresults$dist2tcell$pvals < 1e-3))[topgenes1, ],
          col = colorRampPalette(c("darkblue", "white", "darkred"))(100),
          breaks = seq(-1, 1, length.out = 101))
 ```

@@ -54,7 +54,7 @@ hastyDE <- function(y, df) {
   colnames(SE) <- coef_names
   
   # Effects and p-values
-  Effect <- as.matrix(t(B[-1, , drop = FALSE]))   # G x k
+  Effect <- as.matrix(Matrix::t(B[-1, , drop = FALSE]))   # G x k
   Tstat  <- as.matrix(Effect / SE)
   Pval   <- 2 * pt(abs(Tstat), df = dfres, lower.tail = FALSE)
   
@@ -317,7 +317,7 @@ getPatchHulls <- function(xy, patch, alpha = 0.1) {
       names(hulls)[i] <- unique(patch)[i]
     }
   }
-  return(hulls)
+  return(hulls[sapply(hulls, length) > 0])
 }
 
 #' patchDE: run DE over all patches
