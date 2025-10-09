@@ -85,7 +85,6 @@ hastyDE <- function(y, df) {
 #' @param n_iters How many iterations to run.
 #' @param alpha Number from 0-1. How aggressively patches with low var(X) will grab cells from bigger neighboring patches. 
 #' @param effectivezerodist Lower threshold for cells' distance to patch boundaries. 
-#' @param dbscan eps For definition of variance hotspots, parameter passed to dbscan algorithm used to cluster cells with high GI* (hotspot) scores.
 #' @param plotprogress Logical for whether to show progress over iters
 #' @return A vector of cells' patch assigments, possibly including nA's. 
 #' @export
@@ -95,9 +94,7 @@ hastyDE <- function(y, df) {
 #' @importFrom spdep knn2nb
 #' @importFrom spdep nb2listw
 #' @importFrom spdep localG
-#' @importFrom mclust Mclust
-#' @importFrom mclust MclustBIC
-#' @importFrom dbscan dbscan
+#' @importFrom stats kmeans
 getPatches <- function(xy, X, npatches,
                        bitesize = 0.1,
                        maxradius = 0.5,
@@ -106,7 +103,6 @@ getPatches <- function(xy, X, npatches,
                        n_iters = 25,
                        alpha = 0.5,
                        effectivezerodist = 0.025,
-                       dbscan_eps = 0.05,
                        plotprogress = FALSE) {
   
   #### preliminaries --------------------------------------
@@ -131,19 +127,15 @@ getPatches <- function(xy, X, npatches,
     
     ## call hotspots, and link them with dbscan:
     ishot <- gi >= 1
-    db <- as.character(dbscan::dbscan(xy[ishot, ], minPts = 1, eps = dbscan_eps)$cluster)
-    
     # cluster hotspot points to get patch seeds:
-    hotspotcluster <- mclust::Mclust(xy[ishot, ], modelNames = "EII", G = npatches)$classification
-    hotspotcluster <- paste0("patch", hotspotcluster)
+    hotspotcluster <- stats::kmeans(xy[ishot, ], centers = npatches, iter.max = 30)$cluster
     seeds <- rep(NA, nrow(xy))
-    seeds[ishot] <- hotspotcluster
+    seeds[ishot] <- paste0("patch", hotspotcluster)
   } else {
     ## simple initial clustering: Mclust on xy alone:
-    seeds <- paste0("patch", mclust::Mclust(xy, modelNames = "EII", G = npatches)$classification)
+    seeds <- paste0("patch", stats::kmeans(xy, centers = npatches, iter.max = 30)$cluster)
   }
-  
-  
+
   #### set up iterations: --------------------------------------
   # set up data frame to track cells:
   celldf <- data.frame(X = X)
@@ -152,14 +144,15 @@ getPatches <- function(xy, X, npatches,
   celldf$patch <- seeds
 
   # intialize patch df:
-  patchdf <- data.frame(totvar = rep(NA, length(unique(seeds))),
-                        hunger = rep(NA, length(unique(seeds))))
-  rownames(patchdf) = unique(seeds)
+  uniqueseeds <- setdiff(seeds, NA)
+  patchdf <- data.frame(totvar = rep(NA, length(uniqueseeds)),
+                        hunger = rep(NA, length(uniqueseeds)))
+  rownames(patchdf) = uniqueseeds
   
   # get patch centroids:
   centroids <- c()
   for (name in unique(seeds)) {
-    centroids <- rbind(centroids, colMeans(xy[seeds == name, ]))
+    centroids <- rbind(centroids, colMeans(xy[(seeds == name) & !is.na(seeds), ]))
   }
   rownames(centroids) = unique(seeds)
   
@@ -184,7 +177,7 @@ getPatches <- function(xy, X, npatches,
     print(iter)
     
     # get patch stats:
-    for (name in unique(seeds)) {
+    for (name in uniqueseeds) {
       patchdf[name, "totvar"] <- var(celldf$X[celldf$patch == name], na.rm = T) * sum(celldf$patch == name, na.rm = T)
     }
     patchdf[, "hunger"] <- 1 / ((1 - alpha) * mean(patchdf[, "totvar"]) + alpha * patchdf[, "totvar"])
