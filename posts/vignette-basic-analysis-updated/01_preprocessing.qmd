@@ -331,7 +331,7 @@ xy[thisgroup, 1] <- xy[thisgroup, 1] + 1
 xy[thisgroup, 2] <- xy[thisgroup, 2] + 5
 ```
 
-...or automatically using the same \code{condenseTissues} function we used to tile out slides:
+...or we can move them automatically using the same \code{condenseTissues} function we used above:
 
 ```{r echo = TRUE, eval = FALSE}
 set.seed(1)
@@ -343,7 +343,186 @@ xy <- condenseTissues(xy = xy,
 ```
 
 
+# QC
+
+QC of CosMx data is mostly straightforward. Technical effects can be complex,
+ but they manifest in limited ways:
+ 
+- Many individual cells can have low signal
+- Segmentation errors can create "cells" with bad data
+- Sporadic FOVs can have low signal
+- Sporadic FOVs can have distorted / outlier expression profiles
+
+Our workflow will create then add to \code{flag}, a vector marking cells flagged for one reason or another.
+When we're done, we'll delete everything we've flagged. 
+(The full original data will remain on AtoMx, so this step is not as drastic as it seems. 
+For smaller studies it could still be reasonable to hold on to the pre-QC .RDS files.)
+
+## Per-cell QC:
+
+First, we'll apply a threshold on cells' total counts. 
+Our defaults are fairly permissive; it would be reasonable double them in datasets where you can do so without throwing out too many cells. 
+
+```{r echo = TRUE, eval = FALSE}
+## set the total counts threshold:
+count_threshold <- 100 # recommendations (on the permissive side): 20 counts for 1000plex, 50 for 6000plex, 100 for WTX 
+
+# require sufficient counts per cell 
+hist(log2(metadata$nCount_RNA), breaks = 100, xlab = "Log2 counts per cell", ylab = "N cells", main = "")
+# cut off the low tail: 
+abline(v = log2(count_threshold), col = "red")
+legend("topleft", legend = paste0(round(mean(metadata$nCount_RNA < count_threshold) * 100, 1), "% rejected"))
+
+# flag cells based on total counts:
+flag <- metadata$nCount_RNA < count_threshold
+mean(flag)
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/QC_counts_histogram.png")
+```
+
+Next we'll throw out cells with excessively large areas. In most studies, these "cells" are the result of segmentation errors. 
+This step typically removes very few cells.
+
+```{r echo = TRUE, eval = FALSE}
+# what's the distribution of areas?
+hist(metadata$Area, breaks = 100, xlab = "Cell Area", main = "")
+# based on the above, set a threshold way out in the tail:
+area_threshold <- 30000
+abline(v = area_threshold, col = "red")
+legend("topright", legend = paste0(round(mean(metadata$Area > area_threshold) * 100, 2), "% rejected"))
+
+# flag cells based on area:
+flag <- flag | (metadata$Area > area_threshold)
+mean(flag)
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/QC_area_histogram.png")
+```
 
 
+## FOV QC
+
+We check FOVs for two indicators of artifacts: diminished total counts, and biased gene expression profiles. 
+Procedures for both these checks, along with a detailed discussion, can be found in a method
+described [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/).
+
+To summarize briefly: for each "bit" in our barcodes (e.g. red in reporter cycle 8), we look for FOVs where 
+genes using the bit are underexpressed. We also look for FOVs where total expression is suppressed.
+
+Below we'll run our FOV QC code and examine its results:
+
+```{r echo = TRUE, eval = FALSE}
+## preparing resources:
+# source the FOV QC tool:
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/FOV%20QC/FOV%20QC%20utils.R")
+# load necessary information for the QC tool: the gene to barcode map:
+allbarcodes <- readRDS(url("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/raw/Main/_code/FOV%20QC/barcodes_by_panel.RDS"))
+names(allbarcodes)
+# get the barcodes for the panel we want:
+barcodemap <- allbarcodes$Hs_WTX    # <------- choose the right map for your panel
+head(barcodemap)
+
+## run the method:
+fovqcresult <- runFOVQC(counts = counts, xy = xy, fov = metadata$FOV, barcodemap = barcodemap) 
+saveRDS(fovqcresult, file = "processed_data/fovqcresult.RDS")
+
+# map of flagged FOVs:
+mapFlaggedFOVs(fovqcresult)
+
+# list FOVs flagged for any reason, for loss of signal, for bias:
+fovqcresult$flaggedfovs
+fovqcresult$flaggedfovs_fortotalcounts
+fovqcresult$flaggedfovs_forbias
+
+# flag cells in flagged FOVs:
+flag[is.element(metadata$FOV, fovqcresult$flaggedfovs)] <- TRUE
+
+# plot the result:
+FOVSignalLossSpatialPlot(fovqcresult) 
+```
+
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/QC_FOVQC.png")
+```
+
+We don't have any flagged FOVs in this study. For examples of studies with more flagged FOVs, 
+ see [the FOV QC post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/){target="_blank"} and [this older vignette](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/assets/2.-QC-and-normalization.html){target="_blank"}.
+
+Finally, we'll remove flagged cells and save the filtered data for downstream analysis:
+
+```{r echo = FALSE, eval = TRUE}
+# save data with flagged cells removed
+counts <- counts[!flag, ]
+metadata <- metadata[!flag, ]
+xy <- xy[!flag, ]
+
+# save filtered data objects, to be used in the remainder of the analysis
+saveRDS(counts, file = paste0(outdir, "/processed_data/counts.RDS"))
+saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
+saveRDS(xy, file = paste0(outdir, "/processed_data/xy.RDS"))
+```
+
+## Descriptive QC plots
+
+In addition to the above per-cell flags, it can be worth plotting some QC metrics atop the space of your tissues.
+The purpose of these plots is to become aware of possible technical effects that might 
+ explain any artifacts you discover later in analysis. 
+In the vast majority of studies, these plots will not require any action from you. 
+
+First, plot total counts over space:
+
+```{r echo = TRUE, eval = FALSE}
+## plot total counts over space:
+par(mar = c(0,0,0,0))
+plot(xy, pch = 16, cex = 0.1, asp = 1, 
+     col = viridis_pal(option = "B")(101)[
+       round(1 + 100 * (log2(pmin(pmax(metadata$nCount_RNA, 10), 5000)) - log2(10)) / log2(5000))
+     ])
+legendvals <- c(10, 100, 1000, 5000)
+legend("bottomright", pch = 16, 
+       col = c("white", viridis_pal(option = "B")(101)[round(1 + 100 * (log2(legendvals) - log2(10)) / log2(5000))]),
+       legend = c("Total counts:", legendvals))
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/QC_counts_over_xy.png")
+```
+
+We see ample variability in total counts over space, but it all appears biological, not technical, with the exception of some FOV edge effects 
+ in which cells partially captured at some FOV edges have suppressed counts.
+ 
+We also like to plot background over space. Because negative control counts are so sparse at the level of single cells, 
+ we plot *spatially smoothed* background, i.e. we color each cell by the mean background over its 50 nearest neighbors.
+
+```{r echo = TRUE, eval = FALSE}
+## plot smoothed background over space:
+# get spatial neighbors:
+neighbors <- InSituCor:::nearestNeighborGraph(xy[, 1], xy[, 2], N = 50, subset = metadata$slide_ID)  
+# calculate spatially-smoothed background:
+smoothedbg <- InSituCor:::neighbor_mean(x = metadata$nCount_negprobes, neighbors = neighbors)
+# plot spatially-smoothed background:
+par(mar = c(0,0,0,0))
+plot(xy, pch = 16, cex = 0.1, asp = 1, 
+     col = viridis_pal(option = "B")(101)[
+       round(1 + 100 * pmin(smoothedbg / quantile(smoothedbg, 0.9995), 1))
+     ])
+legendvals <- round(seq(0, quantile(smoothedbg, 0.9995), length.out = 4), 2)
+legend("bottomright", pch = 16, 
+       col = c("white", viridis_pal(option = "B")(101)[round(1 + 100 * (legendvals / quantile(smoothedbg, 0.9995)))]),
+       legend = c("Spatially smoothed \n negprobe counts:", legendvals))
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/QC_negprobes_xy.png")
+```
+
+FOV edge effects are also notable here, presumably downstream from suppressed signal in those locations.
+Of greater note is a band of higher-background FOVs towards the lower left of the tissue. 
+No immediate action is needed, but by becoming aware of this small technical effect 
+ we'll be armed to interpret any strange results driven by it. 
 
 
