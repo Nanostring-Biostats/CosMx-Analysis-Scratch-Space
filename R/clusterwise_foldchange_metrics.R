@@ -38,6 +38,7 @@ clusterwise_foldchange_metrics <- function(counts=NULL, normed = NULL, totalcoun
               length(unique(metainfo[["cell_ID"]])) == nrow(metainfo))
   
   if(!is.null(counts)){
+    ## checks on the counts matrix 
     if(!is.null(totalcounts)){
       stopifnot(length(totalcounts) == ncol(counts))
       if(!is.null(names(totalcounts)) && !is.null(colnames(counts))){
@@ -45,17 +46,30 @@ clusterwise_foldchange_metrics <- function(counts=NULL, normed = NULL, totalcoun
                     all(names(totalcounts) %in% colnames(counts))) 
         totalcounts <- totalcounts[colnames(counts)] 
       }
+      if(is.null(names(totalcounts))){
+        warning("No names provided for 'totalcounts'.\nAssuming that 'totalcounts' vector matches the order of provided 'counts' matrix.\nPlease consider providing a cellid-named vector of totalcounts.")
+      }
+    }
+    stopifnot(all(metainfo[["cell_ID"]] %in% colnames(counts)))
+    if(nrow(metainfo)!=ncol(counts)){
+      warning("Number of rows (cells) in 'metadata' does not match the number of columns (cells) in the 'counts' matrix!\nUsing only the cells in the metadata to compute the foldchange table.")
     }
   }  else {
     if(missing(normed)){
         stop("either 'normed' or 'counts' argument must be provided")
     }
   }
-   
+  
   if(missing(normed)){
     normed <- Matrix::t(totalcount_norm(Matrix::t(counts), totalcounts))
   }
  
+  ## check on the normed matrix 
+  stopifnot(all(metainfo[["cell_ID"]] %in% colnames(normed)))
+  if(nrow(metainfo)!=ncol(normed)){
+    warning("Number of rows (cells) in 'metadata' does not match the number of columns (cells) in the 'normed' matrix!\nUsing only the cells in the metadata to compute the foldchange table.")
+  }
+  
   
   pb <- txtProgressBar(min =0, max = length(unique(metainfo[[cluster_column]])), style = 3)
   idx <- 0
