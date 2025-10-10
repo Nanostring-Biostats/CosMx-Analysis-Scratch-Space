@@ -22,7 +22,6 @@
 #' @export
 clusterwise_foldchange_metrics <- function(counts=NULL, normed = NULL, totalcounts = NULL, metadata, cluster_column, cellid_column = "cell_ID"){
 
-  stopifnot(cellid_column %in% colnames(metadata)) 
   stopifnot(cluster_column %in% colnames(metadata)) 
   metainfo <- data.table::copy(data.table::data.table(metadata))
   if(!(cellid_column) %in% colnames(metainfo)){
