@@ -8,7 +8,7 @@ Here we'll walk through a full pipeline for getting your data ready to explore a
 4. Perform dimension reduction (features a new algorithm for obtaining better PC projections)
 5. Cluster our data and name the clusters we discover
 6. Use the HieraType algorithm to obtain superior immune cell subtyping
-
+7. Perform thorough cell type QC
 
 # Loading flat files
 
@@ -653,5 +653,272 @@ knitr::include_graphics("figures/umap_totalcounts.png")
 ```
 
 # Cell typing
+
+Here we demo the most consistently-successful approach to cell typing we have found.
+First, we perform unsupervised clustering using a set of a few thousand highly variable genes (hvg's).
+This approach is robust, and requires minimal configuration and re-running.
+Naming clusters used to be time-consuming, but we have found that the right prompts to an Large Language Model,
+**combined with rigorous oversight**, minimize the burden of cluster naming.
+We will demonstrate two approaches to unsupervised clustering:
+
+- Louvain clustering, using PC's derived from Pearson residuals of hvg's.
+- InSituType's unsupervised mode, run on hvg's. 
+
+Of the above two methods, Louvain tends to be faster, while InSituType is easier to refine,
+ and, more importantly, straightforward to project onto future datasets.
+
+::: {.panel-tabset}
+
+## Louvain clustering
+
+**Note:** Here we run louvain clustering with a high resolution, intentionally over-clustering with the plan to condense afterwards.
+It's often better to run with the default resolution (0.8) at first, then subcluster selected cell types afterwards.
+to sub-cluster a cell type, first filter out genes for which segmentation errors are likely to bias its profiles.
+use smiDE::overlap_ratio_metric to do so. (smiDE is available on the scratch space.)
+
+
+
+**Note:** Here we run louvain clustering with a high resolution, intentionally over-clustering with the plan to condense afterwards.
+It's often better to run with the default resolution (0.8) at first, then subcluster selected cell types afterwards.
+to sub-cluster a cell type, first filter out genes for which segmentation errors are likely to bias its profiles.
+use smiDE::overlap_ratio_metric to do so. (smiDE is available on the scratch space.)
+
+
+
+```{r echo = FALSE, eval = TRUE}
+# use Seurat to run Louvain clustering on the graph from our umap object
+if (TRUE) {
+  seu[["pearsongraph"]] <- Seurat::as.Graph(umapobj$grph) ## nearest neighbors / adjacency matrix used for unsupervised clustering
+  seu <- Seurat::FindClusters(seu, graph = "pearsongraph", resolution = 1.2)  # choosing a high resolution with the plan to condense afterwards
+  clust <- seu@meta.data$seurat_clusters
+  saveRDS(clust, file = paste0(outdir, "/processed_data/clust.RDS"))
+} else {
+  clust <- readRDS(paste0(outdir, "/processed_data/clust.RDS"))
+}
+
+# save to metadata
+metadata$clust <- clust
+
+cellcols <- rep(c(
+  "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00",
+  "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62",
+  "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494",
+  "#B3B3B3", "#1B9E77", "#D95F02", "#7570B3", "#E7298A",
+  "#66A61E", "#E6AB02", "#A6761D", "#666666", "#A6CEE3",
+  "#1F78B4", "#B2DF8A", "#33A02C", "#FB9A99", "#E31A1C",
+  "#FDBF6F", "#FF7F00", "#CAB2D6", "#6A3D9A", "#FFFF99",
+  "#B15928", "#8DD3C7", "#FFFFB3", "#BEBADA", "#FB8072"
+), 3)[1:length(unique(clust))]
+
+# Quick umap plot of clusters to confirm resolution looks right:
+plot(umapobj$ump@cell.embeddings, pch = 16, asp = 1, cex = 0.1, 
+     col = scales::alpha(cellcols[as.numeric(as.factor(clust))], 0.05))
+```
+
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/umap_louvain.png")
+```
+
+
+## Clustering with InSituType
+
+Here we refer you to the [InSituType vignette](https://github.com/Nanostring-Biostats/InSituType/blob/main/vignettes/NSCLC-RNA_InsituType-vignette.Rmd){target="_blank"}
+
+A call to InSituType that would work with our setup here is:
+
+```{r echo = FALSE, eval = TRUE}
+if (TRUE) {
+  unsup <- insitutype(
+    x = counts[, hvgs],  # only use HVG's. InSituType's computation time scales with the number of genes, so analyzing the full WTX panel is very slow. 
+    neg = meta_data$negmean,
+    assay_type = "RNA", 
+    reference_profiles = NULL,
+    reference_sds = NULL,
+    cohort = NULL,   # see the InSituType docs for how to use this argument to incorporate spatial information into clustering
+    n_clusts = 20,
+    n_starts = 5,
+    max_iters = 25
+  ) 
+  saveRDS(unsup, file = paste0(outdir, "/processed_data/unsup.RDS"))
+} else {
+  unsup <- readRDS(paste0(outdir, "/processed_data/unsup.RDS"))
+}
+# save results
+metadata$clust <- clust <- unsup$clust
+```
+
+:::
+
+## Naming clusters
+
+Determining which cell type a cluster corresponds to is a complex exercise that should take into account:
+
+- The cluster's marker genes
+- Its overall abundance
+- Its spatial locations
+
+This can be onerous, but we can get a big jump start on this work by using large language models (LLM's).
+Below, we'll create a custom prompt asking a LLM to name your cluster. 
+We have found LLM's to do a very good (though not perfect!) job of naming cell types given this information.
+After this step we'll show how to QC your cell type assignments. 
+
+As a first step, we'll derive marker genes for our clusters:
+
+::: {.callout .code collapse="true"}
+```{r echo = FALSE, eval = TRUE}
+if (TRUE) {
+  markers <- HieraType::clusterwise_foldchange_metrics(
+    Matrix::t(counts),
+    metadata = metadata,
+    cluster_column = "clust",
+    cellid_column = "cell_id")
+  saveRDS(markers, file = "processed_data/markers.RDS")
+} else {
+  markers <- readRDS("processed_data/markers.RDS")
+}
+
+# get a more succinct list of markers: only the top N per cell type:
+# prioritize by fold change, but penalize low-expressers:
+markers$prioritystat <- (markers$cluster_expr + 0.025) / (markers$clusterprime_expr + 0.025)
+markersshort <- c()
+nperclust <- 5
+for (name in unique(markers$cluster)) {
+  inds <- markers$cluster == name
+  if (length(inds) > 0) {
+    markersshort <- c(markersshort,
+                      markers$gene[inds][order(markers$prioritystat[inds], decreasing = TRUE)[1:min(nperclust, sum(inds))]])
+  }
+}
+
+```
+:::
+
+Now that we have marker genes identified, we can proceed to crafting an LLM prompt:
+
+::: {.callout .code collapse="true"}
+```{r echo = FALSE, eval = TRUE}
+## describe your tissue here. 
+mytissuetype <- "HER2+ breast cancer"
+
+# the preamble:
+prompt_preamble <- paste0(
+"Please propose cell type names for the clusters I\'ve found in a CosMx study. This is data from a ", mytissuetype, ". ",
+"Below are two tables. The first is each cell type\'s abundance in the dataset. ",
+"The second is a table of mean expression levels of various marker genes and lineage-defining genes in each cluster. ",
+"It\'s possible that some clusters could be closely-related cell types, or distinct states of the same cell type. Call that out when it\'s apparent. ",
+"For each cluster, give me your best guess at its identity, and give me your justification. Let me know when you\'re uncertain. ",
+"Then, give me R code defining a named vector called \'cluster_labels\' in which my cluster IDs are the names and the values are your proposed cell types. ",
+"Don\'t hallucinate, and check your work three times. ")
+
+# info on cluster frequencies:
+prompt_frequencies <- paste0(
+"
+The cluster frquencies are: ", 
+paste0(paste0("cluster ", names(table(clust)), ":", table(clust)), collapse = ", "))
+
+## give the LLM the clusters' marker gene profiles:
+
+# load general-purpose lineage and marker genes:
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/vignette2/lineage_and_marker_genes.R")
+# (load the list "lineagegenes")
+
+# derive marker genes:
+# add normalized data to seurat object:
+norm <- Matrix::Diagonal(x = mean(metadata$nCount_RNA)/metadata$nCount_RNA,names=colnames(counts)) %*% counts
+rownames(norm) <- rownames(counts)
+seu[["RNA_norm"]] <- Seurat::CreateAssayObject(data = Matrix::t(norm))  # genes x cells
+
+# get mean expression per cluster of lineage genes and marker genes:
+allusefulmarkers <- intersect(colnames(counts), unique(c(unlist(lineagegenes), markersshort)))
+meanexpression <- InSituType::getRNAprofiles(x = counts[, allusefulmarkers], 
+                                             neg = metadata$negmean,  
+                                             clust = paste0("cluster", clust))
+# reduce to just lineage genes with decent expression (but keep de novo markers):
+isdenovo <- is.element(rownames(meanexpression), markersshort)
+meanexpression <- meanexpression[isdenovo | apply(meanexpression, 1, max) > 0.2, ]
+
+meanexpressionastext <- write.table(round(meanexpression[1:5,1:5], 1), sep = ",", row.names = TRUE, col.names = TRUE)
+
+
+prompt_profiles <- paste0(
+  "And here is a table of each cluster's mean expression of selected data- and biology-derived marker genes: ",
+  paste(capture.output(
+    write.table(round(meanexpression, 1), sep = ",", row.names = TRUE, col.names = TRUE)
+  ), collapse = "\n"))
+
+
+message(paste0(prompt_preamble, "\n", prompt_frequencies, "\n", prompt_profiles))
+```
+:::
+
+This creates the below prompt, which can be copied into whichever LLM you prefer:
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/LLMprompt.png")
+```
+
+When this prompt was passed to ChatGPT5, it produced a writeup that looked like this:
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/LLMresponse.png")
+```
+
+... and more importantly, the below code ready to be copy-pasted into our analysis:
+
+```{r echo = FALSE, eval = TRUE}
+cluster_labels <- c(
+  "0"  = "Luminal epithelial (low-RNA/quiescent)",
+  "1"  = "Neutrophils (state C, degranulating/secretory-high)",
+  "2"  = "T cells (CD4-like, resting)",
+  "3"  = "IFN-high epithelial (luminal, inflamed)",
+  "4"  = "Luminal epithelial (apocrine-leaning; state A)",
+  "5"  = "CAFs (matrix-rich fibroblasts)",
+  "6"  = "Antigen-presenting myeloid (cDC2 / moDC)",
+  "7"  = "Luminal epithelial (apocrine-high; state B)",
+  "8"  = "Luminal epithelial (apocrine-high; state C)",
+  "9"  = "Neutrophils (state B)",
+  "10" = "Luminal epithelial (apocrine-secretory)",
+  "11" = "Luminal epithelial (apocrine-high; state D)",
+  "12" = "Luminal epithelial (apocrine-very-high; state E)",
+  "13" = "Macrophages (APOE+/C1QA+ TAMs)",
+  "14" = "Neutrophils (state A; S100A8/A9-max)",
+  "15" = "Epithelial–neutrophil admixture (uncertain)",
+  "16" = "CAFs (cycling)",
+  "17" = "Endothelial (blood/lymphatic mix)",
+  "18" = "Inflamed epithelial with myeloid shadow (uncertain)",
+  "19" = "Pericytes / vascular SMC",
+  "20" = "Luminal epithelial (mucociliary-like secretory)",
+  "21" = "Cycling epithelial",
+  "22" = "Luminal epithelial (baseline state)",
+  "23" = "IFN-high epithelial (luminal, inflamed)",
+  "24" = "Luminal epithelial (mucociliary-like secretory)",
+  "25" = "Plasma cells",
+  "26" = "Antigen-presenting cells (B/cDC; cycling, uncertain)",
+  "27" = "Cytotoxic T / NK cells"
+)
+
+# for now, just uncritically take the names. Clustering QC and possible renaming will come later.
+metadata$clust <- clust <- cluster_labels[as.character(clust)]
+```
+
+
+**Note: for tumor studies, additional techniques can help classify cancer cells:**
+
+1. Cancer cells tend to be extremely transcriptionally active. Clusters with high total counts per cell are usually cancer.
+2. The scMalignantFinder algorithm (https://github.com/Jonyyqn/scMalignantFinder) promises to call cells as cancer vs. non-cancer. We have not tried it, but it seems promising.
+3. For WTX studies, it's possible to estimate cells' copy number variants. We have used inferCNV successfully (though we needed to run it on subsets of ~10k cells for it to compute. A newer method, ClonalScope (https://github.com/seasoncloud/Clonalscope), looks promising.
+
+
+## Optimizing immune cell calling with the HieraType algorithm
+
+We created the [HieraType algorithm](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth/){target="_blank"} to classify immune cells in a way that is informed by marker genes. 
+We have found it to consistently outperform other algorithms in immune cell typing. 
+Our standard approach now is to overwrite our initial clustering results with HieraType's results whenever it calls an immune cell.
+
+Below, we run HieraType in two steps. 
+In the first, we call broad cell types (e.g. epithelial, immune, ...) then subclassify the immune cells (B, T, macrophage...)
+
+
 
 
