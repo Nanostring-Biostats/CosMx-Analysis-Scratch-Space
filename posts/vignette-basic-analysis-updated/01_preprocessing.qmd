@@ -197,7 +197,7 @@ stopifnot(identical(rownames(counts), metadata$cell_id))
 stopifnot(max(abs(Matrix::rowSums(counts) - metadata$nCount_RNA)) == 0)
 
 ```
-
+:::
 
 Next we'll perform some well-advised modifications to our metadata:
 
@@ -243,6 +243,7 @@ saveRDS(falsecounts, file = paste0(outdir, "/processed_data/falsecounts_unfilter
 saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata_unfiltered.RDS"))
 saveRDS(xy, file = paste0(outdir, "/processed_data/xy_unfiltered.RDS"))
 ```
+:::
 
 Now we have data in 3 locations:
 
@@ -414,6 +415,7 @@ genes using the bit are underexpressed. We also look for FOVs where total expres
 
 Below we'll run our FOV QC code and examine its results:
 
+::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
 ## preparing resources:
 # source the FOV QC tool:
@@ -427,7 +429,7 @@ head(barcodemap)
 
 ## run the method:
 fovqcresult <- runFOVQC(counts = counts, xy = xy, fov = metadata$FOV, barcodemap = barcodemap) 
-saveRDS(fovqcresult, file = "processed_data/fovqcresult.RDS")
+saveRDS(fovqcresult, file = paste0(outdir, "/processed_data/fovqcresult.RDS"))
 
 # map of flagged FOVs:
 mapFlaggedFOVs(fovqcresult)
@@ -443,6 +445,7 @@ flag[is.element(metadata$FOV, fovqcresult$flaggedfovs)] <- TRUE
 # plot the result:
 FOVSignalLossSpatialPlot(fovqcresult) 
 ```
+:::
 
 
 ```{r echo = FALSE, eval = TRUE}
@@ -524,5 +527,131 @@ FOV edge effects are also notable here, presumably downstream from suppressed si
 Of greater note is a band of higher-background FOVs towards the lower left of the tissue. 
 No immediate action is needed, but by becoming aware of this small technical effect 
  we'll be armed to interpret any strange results driven by it. 
+
+
+# Dimension reduction
+
+Here we demonstrate an important improvement in dimension reduction for large studies.
+The single cell analysis world has long used Pearson residuals to transform their data prior to running PCA;
+these residuals scale count data to better balance the information available in each cell / gene.
+However, Pearson residuals are dense, meaning we cannot encode them with a sparse matrix, making
+them computationally intractable for larger datasets.
+To benefit from Pearson residuals without taxing our compute instances,
+we have developed a method of calculating the principal components of a Pearson residual matrix
+without ever having to store the entire matrix. We demonstrate this function below.
+
+We'll start by identifying highly variable genes. 
+In this section we'll take advantage of some of the functions in the Seurat ecosystem.
+
+```{r echo = TRUE, eval = FALSE}
+# make a seurat object:
+library(Seurat)
+seu <- Seurat::CreateSeuratObject(counts = Matrix::t(counts),
+                                  meta.data = metadata)
+seu <- Seurat::FindVariableFeatures(seu, nfeatures = 3000) # recommend 3000 for WTX panel, 2000 for 6k panel, and all features for 1k panels
+hvgs <- setdiff(seu@assays$RNA@meta.data$var.features, NA)
+saveRDS(hvgs, file = paste0(outdir, "/processed_data/hvgs.RDS"))
+```
+
+Next we run our Pearson residual-based PCA algorithm. 
+You can install it with this command:
+
+```{r echo = TRUE, eval = FALSE}
+# install the sparse pearson PCA package:
+  remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
+                          subdir = "_code/scPearsonPCA", ref = "Main")
+```
+
+The algorithm runs in two versions: standard, and batch-aware. 
+The batch-aware version allows for gene frequencies that vary across some categorical batch variable like tissue or slide. 
+
+Note the code saving the output. This lets us re-run the script without waiting for long algorithms to reprocess.
+However, this particular routine runs fast enough, and generates a large enough data object,
+ that it would also be reasonable to recalculate rather than store its output. 
+
+::: {.panel-tabset}
+
+## Standard mode
+
+```{r echo = TRUE, eval = FALSE}
+## get PCs based on Pearson residuals:
+# version without batch adjustment:
+if (TRUE) {
+  genefreq <- scPearsonPCA::gene_frequency(Matrix::t(counts[, hvgs])) ## gene frequency (across all cells)
+  pcaobj <- scPearsonPCA::sparse_quasipoisson_pca_seurat(
+    x = Matrix::t(counts[, hvgs]),
+    totalcounts = metadata$nCount_RNA,
+    grate = genefreq[hvgs],
+    scale.max = 10, ## PC's reflect clipping pearson residuals > 10 SDs above the mean pearson residual
+    do.scale = TRUE, ## PC's reflect as if pearson residuals for each gene were scaled to have standard deviation=1
+    do.center = TRUE ## PC's reflect as if pearson residuals for each gene were centered to have mean=0
+  )
+  saveRDS(pcaobj, file = paste0(outdir, "/processed_data/pcaobj.RDS"))
+  } else {
+  pcaobj <- readRDS(paste0(outdir, "/processed_data/pcaobj.RDS"))
+}
+```
+
+## Batch-aware mode
+
+```{r echo = TRUE, eval = FALSE}
+# In this example code we assume the metadata has a column "patient" that we wish to treat as a possible batch effect
+if (TRUE) {
+  genefreq_batch <- scPearsonPCA::gene_frequency(
+    x = Matrix::t(counts[, hvgs]),
+    obs = metadata[,.(cell, patient)],
+    cellid_colname = "cell_ID",
+    batch_variable = "patient")
+  
+  pcaobj <- 
+    sparse_quasipoisson_pca_seurat_batch(
+      Matrix::t(counts[, hvgs]),
+      totalcounts = metadata$nCount_RNA,
+      grate = genefreq_batch[hvgs,],
+      obs = metadata[,.(cell, patient)],
+      batch_variable = "patient",
+      cellid_colname = "cell",
+      scale.max = 10,
+      do.scale = TRUE,
+      do.center = TRUE
+    )
+  saveRDS(pcaobj, file = paste0(outdir, "/processed_data/pcaobj.RDS"))
+} else {
+  pcaobj <- readRDS(paste0(outdir, "/processed_data/pcaobj.RDS"))
+}
+```
+
+:::
+
+Next we'll obtain a UMAP projection from those PCs:
+
+```{r echo = TRUE, eval = FALSE}
+## run UMAP:
+if (TRUE) {
+  umapobj <- scPearsonPCA::make_umap(pcaobj)
+  # save the full object: the umap connectivity graph will be useful later on:
+  saveRDS(umapobj, file = paste0(outdir, "/processed_data/umapobj.RDS"))
+} else {
+  umapobj <- readRDS(paste0(outdir, "/processed_data/umapobj.RDS"))
+}
+
+## plot the UMAP projection, coloring by total counts:
+par(mar = c(0,0,0,0))
+plot(umapobj$ump@cell.embeddings, pch = 16, asp = 1, cex = 0.1,
+     col = scales::alpha(viridis_pal(option = "B")(101)[
+       round(1 + 100 * (log2(pmin(pmax(metadata$nCount_RNA, 10), 5000)) - log2(10)) / log2(5000))
+     ], 0.05))
+legendvals <- c(10, 100, 1000, 5000)
+legend("topleft", pch = 16, 
+       col = c("white", viridis_pal(option = "B")(101)[round(1 + 100 * (log2(legendvals) - log2(10)) / log2(5000))]),
+       legend = c("Total counts:", legendvals))
+```
+
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/umap_totalcounts.png")
+```
+
+# Cell typing
 
 
