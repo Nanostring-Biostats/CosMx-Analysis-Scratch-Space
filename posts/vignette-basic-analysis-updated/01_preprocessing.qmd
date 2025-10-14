@@ -26,6 +26,7 @@ but our approach here will be more performant for most operations.
 # necessary libraries
 library(data.table) # for more memory efficient data frames
 library(Matrix) # for sparse matrices like our counts matrix
+library(ggplot2)
 ```
 
 AtoMx flat file exports come with each slide packaged in its own directory. 
@@ -57,6 +58,15 @@ myflatfiledir <- "path_to_your_flat_files_folder/flatFiles"    # point to a dire
 # where to write output:
 outdir <- "path_to_your_desired_output_location"
 
+
+# set up results directories for later
+if(!dir.exists(paste0(outdir, "/results"))){
+  dir.create(paste0(outdir, "/results"))
+}
+# directory to hold intermediate data files
+if(!dir.exists(paste0(outdir, "/processed_data"))){
+  dir.create(paste0(outdir, "/processed_data"))
+}
 setwd(outdir)
 ```
 
@@ -234,9 +244,6 @@ colnames(xy) <- paste0(c("x", "y"), "_mm")
 metadata$negmean <- Matrix::rowMeans(negcounts)
 
 # save data in R-friendly form:
-if(!dir.exists(paste0(outdir, "/processed_data"))){
-  dir.create(paste0(outdir, "/processed_data"))
-}
 saveRDS(counts, file = paste0(outdir, "/processed_data/counts_unfiltered.RDS"))
 saveRDS(negcounts, file = paste0(outdir, "/processed_data/negcounts_unfiltered.RDS"))
 saveRDS(falsecounts, file = paste0(outdir, "/processed_data/falsecounts_unfiltered.RDS"))
@@ -685,7 +692,7 @@ use smiDE::overlap_ratio_metric to do so. (smiDE is available on the scratch spa
 
 
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = TRUE, eval = FALSE}
 # use Seurat to run Louvain clustering on the graph from our umap object
 if (TRUE) {
   seu[["pearsongraph"]] <- Seurat::as.Graph(umapobj$grph) ## nearest neighbors / adjacency matrix used for unsupervised clustering
@@ -727,7 +734,7 @@ Here we refer you to the [InSituType vignette](https://github.com/Nanostring-Bio
 
 A call to InSituType that would work with our setup here is:
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = TRUE, eval = FALSE}
 if (TRUE) {
   unsup <- insitutype(
     x = counts[, hvgs],  # only use HVG's. InSituType's computation time scales with the number of genes, so analyzing the full WTX panel is very slow. 
@@ -766,7 +773,7 @@ After this step we'll show how to QC your cell type assignments.
 As a first step, we'll derive marker genes for our clusters:
 
 ::: {.callout .code collapse="true"}
-```{r echo = FALSE, eval = TRUE}
+```{r echo = TRUE, eval = FALSE}
 if (TRUE) {
   markers <- HieraType::clusterwise_foldchange_metrics(
     Matrix::t(counts),
@@ -797,7 +804,7 @@ for (name in unique(markers$cluster)) {
 Now that we have marker genes identified, we can proceed to crafting an LLM prompt:
 
 ::: {.callout .code collapse="true"}
-```{r echo = FALSE, eval = TRUE}
+```{r echo = TRUE, eval = FALSE}
 ## describe your tissue here. 
 mytissuetype <- "HER2+ breast cancer"
 
@@ -849,6 +856,10 @@ prompt_profiles <- paste0(
 
 
 message(paste0(prompt_preamble, "\n", prompt_frequencies, "\n", prompt_profiles))
+
+# save old results for rewriting later on:
+unnamedclust <- clust
+unnamedmeanexpression <- meanexpression
 ```
 :::
 
@@ -866,7 +877,7 @@ knitr::include_graphics("figures/LLMresponse.png")
 
 ... and more importantly, the below code ready to be copy-pasted into our analysis:
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = TRUE, eval = FALSE}
 cluster_labels <- c(
   "0"  = "Luminal epithelial (low-RNA/quiescent)",
   "1"  = "Neutrophils (state C, degranulating/secretory-high)",
@@ -899,11 +910,85 @@ cluster_labels <- c(
 )
 
 # for now, just uncritically take the names. Clustering QC and possible renaming will come later.
-metadata$clust <- clust <- cluster_labels[as.character(clust)]
+metadata$clust <- clust <- cluster_labels[as.character(unnamedclust)]
+colnames(meanexpression) <- cluster_labels[as.character(gsub("cluster", "", colnames(unnamedmeanexpression)))]
 ```
 
 
-**Note: for tumor studies, additional techniques can help classify cancer cells:**
+## Verifying cluster names
+
+The LLM gave us a good guess at cluster names, but we still need to verify them.
+To assist in this process, we recommend looking at 3 outputs:
+
+  1. The LLM's justifications for its calls
+  2. A heatmap of each cluster's expression of key marker genes
+  3. The clusters' distributions in space.
+  4. The clusters' UMAP positions
+
+The code below draws the key plots:
+
+::: {.callout .code collapse="true"}
+```{r echo = TRUE, eval = FALSE}
+
+# heatmap of marker genes - drawn tall so we can read all gene names:
+dev.off() # need to silence the current graphics device for a pheatmap pdf to render properly
+pdf(paste0(outdir, "/results/marker heatmap tall.pdf"), height = 17, width = 6)
+pheatmap::pheatmap(sweep(meanexpression, 1, pmax(0.1, apply(meanexpression, 1, max)), "/"),
+         col = colorRampPalette(c("white", "darkblue"))(101),
+         fontsize_row = 6)
+dev.off()
+
+# umap positions
+png("results/umap_by_cluster.png", wiodth = 16, height = 16, units = "in", res = 400)
+par()
+dev.off()
+  
+# xy positions:
+for (name in unique(clust)) {
+  png(paste0("results/cluster xy - ", make.names(name), ".png"), 
+      width = diff(range(xy[, 1])) * 0.5, 
+      height = diff(range(xy[, 2])) * 0.5,
+      unit = "in", res = 350)
+  par(mar = c(0,0,0,0))
+  plot(xy, pch = 16, cex = 0.1, 
+       col = scales::alpha(cellcols, 0.3)[as.numeric(as.factor(clust))], 
+       xlab = "", ylab = "", xaxt = "n", yaxt = "n")
+  points(xy[clust == name, ], pch = 16, cex = 0.1, 
+         col = "black")
+  legend("top", legend = name, bty = "n")
+  dev.off()
+}
+
+```
+:::
+
+The above code produces the below plots:
+
+A pdf heatmap of marker gene expression, stretched out to allow for scrutinizing gene names:
+
+```{r echo = FALSE, eval = TRUE, out.width = "100%"}
+knitr::include_graphics("figures/tallheatmapsnippet.png")
+```
+
+A png showing each cluster in umap space, giving you another look at which clusters
+ are similar to each other:
+
+```{r echo = FALSE, eval = TRUE, out.width = "100%"}
+knitr::include_graphics("figures/umapbyclustersnippet.png")
+```
+
+A png for each cluster showing its positions in xy space (bold black points atop faded points for other clusters):
+
+```{r echo = FALSE, eval = TRUE, out.width = "80%"}
+knitr::include_graphics("figures/cluster_xy_snippet.png")
+```
+
+With these plots in hand, you should scrutinize the initial cluster names and correct as needed.
+Note that you can gloss over immune clusters: we'll be overriding them later with the HieraType algorithm's results.
+
+To rename clusters, simply edit the cluster names in the definition of \code{cluster_labels} above, and re-run from that code block onward. This step can also be used to merge closely-related clusters by assigning multiple clusters the same name. In our case, we renamed three clusters of cancer cells that the LLM labeled as neutrophils (some of the classic neutrophil markers are also expressed by cancer cells). 
+
+**Aside: for tumor studies, additional techniques can help classify cancer cells:**
 
 1. Cancer cells tend to be extremely transcriptionally active. Clusters with high total counts per cell are usually cancer.
 2. The scMalignantFinder algorithm (https://github.com/Jonyyqn/scMalignantFinder) promises to call cells as cancer vs. non-cancer. We have not tried it, but it seems promising.
@@ -920,5 +1005,149 @@ Below, we run HieraType in two steps.
 In the first, we call broad cell types (e.g. epithelial, immune, ...) then subclassify the immune cells (B, T, macrophage...)
 
 
+::: {.callout .code collapse="true"}
+```{r echo = TRUE, eval = FALSE}
+### set up hieratype pipeline:
+pipeline_io_rna <- HieraType::make_pipeline(
+  markerslists = list(
+    "l1" = HieraType::markerslist_l1
+    ,"l2" = HieraType::markerslist_immune
+  )
+  ,priors = list(
+    "l2" = "l1"
+  )
+  ,priors_category = list(
+    "l2" = "immune"
+  )
+)
 
+if (TRUE) {
+  hieratyperes <- HieraType::run_pipeline(
+    pipeline = pipeline_io_rna
+    ,counts_matrix = counts
+    ,totalcounts = metadata$nCount_RNA
+    ,adjacency_matrix = umapobj$grph[rownames(counts), rownames(counts)]
+  )
+  saveRDS(hieratyperes, file = "processed_data/hieratyperes.RDS")
+} else {
+  hieratyperes <- readRDS("processed_data/hieratyperes.RDS")
+}
+
+# further subclassify T-cells:
+tcell_ids <- hieratyperes$post_probs$l1[celltype_granular=="tcell"][["cell_ID"]]
+if (TRUE) {
+  tcell_typing <- 
+    HieraType::run_pipeline(pipeline = HieraType::pipeline_tcell
+                 ,counts_matrix = counts[tcell_ids, ]
+                 ,adjacency_matrix = umapobj$grph[tcell_ids,tcell_ids]
+                 ,celltype_call_threshold = 0.5
+    )
+  saveRDS(tcell_typing, file = "processed_data/tcell_typing.RDS")
+} else {
+  tcell_typing <- readRDS("processed_data/tcell_typing.RDS")
+}
+
+# unify the two levels of hieratype results:
+htclust <- hieratyperes$post_probs$l1$celltype_granular
+names(htclust) <- hieratyperes$post_probs$l1$cell_ID
+htclust[tcell_typing$post_probs$tmajor$cell_ID] <- tcell_typing$post_probs$tmajor$celltype_granular
+htclust <- htclust[match(metadata$cell_id, names(htclust))]
+```
+:::
+
+Now we'll use a simple marker heatmap to confirm HieraType worked as hoped:
+
+::: {.callout .code collapse="true"}
+```{r echo = TRUE, eval = FALSE}
+
+# pull out canonical ("index") markers for immune cells:
+indexmarkers <- unique(c(
+  unlist(pipeline_io_rna$markerslists)[grepl("index_marker", names(unlist(pipeline_io_rna$markerslists)))],
+  unlist(HieraType::pipeline_tcell)[grepl("index_marker", names(unlist(HieraType::pipeline_tcell)))]
+))
+indexmarkers <- intersect(indexmarkers, hvgs)
+
+# make a marker heatmap for the hieratype immune cell calls:
+fcmetrics <- HieraType::clusterwise_foldchange_metrics(
+  normed  = Matrix::t(norm[, indexmarkers]),
+  metadata = data.frame("cell_ID" = names(htclust), "hieratype_call" = htclust),
+  cluster_column = "hieratype_call"
+)
+hm_unsup <- HieraType::marker_heatmap(fcmetrics, extras = NULL)
+
+print(hm_unsup)
+```
+:::
+
+```{r echo = FALSE, eval = TRUE, out.width = "60%"}
+knitr::include_graphics("figures/hieratype_marker_heatmap.png")
+```
+
+The above heatmap doesn't show the strongest markers; it shows the most biologically-relevant markers. 
+We can gain further confidence in our immune cell typing results looking at data-driven markers:
+
+::: {.callout .code collapse="true"}
+```{r echo = TRUE, eval = FALSE}
+fctbl_unsup <- 
+  HieraType::clusterwise_foldchange_metrics(normed  = Matrix::t(norm),
+                                            metadata = data.frame("cell_ID" = names(htclust), "hieratype_call" = htclust),
+                                            cluster_column = "hieratype_call"
+  )
+
+## make a marker heatmap
+hm_unsup <- HieraType::marker_heatmap(fctbl_unsup)
+print(hm_unsup)
+```
+:::
+
+```{r echo = FALSE, eval = TRUE, out.width = "60%"}
+knitr::include_graphics("figures/hieratype_marker_heatmap2.png")
+```
+
+### Merging clustering and HieraType results
+
+To finish our cell typing exercise, we now merge the Louvain and HieraType results.
+All cells called immune by HieraType will get HieraType labels. 
+All other cells will retain their old labels, with one important exception: any cells in an immune Louvain cluster but not called immune by HieraType will be reclassified as "unknown":
+
+```{r echo = TRUE, eval = FALSE}
+# combine hieratype and clustering:
+immune.ids <- hieratyperes$post_probs$l1$cell_ID[
+  !is.element(hieratyperes$post_probs$l1$celltype_thresh, c("epithelial", "fibroblast", "endothelial", "smooth_muscle"))]
+celltype <- clust
+names(celltype) <- metadata$cell_id
+celltype[immune.ids] <- htclust[immune.ids]
+# what to do with the leftover immune cells from clustering?
+setdiff(unique(celltype), unique(htclust))
+louvain_immune_names <- c("Macrophages (APOE+/C1QA+ TAMs)",
+                          "Neutrophils (state A; S100A8/A9-max)",
+                          "Neutrophils (state C, degranulating/secretory-high)",
+                          "T cells (CD4-like, resting)",
+                          "Antigen-presenting myeloid (cDC2 / moDC)",
+                          "Neutrophils (state B)",
+                          "Plasma cells",
+                          "Antigen-presenting cells (B/cDC; cycling, uncertain)",
+                          "Cytotoxic T / NK cells")
+
+# check overlaps, making sure there aren't huge numbers of cells called immune by Louvain but not HieraType:
+par(mar = c(22,4,2,1))
+barplot(table(celltype), las = 2, 
+        col = c("grey", "orange", "cornflowerblue")[1 + is.element(names(table(celltype)), louvain_immune_names) + 2 * is.element(names(table(celltype)), unique(htclust))])
+legend("topleft", fill = c("grey", "orange", "cornflowerblue"), legend = c("Louvain non-immune", "Louvain immune", "HieraType immune"))
+
+
+# overwrite left-behind louvain immune clusters:
+celltype[is.element(celltype, louvain_immune_names)] <- "immune_unspecified"
+metadata$celltype <- celltype
+saveRDS(celltype, file = paste0(outdir, "/processed_data/celltype.RDS"))
+saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
+```
+
+
+```{r echo = FALSE, eval = TRUE, out.width = "60%"}
+knitr::include_graphics("figures/celltype_merge_barplot.png")
+```
+
+Note that in the above plot, we have 3 tall bars from neutrophil clusters called by Louvain. 
+This result would be concerning for a merge of HieraType and Louvain, implying many immune cells were getting left behind. In our case, these are the 3 clusters that the LLM misclassified; we renamed them to "cancer" for our analysis.
 
