@@ -13,7 +13,7 @@ Here we'll walk through a full pipeline for getting your data ready to explore a
 # Loading flat files
 
 First we'll load the packages we need. 
-Importantly, we'll load "Matrix", which handles *sparse matrices*. 
+Importantly, we'll load "Matrix", which handles _sparse matrices_. 
 When a matrix has mainly zeroes, which is generally the case for single cell data,
 storing it in sparse matrix format has huge memory savings. Given the size of CosMx
 data, it is vital to be memory-efficient. 
@@ -32,7 +32,7 @@ library(ggplot2)
 AtoMx flat file exports come with each slide packaged in its own directory. 
 Our example here has one slide, titled "BreastCancer"; its contents look like this:
 
-```{r echo = FALSE, eval = TRUE, out.width = "100%"}
+```{r echo = FALSE, eval = TRUE, out.width = "85%"}
 knitr::include_graphics("figures/flatfiles.png")
 ```
 
@@ -54,10 +54,10 @@ To begin, tell your script where to operate:
 ```{r echo = TRUE, eval = FALSE}
 ## set up:
 # location of flat files:
-myflatfiledir <- "path_to_your_flat_files_folder/flatFiles"    # point to a directory containing one folder of flat files per slide
+# (point to a directory containing one folder of flat files per slide)
+myflatfiledir <- "path_to_your_flat_files_folder/flatFiles"    
 # where to write output:
 outdir <- "path_to_your_desired_output_location"
-
 
 # set up results directories for later
 if(!dir.exists(paste0(outdir, "/results"))){
@@ -205,7 +205,6 @@ counts <- counts[, !grepl("Negative", colnames(counts)) & !grepl("SystemControl"
 # checks
 stopifnot(identical(rownames(counts), metadata$cell_id))
 stopifnot(max(abs(Matrix::rowSums(counts) - metadata$nCount_RNA)) == 0)
-
 ```
 :::
 
@@ -216,11 +215,6 @@ Next we'll perform some well-advised modifications to our metadata:
 * Remove the "cell_ID" column, which also can have duplicate values across slides, and retain the duplicate-free column "cell_id".
 * For convenience, extract cells' xy positions as a separate data object, and recast them from pixel-scale to mm-scale. 
 * Add the mean negprobe counts to the metadata (the metadata has the *sum* of the negprobes already, but since negprobe counts vary across panels it's worth recording this value now so we won't have to remember our negprobe number later.)
-
-Finally, we'll save these data objects as .RDS files. These files are smaller on disk (they 
-benefit from more compression than flat files do), and they're faster to read back into R.
-
-**Please note that these files hold intermediate results for convenience during analysis; they are not official file formats supported by NanoString.**
 
 ::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
@@ -242,7 +236,15 @@ colnames(xy) <- paste0(c("x", "y"), "_mm")
 
 # add mean negprobe to metadata:
 metadata$negmean <- Matrix::rowMeans(negcounts)
+```
+:::
 
+Finally, we'll save these data objects as .RDS files. These files are smaller on disk (they 
+benefit from more compression than flat files do), and they're faster to read back into R.
+
+**Please note that these files hold intermediate results for convenience during analysis; they are not official file formats supported by NanoString.**
+
+```{r echo = TRUE, eval = FALSE}
 # save data in R-friendly form:
 saveRDS(counts, file = paste0(outdir, "/processed_data/counts_unfiltered.RDS"))
 saveRDS(negcounts, file = paste0(outdir, "/processed_data/negcounts_unfiltered.RDS"))
@@ -250,7 +252,6 @@ saveRDS(falsecounts, file = paste0(outdir, "/processed_data/falsecounts_unfilter
 saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata_unfiltered.RDS"))
 saveRDS(xy, file = paste0(outdir, "/processed_data/xy_unfiltered.RDS"))
 ```
-:::
 
 Now we have data in 3 locations:
 
@@ -327,7 +328,10 @@ Or, we can automatically group contiguous FOVs using the dbscan algorithm:
 # cells within eps range of each other will be grouped together. 
 # Set eps appropriately to link sufficiently close FOVs and separate sufficiently distant FOVs. 
 # An FOV's width is about 1. 
-cellgroups <- dbscan::dbscan(xy, minPts = 1, eps = 1)$cluster  
+cellgroups <- dbscan::dbscan(xy, minPts = 1, eps = 1)$cluster
+# confirm the grouping is as desired:
+plot(xy, pch = 16, cex = 0.1, asp = 1, 
+     col = sample(colors())[as.numeric(as.factor(cellgroups))])
 ```
 
 **Third**, we rearrange groups. We can move groups manually:
@@ -373,7 +377,8 @@ Our defaults are fairly permissive; it would be reasonable double them in datase
 
 ```{r echo = TRUE, eval = FALSE}
 ## set the total counts threshold:
-count_threshold <- 100 # recommendations (on the permissive side): 20 counts for 1000plex, 50 for 6000plex, 100 for WTX 
+# recommendations (on the permissive side): 20 counts for 1000plex, 50 for 6000plex, 100 for WTX
+count_threshold <- 100  
 
 # require sufficient counts per cell 
 hist(log2(metadata$nCount_RNA), breaks = 100, xlab = "Log2 counts per cell", ylab = "N cells", main = "")
@@ -386,7 +391,7 @@ flag <- metadata$nCount_RNA < count_threshold
 mean(flag)
 ```
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "115%"}
 knitr::include_graphics("figures/QC_counts_histogram.png")
 ```
 
@@ -396,7 +401,8 @@ This step typically removes very few cells.
 ```{r echo = TRUE, eval = FALSE}
 # what's the distribution of areas?
 hist(metadata$Area, breaks = 100, xlab = "Cell Area", main = "")
-# based on the above, set a threshold way out in the tail:
+
+# based on the above, set a threshold well out into the tail:
 area_threshold <- 30000
 abline(v = area_threshold, col = "red")
 legend("topright", legend = paste0(round(mean(metadata$Area > area_threshold) * 100, 2), "% rejected"))
@@ -406,16 +412,17 @@ flag <- flag | (metadata$Area > area_threshold)
 mean(flag)
 ```
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "115%"}
 knitr::include_graphics("figures/QC_area_histogram.png")
 ```
 
+To check for segmentation errors, consider our R package [FastReseg](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/){target="_blank"}, which uses transcript positions to flag cells with likely segmentation errors, then remove or reassign transcripts assigned to the wrong cells.
 
 ## FOV QC
 
 We check FOVs for two indicators of artifacts: diminished total counts, and biased gene expression profiles. 
 Procedures for both these checks, along with a detailed discussion, can be found in a method
-described [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/).
+described [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/){target="_blank"}.
 
 To summarize briefly: for each "bit" in our barcodes (e.g. red in reporter cycle 8), we look for FOVs where 
 genes using the bit are underexpressed. We also look for FOVs where total expression is suppressed.
@@ -498,7 +505,7 @@ legend("bottomright", pch = 16,
        legend = c("Total counts:", legendvals))
 ```
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "115%"}
 knitr::include_graphics("figures/QC_counts_over_xy.png")
 ```
 
@@ -555,7 +562,9 @@ In this section we'll take advantage of some of the functions in the Seurat ecos
 library(Seurat)
 seu <- Seurat::CreateSeuratObject(counts = Matrix::t(counts),
                                   meta.data = metadata)
-seu <- Seurat::FindVariableFeatures(seu, nfeatures = 3000) # recommend 3000 for WTX panel, 2000 for 6k panel, and all features for 1k panels
+# find HVG's:
+# recommend nfeatures = 3000 for WTX, 2000 for 6k panel, and using all features for 1k panels
+seu <- Seurat::FindVariableFeatures(seu, nfeatures = 3000) 
 hvgs <- setdiff(seu@assays$RNA@meta.data$var.features, NA)
 saveRDS(hvgs, file = paste0(outdir, "/processed_data/hvgs.RDS"))
 ```
@@ -655,7 +664,7 @@ legend("topleft", pch = 16,
 ```
 
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "100%"}
 knitr::include_graphics("figures/umap_totalcounts.png")
 ```
 
@@ -664,8 +673,7 @@ knitr::include_graphics("figures/umap_totalcounts.png")
 Here we demo the most consistently-successful approach to cell typing we have found.
 First, we perform unsupervised clustering using a set of a few thousand highly variable genes (hvg's).
 This approach is robust, and requires minimal configuration and re-running.
-Naming clusters used to be time-consuming, but we have found that the right prompts to an Large Language Model,
-**combined with rigorous oversight**, minimize the burden of cluster naming.
+Naming clusters used to be time-consuming, but we have found that the right prompts to an large language model (LLM), **combined with rigorous oversight**, minimize the burden of cluster naming.
 We will demonstrate two approaches to unsupervised clustering:
 
 - Louvain clustering, using PC's derived from Pearson residuals of hvg's.
@@ -680,17 +688,8 @@ Of the above two methods, Louvain tends to be faster, while InSituType is easier
 
 **Note:** Here we run louvain clustering with a high resolution, intentionally over-clustering with the plan to condense afterwards.
 It's often better to run with the default resolution (0.8) at first, then subcluster selected cell types afterwards.
-to sub-cluster a cell type, first filter out genes for which segmentation errors are likely to bias its profiles.
-use smiDE::overlap_ratio_metric to do so. (smiDE is available on the scratch space.)
-
-
-
-**Note:** Here we run louvain clustering with a high resolution, intentionally over-clustering with the plan to condense afterwards.
-It's often better to run with the default resolution (0.8) at first, then subcluster selected cell types afterwards.
-to sub-cluster a cell type, first filter out genes for which segmentation errors are likely to bias its profiles.
-use smiDE::overlap_ratio_metric to do so. (smiDE is available on the scratch space.)
-
-
+To sub-cluster a cell type, first filter out genes for which segmentation errors are likely to bias its profiles.
+Use \code{smiDE::overlap_ratio_metric} to do so. (smiDE is available on the scratch space.)
 
 ```{r echo = TRUE, eval = FALSE}
 # use Seurat to run Louvain clustering on the graph from our umap object
@@ -767,7 +766,7 @@ Determining which cell type a cluster corresponds to is a complex exercise that 
 
 This can be onerous, but we can get a big jump start on this work by using large language models (LLM's).
 Below, we'll create a custom prompt asking a LLM to name your cluster. 
-We have found LLM's to do a very good (though not perfect!) job of naming cell types given this information.
+We have found LLM's to do a very good (**though not perfect**) job of naming cell types given this information.
 After this step we'll show how to QC your cell type assignments. 
 
 As a first step, we'll derive marker genes for our clusters:
@@ -865,13 +864,13 @@ unnamedmeanexpression <- meanexpression
 
 This creates the below prompt, which can be copied into whichever LLM you prefer:
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "120%"}
 knitr::include_graphics("figures/LLMprompt.png")
 ```
 
 When this prompt was passed to ChatGPT5, it produced a writeup that looked like this:
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "110%"}
 knitr::include_graphics("figures/LLMresponse.png")
 ```
 
@@ -918,7 +917,7 @@ colnames(meanexpression) <- cluster_labels[as.character(gsub("cluster", "", coln
 ## Verifying cluster names
 
 The LLM gave us a good guess at cluster names, but we still need to verify them.
-To assist in this process, we recommend looking at 3 outputs:
+To assist in this process, we recommend looking at 4 outputs:
 
   1. The LLM's justifications for its calls
   2. A heatmap of each cluster's expression of key marker genes
@@ -962,22 +961,22 @@ for (name in unique(clust)) {
 ```
 :::
 
-The above code produces the below plots:
+We obtain:
 
-A pdf heatmap of marker gene expression, stretched out to allow for scrutinizing gene names:
+A .pdf heatmap of marker gene expression, stretched out to allow for scrutinizing gene names:
 
 ```{r echo = FALSE, eval = TRUE, out.width = "100%"}
 knitr::include_graphics("figures/tallheatmapsnippet.png")
 ```
 
-A png showing each cluster in umap space, giving you another look at which clusters
+A .png showing each cluster in umap space, giving you another look at which clusters
  are similar to each other:
 
 ```{r echo = FALSE, eval = TRUE, out.width = "100%"}
 knitr::include_graphics("figures/umapbyclustersnippet.png")
 ```
 
-A png for each cluster showing its positions in xy space (bold black points atop faded points for other clusters):
+A .png for each cluster showing its positions in xy space (bold black points atop faded points for other clusters):
 
 ```{r echo = FALSE, eval = TRUE, out.width = "80%"}
 knitr::include_graphics("figures/cluster_xy_snippet.png")
@@ -988,11 +987,11 @@ Note that you can gloss over immune clusters: we'll be overriding them later wit
 
 To rename clusters, simply edit the cluster names in the definition of \code{cluster_labels} above, and re-run from that code block onward. This step can also be used to merge closely-related clusters by assigning multiple clusters the same name. In our case, we renamed three clusters of cancer cells that the LLM labeled as neutrophils (some of the classic neutrophil markers are also expressed by cancer cells). 
 
-**Aside: for tumor studies, additional techniques can help classify cancer cells:**
+**Note: for tumor studies, additional techniques can help classify cancer cells:**
 
 1. Cancer cells tend to be extremely transcriptionally active. Clusters with high total counts per cell are usually cancer.
-2. The scMalignantFinder algorithm (https://github.com/Jonyyqn/scMalignantFinder) promises to call cells as cancer vs. non-cancer. We have not tried it, but it seems promising.
-3. For WTX studies, it's possible to estimate cells' copy number variants. We have used inferCNV successfully (though we needed to run it on subsets of ~10k cells for it to compute. A newer method, ClonalScope (https://github.com/seasoncloud/Clonalscope), looks promising.
+2. The [scMalignantFinder algorithm](https://github.com/Jonyyqn/scMalignantFinder){target="_blank"} promises to call cells as cancer vs. non-cancer. We have not tried it, but it seems promising.
+3. For WTX studies, it's possible to estimate cells' copy number variants. We have used inferCNV successfully, though we needed to run it on subsets of ~10k cells for it to compute. A newer method, [ClonalScope](https://github.com/seasoncloud/Clonalscope){target="_blank"}, looks promising.
 
 
 ## Optimizing immune cell calling with the HieraType algorithm
@@ -1079,7 +1078,7 @@ print(hm_unsup)
 ```
 :::
 
-```{r echo = FALSE, eval = TRUE, out.width = "60%"}
+```{r echo = FALSE, eval = TRUE, out.width = "80%"}
 knitr::include_graphics("figures/hieratype_marker_heatmap.png")
 ```
 
@@ -1100,7 +1099,7 @@ print(hm_unsup)
 ```
 :::
 
-```{r echo = FALSE, eval = TRUE, out.width = "60%"}
+```{r echo = FALSE, eval = TRUE, out.width = "80%"}
 knitr::include_graphics("figures/hieratype_marker_heatmap2.png")
 ```
 
@@ -1144,7 +1143,7 @@ saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
 ```
 
 
-```{r echo = FALSE, eval = TRUE, out.width = "60%"}
+```{r echo = FALSE, eval = TRUE, out.width = "75%"}
 knitr::include_graphics("figures/celltype_merge_barplot.png")
 ```
 
