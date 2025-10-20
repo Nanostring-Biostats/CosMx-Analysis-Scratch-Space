@@ -16,7 +16,7 @@ lineagegenes <- list(
   Lineage_Immune = c("PTPRC","CD74","HLA-DRA","HLA-DRB1"),
   
   Immune_T_NaiveMemory = c("CCR7","IL7R","LTB","SELL","TCF7","LEF1","TRAC"),
-  Immune_T_CD8_Effector = c("CD8A","CD8B","GZMB","PRF1","NKGY7"="NKG7","IFNG","CXCR3"),
+  Immune_T_CD8_Effector = c("CD8A","CD8B","GZMB","PRF1","NKG7","IFNG","CXCR3"),
   Immune_Treg = c("FOXP3","IL2RA","CTLA4","IKZF2","TIGIT"),
   Immune_Tfh = c("CXCR5","BCL6","PDCD1","IL21","ICOS"),
   Immune_NK = c("KLRD1","KLRC1","KLRK1","NKG7","GNLY","PRF1","GZMB","FCGR3A"),

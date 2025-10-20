@@ -1,14 +1,78 @@
-# A recommended preprocessing pipeline
+---
+title: "Basic Analysis Vignette: current best practices for QC, normalization, dimension reduction and cell typing"
+author:
+  - name: Patrick Danaher
+    orcid: 0000-0002-2844-5883
+    affiliations:
+      - ref: bsb
+      - ref: patrickjdanaher
+toc: true
+code-fold: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 1
+toc-location: left
+number-sections: true
+number-depth: 4
+date: "2025-10-21"
+date-modified: last-modified
+categories:
+  - recommended
+  - quality control
+  - cell typing
+  - normalization
+image: figures/thumbnail.png
+draft: false
+---
+
+# New best practices for CosMx analysis
+
+Here we propose an updated pipeline for basic CosMx<sup>&#174;</sup> analysis in R, 
+ from data loading through cell typing. 
+This post is the first in a series; coming soon will be posts 
+ on exploratory analysis, on differential expression analysis, and on pipelines for large studies. 
+This workflow assumes a whole study can be fit into your compute environment's memory. 
+ For very large studies, see our upcoming vignette on the topic, or the summary below. 
+ 
+## Basic analysis strategy 
+
+Analyses can meander and sprawl, but often enough they are reducible to 3 phases:
+
+1. **Basic pre-processing**: prepare your data for deeper analysis: perform QC, normalize your data, 
+ perform dimension reduction, and finalize your cell typing. 
+2. **Exploratory analysis**: see what unexpected trends your data holds. Ideally, these trends 
+ can be phrased as formal hypotheses to be tested.
+3. **Hypothesis testing**: In our experience, most analyses culminate here, mainly taking the form of differential expression (DE) testing. 
+ DE is a flexible tool to interrogate both the hypotheses you designed the study around and new hypotheses discovered in exploratory analysis. 
+ We see DE as the workhorse of spatial analyses, but there are other useful tools: e.g., 
+ you might calculate changes in cell type abundance or co-localization across space, or compute various metrics of ligand-receptor interactions.  
+ 
+## Basic analysis strategy: large studies 
+
+When your data is too large to fit into memory -- and this can happen with just a few slides of WTX data --
+ you need to modify the above strategy. 
+We propose the below approach, which we will demonstrate in a separate vignette in late 2025:
+
+1. Obtain a subsample of the larger study. This could be FOVs chosen at random from all the tissues in the study, or just the first couple slides to come off the instrument. 
+2. Use this subsample to fix a basic pre-processing pipeline. Importantly, this pipeline has to be applicable to new samples: their data has to be projected onto the same dimension-reduced embedding, and their cell typing has to map to the cell typing of the subsample. 
+3. Apply the above pre-processing pipeline separately to each tissue/slide in the study.
+4. Define an additional "hypothesis testing" pipeline, also to be applied separately to each tissue. 
+ This pipeline will compute whatever summary statistics you're interested in, e.g. DE results, cell type abundance, LR interaction scores.
+5. Perform meta-analysis of every tissues' summary statistics together. E.g. contrast DE results or cell type abundances across responders and non-responders. 
+6. Custom subset analyses: you may also have to load in custom subsets of the data for analysis, e.g. just the macrophages from every tissue. 
+
+
+## 
 
 Here we'll walk through a full pipeline for getting your data ready to explore and analyze.  We will:
 
-1. Load in flat files exported by AtoMx
-2. Optionally, create custom spatial layout of your tissues for better visualization
+1. Load in flat files exported by AtoMx<sup>&#174;</sup> SIP
+2. Create a custom spatial layout of our tissues for better visualization (optional)
 3. QC our data, removing cells and FOVs with bad data
 4. Perform dimension reduction (features a new algorithm for obtaining better PC projections)
 5. Cluster our data and name the clusters we discover
-6. Use the HieraType algorithm to obtain superior immune cell subtyping
-7. Perform thorough cell type QC
+6. Perform immune cell typing using the HieraType algorithm
+7. Thoroughly QC our cell typing results
 
 # Loading flat files
 
