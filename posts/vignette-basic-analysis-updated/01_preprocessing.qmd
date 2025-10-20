@@ -14,6 +14,9 @@ toc-expand: 1
 toc-location: left
 number-sections: true
 number-depth: 4
+format:
+  html:
+    code-fold: true
 date: "2025-10-21"
 date-modified: last-modified
 categories:
@@ -38,14 +41,14 @@ This workflow assumes a whole study can be fit into your compute environment's m
 
 Analyses can meander and sprawl, but often enough they are reducible to 3 phases:
 
-1. **Basic pre-processing**: prepare your data for deeper analysis: perform QC, normalize your data, 
- perform dimension reduction, and finalize your cell typing. 
-2. **Exploratory analysis**: see what unexpected trends your data holds. Ideally, these trends 
- can be phrased as formal hypotheses to be tested.
+1. **Basic pre-processing**: Prepare your data for deeper analysis: perform QC, normalize your data, 
+ perform dimension reduction, and finalize your cell typing. This vignette covers this workflow. 
+2. **Exploratory analysis**: See what unexpected trends your data holds. Ideally, these trends 
+ can be phrased as formal hypotheses to be tested. (Post coming soon.)
 3. **Hypothesis testing**: In our experience, most analyses culminate here, mainly taking the form of differential expression (DE) testing. 
  DE is a flexible tool to interrogate both the hypotheses you designed the study around and new hypotheses discovered in exploratory analysis. 
  We see DE as the workhorse of spatial analyses, but there are other useful tools: e.g., 
- you might calculate changes in cell type abundance or co-localization across space, or compute various metrics of ligand-receptor interactions.  
+ you might calculate changes in cell type abundance or co-localization across space, or compute various metrics of ligand-receptor interactions. (Post coming soon.)  
  
 ## Basic analysis strategy: large studies 
 
@@ -62,19 +65,18 @@ We propose the below approach, which we will demonstrate in a separate vignette 
 6. Custom subset analyses: you may also have to load in custom subsets of the data for analysis, e.g. just the macrophages from every tissue. 
 
 
-## 
+## Outline
 
 Here we'll walk through a full pipeline for getting your data ready to explore and analyze.  We will:
 
-1. Load in flat files exported by AtoMx<sup>&#174;</sup> SIP
-2. Create a custom spatial layout of our tissues for better visualization (optional)
-3. QC our data, removing cells and FOVs with bad data
-4. Perform dimension reduction (features a new algorithm for obtaining better PC projections)
-5. Cluster our data and name the clusters we discover
-6. Perform immune cell typing using the HieraType algorithm
-7. Thoroughly QC our cell typing results
+1. [Load in flat files exported by AtoMx<sup>&#174;</sup> SIP](#loading)
+2. [Create a custom spatial layout of our tissues for better visualization (optional)](#xy)
+3. [QC our data, removing cells and FOVs with bad data](#qc)
+4. [Perform dimension reduction (features a new algorithm for obtaining better PC projections)](#dimred)
+5. [Cluster our data and name the clusters we discover](#clust)
+6. [Perform immune cell typing using the HieraType algorithm](#hieratype)
 
-# Loading flat files
+# Loading flat files {#loading}
 
 First we'll load the packages we need. 
 Importantly, we'll load "Matrix", which handles _sparse matrices_. 
@@ -93,7 +95,7 @@ library(Matrix) # for sparse matrices like our counts matrix
 library(ggplot2)
 ```
 
-AtoMx flat file exports come with each slide packaged in its own directory. 
+[AtoMx flat file exports](../flat-file-exports/flat-files-compare.qmd){target="_blank"} come with each slide packaged in its own directory. 
 Our example here has one slide, titled "BreastCancer"; its contents look like this:
 
 ```{r echo = FALSE, eval = TRUE, out.width = "85%"}
@@ -142,15 +144,9 @@ The below code performs the loading and merging operations, producing 4 data obj
 * A negative control probe ("negprobe") counts matrix (cells x negprobes)
 * A SystemControl ("falsecode") counts matrix (cells x falsecodes)
 
+If given a flat files directory with multiple slides, it will seamlessly load and combine their data into a unified dataset. 
 
-::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
-## set up:
-# location of flat files:
-myflatfiledir <- "path_to_your_flat_files_folder/flatFiles"    # point to a directory containing one folder of flat files per slide
-# where to write output:
-outdir <- "path_to_your_desired_output_location"
-
 ### automatically get slide names:
 slidenames <- dir(myflatfiledir)
 
@@ -184,7 +180,6 @@ for(i in 1:length(slidenames)){
   countsfile <- paste0(myflatfiledir, "/", slidename, "/", thisslidescounts)
   nonzero_elements_perchunk <- 5*10**7
   ### Safely read in the dense (0-filled ) counts matrices in chunks.
-  ### Note: the file is gzip compressed, so we don't know a priori the number of chunks needed.
   lastchunk <- FALSE 
   skiprows <- 0
   chunkid <- 1
@@ -270,7 +265,6 @@ counts <- counts[, !grepl("Negative", colnames(counts)) & !grepl("SystemControl"
 stopifnot(identical(rownames(counts), metadata$cell_id))
 stopifnot(max(abs(Matrix::rowSums(counts) - metadata$nCount_RNA)) == 0)
 ```
-:::
 
 Next we'll perform some well-advised modifications to our metadata:
 
@@ -280,7 +274,6 @@ Next we'll perform some well-advised modifications to our metadata:
 * For convenience, extract cells' xy positions as a separate data object, and recast them from pixel-scale to mm-scale. 
 * Add the mean negprobe counts to the metadata (the metadata has the *sum* of the negprobes already, but since negprobe counts vary across panels it's worth recording this value now so we won't have to remember our negprobe number later.)
 
-::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
 # add to metadata: add a global non-slide-specific FOV ID:
 metadata$FOV <- paste0("s", metadata$slide_ID, "f", metadata$fov)
@@ -301,7 +294,6 @@ colnames(xy) <- paste0(c("x", "y"), "_mm")
 # add mean negprobe to metadata:
 metadata$negmean <- Matrix::rowMeans(negcounts)
 ```
-:::
 
 Finally, we'll save these data objects as .RDS files. These files are smaller on disk (they 
 benefit from more compression than flat files do), and they're faster to read back into R.
@@ -350,7 +342,7 @@ to analyze is worth some hassle.
 
 
 
-# Customizing the tissues' spatial arrangements 
+# Customizing the tissues' spatial arrangements {#xy}
 
 To show multiple slides in the same spatial plot, or just to produce spatial plots without a lot of extraneous white space, 
  we often have to shift around tissues' and/or FOVs' xy positions. 
@@ -419,7 +411,7 @@ xy <- condenseTissues(xy = xy,
 ```
 
 
-# QC
+# QC {#qc}
 
 QC of CosMx data is mostly straightforward. Technical effects can be complex,
  but they manifest in limited ways:
@@ -493,7 +485,6 @@ genes using the bit are underexpressed. We also look for FOVs where total expres
 
 Below we'll run our FOV QC code and examine its results:
 
-::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
 ## preparing resources:
 # source the FOV QC tool:
@@ -523,8 +514,6 @@ flag[is.element(metadata$FOV, fovqcresult$flaggedfovs)] <- TRUE
 # plot the result:
 FOVSignalLossSpatialPlot(fovqcresult) 
 ```
-:::
-
 
 ```{r echo = FALSE, eval = TRUE}
 knitr::include_graphics("figures/QC_FOVQC.png")
@@ -607,7 +596,24 @@ No immediate action is needed, but by becoming aware of this small technical eff
  we'll be armed to interpret any strange results driven by it. 
 
 
-# Dimension reduction
+## Normalization
+
+We typically normalize each cell's expression profile to its total counts. 
+The below code does this efficiently. 
+In fact, given the size of the matrix and the speed of this calculation, there is no need to save a normalized data object; 
+it's usually cheaper to re-compute it that to store it. 
+
+Note that no steps in this workflow actually use the normalized data, 
+ although the dimension reduction step performs its own normalization under the hood. 
+Normalized data will be useful in later analyses, e.g. for plotting expression over space or running differential expression. 
+
+```{r echo = FALSE, eval = TRUE}
+norm <- Matrix::Diagonal(x = mean(metadata$nCount_RNA)/metadata$nCount_RNA,names=colnames(counts)) %*% counts
+rownames(norm) <- rownames(counts)
+```
+
+
+# Dimension reduction {#dimred}
 
 Here we demonstrate an important improvement in dimension reduction for large studies.
 The single cell analysis world has long used Pearson residuals to transform their data prior to running PCA;
@@ -732,7 +738,7 @@ legend("topleft", pch = 16,
 knitr::include_graphics("figures/umap_totalcounts.png")
 ```
 
-# Cell typing
+# Cell typing {#clust}
 
 Here we demo the most consistently-successful approach to cell typing we have found.
 First, we perform unsupervised clustering using a set of a few thousand highly variable genes (hvg's).
@@ -835,7 +841,6 @@ After this step we'll show how to QC your cell type assignments.
 
 As a first step, we'll derive marker genes for our clusters:
 
-::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
 if (TRUE) {
   markers <- HieraType::clusterwise_foldchange_metrics(
@@ -860,13 +865,15 @@ for (name in unique(markers$cluster)) {
                       markers$gene[inds][order(markers$prioritystat[inds], decreasing = TRUE)[1:min(nperclust, sum(inds))]])
   }
 }
-
+# load general-purpose lineage and marker genes:
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/vignette2/lineage_and_marker_genes.R")
+# (loads the list "lineagegenes")
+# save both selected markers and lineage genes:
+allusefulmarkers <- intersect(colnames(counts), unique(c(unlist(lineagegenes), markersshort)))
 ```
-:::
 
 Now that we have marker genes identified, we can proceed to crafting an LLM prompt:
 
-::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
 ## describe your tissue here. 
 mytissuetype <- "HER2+ breast cancer"
@@ -888,19 +895,6 @@ The cluster frquencies are: ",
 paste0(paste0("cluster ", names(table(clust)), ":", table(clust)), collapse = ", "))
 
 ## give the LLM the clusters' marker gene profiles:
-
-# load general-purpose lineage and marker genes:
-source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/vignette2/lineage_and_marker_genes.R")
-# (load the list "lineagegenes")
-
-# derive marker genes:
-# add normalized data to seurat object:
-norm <- Matrix::Diagonal(x = mean(metadata$nCount_RNA)/metadata$nCount_RNA,names=colnames(counts)) %*% counts
-rownames(norm) <- rownames(counts)
-seu[["RNA_norm"]] <- Seurat::CreateAssayObject(data = Matrix::t(norm))  # genes x cells
-
-# get mean expression per cluster of lineage genes and marker genes:
-allusefulmarkers <- intersect(colnames(counts), unique(c(unlist(lineagegenes), markersshort)))
 meanexpression <- InSituType::getRNAprofiles(x = counts[, allusefulmarkers], 
                                              neg = metadata$negmean,  
                                              clust = paste0("cluster", clust))
@@ -909,7 +903,6 @@ isdenovo <- is.element(rownames(meanexpression), markersshort)
 meanexpression <- meanexpression[isdenovo | apply(meanexpression, 1, max) > 0.2, ]
 
 meanexpressionastext <- write.table(round(meanexpression[1:5,1:5], 1), sep = ",", row.names = TRUE, col.names = TRUE)
-
 
 prompt_profiles <- paste0(
   "And here is a table of each cluster's mean expression of selected data- and biology-derived marker genes: ",
@@ -924,7 +917,6 @@ message(paste0(prompt_preamble, "\n", prompt_frequencies, "\n", prompt_profiles)
 unnamedclust <- clust
 unnamedmeanexpression <- meanexpression
 ```
-:::
 
 This creates the below prompt, which can be copied into whichever LLM you prefer:
 
@@ -978,7 +970,7 @@ colnames(meanexpression) <- cluster_labels[as.character(gsub("cluster", "", coln
 ```
 
 
-## Verifying cluster names
+# QC of clustering results {#clustqc}
 
 The LLM gave us a good guess at cluster names, but we still need to verify them.
 To assist in this process, we recommend looking at 4 outputs:
@@ -990,7 +982,6 @@ To assist in this process, we recommend looking at 4 outputs:
 
 The code below draws the key plots:
 
-::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
 
 # heatmap of marker genes - drawn tall so we can read all gene names:
@@ -1023,7 +1014,6 @@ for (name in unique(clust)) {
 }
 
 ```
-:::
 
 We obtain:
 
@@ -1058,7 +1048,7 @@ To rename clusters, simply edit the cluster names in the definition of \code{clu
 3. For WTX studies, it's possible to estimate cells' copy number variants. We have used inferCNV successfully, though we needed to run it on subsets of ~10k cells for it to compute. A newer method, [ClonalScope](https://github.com/seasoncloud/Clonalscope){target="_blank"}, looks promising.
 
 
-## Optimizing immune cell calling with the HieraType algorithm
+# Optimizing immune cell calling with the HieraType algorithm {#hieratype}
 
 We created the [HieraType algorithm](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth/){target="_blank"} to classify immune cells in a way that is informed by marker genes. 
 We have found it to consistently outperform other algorithms in immune cell typing. 
@@ -1067,8 +1057,6 @@ Our standard approach now is to overwrite our initial clustering results with Hi
 Below, we run HieraType in two steps. 
 In the first, we call broad cell types (e.g. epithelial, immune, ...) then subclassify the immune cells (B, T, macrophage...)
 
-
-::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
 ### set up hieratype pipeline:
 pipeline_io_rna <- HieraType::make_pipeline(
@@ -1116,11 +1104,9 @@ names(htclust) <- hieratyperes$post_probs$l1$cell_ID
 htclust[tcell_typing$post_probs$tmajor$cell_ID] <- tcell_typing$post_probs$tmajor$celltype_granular
 htclust <- htclust[match(metadata$cell_id, names(htclust))]
 ```
-:::
 
 Now we'll use a simple marker heatmap to confirm HieraType worked as hoped:
 
-::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
 
 # pull out canonical ("index") markers for immune cells:
@@ -1140,7 +1126,6 @@ hm_unsup <- HieraType::marker_heatmap(fcmetrics, extras = NULL)
 
 print(hm_unsup)
 ```
-:::
 
 ```{r echo = FALSE, eval = TRUE, out.width = "80%"}
 knitr::include_graphics("figures/hieratype_marker_heatmap.png")
@@ -1149,7 +1134,6 @@ knitr::include_graphics("figures/hieratype_marker_heatmap.png")
 The above heatmap doesn't show the strongest markers; it shows the most biologically-relevant markers. 
 We can gain further confidence in our immune cell typing results looking at data-driven markers:
 
-::: {.callout .code collapse="true"}
 ```{r echo = TRUE, eval = FALSE}
 fctbl_unsup <- 
   HieraType::clusterwise_foldchange_metrics(normed  = Matrix::t(norm),
@@ -1161,7 +1145,6 @@ fctbl_unsup <-
 hm_unsup <- HieraType::marker_heatmap(fctbl_unsup)
 print(hm_unsup)
 ```
-:::
 
 ```{r echo = FALSE, eval = TRUE, out.width = "80%"}
 knitr::include_graphics("figures/hieratype_marker_heatmap2.png")
