@@ -348,8 +348,10 @@ to analyze is worth some hassle.
 
 To show multiple slides in the same spatial plot, or just to produce spatial plots without a lot of extraneous white space, 
  we often have to shift around tissues' and/or FOVs' xy positions. 
+(We if course will preserve the relative xy positions of any cells we plan to analyze together spatially.) 
 Only a small number of operations are required to do so; 
- below are some tools and code chunks for facilitating these operations. 
+ below are some tools and code chunks for facilitating these operations,
+ some borrowed from [this post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/){target="_blank"}.
 Because our example breast cancer dataset is just one tissue with contiguous FOVs, 
  we'll show results from a different dataset in this section.
  
@@ -385,7 +387,7 @@ Or, we can automatically group contiguous FOVs using the dbscan algorithm:
 ```{r echo = TRUE, eval = FALSE}
 # cells within eps range of each other will be grouped together. 
 # Set eps appropriately to link sufficiently close FOVs and separate sufficiently distant FOVs. 
-# An FOV's width is about 1. 
+# An FOV's width is about 1 mm. 
 cellgroups <- dbscan::dbscan(xy, minPts = 1, eps = 1)$cluster
 # confirm the grouping is as desired:
 plot(xy, pch = 16, cex = 0.1, asp = 1, 
@@ -401,7 +403,7 @@ xy[thisgroup, 1] <- xy[thisgroup, 1] + 1
 xy[thisgroup, 2] <- xy[thisgroup, 2] + 5
 ```
 
-...or we can move them automatically using the same \code{condenseTissues} function we used above:
+...or we can move them automatically using the same `condenseTissues` function we used above:
 
 ```{r echo = TRUE, eval = FALSE}
 set.seed(1)
@@ -423,7 +425,7 @@ QC of CosMx data is mostly straightforward. Technical effects can be complex,
 - Sporadic FOVs can have low signal
 - Sporadic FOVs can have distorted / outlier expression profiles
 
-Our workflow will create then add to \code{flag}, a vector marking cells flagged for one reason or another.
+Our workflow will create then add to `flag`, a vector marking cells flagged for one reason or another.
 When we're done, we'll delete everything we've flagged. 
 (The full original data will remain on AtoMx, so this step is not as drastic as it seems. 
 For smaller studies it could still be reasonable to hold on to the pre-QC .RDS files.)
@@ -476,8 +478,8 @@ knitr::include_graphics("figures/QC_area_histogram.png")
 
 Note: some tissues do have very large cells, e.g. purkinje cells in the brain or cardiomyocytes in the heart. 
 
-
-To check for segmentation errors, consider our R package [FastReseg](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/){target="_blank"}, which uses transcript positions to flag cells with likely segmentation errors, then remove or reassign transcripts assigned to the wrong cells.
+To check for segmentation errors, consider our R package [FastReseg](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/){target="_blank"}, which uses transcript positions to flag cells with likely segmentation errors, then remove or reassign transcripts assigned to the wrong cells. 
+We also advise examining the segmentation results in AtoMx's tissue viewer; studies will occasionally need to be re-segmented under a different set of parameters. 
 
 ## FOV QC
 
@@ -575,6 +577,11 @@ We also like to plot background over space. Because negative control counts are 
 To isolate background tendency from overall signal strength, we also normalize our background (negprobe) counts to each cells' total RNA counts.
 
 ```{r echo = TRUE, eval = FALSE}
+# install insitucor:
+if (FALSE) {
+  devtools::install_github("https://github.com/Nanostring-Biostats/InSituCor")
+}
+
 ## plot smoothed background over space:
 # get spatial neighbors:
 neighbors <- InSituCor:::nearestNeighborGraph(xy[, 1], xy[, 2], N = 50, subset = metadata$slide_ID)  
@@ -614,7 +621,7 @@ legend("bottomright", pch = 16,
        legend = c("Spatially smoothed totalcounts-normalized background:", paste0(c(0.5,1,2,5,10), "x median")))
 ```
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "115%"}
 knitr::include_graphics("figures/QC_flaggedcells.png")
 ```
 
@@ -641,13 +648,14 @@ rownames(norm) <- rownames(counts)
 # Dimension reduction {#dimred}
 
 Here we demonstrate an important improvement in dimension reduction for large studies.
-The single cell analysis world has long used Pearson residuals to transform their data prior to running PCA;
+The single cell analysis world has long used Pearson residuals to normalize & transform their data prior to running PCA;
 these residuals scale count data to better balance the information available in each cell / gene.
 However, Pearson residuals are dense, meaning we cannot encode them with a sparse matrix, making
 them computationally intractable for larger datasets.
 To benefit from Pearson residuals without taxing our compute instances,
 we have developed a method of calculating the principal components of a Pearson residual matrix
-without ever having to store the entire matrix. We demonstrate this function below.
+without ever having to store the entire matrix. We demonstrate this function below. 
+(Scratch Space post on the subject coming soon.)
 
 We'll start by identifying highly variable genes. 
 In this section we'll take advantage of some of the functions in the Seurat ecosystem.
@@ -710,8 +718,8 @@ if (TRUE) {
 if (TRUE) {
   genefreq_batch <- scPearsonPCA::gene_frequency(
     x = Matrix::t(counts[, hvgs]),
-    obs = metadata[,.(cell, patient)],
-    cellid_colname = "cell_ID",
+    obs = metadata[,.(cell_id, patient)],
+    cellid_colname = "cell_id",
     batch_variable = "patient")
   
   pcaobj <- 
@@ -719,9 +727,9 @@ if (TRUE) {
       Matrix::t(counts[, hvgs]),
       totalcounts = metadata$nCount_RNA,
       grate = genefreq_batch[hvgs,],
-      obs = metadata[,.(cell, patient)],
+      obs = metadata[,.(cell_id, patient)],
       batch_variable = "patient",
-      cellid_colname = "cell",
+      cellid_colname = "cell_id",
       scale.max = 10,
       do.scale = TRUE,
       do.center = TRUE
@@ -768,7 +776,7 @@ knitr::include_graphics("figures/umap_totalcounts.png")
 Here we demo the most consistently-successful approach to cell typing we have found.
 First, we perform unsupervised clustering using a set of a few thousand highly variable genes (hvg's).
 This approach is robust, and requires minimal configuration and re-running.
-Naming clusters used to be time-consuming, but we have found that the right prompts to an large language model (LLM), **combined with rigorous oversight**, minimize the burden of cluster naming.
+Naming clusters used to be time-consuming, but we have found that the right prompts to a large language model (LLM), **combined with rigorous oversight**, minimize the burden of cluster naming.
 We will demonstrate two approaches to unsupervised clustering:
 
 - Louvain clustering, using PC's derived from Pearson residuals of hvg's.
@@ -784,7 +792,7 @@ Of the above two methods, Louvain tends to be faster, while InSituType is easier
 **Note:** Here we run louvain clustering with a high resolution, intentionally over-clustering with the plan to condense afterwards.
 It's often better to run with the default resolution (0.8) at first, then subcluster selected cell types afterwards.
 To sub-cluster a cell type, first filter out genes for which segmentation errors are likely to bias its profiles.
-Use \code{smiDE::overlap_ratio_metric} to do so. (smiDE is available on the scratch space.)
+Use `smiDE::overlap_ratio_metric` to do so. (smiDE is available on the scratch space.)
 
 ```{r echo = TRUE, eval = FALSE}
 # use Seurat to run Louvain clustering on the graph from our umap object
@@ -811,10 +819,12 @@ cellcols <- rep(c(
   "#B15928", "#8DD3C7", "#FFFFB3", "#BEBADA", "#FB8072"
 ), 3)[1:length(unique(clust))]
 
-# Quick umap plot of clusters to confirm resolution looks right:
+# Quick xy and umap plots of clusters to confirm resolution looks right:
 plot(umapobj$ump@cell.embeddings, pch = 16, asp = 1, cex = 0.1, 
      col = scales::alpha(cellcols[as.numeric(as.factor(clust))], 0.05))
-```
+plot(xy, pch = 16, asp = 1, cex = 0.1, 
+     col = cellcols[as.numeric(as.factor(clust))])
+    ```
 
 
 ```{r echo = FALSE, eval = TRUE}
@@ -822,9 +832,15 @@ knitr::include_graphics("figures/umap_louvain.png")
 ```
 
 
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/cluster_xy_1stlook.png")
+```
+
+
+
 ## Clustering with InSituType
 
-Here we refer you to the [InSituType vignette](https://github.com/Nanostring-Biostats/InSituType/blob/main/vignettes/NSCLC-RNA_InsituType-vignette.Rmd){target="_blank"}
+Here we refer you to the [InSituType vignette](https://github.com/Nanostring-Biostats/InSituType/blob/main/vignettes/NSCLC-RNA_InsituType-vignette.Rmd){target="_blank"}. Running in unsupervised mode is simplest, though supervised and semi-supervised modes can work well provided with good reference profiles. 
 
 A call to InSituType that would work with our setup here is:
 
@@ -890,9 +906,15 @@ for (name in unique(markers$cluster)) {
                       markers$gene[inds][order(markers$prioritystat[inds], decreasing = TRUE)[1:min(nperclust, sum(inds))]])
   }
 }
+```
+
+In addition to data-derived marker genes, we'll also look at a pre-defined list of well-known markers of broad cell types and lineages. 
+
+```{r echo = TRUE, eval = FALSE}
 # load general-purpose lineage and marker genes:
 source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/vignette2/lineage_and_marker_genes.R")
 # (loads the list "lineagegenes")
+
 # save both selected markers and lineage genes:
 allusefulmarkers <- intersect(colnames(counts), unique(c(unlist(lineagegenes), markersshort)))
 ```
@@ -919,10 +941,15 @@ prompt_frequencies <- paste0(
 The cluster frquencies are: ", 
 paste0(paste0("cluster ", names(table(clust)), ":", table(clust)), collapse = ", "))
 
-## give the LLM the clusters' marker gene profiles:
-meanexpression <- InSituType::getRNAprofiles(x = counts[, allusefulmarkers], 
-                                             neg = metadata$negmean,  
-                                             clust = paste0("cluster", clust))
+## give the LLM each cluster's mean expression profile over relevant genes:
+
+# obtain a matrix of the clusters' marker gene profiles:
+allusefulmarkers <- intersect(colnames(counts), unique(c(unlist(lineagegenes), markersshort)))
+meanexpression <- markers[, dcast(.SD, gene ~ cluster, value.var = "cluster_expr")]
+meanexpression <- as.matrix(meanexpression[, -1])          # drop gene col
+rownames(meanexpression) <- markers[, unique(gene)]
+meanexpression <- meanexpression[allusefulmarkers, ]
+
 # reduce to just lineage genes with decent expression (but keep de novo markers):
 isdenovo <- is.element(rownames(meanexpression), markersshort)
 meanexpression <- meanexpression[isdenovo | apply(meanexpression, 1, max) > 0.2, ]
@@ -934,7 +961,6 @@ prompt_profiles <- paste0(
   paste(capture.output(
     write.table(round(meanexpression, 1), sep = ",", row.names = TRUE, col.names = TRUE)
   ), collapse = "\n"))
-
 
 message(paste0(prompt_preamble, "\n", prompt_frequencies, "\n", prompt_profiles))
 
@@ -1018,7 +1044,7 @@ pheatmap::pheatmap(sweep(meanexpression, 1, pmax(0.1, apply(meanexpression, 1, m
 dev.off()
 
 # umap positions
-png("results/umap_by_cluster.png", wiodth = 16, height = 16, units = "in", res = 400)
+png("results/umap_by_cluster.png", width = 16, height = 16, units = "in", res = 400)
 par()
 dev.off()
   
@@ -1064,13 +1090,16 @@ knitr::include_graphics("figures/cluster_xy_snippet.png")
 With these plots in hand, you should scrutinize the initial cluster names and correct as needed.
 Note that you can gloss over immune clusters: we'll be overriding them later with the HieraType algorithm's results.
 
-To rename clusters, simply edit the cluster names in the definition of \code{cluster_labels} above, and re-run from that code block onward. This step can also be used to merge closely-related clusters by assigning multiple clusters the same name. In our case, we renamed three clusters of cancer cells that the LLM labeled as neutrophils (some of the classic neutrophil markers are also expressed by cancer cells). 
+To rename clusters, simply edit the cluster names in the definition of `cluster_labels` above, and re-run from that code block onward. This step can also be used to merge closely-related clusters by assigning multiple clusters the same name. In our case, we renamed three clusters of cancer cells that the LLM labeled as neutrophils (some of the classic neutrophil markers are also expressed by cancer cells). 
 
-**Note: for tumor studies, additional techniques can help classify cancer cells:**
+::: {.callout-note}
+For tumor studies, additional techniques can help classify cancer cells:
 
 1. Cancer cells tend to be extremely transcriptionally active. Clusters with high total counts per cell are usually cancer.
 2. The [scMalignantFinder algorithm](https://github.com/Jonyyqn/scMalignantFinder){target="_blank"} promises to call cells as cancer vs. non-cancer. We have not tried it, but it seems promising.
-3. For WTX studies, it's possible to estimate cells' copy number variants. We have used inferCNV successfully, though we needed to run it on subsets of ~10k cells for it to compute. A newer method, [ClonalScope](https://github.com/seasoncloud/Clonalscope){target="_blank"}, looks promising.
+3. For WTX studies, it's possible to estimate cells' copy number variants. We have used [insituCNV](https://github.com/Moldia/InSituCNV){target="_blank"} successfully. 
+A newer method, [ClonalScope](https://github.com/seasoncloud/Clonalscope){target="_blank"}, also looks promising.
+:::
 
 
 # Optimizing immune cell calling with the HieraType algorithm {#hieratype}
@@ -1222,5 +1251,35 @@ knitr::include_graphics("figures/celltype_merge_barplot.png")
 Note that in the above plot, we have 3 tall bars from neutrophil clusters called by Louvain. 
 This result would be concerning for a merge of HieraType and Louvain, implying many immune cells were getting left behind. In our case, these are the 3 clusters that the LLM misclassified; we renamed them to "cancer" for our analysis.
 
+# Conclusion
 
+The code above provides a direct path through the basic preprocessing of CosMx data. 
+With these results secured, you're ready to proceed to the rewarding parts of data analysis: 
+ exploring your data and testing hypotheses. 
+We will have posts on these subjects soon. 
+For now, here are some reasonable next steps:
 
+Exploratory analysis:
+- If your experiment has baseline / control tissues, try  [InSituDiff](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitudiff/){target="_blank"}.
+- To explore genes' spatial correlation in studies without control tissues (e.g. tumors), try [InSituCor](https://github.com/Nanostring-Biostats/InSitucor){target="_blank"}.
+- Calculate pathway scores using [AUCell](https://github.com/aertslab/AUCell){target="_blank"}.
+
+Hypothesis testing:
+- Use [smiDE](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/){target="_blank"} for differential expression testing.
+- Try Ligand-Receptor analysis (many packages exist; we have no recommendation yet).
+
+We recommend containing those analyses in standalone scripts, each beginning by loading the data we've prepared here:
+
+```{r echo = TRUE, eval = FALSE}
+# load basic data:
+counts <- readRDS(paste0(outdir, "/processed_data/counts.RDS"))
+metadata <- readRDS(paste0(outdir, "/processed_data/metadata.RDS"))
+xy <- readRDS(paste0(outdir, "/processed_data/xy.RDS"))
+
+# get normalized data if desired:
+norm <- Matrix::Diagonal(x = mean(metadata$nCount_RNA)/metadata$nCount_RNA,names=colnames(counts)) %*% counts
+rownames(norm) <- rownames(counts)
+
+# likely to be useful: compute nearest neighbors:
+neighbors <- InSituCor:::nearestNeighborGraph(xy[, 1], xy[, 2], N = 50, subset = metadata$slide_ID)  
+```
