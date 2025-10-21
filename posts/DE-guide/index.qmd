@@ -744,9 +744,10 @@ patches <- getPatches(xy = xy[inds.tumor, ],
                       npatches = 12,
                       bitesize = 0.1,
                       maxradius = 0.5,
-                      roundness = 0.5,
+                      roundness = 0.25,
                       initwithhotspots = TRUE,
-                      n_iters = 25
+                      n_iters = 25,
+                      plotprogress = TRUE
 ) # produces a vector of patch assigments, potentially including NA's for cells not given a patch
 
 
@@ -766,9 +767,14 @@ for (i in 1:length(patchhulls)) {
 }
 ```
 
-```{r echo = FALSE, eval = TRUE, out.width = "170%"}
-knitr::include_graphics("figures/patches.png")
-```
+Below you can see the patches evolve over iterations. 
+Our goal is to get a high "predictor sum of squares" (which determines statistical power) in each patch. 
+You will notice that the per-patch power tends to improve over iterations, especially the early ones, as cells are moved 
+from over-powered patches to under-powered ones. 
+Also note that there algorithm does not converge to a single optimal solution;
+ it ends up wandering around through a space of similarly satisfactory solutions. 
+
+![](figures/patchanimation.gif)
 
 And now we run DE within each patch:
 
@@ -777,8 +783,31 @@ And now we run DE within each patch:
 deresults <- patchDE(y = norm[inds.tumor, ],
                      df = data.frame("dist2tcell" = dist2tcell[inds.tumor]),
                      patch = patches)
+str(deresults)
+# List of 1
+#  $ dist2tcell:List of 3
+#   ..$ pvals: num [1:3, 1:12] 2.59e-01 7.85e-01 3.61e-12 5.70e-01 7.52e-02 ...
+#   .. ..- attr(*, "dimnames")=List of 2
+#   .. .. ..$ : chr [1:3] "PGC" "CXCL14" "VEGFA"
+#   .. .. ..$ : chr [1:12] "patch8" "patch3" "patch4" "patch12" ...
+#   ..$ ests : num [1:3, 1:12] 1.0276 0.0797 6.3659 -0.3679 -0.2379 ...
+#   .. ..- attr(*, "dimnames")=List of 2
+#   .. .. ..$ : chr [1:3] "PGC" "CXCL14" "VEGFA"
+#   .. .. ..$ : chr [1:12] "patch8" "patch3" "patch4" "patch12" ...
+#   ..$ ses  : num [1:3, 1:12] 0.911 0.292 0.91 0.647 0.134 ...
+#   .. ..- attr(*, "dimnames")=List of 2
+#   .. .. ..$ : chr [1:3] "PGC" "CXCL14" "VEGFA"
+#   .. .. ..$ : chr [1:12] "patch8" "patch3" "patch4" "patch12" ...
+```
 
+Now we've got DE results for every gene x patch. 
+Next comes the hard part: figuring our which results to prioritize. 
+We recommend two approaches:
+
+1. Find genes that have significant and large effect sizes in at least a few patches (strong but possibly sporadic results). 
+2. Find genes with strong meta-analysis p-values (consistent but less dramatic results)
   
+```{r echo = TRUE, eval = FALSE}
 ### explore the results:
 
 # find genes with strong results in any region
@@ -793,20 +822,25 @@ metapvals <- sapply(rownames(deresults$dist2tcell$pvals), function(gene) {
   return(fit$pval)
 })
 topgenes2 <- setdiff(names(metapvals)[order(metapvals, decreasing = TRUE)[1:50]], NA)
+```
+ 
+Once you've prioritized genes via the above two lists (`topgenes1` and `topgenes2`), 
+ we recommend making a heatmap of their DE results:
 
+```{r echo = TRUE, eval = FALSE}
 ## now use a heatmap to plot results from either list of top genes:
 pheatmap::pheatmap((deresults$dist2tcell$ests * (deresults$dist2tcell$pvals < 1e-3))[topgenes1, ],
          col = colorRampPalette(c("darkblue", "white", "darkred"))(100),
          breaks = seq(-1, 1, length.out = 101))
 ```
- 
-Below is an example snippet of a heatmap of DE results on patches from a larger study:
 
 ```{r echo = FALSE, eval = TRUE, out.width = "170%"}
 knitr::include_graphics("figures/deheatmap.png")
 ```
 
-A note on multiplicity: when we run DE across dozens of patches, the problem of multiple testing gets even worse. 
+From there, it's the usual exploration of DE results, leaning heavily on spatial plots and literature searches.
+
+Finally, a note on multiplicity: when we run DE across dozens of patches, the problem of multiple testing gets even worse. 
 So, before getting excited about a single gene in a single patch, take one of these countermeasures to multiplicity:
 
 - Confirm the gene x patch has a strong adjusted p-value *considering all the p-values from all the genes x patches*.

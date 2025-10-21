@@ -211,7 +211,7 @@ getPatches <- function(xy, X, npatches,
       plot(xy, asp = 1, pch = 16, cex = 0.1, col = "grey80", main = iter)
       points(xy, pch = 16, cex = 0.4, col = patchcols[celldf$patch])
       
-      barplot(patchdf$totvar, col = patchcols[rownames(patchdf)], ylim = c(0,1000), ylab = "Total var", xlab = "Patches")
+      barplot(patchdf$totvar, col = patchcols[rownames(patchdf)], ylim = c(0,1000), ylab = "Predictor sum of squares", xlab = "Patches")
     }
   }
   out <- celldf$patch
