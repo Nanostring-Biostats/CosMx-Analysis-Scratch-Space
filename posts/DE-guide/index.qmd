@@ -39,7 +39,7 @@ Or, in the general form:
 
 "How does *my favorite cell type* change in response to *some aspect of its environment*?"
 
-The goal of this post is to review major topics in DE in spatial transcriptomics, and to provide code when necessary. 
+This post reviews major topics in DE in spatial transcriptomics, providing code when necessary. 
 
 
 ## Setting up a DE question
@@ -57,7 +57,7 @@ Other models might be more appropriate: we could consider transforming the varia
 In particular, we have often found that binning of continuous variables produces satisfactory results.
 
 #### Transformations:
-- If you think distance to a feature matters because of some diffused signals, then concentration of those molecules will vary with $distance^{-1}$.
+- If you think distance to a feature matters because of some diffused signals, then concentration of those molecules will vary with 1/distance.
 - If neighborhood expression of a molecule is strongly right-tailed, which is likely, then a log transformation could prevent the end of the tail from having undue influence.
 - To make effect sizes more interpretable, scale the variable from 0-1. 
 - For variables with strong skew or long tails, a quantile transformation can prevent extreme values from exerting excess influence on DE results.
@@ -103,28 +103,21 @@ for (i in 1:ncol(splinex)) {
 knitr::include_graphics("figures/splines.png")
 ```
 
-As with DE models fitting to bins, use a likelihood ratio test against an intercept-only null model, just as you would with a binned variable.
-To explore your results, plot mean values across bins for your most significant genes.
+To measure a gene's significance when using splines, use a likelihood ratio test against an intercept-only null model, just as you would with a binned variable.
+To explore your results, plot mean values across bins for your most significant genes as in the above heatmap.
 
 ### Example data
 
-First, let's pull in data in a standard format. We'll assume you're starting with flat files exported from AtoMx, 
-loaded with code similar to the below.
-
+First, let's pull in data in a standard format. We'll assume you're starting with flat files exported from AtoMx,
+ read into R as demonstrated in our basic analysis vignettes.
 
 ```{r echo = TRUE, eval = FALSE}
-# Define paths
-raw_data_dir <- "/path/to/raw/data"
-out_dir <- "/path/to/out/dir"
-slide_name <- "slideName" # Set this to your slide name, i.e. the identifier at the front of each flat file
+## Expected inputs:
+# - counts: a sparse matrix of expression in cells * genes
+# - metadata: a data frame or data table of cell metadata, aligned by row to counts
+# - xy: a 2-column matrix of xy positions, aligned by row to counts
 
-# Read flat file exports: 
-meta_data <- read.csv(paste0(raw_data_dir, "/", slide_name, "_metadata_file.csv.gz")) #Note this is a small file and we read it into a data frame for convenience
-xy <- meta_data[, c("x_slide_mm", "y_slide_mm")]  
-counts <- as.matrix(data.table::fread(  
-  file.path(raw_data_dir, paste0(slide_name, "_exprMat_file.csv.gz"))
-))  # <-------------------------------- PROBABLY WRONG ------------------------ #
-# normalize:
+## Further calculations: get normalized counts:
 norm_factors <- mean(meta_data$nCount_RNA) / meta_data$nCount_RNA 
 norm <- Matrix::Diagonal(x = norm_factors) %*% counts
 ```
@@ -161,7 +154,7 @@ knitr::include_graphics("figures/celltypemap.png")
 
 ### Gallery of Differential Expression setups
 
-Below are examples of variables useful for DE. 
+Below we demonstrate a variety of ways to define predictor variables for DE. 
 In each case, we'll plot the variable spatially and provide code for defining it. 
 
 #### Niche / spatial domain (unsupervised)
@@ -257,6 +250,7 @@ It is more robust to look at distance to the nearest *spatially contiguous group
 Below, we'll define an annotation for 'vascular structure', based on contiguous groups of endothelial cells. 
 We use DBSCAN algorithm, an incredibly fast algorithm which can cluster together cells within a fixed radius of each other. We'll keep only cells that fall in clusters of at least 3. 
 
+First let's look at our target cell type:
 
 ```{r echo = TRUE, eval = FALSE}
 ## show the target cell type: vasculature
@@ -268,10 +262,11 @@ plot(xy[, ], pch = 16, cex = 0.1, asp = 1,
 points(xy[inds, ], pch = 16, cex = 0.3, col = "darkred")
 ```
 
-
 ```{r echo = FALSE, eval = TRUE, out.width = "170%"}
 knitr::include_graphics("figures/vessel.png")
 ```
+
+Then retain only the spatially-contiguous groups:
 
 ```{r echo = TRUE, eval = FALSE}
 ## use dbscan to isolate clusters of Vasculature cells:
@@ -493,8 +488,8 @@ knitr::include_graphics("figures/ROI.png")
 Note that the ```identify()``` function used by ```defineROI()``` above can be finnicky
  and surprisingly challenging to debug.
 If it works in your R environment, great. If not, then you can instead 
-call the ```defineROI()``` function as below code to 
-flag cells inside a set of xy coordinates.
+call the ```defineROI()``` function as in below code to 
+flag cells inside a set of pre-defined xy coordinates.
 
 ```{r echo = TRUE, eval = FALSE}
 # draw the tissue:
@@ -503,7 +498,7 @@ par(mar = c(2,2,0,0))
 plot(xy, pch = 16, cex = 0.3, asp = 1,
      col = clustcols[meta_data$celltype], xlab = "", ylab = "")
 
-# place a grid over it to determine where to pick boudnary points:
+# place a grid over it to determine where to pick boundary points:
 abline(h = pretty(range(xy[,2]), n=30), v = pretty(range(xy[,1]), n=30), lty=3, col="grey20")
 
 # select points by hand:
@@ -613,8 +608,7 @@ We find a tradeoff between accuracy and computational efficiency, with the best 
  long to run in large datasets. 
 Our key finding is that ignoring spatial correlation, i.e. running a traditional DE method,
  leads to large numbers of false positive hits, often far in excess of the presumed true positive hits whose p-values survive accounting for spatial correlation.
-Whichever method in the paper seems suitable for your study, you can run it using  
-[our R package smiDE](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE){target="_blank"}. 
+Whichever method in the paper seems suitable for your study, you can run it using [our R package smiDE](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE){target="_blank"}. 
 
 ### Other model choice considerations
 
@@ -633,12 +627,12 @@ Unfortunately, there’s a cost in compute time and money to many of the more th
 An analysis of 19k genes in hundreds of thousands of cells can take a reasonably powerful EC2 instance a day or more to complete. 
 When computation time is a concern, or when simply pursuing exploratory analysis, we recommend using a less optimal but much faster approach. 
 In the code below, we demonstrate how to run a basic Gaussian / “ordinary least squares” regression simultaneously across all genes at once. This code returns reasonable DE results in seconds. 
-This approach cannot model spatial correlation, nor can it even adjust for confounding from cell segmentation errors.
+This approach cannot model spatial correlation, nor can it adjust for confounding from cell segmentation errors.
 But its speed makes it very useful for exploratory analyses. 
 It could also be used to prioritize genes for more computationally expensive models. 
 
 ```{r echo = TRUE, eval = FALSE}
-source()
+source("https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/PatchDE/DEutils.R")
 
 ### Example usage:
 # run DE:
@@ -690,15 +684,15 @@ We emphasize that this approach is thus far **very** lightly tested, but we incl
  it here before fully developing it in hopes that it proves useful and that community 
  feedback strengthens a later release. 
 
-Our motivation is twofold:
+Our motivation arises from two complaints about typical tissue-wide DE:
 
-1. Biology: we'll often expect a DE relationship to vary across space, or to only occur locally. For example, perhaps T-cells only respond to nearby tumor cells when they're in the nutrient-rich stroma rather than the tumor interior. When we look across the whole tissue for this relationship, we have a harder time discovering it since we model both regions where it occurs and regions where it doesn't. 
+1. **Biology**: we'll often expect a DE relationship to vary across space, or to only occur locally. For example, perhaps T-cells only respond to nearby tumor cells when they're in the nutrient-rich stroma rather than the tumor interior. When we look across the whole tissue for this relationship, we have a harder time discovering it since we model both regions where it occurs and regions where it doesn't. 
 In statistical terminology: unobserved variables across the span of the tissue are acting as effect modifiers. 
-2. Convenience: because accounting for spatial correlation can be slow, running DE on a highly abundant cell type often means making a choice between extreme compute times or using sub-optimal methods that ignore spatial correlation. 
+2. **Convenience**: because accounting for spatial correlation can be slow, running DE on a highly abundant cell type often means making a choice between extreme compute times or using sub-optimal methods that ignore spatial correlation. 
 
 Our solution is to divide the tissue into small patches, then to run DE separately within each patch. 
-This produces a matrix of DE results across genes X patches. 
-Then looking at patch-specific results, we can discover strong relationships that only occur in a few places. 
+This produces a matrix of DE results across genes and patches. 
+Then, looking at patch-specific results, we can discover strong relationships that only occur in a few places. 
 And using metaanalysis techniques across all patches, we recover our ability to discover relationships that exist broadly. 
 In short, we get a more nuanced picture of DE behavior within a diverse tissue. 
 
@@ -715,10 +709,10 @@ This algorithm, "patchDE", attempts to build patches that achieve a balance betw
 - Prevent overly large patches
 - Build as many patches as possible
 
-In other words, we seek to gerrymander the tissue into districts of similar size and with high variance 
- of the predictor variable. 
+In other words, we seek to partition the tissue into reasonably-shaped districts 
+ that are all well-powered to run DE against the predictor variable. 
  
-The patchDE algorithm is available as a .R script [here](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/PatchDE/DEutils.R){target="_blank"}.
+The patchDE algorithm is available as an R script [here](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/PatchDE/DEutils.R){target="_blank"}.
 
 Below is a demonstration of patchDE's use. 
 
@@ -739,6 +733,12 @@ dist2tcell <- FNN::get.knnx(
   k = 1
 )$nn.dist[, 1]
 
+## derive patches:
+# Suggested tuning parameters to use: 
+#  1. Control granularity: npatches.
+#  2. Control learning rate: bizesize, then possibly alpha. 
+#  3. Patch size and shape: maxradius, roundness
+#  4. Patch position: initwithhotspots
 patches <- getPatches(xy = xy[inds.tumor, ], 
                       X = dist2tcell[inds.tumor], 
                       npatches = 12,
@@ -767,6 +767,11 @@ for (i in 1:length(patchhulls)) {
 }
 ```
 
+ 
+```{r echo = FALSE, eval = TRUE, out.width = "120%"}
+knitr::include_graphics("figures/patches.png")
+```
+
 Below you can see the patches evolve over iterations. 
 Our goal is to get a high "predictor sum of squares" (which determines statistical power) in each patch. 
 You will notice that the per-patch power tends to improve over iterations, especially the early ones, as cells are moved 
@@ -776,7 +781,7 @@ Also note that there algorithm does not converge to a single optimal solution;
 
 ![](figures/patchanimation.gif)
 
-And now we run DE within each patch:
+With patches in hand, we can run a computationally-efficient DE test within each patch:
 
 ```{r echo = TRUE, eval = FALSE}
 ### run DE in each patch, using hastyDE, which computationally-efficient but ignores spatial correlation:
@@ -806,21 +811,33 @@ We recommend two approaches:
 
 1. Find genes that have significant and large effect sizes in at least a few patches (strong but possibly sporadic results). 
 2. Find genes with strong meta-analysis p-values (consistent but less dramatic results). 
-**Warning**: most meta-analyses, including the version demonstrated below, assume each patch is independent. 
-Under the realistic scenario where neighboring patches will have correlated results, this assumption fails, producing over-optimistic p-values. 
+**Warning**: most meta-analyses, including the version demonstrated below, will assume each patch is independent. 
+Under the realistic scenario where neighboring patches will have correlated results, this assumption fails, producing overly optimistic p-values. 
 
   
 ```{r echo = TRUE, eval = FALSE}
-### explore the results:
+### prep for gene prioritization:
 
-# find genes with strong results in any region
-lowestp <- apply(deresults$dist2tcell$pvals, 1, min)
-topgenes1 <- setdiff(names(lowestp)[order(lowestp, decreasing = TRUE)[1:50]], NA)
+# replace NA results - arising from all-0 expression - with 0s:
+ps <- replace(deres[[1]]$pvals, is.na(deres[[1]]$pvals), 1)
+ests <- replace(deres[[1]]$ests, is.na(deres[[1]]$pvals), 0)
+ses <- replace(deres[[1]]$ses, is.na(deres[[1]]$pvals), 1e6)
 
-# use meta-analysis to summarize genes' trends across patches
-metapvals <- sapply(rownames(deresults$dist2tcell$pvals), function(gene) {
-  fit <- metafor::rma.uni(yi = deresults$dist2tcell$ests[gene, ], 
-                          sei = deresults$dist2tcell$ses[gene, ], 
+# scale ests by genes' mean expression:
+genefactors <- pmax(Matrix::colMeans(norm[inds.tumor, ]), 0.1)
+ests <- sweep(ests, 1, genefactors[rownames(ests)], "/")
+
+### identify genes with a few strong patches:
+est.thresh <- 0.5
+p.thresh <- 0.01
+crit <- (abs(ests) > est.thresh) & (ps < p.thresh)
+critdir <- 1*((ests > est.thresh) & (ps < p.thresh)) - 1*((ests < -est.thresh) & (ps < p.thresh))
+topgenes1 <- names(which(rowSums(crit) >= 3))
+
+### use meta-analysis to summarize genes' trends across patches
+metapvals <- sapply(rownames(deresults[[1]]$pvals), function(gene) {
+  fit <- metafor::rma.uni(yi = deresults[[1]]$ests[gene, ], 
+                          sei = deresults[[1]]$ses[gene, ], 
                           method = "REML")
   return(fit$pval)
 })
@@ -832,7 +849,7 @@ Once you've prioritized genes via the above two lists (`topgenes1` and `topgenes
 
 ```{r echo = TRUE, eval = FALSE}
 ## now use a heatmap to plot results from either list of top genes:
-pheatmap::pheatmap((deresults$dist2tcell$ests * (deresults$dist2tcell$pvals < 1e-3))[topgenes1, ],
+pheatmap::pheatmap((deresults[[1]]$ests * (deresults[[1]]$pvals < 1e-3))[topgenes1, ],
          col = colorRampPalette(c("darkblue", "white", "darkred"))(100),
          breaks = seq(-1, 1, length.out = 101))
 ```
@@ -854,7 +871,7 @@ So, before getting excited about a single gene in a single patch, take one of th
 
 Very large numbers of cells give us very high statistical power to detect even tiny effect sizes. 
 Paradoxically, this creates a hazard for analysts,
-as our high statistical power applies both to real effects **and** to the effects of unmeasured confounding variables. Now it's usually a safe assumption that a given gene is being influences by a variety of factors in a tissue, many 
+as our high statistical power applies both to real effects **and** to the effects of unmeasured confounding variables. Now it's usually a safe assumption that a given gene is being influenced by a variety of factors in a tissue, many 
  of them unmeasured and at least lightly correlated with your design variable. 
 In other words, any given gene is likely subject to unmeasured confounding, meaning there's a false positive signal that we are well-powered to find significant and get fooled by. 
 
