@@ -696,7 +696,7 @@ However, this particular routine runs fast enough, and generates a large enough 
 ## get PCs based on Pearson residuals:
 # version without batch adjustment:
 if (TRUE) {
-  genefreq <- scPearsonPCA::gene_frequency(Matrix::t(counts[, hvgs])) ## gene frequency (across all cells)
+  genefreq <- scPearsonPCA::gene_frequency(Matrix::t(counts)) ## gene frequency (across all cells)
   pcaobj <- scPearsonPCA::sparse_quasipoisson_pca_seurat(
     x = Matrix::t(counts[, hvgs]),
     totalcounts = metadata$nCount_RNA,
@@ -717,7 +717,7 @@ if (TRUE) {
 # In this example code we assume the metadata has a column "patient" that we wish to treat as a possible batch effect
 if (TRUE) {
   genefreq_batch <- scPearsonPCA::gene_frequency(
-    x = Matrix::t(counts[, hvgs]),
+    x = Matrix::t(counts),
     obs = metadata[,.(cell_id, patient)],
     cellid_colname = "cell_id",
     batch_variable = "patient")
@@ -1068,7 +1068,8 @@ for (name in unique(clust)) {
 
 We obtain:
 
-A .pdf heatmap of marker gene expression, stretched out to allow for scrutinizing gene names:
+A .pdf heatmap of marker gene expression, stretched out to allow for scrutinizing gene names 
+(not legible zoomed-out; meant to be explored via zooming and scrolling):
 
 ```{r echo = FALSE, eval = TRUE, out.width = "100%"}
 knitr::include_graphics("figures/tallheatmapsnippet.png")
@@ -1250,6 +1251,27 @@ knitr::include_graphics("figures/celltype_merge_barplot.png")
 
 Note that in the above plot, we have 3 tall bars from neutrophil clusters called by Louvain. 
 This result would be concerning for a merge of HieraType and Louvain, implying many immune cells were getting left behind. In our case, these are the 3 clusters that the LLM misclassified; we renamed them to "cancer" for our analysis.
+
+Once our cell types are complete, we re-generate the spatial plots:
+
+```{r echo = TRUE, eval = FALSE}
+# xy positions:
+for (name in unique(celltype)) {
+  png(paste0("results/celltype xy - ", make.names(name), ".png"), 
+      width = diff(range(xy[, 1])) * 0.5, 
+      height = diff(range(xy[, 2])) * 0.5,
+      unit = "in", res = 350)
+  par(mar = c(0,0,0,0))
+  plot(xy, pch = 16, cex = 0.1, 
+       col = scales::alpha(cellcols, 0.3)[as.numeric(as.factor(celltype))], 
+       xlab = "", ylab = "", xaxt = "n", yaxt = "n")
+  points(xy[celltype == name, ], pch = 16, cex = 0.1, 
+         col = "black")
+  legend("top", legend = name, bty = "n")
+  dev.off()
+}
+```
+
 
 # Conclusion
 
