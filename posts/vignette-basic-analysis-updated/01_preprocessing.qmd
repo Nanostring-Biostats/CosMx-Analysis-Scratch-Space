@@ -432,18 +432,18 @@ First, we'll apply a threshold on cells' total counts.
 Our defaults are fairly permissive; it would be reasonable double them in datasets where you can do so without throwing out too many cells. 
 
 ```{r echo = TRUE, eval = FALSE}
-## set the total counts threshold:
-# recommendations (on the permissive side): 20 counts for 1000plex, 50 for 6000plex, 100 for WTX
-count_threshold <- 100  
-
 # require sufficient counts per cell 
 hist(log2(metadata$nCount_RNA), breaks = 100, xlab = "Log2 counts per cell", ylab = "N cells", main = "")
-# cut off the low tail: 
+## cut off the low tail: 
+# recommendations:
+# - 1000plex: 20 (permissive) or 50 (conservative)
+# - 6000plex: 50 (permissive) or 100 (conservative)
+# - WTX: 100 (permissive) or 200 (conservative)
+# - all panels: no more than 5% of cells (permissive) or 10% of cells (conservative)
+count_threshold <- min(200, quantile(metadata$nCount_RNA, 0.05)) # apply threshold, but don't flag >5% of cells
 abline(v = log2(count_threshold), col = "red")
-legend("topleft", legend = paste0(round(mean(metadata$nCount_RNA < count_threshold) * 100, 1), "% rejected"))
-
-# flag cells based on total counts:
 flag <- metadata$nCount_RNA < count_threshold
+legend("topleft", legend = paste0(round(mean(flag) * 100, 1), "% rejected"))
 mean(flag)
 ```
 
@@ -471,6 +471,9 @@ mean(flag)
 ```{r echo = FALSE, eval = TRUE, out.width = "115%"}
 knitr::include_graphics("figures/QC_area_histogram.png")
 ```
+
+Note: some tissues do have very large cells, e.g. purkinje cells in the brain or cardiomyocytes in the heart. 
+
 
 To check for segmentation errors, consider our R package [FastReseg](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/){target="_blank"}, which uses transcript positions to flag cells with likely segmentation errors, then remove or reassign transcripts assigned to the wrong cells.
 
@@ -567,27 +570,28 @@ We see ample variability in total counts over space, but it all appears biologic
  
 We also like to plot background over space. Because negative control counts are so sparse at the level of single cells, 
  we plot *spatially smoothed* background, i.e. we color each cell by the mean background over its 50 nearest neighbors.
+To isolate background tendency from overall signal strength, we also normalize our background (negprobe) counts to each cells' total RNA counts.
 
 ```{r echo = TRUE, eval = FALSE}
 ## plot smoothed background over space:
 # get spatial neighbors:
 neighbors <- InSituCor:::nearestNeighborGraph(xy[, 1], xy[, 2], N = 50, subset = metadata$slide_ID)  
-# calculate spatially-smoothed background:
-smoothedbg <- InSituCor:::neighbor_mean(x = metadata$nCount_negprobes, neighbors = neighbors)
-# plot spatially-smoothed background:
+# calculate spatially-smoothed and totalcount-normalized background:
+smoothedgbrate <- InSituCor:::neighbor_mean(x = metadata$nCount_negprobes / metadata$nCount_RNA, neighbors = neighbors)
+# plot:
 par(mar = c(0,0,0,0))
-plot(xy, pch = 16, cex = 0.1, asp = 1, 
+plot(xy[, 2:1], pch = 16, cex = 0.1, asp = 1, 
      col = viridis_pal(option = "B")(101)[
-       round(1 + 100 * pmin(smoothedbg / quantile(smoothedbg, 0.9995), 1))
+       round(1 + 100 * pmin(smoothedgbrate / quantile(smoothedgbrate, 0.9995), 1))
      ])
-legendvals <- round(seq(0, quantile(smoothedbg, 0.9995), length.out = 4), 2)
+legendvals <- signif(median(smoothedgbrate) * c(0.5,1,2,5,10), 2)
 legend("bottomright", pch = 16, 
-       col = c("white", viridis_pal(option = "B")(101)[round(1 + 100 * (legendvals / quantile(smoothedbg, 0.9995)))]),
-       legend = c("Spatially smoothed \n negprobe counts:", legendvals))
+       col = c("white", viridis_pal(option = "B")(101)[signif(1 + 100 * pmin(legendvals / quantile(smoothedgbrate, 0.9995), 1), 2)]),
+       legend = c("Spatially smoothed totalcounts-normalized background:", paste0(c(0.5,1,2,5,10), "x median")))
 ```
 
 ```{r echo = FALSE, eval = TRUE}
-knitr::include_graphics("figures/QC_negprobes_xy.png")
+knitr::include_graphics("figures/spatial_bgoversignal.png")
 ```
 
 FOV edge effects are also notable here, presumably downstream from suppressed signal in those locations.
@@ -595,6 +599,25 @@ Of greater note is a band of higher-background FOVs towards the lower left of th
 No immediate action is needed, but by becoming aware of this small technical effect 
  we'll be armed to interpret any strange results driven by it. 
 
+Finally, we just flagged cells in space:
+
+```{r echo = TRUE, eval = FALSE}
+# plot flagged cells in space:
+par(mar = c(0,0,0,0))
+plot(xy[, 2:1], pch = 16, cex = 0.1, asp = 1, 
+     col = c("grey80", "red")[1 + flag])
+legendvals <- signif(median(smoothedgbrate) * c(0.5,1,2,5,10), 2)
+legend("bottomright", pch = 16, 
+       col = c("white", viridis_pal(option = "B")(101)[signif(1 + 100 * pmin(legendvals / quantile(smoothedgbrate, 0.9995), 1), 2)]),
+       legend = c("Spatially smoothed totalcounts-normalized background:", paste0(c(0.5,1,2,5,10), "x median")))
+```
+
+```{r echo = FALSE, eval = TRUE}
+knitr::include_graphics("figures/QC_flaggedcells.png")
+```
+
+We can see flagged cells clustered in ducts/vessels/gaps in the tissue. 
+Again, no action is needed, but we should keep this in mind while we interpret results. 
 
 ## Normalization
 
