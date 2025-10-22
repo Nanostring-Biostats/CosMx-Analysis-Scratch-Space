@@ -46,16 +46,283 @@ We'll be relying on the
 [this preprint](https://www.biorxiv.org/content/10.1101/2024.08.02.606405v2.abstract){target="_blank"}.
 
 
+## Getting started
+
+To begin, load your fully pre-processed data (including cell type annotations):
+
+```{r libraries}
+# necessary libraries
+library(data.table) # for more memory efficient data frames
+library(Matrix) # for sparse matrices like our counts matrix
+library(ggplot2)
+library(smiDE) # remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space", subdir = "_code/smiDE", ref = "Main")
+library(pheatmap)
+
+# load data:
+counts <- readRDS(paste0(outdir, "/processed_data/counts.RDS"))
+metadata <- readRDS(paste0(outdir, "/processed_data/metadata.RDS")) # expected to have the column "celltype"
+xy <- readRDS(paste0(outdir, "/processed_data/xy.RDS"))
+```
+
 # Crafting predictor variables for DE
+
+Repurpose the below code chunks to create precisely the predictor variable you want to use in DE. 
+
 
 ## Categorical variables
 
-### Options to define a categorical variable
+Below we provide code for 3 different approaches to defining categorical variables for analysis:
 
-- run novae
-- logical operations on existing metadata, e.g. niche
-- select ROI(s)
-- dichotomize a continuous variable, e.g. expression ("B2M high") or pathway score ("INFG signaling high") or one of the continuous variables calculated below. 
+1. Partitioning the tissue into niches / spatial domains using the Novae algorithm. 
+ Spatial domains are a natural framework for comparing cells' expression patterns across spatial contexts; 
+ we have found the Novae algorithm to perform well. 
+2. Selecting custom regions of interest. Use this code to hand-select regions for comparison, e.g. distinct lobes of a tumor, or a tertiary lymphoid structure, or a region suggested by review of H&E, IF, or protein images. 
+3. Logical combinations of existing metadata columns, including dichotomization of continuous variables, e.g. gene expression ("B2M high"), pathway score ("INFG signaling high") or one of the continuous variables calculated below ("distance to tumor glands"). 
+
+
+::: {.panel-tabset}
+
+## Novae niches
+
+You can now get Novae niches in an AtoMx pipeline module. 
+Alternatively, compute them with the below code. 
+Note that Novae is a python package; here we show how to call it from R, leaving details of python setup to you. 
+
+First we'll use R to prepare our data for Novae, writing it to a h5ad file:
+
+```{r echo = TRUE, eval = FALSE}
+# create a seurat object:
+
+# Convert to single cell experiment
+sce <- as.SingleCellExperiment(seu.obj)
+
+# Save as h5ad
+h5ad_path <- paste0(objects_dir, "/assay_data.h5ad")
+#writeH5AD(se_hdf5, file = h5ad_path)
+writeH5AD(sce, file = h5ad_path, X_name = "counts", assay = "counts")
+```
+
+Now we run python code to call Novae:
+
+```{r echo = TRUE, eval = FALSE}
+library(reticulate)
+
+py_run_string("
+
+
+import novae
+import igraph
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import scanpy as sc
+import numpy as np
+import os
+import hdf5plugin
+
+sc.settings.figdir = os.path.join(r.niche_dir, "Plots")
+#torch.set_float32_matmul_precision('high') 
+novae.settings.auto_preprocessing = True
+#os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"
+
+
+# Read in sample
+adata = sc.read_h5ad("analysis/Robjects/assay_data.h5ad")
+
+## convert spatial from mm to microns for novae
+
+# Extract coordinates from obs
+x_mm = adata.obs["x_slide_mm"].to_numpy()
+y_mm = adata.obs["y_slide_mm"].to_numpy()
+
+# Create spatial_mm matrix
+spatial_mm = np.column_stack((x_mm, y_mm))
+adata.obsm["spatial_mm"] = spatial_mm
+
+# Convert to microns
+spatial_um = spatial_mm * 1000
+adata.obsm["spatial_um"] = spatial_um
+
+# Duplicate spatial_um to spatial
+adata.obsm["spatial"] = spatial_um
+
+
+## Start running novae
+# Create a Delaunay graph of the data
+novae.spatial_neighbors(adata, radius=80, coord_type='generic')
+
+# Use a quick plot to ensure that neighbors were calculated appropriately
+# Looking for very few red (unconnected) cells that are only on the edges of tissue
+novae.plot.connectivities(adata)
+
+# Load in pre-trained model
+model1 = novae.Novae.from_pretrained("MICS-Lab/novae-human-0")
+
+# Fine tune model based on CosMx data in this study
+#model1.fine_tune(adata, max_epochs=50, logger=True, accelerator='cuda', num_workers=4)
+model1.fine_tune(adata, max_epochs=50, logger=True) # Took ~24 hours on an r5b.12xlarge with CPU only
+model1.compute_representations(adata, zero_shot=False) # Took ~8 hrs
+
+for i in range(1, 20):
+  model1.assign_domains(adata, i)
+
+model1_dir = os.path.join(r.niche_dir, "novae_model_one")
+model1.save_pretrained(save_directory=model1_dir)
+
+import matplotlib.pyplot as plt
+dh = model1.plot_domains_hierarchy()
+plt.savefig(os.path.join(r.niche_dir, "Plots", "novae_model1_hierarchy.png"))
+plt.close()
+
+novae.plot.paga(adata, obs_key="novae_domains_11", save="_novae_model1_graph.png")
+
+adata.write_h5ad(
+  os.path.join(r.objects_dir, "anndata-plus-novae.h5ad"),
+  compression=hdf5plugin.FILTERS["zstd"],
+  compression_opts=hdf5plugin.Zstd(clevel=5).filter_options
+)
+
+")
+
+
+# get python outputs back into R:
+
+```
+
+## Custom ROIs
+
+Here we provide a function, `defineROI`, to support two workflows for selecting ROIs:
+
+1. Clicking on points in the graphics window to define an ROI boundary (relies on the `identify` function, which can be buggy.)
+2. Hard-coding the xy coordinates of the ROI boundary.
+
+```{r echo = TRUE, eval = FALSE}
+#' Define roi's by Clicking on cells in a graphics window
+#' 
+#' How to use:
+#' \itemize{
+#' \item Plot your cells in xy space. Use asp = 1. 
+#' \item Click cells around the boundary of your roi.
+#' \item Hit enter or escape when done with your selection.
+#' }
+#' Other details:
+#' \itemize{
+#' \item Uses graphics::identify() to select points. 
+#' \item Only works for base graphics, not ggplots.
+#' \item Can go wrong (draw rois in the wrong place) if the plot doesn't have asp = 1. 
+#' }
+#' @param xy Matrix of xy positions used in the plot. 
+#' @param show Logical, for whether to show the selected roi when you're done. 
+#' @param type One of:
+#' \itemize{
+#' \item "direct" to define the boundary points in order, exactly as you click
+#' \item "ahull" to draw an alpha hull around your selection
+#' } 
+#' @return A list with 3 elements:
+#' \itemize{
+#' \item roi: The indices of the points in the roi
+#' \item selected: The indices of the user-selected points
+#' \item hull: The hull of the roi, either the user-selected polygon or the results of alphahull:ahull}
+#' @importFrom graphics identify
+#' @importFrom alphahull ahull
+#' @
+defineROI <- function(xy, type = "direct", boundary_points = NULL, show = TRUE) {
+  if (!is.null(boundary_points)) {
+    hull.x <- boundary_points[, 1]
+    hull.y <- boundary_points[, 2]
+    # get points in the boundary:
+    roi <- sp::point.in.polygon(point.x = xy[, 1], point.y = xy[, 2], 
+                                pol.x = hull.x, pol.y = hull.y) > 0
+    inds <- NULL
+    hull <- NULL
+  }
+  if (is.null(boundary_points)) {
+    
+    if (!is.element(type, c("direct", "ahull"))) {
+      stop("must either give boundary_points or set type to \'direct\' or \'ahull\'")
+    }
+    # user identifies boundary:
+    identifyres <- identify(xy, plot = FALSE, order = TRUE)
+    inds <- identifyres$ind[order(identifyres$order)]
+    
+    if (type == "direct") {
+      # The hull is just the polygon you've selected:
+      hull.x <- xy[inds, 1]
+      hull.y <- xy[inds, 2]
+      hull <- inds
+      # get points in the boundary:
+      roi <- sp::point.in.polygon(point.x = xy[, 1], point.y = xy[, 2], 
+                                  pol.x = hull.x, pol.y = hull.y) > 0
+    }
+    
+    if (type == "ahull") {
+      # get alpha hull of boundary:
+      hull <- alphahull::ahull(xy[inds, 1], xy[inds, 2], alpha = 0.05)
+      # get points in the boundary:
+      roi <- alphahull::inahull(ahull.obj = hull, xy)
+    }
+    
+  }
+  # plot:
+  if (show) {
+    points(xy[inds, ], col = "red", cex = 0.5, pch = 16)
+    polygon(xy[hull, ])
+    points(xy[roi, ], pch = 16, cex = 1, col = scales::alpha("gold", 0.3))
+  }
+  
+  out = list(roi = roi, selected = inds, hull = hull)
+  return(out)
+}
+```
+
+An example of the click-to-select workflow:
+
+```{r echo = TRUE, eval = FALSE}
+
+### example usage 1: clicking the graphics window to identify a region 
+# NOTE: uses the identify() function, which can be finnicky and hard to debug.
+par(mar = c(0,0,0,0))
+plot(xy, pch = 16, cex = 0.3, asp = 1,
+     xlab = "", ylab = "")
+roi <- defineROI(xy, type = "direct", show = TRUE) 
+# add to metadata: 
+metadata$inmyroi <- roi$roi
+
+```
+
+... and of the hard-coded boundary workflow:
+
+```{r echo = TRUE, eval = FALSE}
+### example usage 2: inputing xy coordinates of the ROI's boundary:
+par(mar = c(2,2,0,0))
+plot(xy, pch = 16, cex = 0.3, asp = 1,
+     xlab = "", ylab = "")
+# place a grid over it to determine where to pick boundary points:
+abline(h = pretty(range(xy[,2]), n=30), v = pretty(range(xy[,1]), n=30), lty=3, col="grey20")
+
+# hard-code boundary points:
+boundary_points <- t(matrix(c(
+    1.85,7.05,
+    2,7.1,
+    2.05,6.95,
+    1.95,6.85,
+    1.87,6.9
+), nrow = 2))
+roi <- defineROI(xy, type = NULL, boundary_points = boundary_points, show = TRUE) 
+# add to metadata: 
+metadata$inmyroi <- roi$roi
+```
+
+## Combining existing annotations
+
+No example code is needed here, but here are some examples for inspiration:
+
+- **Condense niches**: in one study, we obtained 9 niches, then condensed them into 3 broad categories (tumor, interior stroma, exterior stroma) for some analyses.  
+- **Dichotomize a continuous variable**: for example, you could pretty accurately identify cells in glomeruli as all cells with >5 native glomerular cells (podocytes/mesangial cells/glomerular endothelial cells...) in their 20 nearest neighbors. And in some tumors, you could pretty accurately define tertiary lymphoid structures as all cells with >10 B/T cells in their 20 nearest neighbors. Or you could divide a tumor into glycolysis high/low zones by dichotomizing a score of cells' mean neighborhood glycolysis pathway scores. 
+- **Combine metadata columns**: for example, combine a handful of custom ROI's into a single annotation column. 
+
+:::
+
 
 ## Continuous variables
 
