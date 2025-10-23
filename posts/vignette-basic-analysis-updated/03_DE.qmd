@@ -50,18 +50,41 @@ We'll be relying on the
 
 To begin, load your fully pre-processed data (including cell type annotations):
 
-```{r libraries}
-# necessary libraries
+```{r echo = TRUE, eval = FALSE}
+## load necessary libraries
 library(data.table) # for more memory efficient data frames
 library(Matrix) # for sparse matrices like our counts matrix
 library(ggplot2)
 library(smiDE) # remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space", subdir = "_code/smiDE", ref = "Main")
 library(pheatmap)
+library(InSituCor) # devtools::install_github("https://github.com/Nanostring-Biostats/InSituCor")
 
-# load data:
+## load data:
 counts <- readRDS(paste0(outdir, "/processed_data/counts.RDS"))
 metadata <- readRDS(paste0(outdir, "/processed_data/metadata.RDS")) # expected to have the column "celltype"
 xy <- readRDS(paste0(outdir, "/processed_data/xy.RDS"))
+```
+
+Then we'll define each cell's neighbors. 
+This will prove useful for a variety of downstream calculations.
+Note that cells are not included in their own neighbors.
+
+```{r echo = TRUE, eval = FALSE}
+## define cell neighborhoods:
+# get the 50 nearest neighbors of each cell:
+neighbors <- InSituCor:::nearestNeighborGraph(
+  x = xy[, 1], y = xy[, 2], 
+  N = 50,  # number of neighbors
+  subset = metadata$slide_ID_numeric)  # optional argument to ensure cells with similar xy positions in different slides aren't linked
+
+# or alternatively, get neighbors within a radius of 0.1mm:
+neighbors <- InSituCor:::radiusBasedGraph(
+  x = xy[, 1], y = xy[, 2], 
+  R = 0.1,  # radius
+  subset = metadata$slide_ID_numeric) # optional argument to ensure cells with similar xy positions in different slides aren't linked
+
+# see how many neighbors you're defining for each cell:
+summary(Matrix::rowSums(1 * (neighbors20 > 0)))
 ```
 
 # Crafting predictor variables for DE
@@ -78,7 +101,7 @@ Below we provide code for 3 different approaches to defining categorical variabl
  we have found the Novae algorithm to perform well. 
 2. Selecting custom regions of interest. Use this code to hand-select regions for comparison, e.g. distinct lobes of a tumor, or a tertiary lymphoid structure, or a region suggested by review of H&E, IF, or protein images. 
 3. Logical combinations of existing metadata columns, including dichotomization of continuous variables, e.g. gene expression ("B2M high"), pathway score ("INFG signaling high") or one of the continuous variables calculated below ("distance to tumor glands"). 
-
+4. Defining anatomical features consisting of spatially contiguous cells. 
 
 ::: {.panel-tabset}
 
@@ -287,7 +310,6 @@ plot(xy, pch = 16, cex = 0.3, asp = 1,
 roi <- defineROI(xy, type = "direct", show = TRUE) 
 # add to metadata: 
 metadata$inmyroi <- roi$roi
-
 ```
 
 ... and of the hard-coded boundary workflow:
@@ -321,42 +343,164 @@ No example code is needed here, but here are some examples for inspiration:
 - **Dichotomize a continuous variable**: for example, you could pretty accurately identify cells in glomeruli as all cells with >5 native glomerular cells (podocytes/mesangial cells/glomerular endothelial cells...) in their 20 nearest neighbors. And in some tumors, you could pretty accurately define tertiary lymphoid structures as all cells with >10 B/T cells in their 20 nearest neighbors. Or you could divide a tumor into glycolysis high/low zones by dichotomizing a score of cells' mean neighborhood glycolysis pathway scores. 
 - **Combine metadata columns**: for example, combine a handful of custom ROI's into a single annotation column like "inflamed regions" or "dysplastic regions".
 
+## Anatomical features / groups of contiguous cells
+
+Often, instead of just selecting cells belonging to a given cell type, you want cells in anatomical structures. 
+For example, you might want to select tumor glands while omitting single isolated tumor cells, 
+ or you might want to define blood vessels as groups of contiguous endothelial cells, omitting isolated endothelial cells. 
+The below code uses the DBSCAN algorithm to achieve this:
+
+```{r echo = TRUE, eval = FALSE}
+# define the starting group of cells, e.g. cells of a given cell type:
+tempcells <- metadata$celltype == "Endothelial"
+dbscancluster <- dbscan::dbscan(xy[tempcells, ],
+                     eps = 0.05, # very small radius
+                     minPts = 5  # throw out clusters of less than 5 cells
+                     )$cluster
+selectedcells <- dbscancluster != 0
+```   
+
 :::
 
 
 ## Defining continuous variables
 
-### Options to define a continuous variable:
+Here we provide code for a few ways to define useful continuous variables. 
+
+We'll save each of these var
 
 ::: {.panel-tabset}
 
 ## Distance to nearest neighbor
 
+The below code shows how to find the distance to the nearest neighbor of a given set of cells,
+ e.g. tumor cells, or cells in a given niche, or cells in a region of interest (ROI). 
+This approach is appropriate when you expect your selected cells to impact their surroundings in a way that declines over distance,
+ e.g. with oxygen availability dropping with distance to the nearest blood vessel. 
+
+By modifying the `k` variable below you can take the distance to the *k*-th closest cell in the set. 
+ This can be useful when you're trying to get distance to anatomical features like tumor glands rather than just single isolated tumor cells.
+
+```{r echo = TRUE, eval = FALSE}
+# collection of cells we want to take a distance to:
+istargetcell <- meta_data$celltype == "Tcell"
+# record all cells' distances to k-th nearest target cell
+k <- 1
+dist2target <- FNN::get.knnx(
+  data  = as.matrix(xy[istargetcell, , drop=FALSE]),
+  query = as.matrix(xy),
+  k = k
+)$nn.dist[, k]
+```
 
 ## Number of neighbors
 
+The below code shows how to record how many of each cells' nearest neighbors belong to a given set of cells, 
+ e.g. T-cells or 
+This approach is appropriate when you expect the impact of your selected cells on their neighbors to compound.
+E.g., a neighborhood with more T cells might have a stronger inflammatory milieu than a neighborhood with just 1 T cell. 
+
+```{r echo = TRUE, eval = FALSE}
+
+# collection of cells we want to take a distance to:
+istargetcell <- meta_data$celltype == "Tcell"
+
+# count the target cells among cells' neighbors:
+neighboring.targetcells <- InSituCor:::neighbor_sum(x = 1 * (istargetcell),
+                                                    neighbors = neighbors)   # calculated in the preliminaries
+```
 
 ## Mean neighborhood expression
 
-:::
+The below code shows how to measure the mean / total expression of a gene in each cells' neighborhood. 
 
-- distance to nearest (nearest 3rd) (nearest cluster)
-- number of neighbors (choose radius or K)
-- mean (or total) neighborhood expression
+```{r echo = TRUE, eval = FALSE}
+## examples of a variable to average over neighborhoods:
+# raw counts of a gene:
+x <- counts[, "CXCL14"] 
+# normalized expression of a gene:
+x <- counts[, "CXCL14"] / meta_data$nCount_RNA
+# or you could use a pathway score, or protein expression (if measured)
+
+## get average expression in each cell's neighborhood:
+neighbormean <- InSituCor:::neighbor_sum(x = x,
+                                         neighbors = neighbors)
+```
+
+
+:::
 
 ## Transformations on continuous variables:
 
+Once we've derived a continuous variable, we still have decisions to make. 
+When we put a variable in a model, we are implicitly assume a linear relationship between the variable and our gene expression ("gene expression" occuring either on the linear or log scale, depending on the model). 
+It often makes scientific sense to transform a variable before entering it into a model.
+See the code below for examples of useful transformations. 
+
+
+
+
+
 ::: {.panel-tabset}
 
+## Monotonic tranformations
+
+If you think distance to a feature matters because of some diffused signals, then concentration of those molecules will vary with 1/distance.
+If neighborhood expression of a molecule is strongly right-tailed, which is common, then a log transformation could prevent the end of the tail from having undue influence.
+To make effect sizes more interpretable, scale the variable from 0-1.
+For variables with strong skew or long tails, a quantile transformation can prevent extreme values from exerting excess influence on DE results.
+
+```{r echo = TRUE, eval = FALSE}
+# inverse:
+x <- 1 / x
+# log2-transform:
+x <- log2(x)
+# scale from 0-1:
+x <- (x - min(x)) / (max(x) - min(x))
+# scale to have unit SD:
+x <- x / sd(x)
+# quantile transformation:
+x <- order(order(x)) / length(x)
+# truncate at the upper extreme:
+x <- pmin(x, quantile(x, 0.995))
+# truncate at the lower extreme:
+x <- pmax(x, quantile(x, 0.005))
+# truncate at both extremes:
+x <- pmin(pmax(x, quantile(x, 0.005)), quantile(x, 0.995))
+```
+
+## Binning
+
+If you're unwilling to commit to the shape of a relationship between a variable and gene expression, 
+ you can take a non-parametric approach and break it into bins. 
+Our favored DE library, smiDE, will then give you results for all pairwise comparisons between bins, and it can be useful to e.g. compare all bins to the first bin. 
+Alteratively, using various base R packages for linear models, you can run both a full model and a "null" model omitting your binned variable,
+ then use a likelihood ratio test (`lrtest`) to get a p-value for the variable as a whole rather than for individual levels. 
+ 
+```{r echo = TRUE, eval = FALSE}
+# break a variable into bins of equal width:
+x <- cut(x, breaks = 20)
+# break a variable into bins of equal cell numbers:
+quants <- quantile(x, seq(0,1,length.out = 21))
+x <- cut(x, breaks = quants)
+```
+After the above, `x` is now a factor with 20 levels. 
+
+## Splines
+
+Instead of forcing the data into discrete bins, we can use splines to get a smoother fit. 
+
+```{r echo = TRUE, eval = FALSE}
+splinex <- as.matrix(splines::ns(x, df = 20))
+```
+
+This produces a matrix with 20 columns, suitable as use as predictors for DE. 
+Prioritize genes by their global p-values from a likelihood ratio test vs. a model excluding this matrix. 
+(This approach is not yet supported by smiDE.)
 
 :::
 
 
-- Truncate
-- Dichotomize
-- monotonic: Log / inverse / sqrt / etc
-- bins
-- splines
 
 ## Confirm your variable:
 
