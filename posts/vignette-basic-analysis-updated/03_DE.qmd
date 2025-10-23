@@ -500,12 +500,49 @@ Prioritize genes by their global p-values from a likelihood ratio test vs. a mod
 
 :::
 
-
-
 ## Confirm your variable:
 
-- plot it in space over your cell type in question
-- histogram
+Once you've crafted a variable, plot it in space to confirm it's as you hoped:
+
+```{r echo = TRUE, eval = FALSE}
+# plotting a categorical variable:
+cols <- rep(c(
+  "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00",
+  "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62",
+  "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494",
+  "#B3B3B3", "#1B9E77", "#D95F02", "#7570B3", "#E7298A",
+  "#66A61E", "#E6AB02", "#A6761D", "#666666", "#A6CEE3",
+  "#1F78B4", "#B2DF8A", "#33A02C", "#FB9A99", "#E31A1C",
+  "#FDBF6F", "#FF7F00", "#CAB2D6", "#6A3D9A", "#FFFF99",
+  "#B15928", "#8DD3C7", "#FFFFB3", "#BEBADA", "#FB8072"
+), 3)[1:length(unique(x))]
+
+plot(xy, cex = 0.1, pch = 16, asp = 1,
+     col = cols[as.numeric(as.factor(x))])
+
+
+# plotting a continuous variable that goes up from 0:
+plot(xy, cex = 0.1, pch = 16, asp = 1,
+     col = colorRampPalette(c("grey80", "#4B0082"))(101)[
+       1 + round(100 * x / max(x))
+     ])
+
+# plotting a continuous variable centered at 0:
+plot(xy, cex = 0.1, pch = 16, asp = 1,
+     col = colorRampPalette(c("darkblue", "grey80", "darkred"))(101)[
+       51 + round(50 * x / max(abs(x)))
+     ])
+
+# plotting a continous variable with arbitrary center:
+plot(xy, cex = 0.1, pch = 16, asp = 1,
+     col = colorRampPalette(c("darkblue", "grey80", "darkred"))(101)[
+       1 + round(100 * (x - min(x)) / (max(x) - min(x)))
+     ])
+
+# draw a histogram of the continuous variable to confirm it's not excessively long-tailed:
+hist(x, breaks = 40)
+```
+
 
 # Running DE
 
