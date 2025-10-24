@@ -710,13 +710,23 @@ for(ii in 1:nrow(index_markers)){
   #ggplot(rbindlist(pdlbl)[seq(1,.N,by=10)],aes(x = (1-spec), y = sens, color=label)) + geom_line()
   aucrocl[[ii]] <- data.table::copy(res) #return(res)
 }
-  
+ 
+```
+```{r}
+#| eval: false
+#| echo: false
+
+
   saveRDS(aucrocl, "data2/aucrocl.rds")
   saveRDS(plotdata_markerl, "data2/plotdata_markerl.rds")
   #pdlbl
   aucrocl <- readRDS("data2/aucrocl.rds")
   plotdata_markerl <- readRDS("data2/plotdata_markerl.rds")
-  
+ ```
+ ```{r}
+#| eval: false
+#| echo: true
+
   aucroc <- rbindlist(aucrocl, use.names=TRUE,fill=TRUE)
   shw <- rbindlist(plotdata_markerl)[marker %in% c("CD3", "CD3D", "CD2")]
   shw[,method:=factor(label, levels=c("celltype_multi_major", "celltype_rna_major", "celltype_protein_major"), labels=c("multiomic typing", "rna-only cell typing", "protein-only cell typing"))]
@@ -757,10 +767,6 @@ for(ii in 1:nrow(index_markers)){
          ,height=742*sqrt(9)
          ,units = 'px'
   )
-  #  labs(title = "ROC curve with T cell RNA and protein markers:\n#How well does normalized protein/RNA marker expression predict the cell type label?\nMultimomic integrated celltyping outperforms\neither RNA or protein alone when considering cell type markers measured on both analytes"
-  # # ,
-  #  title="\nMultimomic integrated celltyping outperforms\neither RNA or protein alone when considering cell type markers measured on both analytes")
-  #
   
   mroc <- melt(aucroc
                ,id.vars=c("celltype", "marker", "typ")
