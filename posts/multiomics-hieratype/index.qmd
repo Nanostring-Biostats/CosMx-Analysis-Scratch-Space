@@ -38,14 +38,14 @@ We compare cell typing performance and show that, overall, protein-only and RNA-
 
 We also demonstrate evidence of improved coherence of cell type labels with the defining marker genes and proteins when using an integrated approach that makes use of both analytes.
 
-Finally, we show a simple yet effective way to integrate unsupervised clusters with supervised immune cell type labels generated with HieraType, to create allowing for identification of novel or tissue-specific cell types with well known immune cell types.
+Finally, we show a simple yet effective way to integrate unsupervised clusters with supervised immune cell type labels generated with HieraType. This can enable granular detection of novel or tissue-specific cell types along with well known immune cell types.
 
-Code for this analysis end-to-end can be found by skipping ahead [here](#endtoend)
+Code for this analysis end-to-end can be found by skipping ahead [here](#endtoend).
 
 
 #  A quick look at the tissue
 
-Here's a quick look at this breast cancer tissue, where unsupervised clustering was performed using both the pearson residual normalized RNA + protein.  Code for creating these unsupervised clusters is [here](#multiunsup).  Next, we'll compare multiomic cell typing performance with RNA-only or protein-only cell typing.
+Here's a quick look at this breast cancer tissue, where unsupervised clustering was performed using both the pearson residual normalized RNA + protein.  Code for creating these unsupervised clusters is [here](#multiunsup).  Next, we'll compare multiomic immune cell typing performance with RNA-only or protein-only cell typing.
 
 <div class="wider-image">
   <img src="./figures/xyp_multi_unsup.png" alt="Wide Image">
@@ -70,7 +70,7 @@ We compared the agreement between celltype predictions and canonical protein mar
 For example, the figure below shows ROC curves for T cell predictions along with three canonical cell type markers for T cells (one protein, and two RNA).  If we treat our normalized marker expression as a gold standard for cell type calling, then we would want to see high sensitivity and specificity of the T cell calls depending on whether marker expression is high or low.  Below, as we might expect, we see that using  <span style="color:#377EB8;">RNA-only</span> for calling T cells does not optimize agreement between CD3 protein (AUC=0.871).  Unsurprisingly, agreement improves when using CD3 protein directly for celltyping (<span style="color:#4DAF4A;">protein-only</span> AUC=0.927).  In this case, we actually observed the best AUC when both RNA and protein were used  (<span style="color:#E41A1C;">multiomics</span> AUC=0.937).
 
 A perhaps unsurprising theme that emerged from these cell typing comparisons was that we often see the worst agreement for protein markers when using RNA-only for celltyping, and the worst agreement for RNA markers when using protein-only for celltyping.  Meanwhile, using both RNA and protein analytes often yields the best or nearly-best agreement for both marker types.
-This is further shown below in the middle-and-right panels when looking at CD3D and CD2 RNA markers.  <span style="color:#E41A1C;">Multiomic</span> celltyping outperforms protein-only, and also slightly outperforms <span style="color:#377EB8;">RNA-only</span>.
+This is further shown below in the middle-and-right panels when looking at CD3D and CD2 RNA markers.  <span style="color:#E41A1C;">Multiomic</span> celltyping outperforms protein-only by the widest margin, and also slightly outperforms <span style="color:#377EB8;">RNA-only</span>.
 
 
 ```{r}
@@ -99,6 +99,7 @@ knitr::include_graphics("./figures/aucbarplot_wtext.png")
 
 # Running HieraType using Protein + RNA {#multiomic}
 
+Below, we'll step through the process of generating cell type labels with multiomic data.
 The code for using HieraType with protein data uses very similar syntax as a regular HieraType call, with a few exceptions worth calling out.
 
 ##### Protein naming convention
@@ -135,7 +136,7 @@ message(paste(example_multi_markerslist, collapse = '\n'))
 ##### Protein data normalization and constructing a multiomic adjacency_matrix
 
 Protein data should be normalized, then combined with a sparse un-normalized RNA counts matrix before passing to HieraType.
-Here we'll use pearson residuals from a gamma regression model as a normalization method, although many reasonable methods are available.  We then add the "_protein" suffix to the protein names, so they'll align with the HieraType markerlists.
+Here we'll use pearson residuals from a gamma regression model as a normalization method, although other reasonable methods might be considered and left to the user's disgression.  We then add the "_protein" suffix to the protein names, so they'll align with the HieraType markerlists.
 ```{r}
 #| eval: false
 #| echo: true
@@ -186,6 +187,7 @@ multi_simgrph <- uwot::similarity_graph(pcaobj_multi$reduction.data@cell.embeddi
                                   ,nn_method = "annoy"
                                   ,metric = 'cosine'
                                   )
+rownames(multi_simgrph) <- colnames(multi_simgrph) <- rownames(pcaobj_multi$reduction.data@cell.embeddings)
 
 ```
 
@@ -231,7 +233,7 @@ multictobj <- HieraType::run_pipeline(
    ,totalcounts= tc[rownames(multimat)]
    ,gene_wise_frequency = genefreq
    ,counts_matrix = multimat 
-   ,adjacency_matrix = simgrph[rownames(multimat), rownames(multimat)]
+   ,adjacency_matrix = multi_simgrph[rownames(multimat), rownames(multimat)]
  )
 
 
@@ -255,19 +257,12 @@ knitr::include_graphics("./figures/xyp_multi_semisup.png")
 
 # Conclusion
 
-The HieraType method constructs continuous celltype metagene scores, which are then probabilistically clustered to classify cell types.
+The HieraType method constructs continuous celltype metagene scores, which are then probabilistically clustered to classify cell types. 
 Because these metagene scores are continuous and the clustering uses flexible gaussian mixture models, the inputted expression can be fluidly specified in terms of RNA markers, protein markers, or some combination of both.  This allows for an elegant and efficient solution for fully integrated celltyping when both protein and RNA are available.  
 Overall, we found improved cell typing performance in the breast cancer sample analyzed in this post when both analytes were used compared to either analyte on its own.
 
 While the HieraType method is fully supervised and cannot identify novel cell types not specified in a '`markerslist`',  we demonstrate an easy approach for integrating unsupervised clusters with HieraType immune cell typing calls, enabling high resolution cell typing for both immune cell types as well as epithelial or tissue context specific cell types which may not have a known marker profile a priori.
 This can help reap benefits of both unsupervised and supervised approaches - well controlled pre-specified immune cell typing combined with granular unsupervised epithelial clusters.
-
-
-
-Even on their own, cell typing using either protein or RNA in spatial assays can be challenging: protein signals can bleed across segmented cell boundaries, creating mixed or incompatible marker profiles (e.g., simultaneous detection of CD3 and CD20), while transcriptomic measurements are often sparse and stochastic, limiting the reliability of individual marker genes.
-
-
-
 
 # End-to-end detailed analysis code {#endtoend}
 
