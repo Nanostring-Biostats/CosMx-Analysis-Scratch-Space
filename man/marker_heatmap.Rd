@@ -11,6 +11,7 @@ marker_heatmap(
   topn = 5,
   geneorder = NULL,
   clusterorder = NULL,
+  fold_change_min = -1,
   cluster_prop_min = 0.05,
   colordervar = "scaled_fold_change",
   orient_diagonal = TRUE,
@@ -31,6 +32,8 @@ marker_heatmap(
 Probably should only used if the exact set of features is also provided with \code{featsuse}.}
 
 \item{clusterorder}{if provided this allows to manually control the order in which clusters are plotted.}
+
+\item{fold_change_min}{minimum fold change, order to qualify to be plotted.}
 
 \item{cluster_prop_min}{minimum proportion of cells that the gene must be expressed in, in order to qualify to be plotted.}
 

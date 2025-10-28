@@ -21,6 +21,15 @@ validate_markerslist <- function(markerslist, available_genes){
       }
       
     }
+    
+    index_markers_not_in_predictors <- setdiff(index_markers[[idx]], markerslist[[idx]][["predictors"]])
+    if(length(index_markers_not_in_predictors) > 0){
+      msg <- paste0(paste0(index_markers_not_in_predictors, collapse=","), " specified as index_marker for celltype ", names(markerslist)[idx]
+                    ," but not specified as predictors."
+                    ,"\nThese will be added to the predictors list and used when not also specified as the response variable in metagene model.")
+      message(msg)
+      markerslist[[idx]][["predictors"]] <- unique(c(index_markers_not_in_predictors, markerslist[[idx]][["predictors"]]))
+    }
   } 
   ## check for missing predictors.  Remove any missing and print a message.
   all_missing_predictors <- c()
