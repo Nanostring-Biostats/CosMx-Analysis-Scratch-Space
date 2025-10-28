@@ -15,16 +15,60 @@
 #' If you desire to use raw counts for computing fold change, use like `normed=my_raw_counts`.
 #' @param metadata metadata including (at minimum) 'cellid_column' and a 'cluster_column'
 #' @param cluster_column column in metadata corresponding to cell type 
+#' @param cellid_column column in metadata corresponding to cell id. Should also correspond to the column names of the `counts` and `normed` expression matrices.
 #' @param totalcounts optional user-specified vector of totalcounts used for normalizing the counts matrix.  
 #' (useful if a subsetted counts matrix is passed)
 #' 
 #' @export
-clusterwise_foldchange_metrics <- function(counts=NULL, normed = NULL, totalcounts = NULL, metadata, cluster_column){
+clusterwise_foldchange_metrics <- function(counts=NULL, normed = NULL, totalcounts = NULL, metadata, cluster_column, cellid_column = "cell_ID"){
+
+  stopifnot(cluster_column %in% colnames(metadata)) 
+  metainfo <- data.table::copy(data.table::data.table(metadata))
+  if(!(cellid_column) %in% colnames(metainfo)){
+    stopifnot(!is.null(rownames(metadata)))
+    cellid_column <- "cell_ID"
+    metainfo[[cellid_column]] <- rownames(metadata)
+  }
+  if(cellid_column!="cell_ID" & ("cell_ID" %in% names(metainfo))) metainfo[["cell_ID"]] <- NULL
+  data.table::setnames(metainfo, old=cellid_column, new="cell_ID")
+  rm(metadata); gc()
+  
+  stopifnot("provided 'cellid_column' are not all unique in metadata " = 
+              length(unique(metainfo[["cell_ID"]])) == nrow(metainfo))
+  
+  if(!is.null(counts)){
+    ## checks on the counts matrix 
+    if(!is.null(totalcounts)){
+      stopifnot(length(totalcounts) == ncol(counts))
+      if(!is.null(names(totalcounts)) && !is.null(colnames(counts))){
+        stopifnot("ids of 'totalcounts' dont match ids in 'counts'" = 
+                    all(names(totalcounts) %in% colnames(counts))) 
+        totalcounts <- totalcounts[colnames(counts)] 
+      }
+      if(is.null(names(totalcounts))){
+        warning("No names provided for 'totalcounts'.\nAssuming that 'totalcounts' vector matches the order of provided 'counts' matrix.\nPlease consider providing a cellid-named vector of totalcounts.")
+      }
+    }
+    stopifnot(all(metainfo[["cell_ID"]] %in% colnames(counts)))
+    if(nrow(metainfo)!=ncol(counts)){
+      warning("Number of rows (cells) in 'metadata' does not match the number of columns (cells) in the 'counts' matrix!\nUsing only the cells in the metadata to compute the foldchange table.")
+    }
+  }  else {
+    if(missing(normed)){
+        stop("either 'normed' or 'counts' argument must be provided")
+    }
+  }
+  
   if(missing(normed)){
     normed <- Matrix::t(totalcount_norm(Matrix::t(counts), totalcounts))
   }
  
-  metainfo <- data.table::copy(data.table::data.table(metadata))
+  ## check on the normed matrix 
+  stopifnot(all(metainfo[["cell_ID"]] %in% colnames(normed)))
+  if(nrow(metainfo)!=ncol(normed)){
+    warning("Number of rows (cells) in 'metadata' does not match the number of columns (cells) in the 'normed' matrix!\nUsing only the cells in the metadata to compute the foldchange table.")
+  }
+  
   
   pb <- txtProgressBar(min =0, max = length(unique(metainfo[[cluster_column]])), style = 3)
   idx <- 0

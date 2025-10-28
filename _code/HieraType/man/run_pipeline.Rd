@@ -7,7 +7,7 @@
 run_pipeline(
   pipeline,
   counts_matrix,
-  adjacency_matrix,
+  adjacency_matrix = NULL,
   initial_prior_weights = NULL,
   celltype_call_threshold = 0.5,
   return_all_columns_postprobs = FALSE,
