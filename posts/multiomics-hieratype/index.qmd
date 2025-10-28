@@ -153,11 +153,13 @@ message(paste(example_multi_markerslist, collapse = '\n'))
 
 ##### Protein data normalization and constructing a multiomic adjacency_matrix
 
+
+::: {.callout-note}
+Below, we make use of the [scPearsonPCA package](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/scPearsonPCA).  This R package provides convenience functions for getting the principal component embeddings for pearson-residual normalized data directly from a raw counts matrix.  When normalized protein is also available, we can get the PC decomposition from both RNA and normalized protein using the functions below.   For more detail on the package, please check out the [README](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/scPearsonPCA). 
+:::
+
 Protein data should be normalized, then combined with a sparse un-normalized RNA counts matrix before passing to HieraType.
 Here we'll use pearson residuals from a gamma regression model as a normalization method, although other reasonable methods might be considered and left to the user's disgression.  We then add the "_protein" suffix to the protein names, so they'll align with the HieraType markerlists.
-
-Below, we make use of the [scPearsonPCA package](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/scPearsonPCA).  This R package provides convenience functions for getting the principal component embeddings for pearson-residual normalized data directly from a raw counts matrix.  When normalized protein is also available, we can get the PC decomposition from both RNA and normalized protein using the functions below.   For more detail on the package, please check out the [README](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/scPearsonPCA). 
-
 
 ```{r}
 #| eval: false
@@ -261,6 +263,90 @@ multictobj <- HieraType::run_pipeline(
 
 ```
 
+##### Outputs
+
+For extensive description of the outputs we get from HieraType, we refer the reader to the original post.
+Here, we'll demonstrate how to make a few marker heatmaps from the RNA and protein data to sanity check our cell typing results.
+```{r}
+#| eval: false
+#| echo: true
+
+multictobj$post_probs[[1]][1:10] ## posterior probabilities for each cell type
+
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+#fwrite(multictobj$post_probs[[1]][1:10], file="figures/postprobs_head.csv")
+print(data.table::fread("figures/postprobs_head.csv")[])
+```
+```{r}
+#| eval: false
+#| echo: true
+
+### Use the major cell type categories for a heatmap
+ppmulti <- copy(multictobj$post_probs$l1)
+ppmulti[,celltype_multi_major:=celltype_granular]
+ppmulti[grepl("cd4",celltype_multi_major),celltype_multi_major:="cd4_tcell"]
+ppmulti[grepl("cd8",celltype_multi_major),celltype_multi_major:="cd8_tcell"]
+ppmulti[grepl("mono|macro",celltype_multi_major),celltype_multi_major:="macrophage_monocyte"]
+
+### fold change metrics to show in RNA heatmap
+fctbl_rna <- 
+clusterwise_foldchange_metrics(sem_rna[["RNA"]]@counts[use_genes,]
+                               ,totalcounts = Matrix::colSums(sem_rna[["RNA"]]@counts)
+                               ,metadata = ppmulti
+                               ,cluster_column = "celltype_multi_major"
+                               ,cellid_column = "cell_ID"
+                               )
+
+hm_rna <- add_ncells(marker_heatmap(fctbl_rna))
+print(hm_rna)
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+ggsave(plot=hm_rna, filename = "figures/hm_rna_multi.png", width = 1522 * sqrt(20), height = 430*sqrt(20), dpi=400,units='px')
+
+```
+
+<div class="wider-image">
+  <img src="./figures/hm_rna_multi.png" alt="Wide Image">
+</div>
+
+
+For the protein data, almost all proteins have some positive measurement in each cell.  We can use the pearson residuals to set a cutoff for computing the proportion of positive cells by marker and by cell type.  Below, we'll use cutoff of 'pearson residual > 1' to determine the size of the bubble in the heatmap.
+```{r}
+#| eval: false
+#| echo: true
+
+fctbl_protein <- 
+clusterwise_foldchange_metrics_protein(sem_protein[["RNA"]]@counts[,overlapping_cells]
+                               ,metadata = ppmulti
+                               ,cluster_column = "celltype_multi_major"
+                               ,propd = (pgamm[,overlapping_cells] > 1))
+
+hm_protein <- add_ncells(marker_heatmap(fctbl_protein))
+print(hm_protein)
+
+```
+```{r}
+#| eval: false
+#| echo: false
+
+
+ggsave(plot=hm_protein, filename = "figures/hm_protein_multi.png", width = 1522 * sqrt(20), height = 430*sqrt(20), dpi=400,units='px')
+
+
+```
+<div class="wider-image">
+  <img src="./figures/hm_protein_multi.png" alt="Wide Image">
+</div>
 
 # Integrating unsupervised clusters with immune cell type labels
 
