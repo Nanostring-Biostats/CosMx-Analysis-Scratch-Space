@@ -3,13 +3,13 @@ format: gfm
 editor: visual
 ---
 
-# scPearsonPCA: An R package for efficient Principal Components decomposition of pearson residual normalized single cell data.
+# scPearsonPCA: An R package for efficient Principal Components decomposition of pearson residual normalized single cell data
 
 ## Introduction
 
 Pearson residuals can be an effective normalization method for spatially-resolved transcriptomic data. However, the normalized data matrix produced is **dense** with nearly all values non-zero. This limits the usability of pearson residuals for high-plex or large datasets where computing memory can be a limiting factor.
 
-However, the principal component (PC) decomposition of quasi-poisson pearson residuals can be computed directly from a sparse counts matrix and a few easy-to-calculate summary statistics. The R package [scPearsonPCA](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/scPearsonPCA) enables this PC decomposition, including the returning the PC's as if the normalized data had been centered, scaled, and influential values clipped according to common best practices for PC analysis.
+However, the principal component (PC) decomposition of quasi-poisson pearson residuals can be computed directly from a sparse counts matrix and a few easy-to-calculate summary statistics. The R package [scPearsonPCA](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/scPearsonPCA) enables this PC decomposition, including the returning the PCs as if the normalized data had been centered, scaled, and influential values clipped according to common best practices for PC analysis.
 
 In this post we demonstrate a few quick examples for the package, as well as how to use the PCA results returned for common downstream analyses like UMAP and unsupervised clustering.
 
@@ -64,7 +64,7 @@ sem <- readRDS("seurat_obj_nsclc.rds")
 
 We typically recommend to use up to 2,000-3,000 highly variable genes for generating PCA results.
 
-A few summary stats used as input for calculating pearson-normalized PC's:
+A few summary stats used as input for calculating pearson-normalized PCs:
 
 -   `tc` is the total counts per cell across all genes.
 -   `genefreq` is the proportion of transcript calls for each gene across all cells.
@@ -85,9 +85,9 @@ pcaobj <-
 sparse_quasipoisson_pca_seurat(sem[["RNA"]]@counts[hvgs,]
                                ,totalcounts = tc
                                ,grate = genefreq[hvgs]
-                               ,scale.max = 10 ## PC's reflect clipping pearson residuals > 10 SDs above the mean pearson residual
-                               ,do.scale = TRUE ## PC's reflect as if pearson residuals for each gene were scaled to have standard deviation=1
-                               ,do.center = TRUE ## PC's reflect as if pearson residuals for each gene were centered to have mean=0
+                               ,scale.max = 10 ## PCs reflect clipping pearson residuals > 10 SDs above the mean pearson residual
+                               ,do.scale = TRUE ## PCs reflect as if pearson residuals for each gene were scaled to have standard deviation=1
+                               ,do.center = TRUE ## PCs reflect as if pearson residuals for each gene were centered to have mean=0
                                )
 
 ```
@@ -201,7 +201,7 @@ For this dataset, there are epithelial cell clusters which are fairly specific t
 
 For sake of demonstration here, however, we can visualize how the batch variable 'patient' separates more on the UMAP before vs. after batch-correction, where patient clusters have higher overlap in UMAP space.
 
-In case of known batch effects, multiple methods of correction may be considered, and best performing method may well vary from dataset to dataset. One alternative recommended method which often works well is 'Harmony', described and demonstrated here in this [post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/).
+In case of known batch effects, multiple methods of correction may be considered, and best performing method may well vary from dataset to dataset. One alternative recommended method which often works well is 'Harmony', described in this [post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/).
 
 ```{r}
 #| echo: true
@@ -211,8 +211,8 @@ umapplot_patient_batch <- scPearsonPCA::plot_umap(umapreduc = "pearsonbatchumap"
 umapplot_patient <- scPearsonPCA::plot_umap(umapreduc = "pearsonumap", clustercol = "patient", semuse = sem,alpha=0.1)
 
 cp <- 
-cowplot::plot_grid(umapplot_patient_batch + labs(title = "UMAP using batch-corrected pearson PC's")
-                   ,umapplot_patient + labs(title = "UMAP using pearson PC's")
+cowplot::plot_grid(umapplot_patient_batch + labs(title = "UMAP using batch-corrected pearson PCs")
+                   ,umapplot_patient + labs(title = "UMAP using pearson PCs")
                    ,nrow=1) + 
   theme(plot.background = element_rect(fill = 'white',color='white')) + 
   cowplot::panel_border(remove=TRUE)  

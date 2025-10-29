@@ -49,18 +49,13 @@ sparse_quasipoisson_pca_seurat <- function(x
                                            ,only_return_sds = FALSE
 ){
   
-  message_parallel(paste0(Sys.time(), ", computing PCA loadings..."))
-  
+  x <- check_x_is_dgcmatrix(x)
   nn <- ncol(x)
   phi <- quasi_poisson_variance_inflation   
-  if(is.null(totalcounts)){
-    totalcounts <- Matrix::colSums(x)
-  }
-  if(is.null(grate)){
-    grate <- Matrix::rowSums(x) 
-    grate <- grate / sum(grate) 
-  }
+  totalcounts <- check_totalcounts(x, totalcounts)
+  grate <- check_grate(x, grate)
   
+  message_parallel(paste0(Sys.time(), ", computing PCA loadings..."))
   ### diagonal matrix (1/(phi*estimated gene frequency))
   root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi))
                                           ,names =names(grate))
@@ -159,8 +154,17 @@ sparse_quasipoisson_pca_seurat <- function(x
     ## y' = y/sqrt(p_g n_c phi ); mu' = sqrt(p_g n_c/phi)
     ## clipping: y' - mu' > c ==> y' > mu' + c
     ## clip values of y' > mu' + c, to mu' + c
-    max_val_vec <- max_val_vec + 
-      sqrt(grate[names(max_val_vec)]/phi) * sqrt(totalcounts[cellnames_max_val_vec])
+    if(length(phi)==1){
+      max_val_vec <- max_val_vec + 
+        sqrt(grate[names(max_val_vec)]/phi) * sqrt(totalcounts[cellnames_max_val_vec])
+        
+    } else if(length(phi)==length(grate)){
+      phi_val_vec <- phi[names(xvec)]  
+      max_val_vec <- max_val_vec + 
+        sqrt(grate[names(max_val_vec)]/phi_val_vec[names(xvec)]) * sqrt(totalcounts[cellnames_max_val_vec])
+    } else {
+      stop(paste0("overdispersion factor has different length (", length(phi), ") than the number of genes"))
+    }
     xvec <- pmin(xvec, max_val_vec) 
     
     ytilde@x <- xvec
@@ -191,7 +195,8 @@ sparse_quasipoisson_pca_seurat <- function(x
   
   if(do.scale){
     message_parallel(paste0(Sys.time(), ", scaling pearson residuals")) 
-    qp <- diag(1/sd.pearson_residual) %*% qp %*% diag(1/sd.pearson_residual)
+ #   qp <- diag(1/sd.pearson_residual) %*% qp %*% diag(1/sd.pearson_residual)
+    qp <- Matrix::Diagonal(x = 1/sd.pearson_residual, names = names(sd.pearson_residual)) %*% qp %*% Matrix::Diagonal(x = 1/sd.pearson_residual, names = names(sd.pearson_residual))
   } 
   
   #### Get the eigenvectors / loadings 
