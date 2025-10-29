@@ -53,6 +53,10 @@ remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
 
 -   `sparse_quasipoisson_pca_seurat_batch()` This function employs a batch-correction method to PCA, provided there is a single categorical variable for 'batch'. Examples could be 'patient', 'slide_id', 'tma_id', etc. Akin to a quasipoisson glm-based correction with the batch variable used as a covariate, the basic idea here is that gene frequencies are computed separately by batch rather than across the full sample.
 
+-  `sparse_quasipoisson_pca_seurat_multiomic()` This function is useful for getting the PCA decomposition from same-cell multiomic data.  Here we assume we have two matrices, a sparse RNA counts matrix `x`, 
+and a (possibly dense,lower dimensional) matrix of already-normalized protein expression `xother`. 
+We want to be able to get PCA from the combined dataset, while still applying effective normalization to the RNA data.  This function uses similar algebraic shortcuts which allow for efficient calculation of PCA from the **covariance matrix** of pearson residuals from the RNA, by deriving PCA from the combined covariance matrix of pre-normalized protein, and pearson-normalized RNA.  We'll demo a full example below using a multiomics breast cancer dataset.
+
 ## Quickstart / Example Usage
 
 First we'll read in our Seurat object dataset. This is 960-plex NSCLC tissue.
@@ -268,4 +272,14 @@ ggsave("/home/rstudio/data/dan/scPearsonPCA/readmedata/umapplot_patient_compare.
 
 knitr::include_graphics("readmedata/umapplot_patient_compare.png")
 ```
+
+
+
+
+## Pearson PCA for multiomic data using `sparse_quasipoisson_pca_seurat_multiomic`
+
+
+
+
+
 
