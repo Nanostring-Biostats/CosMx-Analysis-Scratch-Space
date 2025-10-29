@@ -51,18 +51,23 @@ sparse_quasipoisson_pca_seurat <- function(x
   
   x <- check_x_is_dgcmatrix(x)
   nn <- ncol(x)
-  phi <- quasi_poisson_variance_inflation   
+  phi <- check_phi(x, quasi_poisson_variance_inflation)
   totalcounts <- check_totalcounts(x, totalcounts)
   grate <- check_grate(x, grate)
+
+  if (.Platform$OS.type == "windows" && ncores > 1L) {
+    warning("mclapply() runs serially on Windows; mc.cores ignored.")
+    ncores <- 1L
+  } 
   
   message_parallel(paste0(Sys.time(), ", computing PCA loadings..."))
   ### diagonal matrix (1/(phi*estimated gene frequency))
-  root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi))
-                                          ,names =names(grate))
+  root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi)))
+  dimnames(root_grate_phi_diag) <- list(names(grate) , names(grate))
   
   ### diagonal matrix (1/totalcounts)
-  root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts)
-                                   ,names =colnames(x))
+  root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts))
+  dimnames(root_tc_diag) <- list(colnames(x) , colnames(x))
   
   ### y / sqrt(v(y)) 
   ytilde <- root_grate_phi_diag %*% x %*% root_tc_diag ## sparse  n x g
@@ -95,12 +100,11 @@ sparse_quasipoisson_pca_seurat <- function(x
     ##browser()
     phi <- Matrix::diag(qp) / (nn - 1) ## get glm-like estimate of overdispersion factor phi
     ### diagonal matrix (1/(phi*estimated gene frequency))
-    root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi))
-                                            ,names =names(grate))
-    
+    root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi)))
+    dimnames(root_grate_phi_diag) <- list(names(grate), names(grate)) 
     ### diagonal matrix (1/totalcounts)
-    root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts)
-                                     ,names =colnames(x))
+    root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts))
+    dimnames(root_tc_diag) <- list(colnames(x), colnames(x)) 
     
     ### y / sqrt(v(y)) 
     ytilde <- root_grate_phi_diag %*% x %*% root_tc_diag ## sparse  n x g
@@ -136,7 +140,7 @@ sparse_quasipoisson_pca_seurat <- function(x
   sd.pearson_residual <- sqrt((Matrix::diag(qp) - 
                                  nn * mean.pearson_residual^2 ) / 
                                 (nn-1))
- 
+
   if(only_return_sds){
     return(list(sd.pearson_residual = sd.pearson_residual))
   } 
@@ -148,7 +152,8 @@ sparse_quasipoisson_pca_seurat <- function(x
     xvec <- ytilde@x   
     names(xvec) <- rownames(ytilde)[(ytilde@i + 1)] 
     max_val_vec <- clip_vals[names(xvec)] 
-    cellnames_max_val_vec <- colnames(ytilde)[findInterval(seq(ytilde@x)-1, ytilde@p[-1]) + 1]
+#    cellnames_max_val_vec <- colnames(ytilde)[findInterval(seq(ytilde@x)-1, ytilde@p[-1]) + 1]
+    cellnames_max_val_vec <- colnames(ytilde)[rep.int(seq_len(ncol(ytilde)), diff(ytilde@p))]
     
     ## pearson residual = y' - mu'
     ## y' = y/sqrt(p_g n_c phi ); mu' = sqrt(p_g n_c/phi)
@@ -195,12 +200,12 @@ sparse_quasipoisson_pca_seurat <- function(x
   
   if(do.scale){
     message_parallel(paste0(Sys.time(), ", scaling pearson residuals")) 
- #   qp <- diag(1/sd.pearson_residual) %*% qp %*% diag(1/sd.pearson_residual)
-    qp <- Matrix::Diagonal(x = 1/sd.pearson_residual, names = names(sd.pearson_residual)) %*% qp %*% Matrix::Diagonal(x = 1/sd.pearson_residual, names = names(sd.pearson_residual))
+    qp <- Matrix::Diagonal(x = 1/sd.pearson_residual) %*% qp %*% Matrix::Diagonal(x = 1/sd.pearson_residual)
+    dimnames(qp) <- list(names(sd.pearson_residual), names(sd.pearson_residual))
   } 
   
   #### Get the eigenvectors / loadings 
-  svdd <- RSpectra::svds(qp, k = npcs)
+  svdd <- RSpectra::svds(qp, k = min(nrow(qp), npcs))
   feature.loadings <- svdd$u
   rownames(feature.loadings) <- rownames(x)
   colnames(feature.loadings) <- paste0(reduction.key, 1:npcs)

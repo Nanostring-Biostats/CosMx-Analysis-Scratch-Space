@@ -42,7 +42,7 @@ sparse_quasipoisson_pca_seurat_multiomic <- function(x
                                            ,do.center= TRUE
                                            ,quasi_poisson_variance_inflation = 1.01
                                            ,npcs = 50
-                                           ,ncores=4
+                                           ,ncores=1
                                            ,verbose=TRUE
                                            ,block.size=10**4
                                            ,ndims.print = 1:5
@@ -54,6 +54,8 @@ sparse_quasipoisson_pca_seurat_multiomic <- function(x
   
   message_parallel(paste0(Sys.time(), ", computing PCA loadings..."))
  
+  x <- check_x_is_dgcmatrix(x)
+  
   overlapping <- intersect(colnames(xother), colnames(x))
   x <- x[,overlapping, drop=FALSE]  
   xother <- xother[,overlapping, drop=FALSE]  
@@ -64,22 +66,22 @@ sparse_quasipoisson_pca_seurat_multiomic <- function(x
  
   
   nn <- ncol(x)
-  phi <- quasi_poisson_variance_inflation   
-  if(is.null(totalcounts)){
-    totalcounts <- Matrix::colSums(x)
-  }
-  if(is.null(grate)){
-    grate <- Matrix::rowSums(x) 
-    grate <- grate / sum(grate) 
-  }
+  phi <- check_phi(x, quasi_poisson_variance_inflation)
+  totalcounts <- check_totalcounts(x, totalcounts)
+  grate <- check_grate(x, grate)
+  
+  if (.Platform$OS.type == "windows" && ncores > 1L) {
+    warning("mclapply() runs serially on Windows; mc.cores ignored.")
+    ncores <- 1L
+  } 
   
   ### diagonal matrix (1/(phi*estimated gene frequency))
-  root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi))
-                                          ,names =names(grate))
+  root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi)))
+  dimnames(root_grate_phi_diag) <- list(names(grate) , names(grate))
   
   ### diagonal matrix (1/totalcounts)
-  root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts)
-                                   ,names =colnames(x))
+  root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts))
+  dimnames(root_tc_diag) <- list(colnames(x) , colnames(x))
   
   ### y / sqrt(v(y)) 
   ytilde <- root_grate_phi_diag %*% x %*% root_tc_diag ## sparse  n x g
@@ -101,8 +103,6 @@ sparse_quasipoisson_pca_seurat_multiomic <- function(x
   ytilde_muhat <- ytilde_muhat %*% root_grate_phi_row ### g x g
  
    
-  
-  #browser() 
   message_parallel(paste0(Sys.time(), ", computing cross-product of pearson residuals.")) 
   #### The cross product of pearson residuals:
   #### [y/sqrt(v(y)) -  muhat/sqrt(v(y))] [y/sqrt(v(y)) -  muhat/sqrt(v(y))]^T
@@ -114,12 +114,11 @@ sparse_quasipoisson_pca_seurat_multiomic <- function(x
     ##browser()
     phi <- Matrix::diag(qp) / (nn - 1) ## get glm-like estimate of overdispersion factor phi
     ### diagonal matrix (1/(phi*estimated gene frequency))
-    root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi))
-                                            ,names =names(grate))
-    
+    root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi)))
+    dimnames(root_grate_phi_diag) <- list(names(grate) , names(grate))
     ### diagonal matrix (1/totalcounts)
-    root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts)
-                                     ,names =colnames(x))
+    root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts))
+    dimnames(root_tc_diag) <- list(colnames(x) , colnames(x))
     
     ### y / sqrt(v(y)) 
     ytilde <- root_grate_phi_diag %*% x %*% root_tc_diag ## sparse  n x g
@@ -172,7 +171,8 @@ sparse_quasipoisson_pca_seurat_multiomic <- function(x
     xvec <- ytilde@x   
     names(xvec) <- rownames(ytilde)[(ytilde@i + 1)] 
     max_val_vec <- clip_vals[names(xvec)] 
-    cellnames_max_val_vec <- colnames(ytilde)[findInterval(seq(ytilde@x)-1, ytilde@p[-1]) + 1]
+   # cellnames_max_val_vec <- colnames(ytilde)[findInterval(seq(ytilde@x)-1, ytilde@p[-1]) + 1]
+    cellnames_max_val_vec <- colnames(ytilde)[rep.int(seq_len(ncol(ytilde)), diff(ytilde@p))]
     
     max_val_vec <- max_val_vec + 
       sqrt(grate[names(max_val_vec)]/phi) * sqrt(totalcounts[cellnames_max_val_vec])
@@ -235,20 +235,19 @@ sparse_quasipoisson_pca_seurat_multiomic <- function(x
   
   if(do.scale){
     message_parallel(paste0(Sys.time(), ", scaling pearson residuals")) 
-    qpall <- diag(1/sd.pearson_residual) %*% qpall %*% diag(1/sd.pearson_residual)
+    qpall <- Matrix::Diagonal(x = 1/sd.pearson_residual) %*% qpall %*% Matrix::Diagonal(x = 1/sd.pearson_residual)
+    dimnames(qpall) <- list(names(sd.pearson_residual), names(sd.pearson_residual))
   } 
   
   #### Get the eigenvectors / loadings 
-  svdd <- RSpectra::svds(qpall, k = npcs)
+  svdd <- RSpectra::svds(qpall, k = min(nrow(qpall), npcs))
   feature.loadings <- svdd$u
-  #rownames(feature.loadings) <- rownames(x)
   rownames(feature.loadings) <- c(rownames(x), rownames(xother))
   colnames(feature.loadings) <- paste0(reduction.key, 1:npcs)
   
   message_parallel(paste0(Sys.time(), ", computing PCA cell embeddings using ", ncores, " threads.")) 
   
   gc() 
-  #browser()
   ### Need to get the cell embeddings.
   ### scale one piece at a time and project 
   splitdt <- data.table::data.table(i=1:ncol(x))[,ss:=floor(i/block.size) + 1L]

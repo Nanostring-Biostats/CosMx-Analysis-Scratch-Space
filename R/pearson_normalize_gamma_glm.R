@@ -18,7 +18,6 @@
 pearson_normalize_gamma_glm <- function(x
                                         ,lower_q_thresh = 0.01
                                         ,upper_q_thresh = NULL
-                                        ,verbose = FALSE
 ){
   
   if(inherits(x, "sparseMatrix")){
