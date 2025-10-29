@@ -19,6 +19,7 @@
 #' @export  
 project_sparse_quasipoisson_pca_seurat <- function(x
                                                    ,pcaobj
+                                                   ,totalcounts = NULL
                                                    ,ncores=1
                                                    ,verbose=TRUE
                                                    ,block.size=10**4
@@ -27,25 +28,25 @@ project_sparse_quasipoisson_pca_seurat <- function(x
                                                    ,return_seurat_reduction = TRUE
 ){
  
-  if(!inherits(x, "sparseMatrix")){
-    stop("'x' should be of 'sparseMatrix' class")
-  } 
-  if(!inherits(x, "dgCMatrix")){
-    x <- as(x, "dgCMatrix") 
-  }
+  x <- check_x_is_dgcmatrix(x)
   
   nn <- ncol(x)
-  phi <- pcaobj$phi# quasi_poisson_variance_inflation   
-  totalcounts <- Matrix::colSums(x)
+  phi <- check_phi(x, pcaobj$phi) # quasi_poisson_variance_inflation   
+  stopifnot(length(phi) %in% c(1, length(pcaobj$grate)))
+  totalcounts <- check_totalcounts(x, totalcounts)
   grate <- pcaobj$grate
+  stopifnot(!is.null(names(grate)))
+  stopifnot(all(names(grate) %in% rownames(x))) 
+  x <- x[names(grate),] 
+  grate <- check_grate(x, grate)
   
   ### diagonal matrix (1/(phi*estimated gene frequency))
-  root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi))
-                                          ,names =names(grate))
+  root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi)))
+  dimnames(root_grate_phi_diag) <- list(names(grate) , names(grate))
   
   ### diagonal matrix (1/totalcounts)
-  root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts)
-                                   ,names =colnames(x))
+  root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts))
+  dimnames(root_tc_diag) <- list(colnames(x) , colnames(x))
   
   ### y / sqrt(v(y)) 
   ytilde <- root_grate_phi_diag %*% x %*% root_tc_diag ## sparse  n x g
@@ -54,81 +55,33 @@ project_sparse_quasipoisson_pca_seurat <- function(x
   ### Note: muhat / sqrt(v(y)) = muhat/sqrt(muhat*phi) = sqrt(muhat/phi)
   mean.pearson_residual <- pcaobj$mean.pearson_residual
   
+  sd.pearson_residual <- pcaobj$sd.pearson_residual
   
-  #root_grate_phi_row <- Matrix::Matrix(data = sqrt(grate / phi)
-  #                                     ,nrow=1
-  #                                     ,dimnames =list(c(), names(grate)))
-  #root_tc_col <- 
-  #  Matrix::Matrix(sqrt(totalcounts), ncol = 1
-  #                 ,dimnames = list(c(colnames(x)), c()))
-  #
-  #ytilde_muhat <- ytilde %*% root_tc_col ### g x 1
-  #ytilde_muhat <- ytilde_muhat %*% root_grate_phi_row ### g x g
-  #
-  #
-  #message_parallel(paste0(Sys.time(), ", computing cross-product of pearson residuals.")) 
-  ##### The cross product of pearson residuals:
-  ##### [y/sqrt(v(y)) -  muhat/sqrt(v(y))] [y/sqrt(v(y)) -  muhat/sqrt(v(y))]^T
-  #qp <- ytilde %*% Matrix::t(ytilde) - 
-  #  ytilde_muhat - Matrix::t(ytilde_muhat) + 
-  #  sum(root_tc_col^2) * Matrix::t(root_grate_phi_row) %*% root_grate_phi_row
-  #
-  #
-  ##### Note: diagonal elements of the crossproduct matrix 'qp' give \sum y_i^2 for each gene             
-  ##### This can be used to get the standard deviation of pearson residuals
-  ##### i.e., V(x) = E(x^2) - E(x)^2
-  #sd.pearson_residual <- pcaobj$sd.pearson_residual
-  #
-  ##### We can infer the cell/gene specific values 
-  ##### which are scale.max SD's above the mean and clip them 
-  #scale.max <- pcaobj$scale.max
-  #do.center <- pcaobj$do.center
-  #do.scale <- pcaobj$do.scale
-  #if(scale.max < Inf){
-  #  message_parallel(paste0(Sys.time(), ", computing clipped values of pearson residuals > scale.max=", scale.max, " sd's above the mean pearson residual")) 
-  #  clip_vals <- scale.max * sd.pearson_residual + mean.pearson_residual
-  #  xvec <- ytilde@x   
-  #  names(xvec) <- rownames(ytilde)[(ytilde@i + 1)] 
-  #  max_val_vec <- clip_vals[names(xvec)] 
-  #  cellnames_max_val_vec <- colnames(ytilde)[findInterval(seq(ytilde@x)-1, ytilde@p[-1]) + 1]
-  #  
-  #  max_val_vec <- max_val_vec + 
-  #    sqrt(grate[names(max_val_vec)]/phi) * sqrt(totalcounts[cellnames_max_val_vec])
-  #  xvec <- pmin(xvec, max_val_vec) 
-  #  
-  #  ytilde@x <- xvec
-  #  rm(list=c("xvec", "max_val_vec", "cellnames_max_val_vec")); gc()
-  #  
-  #  ytilde_muhat <- ytilde %*% root_tc_col ### g x 1
-  #  ytilde_muhat <- ytilde_muhat %*% root_grate_phi_row ### g x g
-  #  
-  #  qp <- ytilde %*% Matrix::t(ytilde) - 
-  #    ytilde_muhat - Matrix::t(ytilde_muhat) + 
-  #    sum(root_tc_col^2) * Matrix::t(root_grate_phi_row) %*% root_grate_phi_row
-  #}
-  #
-  #if(do.center){
-  #  
-  #  message_parallel(paste0(Sys.time(), ", centering pearson residuals")) 
-  #  mean.pearson_residual.clipped  <- 
-  #    Matrix::rowMeans(ytilde) - 
-  #    mean(sqrt(totalcounts)) * sqrt(grate/phi)
-  #  
-  #  inner_prod <- nn*mean.pearson_residual.clipped %*% t(mean.pearson_residual)  
-  #  
-  #  qp <-  
-  #    (qp - inner_prod - Matrix::t(inner_prod) + 
-  #       nn*Matrix::tcrossprod(mean.pearson_residual))
-  #  
-  #}
-  #
-  #if(do.scale){
-  #  message_parallel(paste0(Sys.time(), ", scaling pearson residuals")) 
-  #  qp <- diag(1/sd.pearson_residual) %*% qp %*% diag(1/sd.pearson_residual)
-  #} 
-  #
+  #### We can infer the cell/gene specific values 
+  #### which are scale.max SD's above the mean and clip them 
+  scale.max <- pcaobj$scale.max
+  do.center <- pcaobj$do.center
+  do.scale <- pcaobj$do.scale
+  if(scale.max < Inf){
+    message_parallel(paste0(Sys.time(), ", computing clipped values of pearson residuals > scale.max=", scale.max, " sd's above the mean pearson residual")) 
+    clip_vals <- scale.max * sd.pearson_residual + mean.pearson_residual
+    xvec <- ytilde@x   
+    names(xvec) <- rownames(ytilde)[(ytilde@i + 1)] 
+    max_val_vec <- clip_vals[names(xvec)] 
+#    cellnames_max_val_vec <- colnames(ytilde)[findInterval(seq(ytilde@x)-1, ytilde@p[-1]) + 1]
+    cellnames_max_val_vec <- colnames(ytilde)[rep.int(seq_len(ncol(ytilde)), diff(ytilde@p))]
+    
+    max_val_vec <- max_val_vec + 
+      sqrt(grate[names(max_val_vec)]/phi) * sqrt(totalcounts[cellnames_max_val_vec])
+    xvec <- pmin(xvec, max_val_vec) 
+    
+    ytilde@x <- xvec
+    rm(list=c("xvec", "max_val_vec", "cellnames_max_val_vec")); gc()
+  }
+  
   #### Get the eigenvectors / loadings 
   feature.loadings <- pcaobj$reduction.data@feature.loadings
+  feature.loadings <- feature.loadings[rownames(x),]
   sdev <- pcaobj$reduction.data@stdev
   reduction.key <- pcaobj$reduction.data@key
   

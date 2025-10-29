@@ -87,6 +87,12 @@ sum(genefreq)==1 # TRUE
 
 sem <- Seurat::FindVariableFeatures(sem, nfeatures = 900)
 hvgs <- sem@assays$RNA@var.features
+
+### Returns a Seurat-style DimReduc object with 
+### hvgs x pcs feature loadings
+### cells x pcs cell embeddings
+### gene-length vector of the mean pearson of residuals
+### gene-length vector of the standard deviation of pearson residuals
 pcaobj <- 
 sparse_quasipoisson_pca_seurat(sem[["RNA"]]@counts[hvgs,]
                                ,totalcounts = tc
@@ -136,6 +142,11 @@ gene_frequency(sem[["RNA"]]@counts, obs = data.table(sem@meta.data)[,.(cell_ID, 
 
 Matrix::colSums(genefreq_batch)
 
+### Returns a Seurat-style DimReduc object with 
+### hvgs x pcs feature loadings
+### cells x pcs cell embeddings
+### gene-length vector of the mean pearson of residuals
+### gene-length vector of the standard deviation of pearson residuals
 pcaobj_batch <- 
 sparse_quasipoisson_pca_seurat_batch(sem[["RNA"]]@counts[hvgs,]
                                      ,totalcounts = tc
@@ -177,7 +188,7 @@ batch-correction, where patient clusters have higher overlap in UMAP
 space.
 
 In case of known batch effects, multiple methods of correction may be
-considered, and best performing method may well vary from dataset to
+considered, and the best performing method may well vary from dataset to
 dataset. One alternative recommended method which often works well is
 ‘Harmony’, described in this
 [post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/batchcorrection/).

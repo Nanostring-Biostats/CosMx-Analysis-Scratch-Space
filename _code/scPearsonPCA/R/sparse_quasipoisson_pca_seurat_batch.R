@@ -35,7 +35,7 @@
 #' @export  
 sparse_quasipoisson_pca_seurat_batch <- function(x
                                                  ,obs
-                                                 ,batch_variable =NULL
+                                                 ,batch_variable
                                                  ,cellid_colname = "cell_ID"
                                                  ,scale.max=10
                                                  ,reduction.key="PC_"
@@ -52,8 +52,9 @@ sparse_quasipoisson_pca_seurat_batch <- function(x
                                                  ,nfeatures.print = 30
                                                  ,return_seurat_reduction = TRUE
 ){
-  
-  message_parallel(paste0(Sys.time(), ", computing PCA loadings..."))
+ 
+  x <- check_x_is_dgcmatrix(x)
+  message(paste0(Sys.time(), ", computing PCA loadings..."))
   
   md <- data.table::copy(data.table::data.table(obs))
   if(!(cellid_colname) %in% names(md)){
@@ -74,23 +75,20 @@ sparse_quasipoisson_pca_seurat_batch <- function(x
                                     )
   )
   
-  phi <- quasi_poisson_variance_inflation   
+  phi <- check_phi(x, quasi_poisson_variance_inflation)
   nn <- ncol(x)
-  if(is.null(totalcounts)){
-    totalcounts <- Matrix::colSums(x)
-  }
+  totalcounts <- check_totalcounts(x, totalcounts)
   
   ### expression rates by batch (\hat{p})
-  if(is.null(grate)){
-    grate <- x %*% batch_mat %*% Matrix::Diagonal(x=1/Matrix::colSums(batch_mat), names = colnames(batch_mat))
-    grate <- grate %*% Matrix::Diagonal(x = 1/Matrix::colSums(grate),names=colnames(batch_mat))
-  }  else {
-    stopifnot(all(rownames(x) %in% rownames(grate)))
-    grate <- grate[rownames(x),,drop=FALSE]
-  }
+  grate <- check_grate_batch(x, grate, batch_mat)
   
+  if (.Platform$OS.type == "windows" && ncores > 1L) {
+    warning("mclapply() runs serially on Windows; mc.cores ignored.")
+    ncores <- 1L
+  } 
   ###  
-  cellnames_vec <- findInterval(seq(x@x)-1, x@p[-1]) + 1
+#  cellnames_vec <- findInterval(seq(x@x)-1, x@p[-1]) + 1
+  cellnames_vec <- rep.int(seq_len(ncol(x)), diff(x@p))
   batch_subset <- vector(mode='list',length=ncol(grate)) 
   for(ii in 1:ncol(grate)){
     batch_idx <- md[grpid__==ii,which=TRUE]                    ## which cell_IDs belong to batch 'ii'
@@ -110,15 +108,15 @@ sparse_quasipoisson_pca_seurat_batch <- function(x
   }
   
   ### diagonal matrix (1/totalcounts)
-  root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts)
-                                   ,names =colnames(x))
+  root_tc_diag <- Matrix::Diagonal(x = sqrt(1/totalcounts))
+  dimnames(root_tc_diag) <- list(colnames(x) , colnames(x))
   
   ytilde <- ytilde %*% root_tc_diag
   
   ###  
   root_tc_col <- 
-    Matrix::Diagonal(x=sqrt(totalcounts)
-                     ,names = c(colnames(x))) %*% batch_mat
+    Matrix::Diagonal(x=sqrt(totalcounts)) %*% batch_mat
+  dimnames(root_tc_col) <- list(colnames(x) , colnames(batch_mat))
   
   root_grate_phi_row <- grate
   root_grate_phi_row@x <- sqrt(root_grate_phi_row@x / phi)
@@ -127,9 +125,11 @@ sparse_quasipoisson_pca_seurat_batch <- function(x
   ytilde_muhat <- ytilde_muhat %*%  Matrix::t(root_grate_phi_row)
   
   mean_sqrt_tc_batch <- 
-    Matrix::Diagonal(x=Matrix::colSums(Matrix::Diagonal(x=sqrt(totalcounts), names = names(totalcounts)) %*% batch_mat),names=colnames(batch_mat)) %*%
-    Matrix::Diagonal(x=1/Matrix::colSums(batch_mat), names=colnames(batch_mat))
-  
+    Matrix::Diagonal(x=Matrix::colSums(Matrix::Diagonal(x=sqrt(totalcounts)) %*% batch_mat)) %*%
+    Matrix::Diagonal(x=1/Matrix::colSums(batch_mat))
+  dimnames(mean_sqrt_tc_batch) <- list(colnames(batch_mat) , colnames(batch_mat))
+   
+   
   batch_rate <- Matrix::colSums(batch_mat)
   batch_rate <- batch_rate / sum(batch_rate)
   
@@ -138,6 +138,7 @@ sparse_quasipoisson_pca_seurat_batch <- function(x
   
   inner_tc <-  Matrix::Diagonal(x = sqrt(totalcounts)
                                 ,names =colnames(x)) %*% batch_mat
+  dimnames(inner_tc) <- list(colnames(x), colnames(batch_mat))
   inner_tc <- Matrix::crossprod(inner_tc)
   
   #### The cross product of pearson residuals:
@@ -200,11 +201,12 @@ sparse_quasipoisson_pca_seurat_batch <- function(x
   
   if(do.scale){
     message_parallel(paste0(Sys.time(), ", scaling pearson residuals")) 
-    qp <- diag(1/sd.pearson_residual) %*% qp %*% diag(1/sd.pearson_residual)
+    qp <- Matrix::Diagonal(x = 1/sd.pearson_residual) %*% qp %*% Matrix::Diagonal(x = 1/sd.pearson_residual)
+    dimnames(qp) <- list(names(sd.pearson_residual), names(sd.pearson_residual))
   } 
   
   #### Get the eigenvectors / loadings 
-  svdd <- RSpectra::svds(qp, k = npcs)
+  svdd <- RSpectra::svds(qp, k = min(nrow(qp), npcs))
   feature.loadings <- svdd$u
   rownames(feature.loadings) <- rownames(x)
   colnames(feature.loadings) <- paste0(reduction.key, 1:npcs)
