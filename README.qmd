@@ -30,6 +30,11 @@ remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
 
 -   `sparse_quasipoisson_pca_seurat_batch()` This function employs a batch-correction method to PCA, provided there is a single categorical variable for 'batch'. Examples could be 'patient', 'slide_id', 'tma_id', etc. Akin to a quasipoisson glm-based correction with the batch variable used as a covariate, the basic idea here is that gene frequencies are computed separately by batch rather than across the full sample.
 
+-  `sparse_quasipoisson_pca_seurat_multiomic()` This function is useful for getting the PCA decomposition from same-cell multiomic data.  Here we assume we have two matrices, a sparse RNA counts matrix `x`, 
+and a (possibly dense,lower dimensional) matrix of already-normalized protein expression `xother`. 
+We want to be able to get PCA from the combined dataset, while still applying effective normalization to the RNA data.  This function uses similar algebraic shortcuts which allow for efficient calculation of PCA from the **covariance matrix** of pearson residuals from the RNA, by deriving PCA from the combined covariance matrix of pre-normalized protein, and pearson-normalized RNA.  We'll demo a full example below using a multiomics breast cancer dataset.
+
+
 ## Quickstart / Example Usage
 
 First we'll read in our Seurat object dataset. This is 960-plex NSCLC tissue.
@@ -245,3 +250,264 @@ ggsave("/home/rstudio/data/dan/scPearsonPCA/readmedata/umapplot_patient_compare.
 
 knitr::include_graphics("/home/rstudio/data/dan/scPearsonPCA/readmedata/umapplot_patient_compare.png")
 ```
+
+## Pearson PCA for multiomic data using `sparse_quasipoisson_pca_seurat_multiomic`
+
+Below we'll use a breast cancer dataset with WTx RNA + 64-plex protein to demo multiomic PCA and downstream analysis.
+
+
+##### Reading in RNA and protein datasets
+```{r}
+#| eval: false
+#| echo: true
+
+## Note, using a v3-style Seurat Object below, i.e., `sem[["RNA"]]@counts`
+## For v5-style, the syntax would be like `sem[["RNA"]]$counts`
+options(Seurat.object.assay.version = "v3")  
+
+sem_protein <- readRDS("Breast/sem_protein.rds")
+sem_rna <- readRDS("Breast/sem_rna.rds")
+sem_rna <- subset(sem_rna, nCount_RNA >=100)
+
+
+```
+
+
+```{r}
+#| eval: false
+#| echo: false
+
+options(Seurat.object.assay.version = "v3")  
+devtools::load_all("~/data/dan/imputation_smoothing/HieraType_dev", export_all = FALSE)
+devtools::load_all("~/data/dan/scPearsonPCA", export_all = FALSE)
+
+
+sem_protein <- readRDS("~/data/multiomics_hackathon/Breast/sem_protein.rds")
+sem_rna <- readRDS("~/data/multiomics_hackathon/Breast/sem_rna.rds")
+sem_rna <- subset(sem_rna, nCount_RNA >=100)
+
+```
+
+##### Normalizing the protein data
+
+The `sparse_quasipoisson_pca_seurat_multiomic` function won't do any special normalization to the protein data, so the data should be normalized going in.
+Here we'll use pearson residuals from a gamma regression model as a normalization method, although other reasonable methods might be considered and left to the user's disgression.
+
+```{r}
+#| eval: false
+#| echo: true
+
+## normalize each protein taking pearson residuals from gamma generalized linear model.
+pgamm <- scPearsonPCA::pearson_normalize_gamma_glm(as.matrix(sem_protein[["RNA"]]@counts)
+                                                   ,upper_q_thresh = 0.99
+                                                   ,lower_q_thresh = 0.01
+                                                   )
+### add a '_protein' suffix to the protein names - helps differentiate proteins and RNA's with the same name. 
+rownames(pgamm) <- paste0(rownames(pgamm), "_protein")
+
+pgamm[1:5,1:5] ## normalized protein data
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+print(readRDS("readmedata/pgamm_head.rds"))
+
+```
+##### PCA analysis derived from the joint covariance matrix of the the proteins and RNAs
+
+First we'll identify a subset of highly variable genes from the RNA data.  Then , we'll pass in the RNA counts matrix and normalized protein matrix to get the PCA.
+```{r}
+#| eval: false
+#| echo: true
+
+## select genes from RNA data to use for PCA analysis.
+## Will take the top 2k features as well as any pre-defined immune celltyping markers from HieraType
+sem_rna <- Seurat::FindVariableFeatures(sem_rna, nfeatures = 2000)
+use_genes <- c(sem_rna@assays$RNA@var.features)
+
+
+### total counts and gene frequency from RNA data computed across full dataset
+tc <- Matrix::colSums(sem_rna[["RNA"]]@counts)
+genefreq <- scPearsonPCA::gene_frequency(sem_rna[["RNA"]]@counts)
+
+
+### Principal components derived from the combined covariance matrix of pearson residual normalized RNA and protein.
+pcaobj_multiomics <- scPearsonPCA::sparse_quasipoisson_pca_seurat_multiomic(sem_rna[["RNA"]]@counts[use_genes,] ## raw counts matrix for hvgs
+                                                                       ,totalcounts = tc
+                                                                       ,grate = genefreq[use_genes]
+                                                                       ,xother = pgamm ## normalized protein
+                                                                       ,do.scale = TRUE
+                                                                       ,do.center = TRUE
+                                                                       ,scale.max = 10
+                                                                       ,ncores = 1
+)
+
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+
+saveRDS(pgamm[1:5,1:5], "/home/rstudio/data/dan/scPearsonPCA/readmedata/pgamm_head.rds")## normalized protein data
+saveRDS(pcaobj_multiomics, "/home/rstudio/data/dan/scPearsonPCA/readmedata/pcaobj_multi.rds")
+pcaobj_multiomics <- readRDS("readmedata/pcaobj_multi.rds")
+
+msg <- utils::capture.output(print(
+  x = pcaobj_multiomics$reduction.data,
+  dims = 1:5,
+  nfeatures = 20
+))
+message(paste(msg, collapse = '\n'))
+saveRDS(msg, "/home/rstudio/data/dan/scPearsonPCA/readmedata/pca_multiomics_toppcs_msg.rds")
+```
+```{r}
+
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+msg <- readRDS("readmedata/pca_multiomics_toppcs_msg.rds")
+message(paste(msg, collapse = '\n'))
+```
+
+### Using the output for downstream analysis
+
+
+```{r}
+#| eval: false
+#| echo: true
+
+umapobj_multiomics <- scPearsonPCA::make_umap(pcaobj_multiomics)
+
+
+sem_rna[["multiumap"]] <- umapobj_multiomics$ump
+sem_rna[["multigrph"]] <- Seurat::as.Graph(umapobj_multiomics$grph[colnames(sem_rna),colnames(sem_rna)])
+sem_rna <- Seurat::FindClusters(sem_rna, graph.name="multigrph")
+sem_rna@meta.data$clusters_multi_unsup <- sem_rna@meta.data$seurat_clusters
+
+
+xyp_multi_unsup <- xyplot("clusters_multi_unsup", metadata = sem_rna@meta.data, ptsize = 0.05) + coord_fixed()
+print(xyp_multi_unsup)
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+#knitr::include_graphics("readmedata/umapplot.png")
+knitr::include_graphics("readmedata/xyp_multi_unsup.png")
+```
+
+
+```{r}
+#| eval: false
+#| echo: true
+
+umapp <- plot_umap(umapreduc = "multiumap", clustercol = "clusters_multi_unsup", semuse = sem_rna)
+print(umapp)
+```
+
+```{r}
+#| eval: true
+#| echo: false
+
+#knitr::include_graphics("readmedata/umapplot.png")
+knitr::include_graphics("readmedata/umapp_multi.png")
+```
+
+#### RNA and protein marker heatmaps 
+
+Below we'll look at a couple of marker heatmaps for these unsupervised clusters.
+These functions below use the [HieraType package](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HieraType). 
+```{r}
+#| eval: false
+#| echo: false
+
+
+saveRDS(umapobj_multiomics,"/home/rstudio/data/dan/scPearsonPCA/readmedata/umapobj_multiomics.rds")
+ggsave("/home/rstudio/data/dan/scPearsonPCA/readmedata/xyp_multi_unsup.png"
+       ,plot=xyp_multi_unsup
+       ,device = "png"
+       ,width = 1181 * sqrt(20)
+       ,height=689 * sqrt(20)
+       ,units = 'px'
+)
+
+ggsave("/home/rstudio/data/dan/scPearsonPCA/readmedata/umapp_multi.png"
+       ,plot=umapp
+       ,device = "png"
+       ,width = 1181 * sqrt(20)
+       ,height=800 * sqrt(20)
+       ,units = 'px'
+)
+```
+
+
+```{r}
+#| eval: false
+#| echo: true
+
+#remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space", 
+#                        subdir = "_code/HieraType", ref = "Main")
+library(HieraType)
+
+fctbl_rna <- clusterwise_foldchange_metrics(sem_rna[["RNA"]]@counts[use_genes,]
+                                            ,totalcounts = tc
+                                            ,metadata = sem_rna@meta.data
+                                            ,cluster_column = "clusters_multi_unsup"
+                                            )
+
+hm_rna <- add_ncells(marker_heatmap(fctbl_rna)) + labs(title = "rna heatmap")
+print(hm_rna)
+
+
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+ggsave(plot=hm_rna, filename = "/home/rstudio/data/dan/scPearsonPCA/readmedata/hm_rna_multi.png", width = 1522 * sqrt(20), height = 430*sqrt(20), dpi=400,units='px')
+
+```
+
+<div class="wider-image">
+  <img src="./readmedata/hm_rna_multi.png" alt="Wide Image">
+</div>
+
+```{r}
+#| eval: false
+#| echo: true
+
+
+fctbl_protein <- HieraType::clusterwise_foldchange_metrics_protein(sem_protein[["RNA"]]@counts[,rownames(sem_rna@meta.data)]
+                                                        ,metadata = sem_rna@meta.data
+                                                        ,cluster_column = "clusters_multi_unsup"
+                                                        ,propd = (pgamm[,rownames(sem_rna@meta.data)] > 1)
+                                            )
+hm_protein <- add_ncells(marker_heatmap(fctbl_protein)) + labs(title = "protein heatmap")
+print(hm_protein)
+
+```
+
+```{r}
+#| eval: false
+#| echo: false
+
+ggsave(plot=hm_protein, filename = "/home/rstudio/data/dan/scPearsonPCA/readmedata/hm_protein_multi.png", width = 1522 * sqrt(20), height = 430*sqrt(20), dpi=400,units='px')
+
+```
+
+<div class="wider-image">
+  <img src="./readmedata/hm_protein_multi.png" alt="Wide Image">
+</div>
+
+
+
+
+
