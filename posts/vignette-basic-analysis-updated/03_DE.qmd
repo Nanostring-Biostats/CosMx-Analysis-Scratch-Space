@@ -605,12 +605,62 @@ We recommend different models for different settings; the below categories will 
 
 ## others
 
-## others yet
+## Fast, spatial-free screening with spatial validation
+
+When it's vital to adjust for spatial correlation, but our dataset's size makes that impractical, 
+ we can run a very efficient but spatially blind model to prioritize the most useful genes, then 
+ validate them with a proper spatial correlation model in smiDE. 
+ 
+ 
+ 
+ 
+**An important caveat**: because we've selected the genes for the smiDE run based on their evidence
+ in the spatial-free DE model, calculating proper adjusted p-values becomes very complicated - 
+ we can neither ignore the omitted genes, nor can we use their (presumably over-optimistic) spatial-free p-values.
+ 
+As a solution, we propose the following procedure, which will produce conservative adjusted p-values:
+
+1. Keep the smiDE p-values from the screened genes.
+2. For the remaining genes, generate p-values from the NULL distribution, i.e. uniformly between 0-1. 
+3. Run your preferred p-value adjustment method on the resulting vector of p-values:
+
+
+```{r echo = TRUE, eval = FALSE}
+
+# source the fast DE function:
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/refs/heads/Main/_code/PatchDE/DEutils.R")
+
+
+# run fast DE:
+fastres <- hastyDE(y = ____, df = ____)
+
+# Extract top genes:
+# This example takes the top 10 genes by effect size from the top 1% of p-values.
+# We recommend extracting top genes with some human oversight. 
+topgenes <- names(fastres$p)[order(abs(fastres$effect) * (fastres$p < quantile(fastres$p, 0.01)), 1:10)]  
+
+# Run smiDE on the top genes with :
+
+
+
+```
+
+
+
 
 :::
 
 
 # Analyzing DE results
+
+When your models have finished, it remains to prioritize the most promising genes for reporting and further analysis, 
+ then validate and explore their results.
+
+ 
+
+
+You've got 
+
 
 - volcano
 - heatmap of genes * tissues
