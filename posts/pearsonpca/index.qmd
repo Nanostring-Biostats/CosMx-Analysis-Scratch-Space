@@ -29,6 +29,7 @@ format:
 
 ## Introduction
 
+Here we present a package for better dimension reduction in spatial data.
 Pearson residuals can be an effective normalization method for spatially-resolved transcriptomic data. However, the normalized data matrix produced is **dense** with nearly all values non-zero. This limits the usability of pearson residuals for high-plex or large datasets where computing memory can be a limiting factor.
 
 However, the principal component (PC) decomposition of quasi-poisson pearson residuals can be computed directly from a sparse counts matrix and a few easy-to-calculate summary statistics. The R package [scPearsonPCA](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/scPearsonPCA) enables this PC decomposition, including the returning the PCs as if the normalized data had been centered, scaled, and influential values clipped according to common best practices for PC analysis.
@@ -103,6 +104,12 @@ sum(genefreq)==1 # TRUE
 
 sem <- Seurat::FindVariableFeatures(sem, nfeatures = 900)
 hvgs <- sem@assays$RNA@var.features
+
+### Returns a Seurat-style DimReduc object with 
+### hvgs x pcs feature loadings
+### cells x pcs cell embeddings
+### gene-length vector of the mean pearson of residuals
+### gene-length vector of the standard deviation of pearson residuals
 pcaobj <- 
 sparse_quasipoisson_pca_seurat(sem[["RNA"]]@counts[hvgs,]
                                ,totalcounts = tc
@@ -169,6 +176,11 @@ gene_frequency(sem[["RNA"]]@counts, obs = data.table(sem@meta.data)[,.(cell_ID, 
 
 Matrix::colSums(genefreq_batch)
 
+### Returns a Seurat-style DimReduc object with 
+### hvgs x pcs feature loadings
+### cells x pcs cell embeddings
+### gene-length vector of the mean pearson of residuals
+### gene-length vector of the standard deviation of pearson residuals
 pcaobj_batch <- 
 sparse_quasipoisson_pca_seurat_batch(sem[["RNA"]]@counts[hvgs,]
                                      ,totalcounts = tc
