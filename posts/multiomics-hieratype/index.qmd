@@ -90,21 +90,17 @@ If we treat our normalized marker expression as a gold standard for cell type ca
 knitr::include_graphics("./figures/rocplot_tcell_lbl.png")
 ```
 
-Above, as we might expect, we see that using  <span style="color:#377EB8;">RNA-only</span> for calling T cells does not optimize agreement between CD3 protein (AUC=0.871).  Unsurprisingly, agreement improves when using CD3 protein directly for celltyping (<span style="color:#4DAF4A;">protein-only</span> AUC=0.927).  In this case, we actually observed the best AUC when both RNA and protein were used jointly (<span style="color:#E41A1C;">multiomics</span> AUC=0.937).
+Above, as we might expect, we see that using  <span style="color:#377EB8;">RNA-only</span> for calling T cells does not optimize agreement between CD3 protein (AUC=0.871).  Unsurprisingly, agreement improves when using CD3 protein directly for celltyping (<span style="color:#E41A1C;">protein-only</span> AUC=0.927).  In this case, we actually observed the best AUC when both RNA and protein were used jointly (<span style="color:#9D4EA3;">multiomics</span> AUC=0.937).
 
 A perhaps unsurprising theme that emerged from these cell typing comparisons was that we often see the worst agreement for protein markers when using RNA-only for celltyping, and the worst agreement for RNA markers when using protein-only for celltyping.  Meanwhile, using both RNA and protein analytes often yields the best or nearly-best agreement for both marker types.
-This is further shown above in the middle-and-right panels when looking at CD3D and CD2 RNA markers.  <span style="color:#E41A1C;">Multiomic</span> celltyping outperforms <span style="color:#4DAF4A;">protein-only</span> by the widest margin, and also slightly outperforms <span style="color:#377EB8;">RNA-only</span>.
+This is further shown above in the middle-and-right panels when looking at CD3D and CD2 RNA markers.  <span style="color:#9D4EA3;">Multiomic</span> celltyping outperforms <span style="color:#E41A1C;">protein-only</span> by the widest margin, and also slightly outperforms <span style="color:#377EB8;">RNA-only</span>.
 
-<span style="color:#E41A1C;">protein-only</span>
-<span style="color:#6A3D9A;">multiomic</span>.
-<span style="color:#377EB8;">RNA-only</span>.
-
-One interesting point of note when comparing the shapes of the ROC curves above is the smoothness of the curve for the CD3 protein marker, compared to the CD2 and CD3D RNA markers (which show a sharper bump closer to the lower-left corner where sensitivity=0 and specificity=1).  Due to the sparsity of RNA counts, we see a sharp spike in sensitivity close to an expression threshold at which cells have a single count of the marker gene. Because <span style="color:#377EB8;">RNA-only</span> cell typing uses only the RNA markers, the AUC is larger and more influenced around this local threshold of a single marker gene count, while <span style="color:#4DAF4A;">protein-only</span> and <span style="color:#E41A1C;">multiomic</span> cell type labels are impacted directly by marker protein expression. 
+One interesting point of note when comparing the shapes of the ROC curves above is the smoothness of the curve for the CD3 protein marker, compared to the CD2 and CD3D RNA markers (which show a sharper bump closer to the lower-left corner where sensitivity=0 and specificity=1).  Due to the sparsity of RNA counts, we see a sharp spike in sensitivity close to an expression threshold at which cells have a single count of the marker gene. Because <span style="color:#377EB8;">RNA-only</span> cell typing uses only the RNA markers, the AUC is larger and more influenced around this local threshold of a single marker gene count, while <span style="color:#E41A1C;">protein-only</span> and <span style="color:#9D4EA3;">multiomic</span> cell type labels are impacted directly by marker protein expression. 
 
 ###  Improved AUC across immune cell types
 
 We saw a similar trend as that demonstrated above across immune cell types.  
-Here, for the most important 'index markers' of each immune cell type, we show the area under the ROC curve for <span style="color:#377EB8;">RNA-only</span>, <span style="color:#4DAF4A;">protein-only</span>, and <span style="color:#E41A1C;">multiomic</span> celltyping results (code for this analysis can be found here in the [end-to-end](#endtoend) code section).  In general, there appears to be an improvement in AUC for both RNA and protein markers compared to if one of the analytes were removed. 
+Here, for the most important 'index markers' of each immune cell type, we show the area under the ROC curve for <span style="color:#377EB8;">RNA-only</span>, <span style="color:#E41A1C;">protein-only</span>, and <span style="color:#9D4EA3;">multiomic</span> celltyping results (code for this analysis can be found here in the [end-to-end](#endtoend) code section).  In general, there appears to be an improvement in AUC for both RNA and protein markers compared to if one of the analytes were removed. 
   
 Average AUC was highest for multiomic celltyping across all markers and celltypes, with
 
@@ -857,6 +853,10 @@ aucroc[celltype!="mast",lapply(.SD, mean),.SDcols=4:6]
 #| eval: false
 #| echo: true
 
+
+  methcls <- c("#9D4EA3", "#377EB8", "#E41A1C")
+  names(methcls) <- c("multiomic typing", "rna-only cell typing","protein-only cell typing")
+
   shw <- rbindlist(plotdata_markerl)[marker %in% c("CD3", "CD3D", "CD2")]
   shw[,method:=factor(label, levels=c("celltype_multi_major", "celltype_rna_major", "celltype_protein_major"), labels=c("multiomic typing", "rna-only cell typing", "protein-only cell typing"))]
   merge(shw, aucrocl)
@@ -870,7 +870,8 @@ aucroc[celltype!="mast",lapply(.SD, mean),.SDcols=4:6]
     theme_bw() + 
     scale_x_continuous(breaks = seq(0,1,.2), labels = 1-seq(0,1,.2), name = "specificity") + 
     scale_y_continuous(breaks = seq(0,1,.2), name = "sensitivity") + 
-    scale_color_manual(values = brewer.pal(8,"Set1")[c(1:2,3)]
+    #scale_color_manual(values = brewer.pal(8,"Set1")[c(1:2,3)]
+    scale_color_manual(values = methcls
     #scale_color_manual(values = brewer.pal(8,"Dark2")[c(1:3)]
                        , guide=guide_legend(override.aes=list(lwd=2)))  + 
     theme(text=element_text(size=16)) + 
@@ -905,6 +906,8 @@ aucroc[celltype!="mast",lapply(.SD, mean),.SDcols=4:6]
 #| echo: true 
 
 
+  methcls <- c("#9D4EA3", "#377EB8", "#E41A1C")
+  names(methcls) <- c("celltype_multi_major", "celltype_rna_major","celltype_protein_major")
   mroc <- melt(aucroc
                ,id.vars=c("celltype", "marker", "typ")
                ,value.name="auc"
@@ -914,8 +917,6 @@ aucroc[celltype!="mast",lapply(.SD, mean),.SDcols=4:6]
   mroc[,celltype:=factor(celltype, levels=c("tcell", "bcell", "macrophage_monocyte", "dendritic", "neutrophil", "nk", "mast"))]
   mroc[,marker_label:=paste0(marker, " (", typ, ")")]
   mroc[,marker_label:=factor(marker_label,levels=mroc[order(celltype,typ, -auc),unique(marker_label)])]
-  methcls <- brewer.pal(3,"Set1")
-  names(methcls) <- c("celltype_multi_major", "celltype_rna_major","celltype_protein_major")
   aucbar <- 
     ggplot(mroc[celltype!="mast"]
            ,aes(y = marker_label, x = auc, fill=method)) + 
