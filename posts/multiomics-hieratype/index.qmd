@@ -65,9 +65,9 @@ knitr::include_graphics("./figures/xyp_multi_unsup.png")
 
 We used the Adjusted Rand Index (ARI) metric to quantify the agreement between protein-only, RNA-only, and multiomic cell type labels ([code](#ari)).  ARI is a numerical measure of similarity between two data clusterings [@ariref].  We found protein-only and RNA-only cell typing calls show more disagreement with each other than they do with with integrated multiomic cell type calls, with:
 
-* ARI(multiomic,RNA-only) = 0.679
-* ARI(multiomic, protein-only) = 0.589
-* ARI(protein-only, RNA-only) = 0.483 
+* $ARI(\text{multiomic,RNA-only})= 0.679$
+* $ARI(\text{multiomic, protein-only})= 0.589$
+* $ARI(\text{protein-only, RNA-only})= 0.483$
 
 We compared the agreement between celltype predictions and canonical protein markers and RNA markers, and found that the multiomic cell type labels often show stronger alignment than RNA-only or protein-only cell typing. ( Code for [RNA-only](#rnaonly), [protein-only](#proteinonly), [multiomic](#multiomic) HieraType calls.)
 
@@ -95,7 +95,11 @@ Above, as we might expect, we see that using  <span style="color:#377EB8;">RNA-o
 A perhaps unsurprising theme that emerged from these cell typing comparisons was that we often see the worst agreement for protein markers when using RNA-only for celltyping, and the worst agreement for RNA markers when using protein-only for celltyping.  Meanwhile, using both RNA and protein analytes often yields the best or nearly-best agreement for both marker types.
 This is further shown above in the middle-and-right panels when looking at CD3D and CD2 RNA markers.  <span style="color:#E41A1C;">Multiomic</span> celltyping outperforms <span style="color:#4DAF4A;">protein-only</span> by the widest margin, and also slightly outperforms <span style="color:#377EB8;">RNA-only</span>.
 
-One interesting point of note when comparing the shapes of the ROC curves above is the smoothness of the curve for the CD3 protein marker, compared to the CD2 and CD3D RNA markers (which show a sharper bump closer to the lower-left corner where sensitivity=0 and specificity=1).  Due to the sparsity of RNA counts, we see a sharp spike in sensitivity close to an expression threshold at which cells have a single count of the marker gene. Because RNA-only cell typing uses only the RNA markers, the AUC is larger and more influenced around this local threshold of a single marker gene count, while protein and multiomic cell type labels are impacted directly by marker protein expression. 
+<span style="color:#E41A1C;">protein-only</span>
+<span style="color:#6A3D9A;">multiomic</span>.
+<span style="color:#377EB8;">RNA-only</span>.
+
+One interesting point of note when comparing the shapes of the ROC curves above is the smoothness of the curve for the CD3 protein marker, compared to the CD2 and CD3D RNA markers (which show a sharper bump closer to the lower-left corner where sensitivity=0 and specificity=1).  Due to the sparsity of RNA counts, we see a sharp spike in sensitivity close to an expression threshold at which cells have a single count of the marker gene. Because <span style="color:#377EB8;">RNA-only</span> cell typing uses only the RNA markers, the AUC is larger and more influenced around this local threshold of a single marker gene count, while <span style="color:#4DAF4A;">protein-only</span> and <span style="color:#E41A1C;">multiomic</span> cell type labels are impacted directly by marker protein expression. 
 
 ###  Improved AUC across immune cell types
 
@@ -910,12 +914,14 @@ aucroc[celltype!="mast",lapply(.SD, mean),.SDcols=4:6]
   mroc[,celltype:=factor(celltype, levels=c("tcell", "bcell", "macrophage_monocyte", "dendritic", "neutrophil", "nk", "mast"))]
   mroc[,marker_label:=paste0(marker, " (", typ, ")")]
   mroc[,marker_label:=factor(marker_label,levels=mroc[order(celltype,typ, -auc),unique(marker_label)])]
+  methcls <- brewer.pal(3,"Set1")
+  names(methcls) <- c("celltype_multi_major", "celltype_rna_major","celltype_protein_major")
   aucbar <- 
     ggplot(mroc[celltype!="mast"]
            ,aes(y = marker_label, x = auc, fill=method)) + 
     geom_bar(stat='identity',position=position_dodge()) + 
     theme_bw() + 
-    scale_fill_manual(values = brewer.pal(3,"Set1")#unname(pals::alphabet())
+    scale_fill_manual(values = methcls #brewer.pal(3,"Set1")#unname(pals::alphabet())
                       , guide=guide_legend(reverse=TRUE)) + 
     facet_wrap(~celltype, labeller=label_both,scales="free") + 
     labs(title = "Agreement between celltype label and marker gene/protein as measured by area under the ROC curve"
