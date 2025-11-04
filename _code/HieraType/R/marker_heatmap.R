@@ -6,6 +6,7 @@
 #' `foldchange` for a particular cluster based on fold change or don't meet the `cluster_prop_min` requirement.
 #' @param topn plot the `topn` genes (in terms of fold_change, which are expressed in at least cluster_prop_min pct of cells) from each cluster.
 #' @param cluster_prop_min minimum proportion of cells that the gene must be expressed in, in order to qualify to be plotted.
+#' @param fold_change_min minimum fold change, order to qualify to be plotted.
 #' @param featsuse if provided, these are the (only) genes that will be used , in addition to any `extras`
 #' @param geneorder if provided, this allows to manually control the order of genes.  
 #' Probably should only used if the exact set of features is also provided with `featsuse`.
@@ -23,6 +24,7 @@ marker_heatmap <- function(foldchange_metrics
                       ,topn=5
                       ,geneorder = NULL
                       ,clusterorder = NULL
+                      ,fold_change_min = -1
                       ,cluster_prop_min = 0.05
                       ,colordervar = "scaled_fold_change"
                       ,orient_diagonal = TRUE
@@ -38,7 +40,7 @@ marker_heatmap <- function(foldchange_metrics
   fc_mat <- as.matrix(dmat[,-c("gene"),with=FALSE])
   rownames(fc_mat) <- dmat[,gene]
   if(missing(featsuse)){
-    featsuse <- unique(c(fctable[order(-fold_change)][cluster_prop > cluster_prop_min,head(.SD,topn),by=cluster][,unique(gene)]
+    featsuse <- unique(c(fctable[order(-fold_change)][fold_change > fold_change_min][cluster_prop > cluster_prop_min,head(.SD,topn),by=cluster][,unique(gene)]
                          , extras))
     
   }

@@ -86,16 +86,16 @@ fit_metagene_scores <- function(
   proteinpreds <- setdiff(colnames(counts_matrix), rnapreds)
   
   ### get totalcounts if not specified 
-  if(is.null(totalcounts)){
-    if(length(rnapreds) > 0){
+  if(length(rnapreds) > 0){
+    if(is.null(totalcounts)){
       totalcounts <- Matrix::rowSums(counts_matrix[,rnapreds,drop=FALSE]) 
     }
-  }
-  stopifnot(length(totalcounts) == nrow(counts_matrix))
-  if(!is.null(names(totalcounts)) && !is.null(rownames(counts_matrix))){
-    stopifnot("ids of 'totalcounts' dont match ids in 'counts_matrix'" = 
-                all(names(totalcounts) %in% rownames(counts_matrix))) 
-    totalcounts <- totalcounts[rownames(counts_matrix)] 
+    stopifnot(length(totalcounts) == nrow(counts_matrix))
+    if(!is.null(names(totalcounts)) && !is.null(rownames(counts_matrix))){
+      stopifnot("ids of 'totalcounts' dont match ids in 'counts_matrix'" = 
+                  all(names(totalcounts) %in% rownames(counts_matrix))) 
+      totalcounts <- totalcounts[rownames(counts_matrix)] 
+    }
   }
   
   ### check length and names of prior_level_weights 
