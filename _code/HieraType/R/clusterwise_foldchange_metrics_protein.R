@@ -15,7 +15,7 @@
 #' If you desire to use raw expression for computing fold change, use like `normed=my_raw_expr`.
 #' @param metadata metadata including (at minimum) 'cellid_column' and a 'cluster_column'
 #' @param cluster_column column in metadata corresponding to cell type 
-#' @param cellid_column column in aetadata corresponding to cell id. Should also correspond to the column names of the `raw` and `normed` expression matrices.
+#' @param cellid_column column in metadata corresponding to cell id. Should also correspond to the column names of the `raw` and `normed` expression matrices.
 #' @param totalexpr optional user-specified cell-length vector of 'totalexpression' used for normalizing the raw matrix.  
 #' (useful if a subsetted raw matrix is passed)
 #' @param propd an expression matrix used for computing the proportion of 'positive cells' for a protein.  
