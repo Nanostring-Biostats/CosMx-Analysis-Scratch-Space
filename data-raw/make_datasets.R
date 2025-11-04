@@ -1,13 +1,4 @@
 
-
-
-
-
-
-
-
-
-
 markerslist_cd4tminor <- HieraType::make_markerslist(
   index_marker = list(
     cd4_naive = c('TCF7','LEF1','SELL','CCR7'),
@@ -29,7 +20,6 @@ markerslist_cd4tminor <- HieraType::make_markerslist(
   )
 )
 
-#setwd("/home/rstudio/data/dan/imputation_smoothing/HieraType_dev")
 usethis::use_data(markerslist_cd4tminor, overwrite = TRUE)
 
 markerslist_cd8tminor <- HieraType::make_markerslist(
@@ -365,31 +355,5 @@ pipeline_tcell <-
                           ,"t8minor" = "cd8t"
   )
   )
-
-
-pipeline_gastric <- make_pipeline(
-  markerslists = list("l1" =  HieraType::markerslist_l1
-                      ,"l2" = HieraType::markerslist_immunemajor
-                      ,"lt" = HieraType::markerslist_tcellmajor
-                      )
-  ,priors = list("lt" = "l2"
-                 ,"l2" = "l1"
-                 ,"lepithelial" = "l1"
-                 ,"lendothelial" = "l1"
-                 ,"lb" = "l2" ## 
-                 ) 
-  ,priors_category = list("lt" = "tcell"
-                          ,"l2" = "immune"
-                          ,"lb" = "bcell"
-                          ,"lepithelial" = "epithelial"
-                          ,"lendothelial" = "endothelial"
-                          )
-)
-
-
-
-
-
-
 
 

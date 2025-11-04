@@ -11,7 +11,8 @@ clusterwise_foldchange_metrics_protein(
   totalexpr = NULL,
   metadata,
   cluster_column,
-  propd = NULL
+  propd = NULL,
+  cellid_column = "cell_ID"
 )
 }
 \arguments{
