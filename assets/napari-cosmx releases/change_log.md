@@ -1,5 +1,10 @@
 # Napari-CosMx plugin change log
 
+## 0.4.17.4
+
+- Released Nov. 6th, 2025
+- Allows reading plexfiles from data exported in AtoMx(R) SIP version 2.0+ (csv) while still being backwards compatible (tsv).
+
 ## 0.4.17.3
 
 - Released Feb. 21st, 2025
