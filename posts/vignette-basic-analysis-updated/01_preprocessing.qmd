@@ -640,8 +640,10 @@ Note that no steps in this workflow actually use the normalized data,
 Normalized data will be useful in later analyses, e.g. for plotting expression over space or running differential expression. 
 
 ```{r echo = FALSE, eval = TRUE}
-norm <- Matrix::Diagonal(x = mean(metadata$nCount_RNA)/metadata$nCount_RNA,names=colnames(counts)) %*% counts
-rownames(norm) <- rownames(counts)
+# normalize counts matrix using efficent sparse matrix calls:
+scale_row <- mean(metadata$nCount_RNA)/metadata$nCount_RNA
+norm <- counts
+norm@x <- norm@x * scale_row[norm@i + 1L]
 ```
 
 
