@@ -41,7 +41,7 @@ run_pipeline <- function(pipeline, counts_matrix
                  ,c(list(markerslist = pipeline$markerslist[[parnt]]
                          ,counts_matrix = counts_matrix
                          ,adjacency_matrix = adjacency_matrix
-                         ,prior_level_wts = initial_prior_weights
+                         ,prior_level_weights = initial_prior_weights
                          )
                     ,dots[names(dots) %in% names(formals(fit_metagene_scores))]
                     )
@@ -69,7 +69,7 @@ run_pipeline <- function(pipeline, counts_matrix
                  ,c(list(markerslist = pipeline$markerslist[[chld]]
                          ,counts_matrix = counts_matrix
                          ,adjacency_matrix = adjacency_matrix
-                         ,prior_level_wts = prior_wts
+                         ,prior_level_weights = prior_wts
                          )
                     ,dots[names(dots) %in% names(formals(fit_metagene_scores))]
                     )
