@@ -33,7 +33,7 @@ combine_postprob_tables <- function(pipeline
     while(length(child_categories) > 0){
       child_categories_new <- c()
       for(chld in child_categories){
-        post_probsl[[parnt]] <- merge(post_probsl[[parnt]], models[[chld]]$post_probs, by = "cell_ID")
+        post_probsl[[parnt]] <- merge(post_probsl[[parnt]], models[[chld]]$post_probs, by = "cell_ID", sort = FALSE)
         #post_probsl[[parnt]][best_score > celltype_call_threshold,celltype_thresh:=best_class]
         whch_threshold <- post_probsl[[parnt]][best_score > celltype_call_threshold,which=TRUE]
         parnt_cat <- pipeline$priors_category[[chld]]
