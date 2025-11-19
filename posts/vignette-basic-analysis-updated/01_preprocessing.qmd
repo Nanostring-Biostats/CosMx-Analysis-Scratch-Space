@@ -172,6 +172,10 @@ for(i in 1:length(slidenames)){
   
   # load in counts as a data table:
   thisslidescounts <- thisslidesfiles[grepl("exprMat\\_file", thisslidesfiles)]
+  # if two files, take the one that's been unzipped:
+  if (length(thisslidescounts) == 2) {
+    thisslidescounts <- thisslidescounts[!grepl("\\.gz", thisslidescounts)]
+  }
   # unzip counts file if needed:
   if (substr(thisslidescounts, nchar(thisslidescounts)-2, nchar(thisslidescounts)) == ".gz") {
     R.utils::gunzip(paste0(myflatfiledir, "/", slidename, "/", thisslidescounts), remove = FALSE, overwrite = TRUE)
@@ -850,7 +854,7 @@ A call to InSituType that would work with our setup here is:
 if (TRUE) {
   unsup <- insitutype(
     x = counts[, hvgs],  # only use HVG's. InSituType's computation time scales with the number of genes, so analyzing the full WTX panel is very slow. 
-    neg = meta_data$negmean,
+    neg = metadata$negmean,
     assay_type = "RNA", 
     reference_profiles = NULL,
     reference_sds = NULL,
