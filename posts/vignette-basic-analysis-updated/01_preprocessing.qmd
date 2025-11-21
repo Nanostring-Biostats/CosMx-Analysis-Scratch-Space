@@ -1243,6 +1243,27 @@ barplot(table(celltype), las = 2,
 legend("topleft", fill = c("grey", "orange", "cornflowerblue"), legend = c("Louvain non-immune", "Louvain immune", "HieraType immune"))
 
 
+# which clusters to reassign: >90% taken by hieratype, and < 5% of total cells left.
+propoverwritten <- by(clust != celltype, clust, mean)
+proppercluster <- table(celltype) / length(celltype)
+clusterstodrop <- union(
+  intersect(
+    names(which(propoverwritten > 0.9)),
+    names(which(proppercluster < 0.05))),
+  intersect(
+    names(which(propoverwritten > 0.5)),
+    names(which(proppercluster < 0.01)))
+)
+# find nearest neighbors (in valid clusters) for cells in target clusters:
+cellstoreclassify <- names(celltype)[is.element(celltype, clusterstodrop)]
+neighborclusts <- InSituCor:::neighbor_tabulate(celltype, neighbors = umapobj$grph)
+neighborclusts <- neighborclusts[, !is.element(colnames(neighborclusts), clusterstodrop)]
+# reclassify by most common nearest neighbor among valid clusters:
+celltype[cellstoreclassify] <- colnames(neighborclusts)[apply(neighborclusts[cellstoreclassify, ], 1, which.max)]
+  
+table(celltype)[order(table(celltype))]
+
+
 # overwrite left-behind louvain immune clusters:
 celltype[is.element(celltype, louvain_immune_names)] <- "immune_unspecified"
 metadata$celltype <- celltype
