@@ -1224,23 +1224,7 @@ immune.ids <- hieratyperes$post_probs$l1$cell_ID[
 celltype <- clust
 names(celltype) <- metadata$cell_id
 celltype[immune.ids] <- htclust[immune.ids]
-# what to do with the leftover immune cells from clustering?
-setdiff(unique(celltype), unique(htclust))
-louvain_immune_names <- c("Macrophages (APOE+/C1QA+ TAMs)",
-                          "Neutrophils (state A; S100A8/A9-max)",
-                          "Neutrophils (state C, degranulating/secretory-high)",
-                          "T cells (CD4-like, resting)",
-                          "Antigen-presenting myeloid (cDC2 / moDC)",
-                          "Neutrophils (state B)",
-                          "Plasma cells",
-                          "Antigen-presenting cells (B/cDC; cycling, uncertain)",
-                          "Cytotoxic T / NK cells")
 
-# check overlaps, making sure there aren't huge numbers of cells called immune by Louvain but not HieraType:
-par(mar = c(22,4,2,1))
-barplot(table(celltype), las = 2, 
-        col = c("grey", "orange", "cornflowerblue")[1 + is.element(names(table(celltype)), louvain_immune_names) + 2 * is.element(names(table(celltype)), unique(htclust))])
-legend("topleft", fill = c("grey", "orange", "cornflowerblue"), legend = c("Louvain non-immune", "Louvain immune", "HieraType immune"))
 
 
 # which clusters to reassign: >90% taken by hieratype, and < 5% of total cells left.
@@ -1264,8 +1248,26 @@ celltype[cellstoreclassify] <- colnames(neighborclusts)[apply(neighborclusts[cel
 table(celltype)[order(table(celltype))]
 
 
-# overwrite left-behind louvain immune clusters:
-celltype[is.element(celltype, louvain_immune_names)] <- "immune_unspecified"
+# # what to do with the leftover immune cells from clustering?
+# setdiff(unique(celltype), unique(htclust))
+# louvain_immune_names <- c("Macrophages (APOE+/C1QA+ TAMs)",
+#                           "Neutrophils (state A; S100A8/A9-max)",
+#                           "Neutrophils (state C, degranulating/secretory-high)",
+#                           "T cells (CD4-like, resting)",
+#                           "Antigen-presenting myeloid (cDC2 / moDC)",
+#                           "Neutrophils (state B)",
+#                           "Plasma cells",
+#                           "Antigen-presenting cells (B/cDC; cycling, uncertain)",
+#                           "Cytotoxic T / NK cells")
+# 
+# # check overlaps, making sure there aren't huge numbers of cells called immune by Louvain but not HieraType:
+# par(mar = c(22,4,2,1))
+# barplot(table(celltype), las = 2, 
+#         col = c("grey", "orange", "cornflowerblue")[1 + is.element(names(table(celltype)), louvain_immune_names) + 2 * is.element(names(table(celltype)), unique(htclust))])
+# legend("topleft", fill = c("grey", "orange", "cornflowerblue"), legend = c("Louvain non-immune", "Louvain immune", "HieraType immune"))
+# 
+# # overwrite left-behind louvain immune clusters:
+# celltype[is.element(celltype, louvain_immune_names)] <- "immune_unspecified"
 metadata$celltype <- celltype
 saveRDS(celltype, file = paste0(outdir, "/processed_data/celltype.RDS"))
 saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
