@@ -695,12 +695,15 @@ x <- distance_to_tumor
 normfactor <- metadata$nCount_RNA / mean(metadata$nCount_RNA) * 1000
 norm <- counts
 norm@x <- counts@x * normfactor[ counts@i + 1L ]
+# to put genes on similar scales, scale the columns of norm:
+genefactors <- 1 / pmax(0.05, Matrix::colMeans(norm))  
+normscaled <- norm %*% Matrix::Diagonal(genefactors)
 
 ## source the fast DE function:
 source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/refs/heads/Main/_code/PatchDE/DEutils.R")
 
 ## run fast DE:
-fastres <- hastyDE(y = norm, df = data.frame(distance2tumor = x))
+fastres <- hastyDE(y = normscaled[, genes_to_analyze], df = data.frame(distance2tumor = x))
 
 ## extract estimates and p-values:
 ests <- fastres$effect
@@ -734,12 +737,15 @@ x <- distance_to_tumor
 normfactor <- metadata$nCount_RNA / mean(metadata$nCount_RNA) * 1000
 norm <- counts
 norm@x <- counts@x * normfactor[ counts@i + 1L ]
+# to put genes on similar scales, scale the columns of norm:
+genefactors <- 1 / pmax(0.05, Matrix::colMeans(norm))  
+normscaled <- norm %*% Matrix::Diagonal(genefactors)
 
 ## source the fast DE function:
 source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/refs/heads/Main/_code/PatchDE/DEutils.R")
 
 ## run fast DE:
-fastres <- hastyDE(y = norm[, genes_to_analyze], df = data.frame(distance2tumor = x))
+fastres <- hastyDE(y = normscaled[, genes_to_analyze], df = data.frame(distance2tumor = x))
 
 # Extract top genes:
 # This example takes the top 10 genes by effect size from the top 1% of p-values.
@@ -790,18 +796,27 @@ ps.spatial.adjusted <- p.adjust(c(ps.spatial, ps.null), method = "BH")[1:length(
 
 When your models have finished, it remains to prioritize the most promising genes for reporting and further analysis, then validate and explore their results.
 
+## Priotitizing genes
+
+How you prioritize genes depends on your setting. There are two basic cases:
+
+**High power settings**: when your model has high N (e.g. >10000 cells) and no adjusting for spatial correlation, it's common to get very tiny p-values, e.g. < 10^-50. In these cases, apply a reasonable p-value cutoff, say the top 20% of genes, then rank genes by effect size.
+
+**Low power settings**: when p-values aren't infinitesimal, rank genes as you would in other DE settings, i.e. considering both p-value and effect size. 
+
+
+## Exploring results
 
 
 
-You've got 
-
-
-- volcano
 - heatmap of genes * tissues
-- gsea
 - spatial plotting
 - heatmap and traceplot of mean expression per bin, whether or not you fit to a binned variable
 - LLMs to help prioritize
+
+<omit>:
+- volcano
+- gsea
 
 
   
