@@ -50,7 +50,8 @@ library(future.apply)  # Parallel processing
 
 # ---- Helper: Pad a sparse matrix to full gene/cell dimensions ----
 pad_matrix <- function(mat, all_genes, all_cells) {
-  out <- Matrix(0, nrow = length(all_genes), ncol = length(all_cells), sparse = TRUE,
+  out <- Matrix(0, nrow = length(all_genes), ncol = length(all_cells), 
+                sparse = TRUE,
                 dimnames = list(all_genes, all_cells))
   out[match(rownames(mat), all_genes), match(colnames(mat), all_cells)] <- mat
   return(out)
@@ -58,12 +59,14 @@ pad_matrix <- function(mat, all_genes, all_cells) {
 
 # ---- Helper: Load one target file into sparse matrices ----
 load_to_exp_mat <- function(target_file, slide_number) {
-  calls <- fread(target_file, select = c("CellId", "fov", "codeclass", "target"))
+  calls <- fread(target_file, 
+                 select = c("CellId", "fov", "codeclass", "target"))
   if (nrow(calls) == 0) return(list(Endogenous = NULL, Negative = NULL))
   
   # Get gene sets BEFORE filtering CellId == 0
   all_endogenous <- unique(calls[codeclass == "Endogenous", target])
-  all_negative <- unique(calls[grepl("Neg", codeclass, ignore.case = TRUE), target])
+  all_negative <- unique(
+    calls[grepl("Neg", codeclass, ignore.case = TRUE), target])
   
   # Remove extracellular transcripts
   calls <- calls[CellId != 0]
@@ -76,7 +79,8 @@ load_to_exp_mat <- function(target_file, slide_number) {
   make_sparse <- function(type, genes) {
     subset <- calls[codeclass == type]
     if (nrow(subset) == 0) {
-      return(Matrix(0, nrow = length(genes), ncol = length(all_cells), sparse = TRUE,
+      return(Matrix(0, nrow = length(genes), ncol = length(all_cells), 
+                    sparse = TRUE,
                     dimnames = list(genes, all_cells)))
     }
     counts <- subset[, .N, by = .(target, cell_ID)]
@@ -94,14 +98,17 @@ load_to_exp_mat <- function(target_file, slide_number) {
 # ---- Main Function ----
 #' Load aligned RNA data into sparse expression matrices
 #'
-#' Reads multiple target call files from an aligned RNA directory and returns two
-#' sparse matrices: one for endogenous targets (genes) and one for negative controls.
+#' Reads multiple target call files from an aligned RNA directory 
+#' and returns two sparse matrices: 
+#' one for endogenous targets (genes) and one for negative controls.
 #'
-#' @param aligned_RNA_dir Path to aligned RNA data (folder ending with "_Shifted")
+#' @param aligned_RNA_dir Path to aligned RNA data 
+#' (folder ending with "_Shifted")
 #' @param slide_number Slide number used in cell IDs
 #' @return A named list with two sparse matrices: "Endogenous" and "Negative"
 #' @examples
-#' exp_matrices <- load_aligned_RNA_to_expMat("AnalysisResults/7hzxsoa7rs_Shifted", 2)
+#' exp_matrices <- load_aligned_RNA_to_expMat(
+#'                      "AnalysisResults/7hzxsoa7rs_Shifted", 2)
 #' 
 #' library(Seurat)
 #' sem <- CreateSeuratObject(exp_matrices[["Endogenous"]])
@@ -113,22 +120,28 @@ load_aligned_RNA_to_expMat <- function(aligned_RNA_dir, slide_number) {
   if (!dir.exists(aligned_RNA_dir)) stop("Directory does not exist")
   
   # Get target call files
-  target_call_files <- list.files(aligned_RNA_dir, pattern = "_complete_code_cell_target_call_coord.csv",
+  target_call_files <- list.files(aligned_RNA_dir, 
+                                  pattern = "_complete_code_cell_target_call_coord.csv",
                                   recursive = TRUE, full.names = TRUE)
   if(length(target_call_files) == 0) stop("No target call files found")
   
   # Parallel load of all FOVs
   plan(multisession)  # Set parallel backend
-  exp_mat_list <- future_lapply(target_call_files, load_to_exp_mat, slide_number = slide_number)
+  exp_mat_list <- future_lapply(target_call_files, load_to_exp_mat, 
+                                slide_number = slide_number)
   
   # Collect all genes and cells across FOVs
-  all_endogenous_genes <- unique(unlist(lapply(exp_mat_list, function(x) rownames(x[["Endogenous"]]))))
-  all_negative_genes <- unique(unlist(lapply(exp_mat_list, function(x) rownames(x[["Negative"]]))))
-  all_cells <- unique(unlist(lapply(exp_mat_list, function(x) colnames(x[["Endogenous"]]))))
+  all_endogenous_genes <- unique(
+    unlist(lapply(exp_mat_list, function(x) rownames(x[["Endogenous"]]))))
+  all_negative_genes <- unique(
+    unlist(lapply(exp_mat_list, function(x) rownames(x[["Negative"]]))))
+  all_cells <- unique(
+    unlist(lapply(exp_mat_list, function(x) colnames(x[["Endogenous"]]))))
   
   # Combine matrices across FOVs
   combine_mats <- function(type, all_genes) {
-    mats <- lapply(exp_mat_list, function(x) pad_matrix(x[[type]], all_genes, all_cells))
+    mats <- lapply(exp_mat_list, function(x) pad_matrix(x[[type]], 
+                                                        all_genes, all_cells))
     Reduce(`+`, mats)
   }
   
