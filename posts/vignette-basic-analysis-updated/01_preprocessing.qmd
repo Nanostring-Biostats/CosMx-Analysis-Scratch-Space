@@ -36,6 +36,8 @@ This post is the first in a series; coming soon will be posts
  on exploratory analysis, on differential expression analysis, and on pipelines for large studies. 
 This workflow assumes a whole study can be fit into your compute environment's memory. 
  For very large studies, see our upcoming vignette on the topic, or the summary below. 
+
+This post is exclusively in R. Many steps have easy python analogs, but some, like the hieraType immune cell typing algorithm and the FOV QC functions, only have R implementations. 
  
 ## Basic analysis strategy 
 
@@ -147,159 +149,34 @@ The below code performs the loading and merging operations, producing 4 data obj
 If given a flat files directory with multiple slides, it will seamlessly load and combine their data into a unified dataset. 
 
 ```{r echo = TRUE, eval = FALSE}
+### source readFlatFiles:
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/vignette2/utils/readFlatFiles.R")
+
 ### automatically get slide names:
 slidenames <- dir(myflatfiledir)
 
-### lists to collect the counts matrices and metadata, one per slide
-countlist <- vector(mode='list', length=length(slidenames)) 
-metadatalist <- vector(mode='list', length=length(slidenames)) 
-
-for(i in 1:length(slidenames)){
-  
-  slidename <- slidenames[i] 
-  
-  msg <- paste0("Loading slide ", slidename, ", ", i, "/", length(slidenames), ".")
-  message(msg)    
-  # slide-specific files:
-  thisslidesfiles <- dir(paste0(myflatfiledir, "/", slidename))
-  
-  # load in metadata:
-  thisslidesmetadata <- thisslidesfiles[grepl("metadata\\_file.csv", thisslidesfiles)]
-  tempdatatable <- data.table::fread(paste0(myflatfiledir, "/", slidename, "/", thisslidesmetadata))
-  
-  # numeric slide ID 
-  slide_ID_numeric <- tempdatatable[1,]$slide_ID 
-  
-  # load in counts as a data table:
-  thisslidescounts <- thisslidesfiles[grepl("exprMat\\_file", thisslidesfiles)]
-  # if two files, take the one that's been unzipped:
-  if (length(thisslidescounts) == 2) {
-    thisslidescounts <- thisslidescounts[!grepl("\\.gz", thisslidescounts)]
-  }
-  # unzip counts file if needed:
-  if (substr(thisslidescounts, nchar(thisslidescounts)-2, nchar(thisslidescounts)) == ".gz") {
-    R.utils::gunzip(paste0(myflatfiledir, "/", slidename, "/", thisslidescounts), remove = FALSE, overwrite = TRUE)
-    thisslidescounts <- gsub(".csv.gz", ".csv", thisslidescounts)
-  }
-  countsfile <- paste0(myflatfiledir, "/", slidename, "/", thisslidescounts)
-  nonzero_elements_perchunk <- 5*10**7
-  ### Safely read in the dense (0-filled ) counts matrices in chunks.
-  lastchunk <- FALSE 
-  skiprows <- 0
-  chunkid <- 1
-  
-  required_cols <- fread(countsfile, select=c("fov", "cell_ID"))
-  stopifnot("columns 'fov' and 'cell_ID' are required, but not found in the counts file" = 
-              all(c("cell_ID", "fov") %in% colnames(required_cols)))
-  number_of_cells <- nrow(required_cols)
-  
-  number_of_cols <-  ncol(fread(countsfile, nrows = 2))
-  number_of_chunks <- ceiling(exp(log(number_of_cols) + log(number_of_cells) - log(nonzero_elements_perchunk)))
-  chunk_size <- floor(number_of_cells / number_of_chunks)
-  sub_counts_matrix <- vector(mode='list', length=number_of_chunks)
-  
-  pb <- txtProgressBar(min = 0, max = number_of_chunks, initial = 0, char = "=",
-                       width = NA, title, label, style = 3, file = "")
-  cellcount <- 0
-  while(lastchunk==FALSE){
-    read_header <- FALSE
-    if(chunkid==1){
-      read_header <- TRUE
-    }
-    
-    countsdatatable <- data.table::fread(countsfile,
-                                         nrows=chunk_size,
-                                         skip=skiprows + (chunkid > 1),
-                                         header=read_header)
-    if(chunkid == 1){
-      header <- colnames(countsdatatable)
-    } else {
-      colnames(countsdatatable) <- header
-    }
-    
-    nr <- nrow(countsdatatable)
-    cellcount <- cellcount + nr
-    lastchunk <- (cellcount >= number_of_cells) || nr == 0L
-    skiprows <- skiprows + nr
-    
-    # deleting next line: fov and id columns no longer in counts matrix:
-    slide_fov_cell_counts <- paste0("c_",slide_ID_numeric, "_", countsdatatable$fov, "_", countsdatatable$cell_ID)
-    sub_counts_matrix[[chunkid]] <- as(countsdatatable[,setdiff(colnames(countsdatatable), c("fov", "cell_ID")),with=FALSE], "sparseMatrix") 
-    rownames(sub_counts_matrix[[chunkid]]) <- slide_fov_cell_counts 
-    setTxtProgressBar(pb, chunkid)
-    chunkid <- chunkid + 1
-  }
-  
-  close(pb)   
-  
-  countlist[[i]] <- do.call(rbind, sub_counts_matrix) 
-  # ensure that cell-order in counts matches cell-order in metadata   
-  slide_fov_cell_metadata <- paste0("c_",slide_ID_numeric, "_", tempdatatable$fov, "_", tempdatatable$cell_ID)
-  countlist[[i]] <- countlist[[i]][match(slide_fov_cell_metadata, rownames(countlist[[i]])),] 
-  metadatalist[[i]] <- tempdatatable 
-  
-  # track common genes and common metadata columns across slides
-  if(i==1){
-    sharedgenes <- colnames(countlist[[i]]) 
-    sharedcolumns <- colnames(tempdatatable)
-  }  else {
-    sharedgenes <- intersect(sharedgenes, colnames(countlist[[i]]))
-    sharedcolumns <- intersect(sharedcolumns, colnames(tempdatatable))
-  }
-  
-}
-
-# reduce to shared metadata columns and shared genes
-for(i in 1:length(slidenames)){
-  metadatalist[[i]] <- metadatalist[[i]][, ..sharedcolumns]
-  countlist[[i]] <- countlist[[i]][, sharedgenes]
-}
-
-counts <- do.call(rbind, countlist)
-metadata <- rbindlist(metadatalist)
-
-# isolate negative control matrices:
-negcounts <- counts[, grepl("Negative", colnames(counts))]
-falsecounts <- counts[, grepl("SystemControl", colnames(counts))]
-
-# reduce counts matrix to only genes:
-counts <- counts[, !grepl("Negative", colnames(counts)) & !grepl("SystemControl", colnames(counts))]
+### load the flat files and return as distinct data objects:
+temp <- readFlatFiles(myflatfiledir, slidenames = slidenames, return_negprobes = FALSE, return_falsecodes = FALSE, offset_slides = TRUE) 
+counts   <- temp$counts;    temp$counts <- NULL
+metadata <- temp$metadata;  temp$metadata <- NULL
+xy       <- temp$xy;        temp$xy <- NULL
+rm(temp)
 
 # checks
 stopifnot(identical(rownames(counts), metadata$cell_id))
 stopifnot(max(abs(Matrix::rowSums(counts) - metadata$nCount_RNA)) == 0)
 ```
 
-Next we'll perform some well-advised modifications to our metadata:
+Note that the above performs some well-advised modifications to the metadata:
 
-* Remove the "fov" column, which has duplicate values over multiple slides (e.g. any two slides will each have a fov 1). 
+* Removes the "fov" column, which has duplicate values over multiple slides (e.g. any two slides will each have a fov 1). 
  Replace it with the "FOV" column, which appends a slide identifier to FOV IDs so that each FOV has a unique id.
-* Remove the "cell_ID" column, which also can have duplicate values across slides, and retain the duplicate-free column "cell_id".
-* For convenience, extract cells' xy positions as a separate data object, and recast them from pixel-scale to mm-scale. 
-* Add the mean negprobe counts to the metadata (the metadata has the *sum* of the negprobes already, but since negprobe counts vary across panels it's worth recording this value now so we won't have to remember our negprobe number later.)
+* Removes the "cell_ID" column, which also can have duplicate values across slides, and retain the duplicate-free column "cell_id".
+* For convenience, extracts cells' xy positions as a separate data object, and recasts them from pixel-scale to mm-scale. 
+* Adds the mean negprobe counts to the metadata (the metadata has the *sum* of the negprobes already, but since negprobe counts vary across panels it's worth recording this value now so we won't have to remember our negprobe number later.)
 
-```{r echo = TRUE, eval = FALSE}
-# add to metadata: add a global non-slide-specific FOV ID:
-metadata$FOV <- paste0("s", metadata$slide_ID, "f", metadata$fov)
-metadata$fov <- NULL
 
-# remove cell_ID metadata column, which only identifies cell within slides, not across slides:
-metadata$cell_ID <- NULL
-
-# extract xy positions as a separate object:
-xy <- as.matrix(metadata[, c("CenterX_global_px", "CenterY_global_px")])
-rownames(xy) <- metadata$cell_id
-# rescale to mm:
-thisinstrument_nanometers_per_pixel = 120.280945   
-# The above value holds for most instruments. Your RunSummary file specifies the value for your instrument. 
-xy <- xy * thisinstrument_nanometers_per_pixel / 1000000
-colnames(xy) <- paste0(c("x", "y"), "_mm")
-
-# add mean negprobe to metadata:
-metadata$negmean <- Matrix::rowMeans(negcounts)
-```
-
-Finally, we'll save these data objects as .RDS files. These files are smaller on disk (they 
+Finally, we save these data objects as .RDS files. These files are smaller on disk (they 
 benefit from more compression than flat files do), and they're faster to read back into R.
 
 ::: {.callout-important}
@@ -331,7 +208,7 @@ indefinitely storing large files.
 
 2. Once you've confirmed this data loading script has run successfully,
 you can safely delete the flat files - you won't be using them again. 
-If you do need to go back to them, you can always export them from AtoMx again:
+If you do need to go back to them, they'll be on AtoMx, ready to be downloaded again:
 AtoMx acts as a persistent, authoritative source of unmodified data.
 
 ::: {.callout-note}
@@ -341,7 +218,7 @@ A reasonably high-performance compute instance can generally handle a few slides
  can overwhelm the memory available to most analysts. At this point, you have two options:
 
 1. Use data formats that store data on disk, not in memory, e.g. TileDB, SeuratDisk, hdf5... 
-2. Analyze your data one tissue at a time. Put all tissues through a standard analysis pipeline, then, for multi-tissue analyses, judiciously load in just the data you need for a given analysis. 
+2. Analyze your data one tissue at a time. Put all tissues through a standard analysis pipeline, then, for multi-tissue analyses, judiciously load in just the data you need for a given analysis. This is our recommendation; vignettes demonstrating this workflow are coming in 2026. 
 
 Neither option is terribly convenient, but having millions or tens of millions of cells 
 to analyze is worth some hassle. 
@@ -356,16 +233,15 @@ To show multiple slides in the same spatial plot, or just to produce spatial plo
 Only a small number of operations are required to do so; 
  below are some tools and code chunks for facilitating these operations,
  some borrowed from [this post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/){target="_blank"}.
-Because our example breast cancer dataset is just one tissue with contiguous FOVs, 
- we'll show results from a different dataset in this section.
- 
+
 The basic operations of customized xy layouts are as follows:
 
-**First**, for multi-slide studies, adjust the slides' xy positions do they don't overlap:
+**First**, for multi-slide studies, adjust the slides' xy positions do they don't overlap. 
+This function is called within our flat file reader, but you will often want to customize how slides are tiled.
 
 ```{r echo = TRUE, eval = FALSE}
 # source the tiling function:
-source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/vignette/utils/condenseTissues.R")
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/vignette2/utils/readFlatFiles.R")
 # define new xy positions in which multiple slides no longer overlap each other:
 set.seed(1)
 xy <- condenseTissues(xy = xy, 
