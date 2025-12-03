@@ -13,17 +13,19 @@
 #'  (i.e., less  than 5% of all cells.).
 #'  The defaults below set up two conditions for re-assigning cells in rare unsupervised clusters which were mostly designated to a HieraType cluster.
 #'  Example:
-#'  `dissolve_smallcluster_if_overwritten_prop_greaterthan = c(0.9, 0.5)` 
-#'  `and_dissolve_smallcluster_if_finalcluster_prop_lessthan = c(0.05, 0.01)` 
+#'  dissolve_smallcluster_if_overwritten_prop_greaterthan = c(0.9, 0.5)
+#'  and_dissolve_smallcluster_if_finalcluster_prop_lessthan = c(0.05, 0.01)
 #'  This means that cells in for particular unsupervised clusters would be re-assigned if
-#'  >90% were overwritten by hieratype labels and the final unsupervised cluster proportion < 0.05 or if
-#'  >50% were overwritten by hieratype labels and the final unsupervised cluster proportion < 0.01.
+#'  $>$90% were overwritten by hieratype labels and the final unsupervised cluster proportion < 0.05 or if
+#'  $>$50% were overwritten by hieratype labels and the final unsupervised cluster proportion < 0.01.
 #'  As shown in the example, these two arguments should be numeric vectors of equal length.
 #' @param and_dissolve_smallcluster_if_finalcluster_prop_lessthan This argument is paired with `dissolve_smallcluster_if_overwritten_prop_greaterthan`.  
 #' See notes above for guidance.
 
 #' @return a data.table with ('cellid_colname', 'unsupervised_colname', 'supervised_colname', 'celltype', and 'dissolved_cell'), 
 #' where celltype is the new integrated label and dissolved_cell indicates whether the cell came from a dissolved cluster and was re-assigned using nearest neighbors in the adjacency matrix.
+#'
+#'@export 
 celltype_label_integration <- function(metadata
                                        ,adjacency_mat
                                        ,cellid_colname = "cell_ID"
