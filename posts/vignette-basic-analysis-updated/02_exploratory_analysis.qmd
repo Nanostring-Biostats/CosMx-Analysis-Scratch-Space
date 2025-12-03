@@ -45,14 +45,185 @@ Our primary strategies are:
 4. [Look for perturbations in disease vs. baseline samples using the InSituDiff algorithm](#insitudiff)
 
 
+## Getting started
+
+To begin, load your fully pre-processed data (including cell type annotations):
+
+```{r echo = TRUE, eval = FALSE}
+## load necessary libraries
+library(data.table) # for more memory efficient data frames
+library(Matrix) # for sparse matrices like our counts matrix
+library(InSituCor) # devtools::install_github("https://github.com/Nanostring-Biostats/InSituCor")
+library(InSituDiff) # remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space", subdir = "_code/InSituDiff", ref = "Main")
+library(AUCell) # BiocManager::install("AUCell")
+library(msigdbr) # BiocManager::install("msigdbr")
+
+## load data:
+counts <- readRDS(paste0(outdir, "/processed_data/counts.RDS"))
+metadata <- readRDS(paste0(outdir, "/processed_data/metadata.RDS")) # expected to have the column "celltype"
+xy <- readRDS(paste0(outdir, "/processed_data/xy.RDS"))
+
+## normalize counts matrix using efficent sparse matrix calls:
+scale_row <- mean(metadata$nCount_RNA)/metadata$nCount_RNA
+norm <- counts
+norm@x <- norm@x * scale_row[norm@i + 1L]
+```
+
+
 # Computing pathway scores {#pathway}
 
+Computing per-cell scores of pathway activity is useful for a few reasons:
+
+1. Single gene expression values are noisy; pathway scores, computed across broader sets of genes, are more statistically stable.
+2. Pathway scores are often easier to interpret.
+3. Dimension reduction: it's more convenient to analyze hundreds of pathways than thousands of genes. 
+
+We have tried a variety of pathway scoring approaches, and  [AUCell](https://github.com/aertslab/AUCell){target="_blank"} has emerged as our preferred approach. 
+(That said, our benchmarking was not definitive, and we have no specific concerns about alternative methods.)
+
+For full details on running AUCell, see the [AUC package vignette](https://bioconductor.org/packages/release/bioc/vignettes/AUCell/inst/doc/AUCell.html){target="_blank"}.
+
+For gene sets, we favor the REACTOME pathways. 
+
+You can compute per-cell pathway scores as follows:
+
+```{r echo = TRUE, eval = FALSE}
+## get reactome gene sets:
+gene.sets <- with(
+  msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME"),
+  split(gene_symbol, gs_name)
+)
+
+## get per-cell ranked expression:
+
+
+
+## run AUCell. Process pathways in chunks to constrain memory usage. 
+chunks <- data.table(strt=unique(c(seq(1, length(gene.sets), 100), length(gene.sets))))
+chunks[,stp:=data.table::shift(strt, 1, type="lead")]
+chunks <- chunks[-c(.N)]
+chunks[1:(.N-1),stp:=stp-1]
+
+pb <- txtProgressBar(min = 0, max = nrow(chunks), style=3) 
+for(chunky in 1:nrow(chunks)){
+  strt <- chunks[chunky,strt]
+  stp <- chunks[chunky,stp]
+  #run aucell for all gene sets 
+  reschunk <- AUCell::AUCell_calcAUC(
+    geneSets = reactome[strt:stp], 
+    cells_rankings, 
+    aucMaxRank=ceiling(nrow(cells_rankings)*median_diversity_pctile), verbose = TRUE,
+    nCores = 4
+    # , BPPARAM = BiocParallel::MulticoreParam(workers = 8)
+  )
+  reschunk <- as(reschunk@assays@data$AUC, "sparseMatrix")
+  setTxtProgressBar(pb, chunky)
+  #  cells_AUC[[ii]][[chunky]] <- reschunk
+  saveRDS(reschunk, file=paste0("aucell_results/cellsAUC.smoothedct."
+                                ,"sampleid__",sampl
+                                ,".chunk__",chunky
+                                ,".rds")
+          )
+  #names(cells_AUC[[ii]]) <- paste0("AUC_", names(cells_AUC[[ii]]))
+  rm(reschunk); gc()
+} 
+gc()
+```
 
 # Looking for spatially variable genes {#moran}
 
 
 # Finding modules of spatially correlated genes with InSituCor {#insitucor}
 
+Just as genes with strong spatial trends are potentially interesting, so are sets of genes with shared spatial patterns. 
+Motivated by th
+
+```{r echo = TRUE, eval = FALSE}
+# install insitucor:
+if (FALSE) {
+  devtools::install_github("https://github.com/Nanostring-Biostats/InSituCor")
+}
+```
+
+
+
+InSituCor 
 
 # Studying perturbations from baseline using InSituDiff {#insitudiff}
 
+The InSituDiff algorithm is a useful tool for exploring studies with both disease and baseline samples.
+It matches cellular neighborhoods in disease with the most similar baseline neighborhoods, then records the discrepancies as "perturbations". These perturbations are then very useful fodder for downstream analysis.
+In practice, we find that InSituDiff quickly highlights the genes and spatial regions that are most worthy of attention. For a full writeup, see [the blog post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitudiff/){target="_blank"}; 
+for code, see [the package](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/InSituDiff){target="_blank"}.
+
+A quick run-through of exploratory analysis using InSituDiff is below:
+
+```{r echo = TRUE, eval = FALSE}
+# get the necessary data to run analyses:
+obj <- initializeISD(
+  mat = norm, # matrix of normalized expression
+  xy = xy, # matrix of xy coordinates
+  tissue = annot$tissue, # vector of cells' tissue IDs
+  iscontrol = grepl("control", annot$tissue), 
+  k = 50) # define cellular neighborhoods as a cell's 50 nearest neighbors
+str(obj)
+
+# score perturbations of selected genes over all cells:
+selectedperturbations <- getPerturbations(
+  x = norm, 
+  obj = obj, 
+  cells = rownames(counts)[annot$tissue == "SP19_1139"], # only look at one tissue
+  genes = c("IGHA1", "FGFR3", "HIF1A", "ACE2", "SAT1"),  # only look at a few genes of interest
+  residtype = "log2ratio",  # look at perturbations on the scale of log fold-changes
+  eps = 1)
+
+# score overall perturbation per gene:
+genescores <- summarizeGenePerturbation(
+  x = norm, obj = obj, 
+  residtype = "log2ratio", plotresults = TRUE, eps = 0.1, subsetsize = 1e5) 
+
+# identify highly perturbed genes:
+hist(genescores[,1], breaks = 10)
+thresh = 3
+abline(v = thresh, col = 2, lty = 2)
+hpgs <- rownames(genescores)[genescores[, "broadness"] > thresh]
+print(paste0("Highly perturbed genes: ", paste0(hpgs, collapse = ", ")))
+
+# get modules of genes whose perturbations are spatially correlated:
+modules <- buildGeneModules(
+  x = norm, obj = obj, 
+  genes = NULL,  # subset of genes to use; enter NULL to use all, or "highlyperturbed" to take just the most perturbed genes ("highlyperturbed" is our default and our recommendation for full studies; here we use NULL because our mini dataset has only 30 genes.)
+  resolution = 0.02, # control leiden clustering
+  corthresh = 0.3, # control the adjacency network used by leiden clustering
+  min_module_cor = 0.25, # throw out modules with average cor below this
+  subsetsize = 1e5, 
+  eps = 0.5, 
+  residtype = "log2ratio") 
+modules
+
+# score perturbations of selected modules across all cells:
+moduleperturbations <- getPerturbations(
+  x = norm, 
+  obj = obj, 
+  cells = NULL, # only look at one tissue
+  genes = modules[1:2], # arbitrarily plotting the first and second modules
+  residtype = "log2ratio",  # look at perturbations on the scale of log fold-changes
+  eps = 0.2)
+plot(xy, pch = 16, cex = 0.1, asp = 1, 
+     main = paste0("Perturbation of module ", colnames(moduleperturbations)[1]),
+     col = colorZeroCentered(moduleperturbations[, 1], maxquant = 0.999))
+
+# define spatial domains of perturbations by clustering perturbation values across space:
+set.seed(0)
+res <- clusterPerturbations(x = norm, obj = obj, 
+                            cells = NULL, 
+                            genes = hpgs, # using the highly perturbed genes we defined earlier 
+                            residtype = "log2ratio", 
+                            nclust = 6)
+plot(xy, pch = 16, cex = 0.1, 
+     col = c("grey", "cornflowerblue", "darkviolet", "orange", "red", "forestgreen")[
+       as.numeric(as.factor(res$clust))])  
+pheatmap(res$means, 
+         breaks = seq(-3,3,length.out = 101), 
+         col = colorRampPalette(c("darkblue", "white", "darkred"))(100))
+``

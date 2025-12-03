@@ -1206,8 +1206,9 @@ metadata <- readRDS(paste0(outdir, "/processed_data/metadata.RDS"))
 xy <- readRDS(paste0(outdir, "/processed_data/xy.RDS"))
 
 # get normalized data if desired:
-norm <- Matrix::Diagonal(x = mean(metadata$nCount_RNA)/metadata$nCount_RNA,names=colnames(counts)) %*% counts
-rownames(norm) <- rownames(counts)
+scale_row <- mean(metadata$nCount_RNA)/metadata$nCount_RNA
+norm <- counts
+norm@x <- norm@x * scale_row[norm@i + 1L]
 
 # likely to be useful: compute nearest neighbors:
 neighbors <- InSituCor:::nearestNeighborGraph(xy[, 1], xy[, 2], N = 50, subset = metadata$slide_ID)  
