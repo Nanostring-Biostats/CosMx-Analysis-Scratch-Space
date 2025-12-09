@@ -186,8 +186,6 @@ benefit from more compression than flat files do), and they're faster to read ba
 ```{r echo = TRUE, eval = FALSE}
 # save data in R-friendly form:
 saveRDS(counts, file = paste0(outdir, "/processed_data/counts_unfiltered.RDS"))
-saveRDS(negcounts, file = paste0(outdir, "/processed_data/negcounts_unfiltered.RDS"))
-saveRDS(falsecounts, file = paste0(outdir, "/processed_data/falsecounts_unfiltered.RDS"))
 saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata_unfiltered.RDS"))
 saveRDS(xy, file = paste0(outdir, "/processed_data/xy_unfiltered.RDS"))
 ```
@@ -409,20 +407,6 @@ knitr::include_graphics("figures/QC_FOVQC.png")
 We don't have any flagged FOVs in this study. For examples of studies with more flagged FOVs, 
  see [the FOV QC post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/){target="_blank"} and [this older vignette](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/assets/2.-QC-and-normalization.html){target="_blank"}.
 
-Finally, we'll remove flagged cells and save the filtered data for downstream analysis:
-
-```{r echo = TRUE, eval = FALSE}
-# save data with flagged cells removed
-counts <- counts[!flag, ]
-metadata <- metadata[!flag, ]
-xy <- xy[!flag, ]
-
-# save filtered data objects, to be used in the remainder of the analysis
-saveRDS(counts, file = paste0(outdir, "/processed_data/counts.RDS"))
-saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
-saveRDS(xy, file = paste0(outdir, "/processed_data/xy.RDS"))
-```
-
 ## Descriptive QC plots
 
 In addition to the above per-cell flags, it can be worth plotting some QC metrics atop the space of your tissues.
@@ -508,6 +492,22 @@ knitr::include_graphics("figures/QC_flaggedcells.png")
 We can see flagged cells clustered in ducts/vessels/gaps in the tissue. 
 Again, no action is needed, but we should keep this in mind while we interpret results. 
 
+## Removing flagged cells
+
+As our final QC step, we remove flagged cells and save the filtered data for downstream analysis:
+
+```{r echo = TRUE, eval = FALSE}
+# save data with flagged cells removed
+counts <- counts[!flag, ]
+metadata <- metadata[!flag, ]
+xy <- xy[!flag, ]
+
+# save filtered data objects, to be used in the remainder of the analysis
+saveRDS(counts, file = paste0(outdir, "/processed_data/counts.RDS"))
+saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
+saveRDS(xy, file = paste0(outdir, "/processed_data/xy.RDS"))
+```
+
 ## Normalization
 
 We typically normalize each cell's expression profile to its total counts. 
@@ -559,7 +559,7 @@ You can install it with this command:
 
 ```{r echo = TRUE, eval = FALSE}
 # install the sparse pearson PCA package:
-  remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
+remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
                           subdir = "_code/scPearsonPCA", ref = "Main")
 ```
 
@@ -927,7 +927,10 @@ dev.off()
 
 # umap positions
 png("results/umap_by_cluster.png", width = 16, height = 16, units = "in", res = 400)
-par()
+par(mar = c(0,0,0,0))
+plot(umapobj$ump@cell.embeddings, pch = 16, asp = 1, cex = 0.1, 
+     col = scales::alpha(cellcols[as.numeric(as.factor(clust))], 0.05))
+legend("topleft", pch = 16, legend = levels(as.factor(clust)), col = cellcols[1:length(levels(as.factor(clust)))])
 dev.off()
   
 # xy positions:
@@ -1040,6 +1043,8 @@ htclust <- hieratyperes$post_probs$l1$celltype_granular
 names(htclust) <- hieratyperes$post_probs$l1$cell_ID
 htclust[tcell_typing$post_probs$tmajor$cell_ID] <- tcell_typing$post_probs$tmajor$celltype_granular
 htclust <- htclust[match(metadata$cell_id, names(htclust))]
+metadata$hieratype_call <- htclust
+
 ```
 
 Now we'll use a simple marker heatmap to confirm HieraType worked as hoped:
@@ -1091,37 +1096,55 @@ knitr::include_graphics("figures/hieratype_marker_heatmap2.png")
 
 To finish our cell typing exercise, we now merge the Louvain and HieraType results.
 All cells called immune by HieraType will get HieraType labels. 
-All other cells will retain their old labels, with one important exception: any cells in an immune Louvain cluster but not called immune by HieraType will be reclassified as "unknown":
-
+All other cells will retain their old labels, with one important exception: 
+ clusters that were overwhelmingly called immune by HieraType will be removed,
+ and their cells will be assigned to whatever consensus cell type is most abundant in 
+ its nearest neighbors in expression space.
+ 
 ```{r echo = TRUE, eval = FALSE}
-# combine hieratype and clustering:
-immune.ids <- hieratyperes$post_probs$l1$cell_ID[
-  !is.element(hieratyperes$post_probs$l1$celltype_thresh, c("epithelial", "fibroblast", "endothelial", "smooth_muscle"))]
-celltype <- clust
-names(celltype) <- metadata$cell_id
-celltype[immune.ids] <- htclust[immune.ids]
-
-
-
-# which clusters to reassign: >90% taken by hieratype, and < 5% of total cells left.
-propoverwritten <- by(clust != celltype, clust, mean)
-proppercluster <- table(celltype) / length(celltype)
-clusterstodrop <- union(
-  intersect(
-    names(which(propoverwritten > 0.9)),
-    names(which(proppercluster < 0.05))),
-  intersect(
-    names(which(propoverwritten > 0.5)),
-    names(which(proppercluster < 0.01)))
+## merge w existing clusters:
+merged <- HieraType::celltype_label_integration(
+  metadata = metadata,
+  adjacency_mat = umapobj$grph,
+  cellid_colname = "cell_id",
+  unsupervised_colname = "clust",
+  supervised_colname = "hieratype_call",
+  supervised_labels_keep = unique(c(names(HieraType::markerslist_immune)
+                                   ,names(HieraType::markerslist_tcellmajor)
+                                   ,names(HieraType::markerslist_cd4tminor)
+                                   ,names(HieraType::markerslist_cd8tminor))
+  ),
+  dissolve_smallcluster_if_overwritten_prop_greaterthan = c(0.9, 0.5),
+  and_dissolve_smallcluster_if_finalcluster_prop_lessthan = c(0.05, 0.01)
 )
-# find nearest neighbors (in valid clusters) for cells in target clusters:
-cellstoreclassify <- names(celltype)[is.element(celltype, clusterstodrop)]
-neighborclusts <- InSituCor:::neighbor_tabulate(celltype, neighbors = umapobj$grph)
-neighborclusts <- neighborclusts[, !is.element(colnames(neighborclusts), clusterstodrop)]
-# reclassify by most common nearest neighbor among valid clusters:
-celltype[cellstoreclassify] <- colnames(neighborclusts)[apply(neighborclusts[cellstoreclassify, ], 1, which.max)]
-  
-table(celltype)[order(table(celltype))]
+
+celltype <- metadata$celltype <- merged$celltype[match(metadata$cell_id, merged$cell_id)]
+
+# # combine hieratype and clustering:
+# immune.ids <- hieratyperes$post_probs$l1$cell_ID[
+#   !is.element(hieratyperes$post_probs$l1$celltype_thresh, c("epithelial", "fibroblast", "endothelial", "smooth_muscle"))]
+# celltype <- clust
+# names(celltype) <- metadata$cell_id
+# celltype[immune.ids] <- htclust[immune.ids]
+# # which clusters to reassign: >90% taken by hieratype, and < 5% of total cells left.
+# propoverwritten <- by(clust != celltype, clust, mean)
+# proppercluster <- table(celltype) / length(celltype)
+# clusterstodrop <- union(
+#   intersect(
+#     names(which(propoverwritten > 0.9)),
+#     names(which(proppercluster < 0.05))),
+#   intersect(
+#     names(which(propoverwritten > 0.5)),
+#     names(which(proppercluster < 0.01)))
+# )
+# # find nearest neighbors (in valid clusters) for cells in target clusters:
+# cellstoreclassify <- names(celltype)[is.element(celltype, clusterstodrop)]
+# neighborclusts <- InSituCor:::neighbor_tabulate(celltype, neighbors = umapobj$grph)
+# neighborclusts <- neighborclusts[, !is.element(colnames(neighborclusts), clusterstodrop)]
+# # reclassify by most common nearest neighbor among valid clusters:
+# celltype[cellstoreclassify] <- colnames(neighborclusts)[apply(neighborclusts[cellstoreclassify, ], 1, which.max)]
+#   
+# table(celltype)[order(table(celltype))]
 
 
 # # what to do with the leftover immune cells from clustering?
@@ -1144,7 +1167,6 @@ table(celltype)[order(table(celltype))]
 # 
 # # overwrite left-behind louvain immune clusters:
 # celltype[is.element(celltype, louvain_immune_names)] <- "immune_unspecified"
-metadata$celltype <- celltype
 saveRDS(celltype, file = paste0(outdir, "/processed_data/celltype.RDS"))
 saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
 ```
