@@ -1,5 +1,5 @@
 ---
-title: "Basic Analysis Vignette: exploratory analysis"
+title: "Basic analysis vignette: exploratory analysis"
 author:
   - name: Patrick Danaher
     orcid: 0000-0002-2844-5883
@@ -128,6 +128,8 @@ if (nfovs < length(unique(metadata$FOV))) {
   usefovs <- unique(metadata$FOV)
 }
 inds <- is.element(metadata$FOV, usefovs)
+# compute moran's:
+# (very fast if not too many cells)
 morans_all <- moransMultiFast(X = norm[inds, ], W = neighbors[inds, inds], perm = 10, compute_sparse = TRUE, compute_perm = FALSE)
 
 
@@ -189,6 +191,7 @@ A quick run-through of the InSituCor workflow is below:
 conditionon <- as.data.frame(metadata[, "celltype", drop = FALSE])
 
 ## run InSituCor:
+# (<10 mins)
 res <- InSituCor::insitucor(
          # fundamental input data:
          counts = norm, 
@@ -295,7 +298,8 @@ A quick run-through of exploratory analysis using InSituDiff is below:
 
 ```{r echo = TRUE, eval = FALSE}
 # get the necessary data to run analyses:
-obj <- initializeISD(
+# (a few minutes)
+obj <- InSituDiff::initializeISD(
   mat = norm, # matrix of normalized expression
   xy = xy, # matrix of xy coordinates
   tissue = metadata$tissue, # vector of cells' tissue IDs
@@ -304,16 +308,16 @@ obj <- initializeISD(
 str(obj)
 
 # score perturbations of selected genes over all cells:
-selectedperturbations <- getPerturbations(
+selectedperturbations <- InSituDiff::getPerturbations(
   x = norm, 
   obj = obj, 
-  cells = rownames(counts)[metadata$tissue == "SP19_1139"], # only look at one tissue
+  cells = rownames(counts)[metadata$tissue == "tissue1"], # only look at one tissue
   genes = c("IGHA1", "FGFR3", "HIF1A", "ACE2", "SAT1"),  # only look at a few genes of interest
   residtype = "log2ratio",  # look at perturbations on the scale of log fold-changes
   eps = 1)
 
 # score overall perturbation per gene:
-genescores <- summarizeGenePerturbation(
+genescores <- InSituDiff::summarizeGenePerturbation(
   x = norm, obj = obj, 
   residtype = "log2ratio", plotresults = TRUE, eps = 0.1, subsetsize = 1e5) 
 
@@ -325,7 +329,7 @@ hpgs <- rownames(genescores)[genescores[, "broadness"] > thresh]
 print(paste0("Highly perturbed genes: ", paste0(hpgs, collapse = ", ")))
 
 # get modules of genes whose perturbations are spatially correlated:
-modules <- buildGeneModules(
+modules <- InSituDiff::buildGeneModules(
   x = norm, obj = obj, 
   genes = NULL,  # subset of genes to use; enter NULL to use all, or "highlyperturbed" to take just the most perturbed genes ("highlyperturbed" is our default and our recommendation for full studies; here we use NULL because our mini dataset has only 30 genes.)
   resolution = 0.02, # control leiden clustering
@@ -337,7 +341,7 @@ modules <- buildGeneModules(
 modules
 
 # score perturbations of selected modules across all cells:
-moduleperturbations <- getPerturbations(
+moduleperturbations <- InSituDiff::getPerturbations(
   x = norm, 
   obj = obj, 
   cells = NULL, # only look at one tissue
@@ -350,7 +354,7 @@ plot(xy, pch = 16, cex = 0.1, asp = 1,
 
 # define spatial domains of perturbations by clustering perturbation values across space:
 set.seed(0)
-res <- clusterPerturbations(x = norm, obj = obj, 
+res <- InSituDiff::clusterPerturbations(x = norm, obj = obj, 
                             cells = NULL, 
                             genes = hpgs, # using the highly perturbed genes we defined earlier 
                             residtype = "log2ratio", 

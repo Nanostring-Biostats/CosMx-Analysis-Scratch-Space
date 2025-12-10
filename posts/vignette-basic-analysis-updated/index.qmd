@@ -1,0 +1,68 @@
+---
+title: "Basic Analysis Vignette: current best practice workflow"
+author:
+  - name: Patrick Danaher
+    orcid: 0000-0002-2844-5883
+    affiliations:
+      - ref: bsb
+      - ref: patrickjdanaher
+toc: true
+code-fold: true
+toc-title: Contents
+toc-depth: 3
+toc-expand: 1
+toc-location: left
+number-sections: true
+number-depth: 4
+format:
+  html:
+    code-fold: true
+date: "2025-12-11"
+date-modified: last-modified
+categories:
+  - recommended
+  - quality control
+  - cell typing
+  - normalization
+image: figures/thumbnail.png
+draft: false
+---
+
+# New best practices for CosMx analysis
+
+Here we propose an updated pipeline for basic CosMx<sup>&#174;</sup> analysis in R, 
+ from data loading through cell typing, to exploratory data analysis, to confirmatory analysis with differential expression testing. 
+This workflow assumes a whole study can be fit into your compute environment's memory. 
+For very large studies, see our upcoming vignette on the topic, or the summary below. 
+
+This post is exclusively in R. Many steps have easy python analogs, but some, like the hieraType immune cell typing algorithm and the FOV QC functions, only have R implementations. 
+ 
+## Basic analysis strategy 
+
+Analyses can meander and sprawl, but often enough they are reducible to 3 phases:
+
+1. **Basic pre-processing**: Prepare your data for deeper analysis: perform QC, normalize your data, 
+ perform dimension reduction, and finalize your cell typing. This vignette covers this workflow. 
+2. **Exploratory analysis**: See what unexpected trends your data holds. Ideally, these trends 
+ can be phrased as formal hypotheses to be tested. (Post coming soon.)
+3. **Hypothesis testing**: In our experience, most analyses culminate here, mainly taking the form of differential expression (DE) testing. 
+ DE is a flexible tool to interrogate both the hypotheses you designed the study around and new hypotheses discovered in exploratory analysis. 
+ We see DE as the workhorse of spatial analyses, but there are other useful tools: e.g., 
+ you might calculate changes in cell type abundance or co-localization across space, or compute various metrics of ligand-receptor interactions. (Post coming soon.)  
+ 
+ 
+
+## Basic analysis strategy: large studies 
+
+When your data is too large to fit into memory -- and this can happen with just a few slides of WTX data --
+ you need to modify the above strategy. 
+We propose the below approach, which we will demonstrate in a separate vignette in early 2026:
+
+1. Obtain a subsample of the larger study. This could be FOVs chosen at random from all the tissues in the study, or just the first couple slides to come off the instrument. 
+2. Use this subsample to fix a basic pre-processing pipeline. Importantly, this pipeline has to be applicable to new samples: their data has to be projected onto the same dimension-reduced embedding, and their cell typing has to map to the cell typing of the subsample. 
+3. Apply the above pre-processing pipeline separately to each tissue/slide in the study.
+4. Define an additional "hypothesis testing" pipeline, also to be applied separately to each tissue. 
+ This pipeline will compute whatever summary statistics you're interested in, e.g. DE results, cell type abundance, LR interaction scores.
+5. Perform meta-analysis of every tissues' summary statistics together. E.g. contrast DE results or cell type abundances across responders and non-responders. 
+6. Custom subset analyses: you may also have to load in custom subsets of the data for analysis, e.g. just the macrophages from every tissue. 
+
