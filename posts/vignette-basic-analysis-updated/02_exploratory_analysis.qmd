@@ -96,12 +96,19 @@ if (TRUE) {
   pathscores <- readRDS(paste0(outdir, "/processed_data/pathscores.RDS"))
 }
 ```
+The pathway scores calculated above can now be used anywhere you'd use a gene expression matrix. Our favorite uses of pathway scores are:
+
+- Simply look at spatial plots for pathways of interest.
+- Look for spatially variable pathway scores, e.g. with the Moran's I code below.
+- Score cells for neighborhood pathway activity, e.g. "mean neighborhood IFNG pathway score", and use this as a predictor in differential expression analyses. 
+- Compare mean pathway scores between cell types of interest, e.g. tumor subclusters.
+- Compare pathway scores across niches.
+- It's also possible to run differential expression analysis on pathway scores, but we prefer to run DE on single genes, then run gene set enrichment analysis. 
+
 
 **Note:** the above code produces a dense matrix of cell x pathway scores. For larger datasets, this will take your memory. Above we round the scores to reduce memory usage. For bigger studies, you could compute them in chunks, e.g. separately for each tissue, or for each cell type. 
 
 # Looking for spatially variable genes {#moran}
-
-
 
 ```{r echo = TRUE, eval = FALSE}
 # Source the efficient Moran's function
@@ -164,6 +171,8 @@ text(log2(1e-2 + meanexpr_mycelltype),
      names(meanexpr_mycelltype), cex = 0.5)
 ```
 
+
+
 # Finding modules of spatially correlated genes with InSituCor {#insitucor}
 
 Just as genes with strong spatial trends are potentially interesting, so are sets of genes with shared spatial patterns. 
@@ -177,7 +186,7 @@ A quick run-through of the InSituCor workflow is below:
 
 ```{r echo = TRUE, eval = FALSE}
 ## key input: data to be conditioned on. Only cell type is necessary, though slide / tissue ID could be used as well .
-conditionon <- metadata[, "celltype", drop = FALSE]
+conditionon <- as.data.frame(metadata[, "celltype", drop = FALSE])
 
 ## run InSituCor:
 res <- InSituCor::insitucor(
@@ -236,6 +245,40 @@ pheatmap(res$attributionmats[[1]], col = colorRampPalette(c("white", "darkblue")
          main = "Contribution of cell types to module genes")
 
 ```
+
+
+Our results include:
+
+- A list of gene modules:
+
+```{r echo = FALSE, eval = TRUE, out.width = "100%"}
+knitr::include_graphics("figures/iscor_modules.png")
+```
+
+- The spatial correlation network:
+
+```{r echo = FALSE, eval = TRUE, out.width = "75%"}
+knitr::include_graphics("figures/cornet.png")
+```
+
+- Module scores over space:
+
+```{r echo = FALSE, eval = TRUE, out.width = "75%"}
+knitr::include_graphics("figures/iscorxy.png")
+```
+
+- "Cell type attribution scores" estimating how much each cell type is responsible for each module of correlated genes.
+
+```{r echo = FALSE, eval = TRUE, out.width = "75%"}
+knitr::include_graphics("figures/attribmat.png")
+```
+
+- For each module, attribution scores estimating how much each cell type is responsible for each gene in the module.
+
+```{r echo = FALSE, eval = TRUE, out.width = "75%"}
+knitr::include_graphics("figures/attribmat2.png")
+```
+
 
 
 # Studying perturbations from baseline using InSituDiff {#insitudiff}
