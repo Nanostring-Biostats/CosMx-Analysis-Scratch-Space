@@ -41,6 +41,14 @@ make_W <- function(
                    ,weight_colname=NULL
                    ,standardize_matrix_by_row_or_col = c("col", "row")
   ){
+
+  metainfo <- data.table::copy(data.table::as.data.table(metadata)) 
+  if(!(cellid_colname) %in% names(metainfo)){
+    cellid_colname <- "cell_ID"
+    metainfo[[cellid_colname]] <- rownames(metadata)
+  }
+  if(cellid_colname!="cell_ID" & "cell_ID" %in% names(metainfo)) metainfo[["cell_ID"]] <- NULL
+  setnames(metainfo, old=cellid_colname, new="cell_ID")
   
   standardize_matrix_by_row_or_col <- match.arg(standardize_matrix_by_row_or_col) 
   idx <- rbindlist(list(cell_adjacencies[,.(cell_ID=from)][,unique(.SD)]
@@ -50,7 +58,7 @@ make_W <- function(
   
   ### Add in any missing cells with 0 adjacencies
   idx <- rbindlist(list(idx
-                        ,data.table(cell_ID=setdiff(metadata[,unique(cell_ID)]
+                        ,data.table(cell_ID=setdiff(metainfo[,unique(cell_ID)]
                                                     ,idx[,cell_ID]
                        )
                   )
