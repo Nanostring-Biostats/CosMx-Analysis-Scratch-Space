@@ -358,6 +358,8 @@ dbscancluster <- dbscan::dbscan(xy[tempcells, ],
                      minPts = 5  # throw out clusters of less than 5 cells
                      )$cluster
 selectedcells <- dbscancluster != 0
+metadata$selected <- FALSE
+metadata$selected[tempcells][selectedcells] <- TRUE
 ```   
 
 :::
@@ -385,7 +387,7 @@ By modifying the `k` variable below you can take the distance to the *k*-th clos
 
 ```{r echo = TRUE, eval = FALSE}
 # collection of cells we want to take a distance to:
-istargetcell <- meta_data$celltype == "Tcell"
+istargetcell <- metadata$celltype == "Tcell"
 # record all cells' distances to k-th nearest target cell
 k <- 1
 dist2target <- FNN::get.knnx(
@@ -403,9 +405,8 @@ This approach is appropriate when you expect the impact of your selected cells o
 E.g., a neighborhood with more T cells might have a stronger inflammatory milieu than a neighborhood with just 1 T cell. 
 
 ```{r echo = TRUE, eval = FALSE}
-
 # collection of cells we want to take a distance to:
-istargetcell <- meta_data$celltype == "Tcell"
+istargetcell <- metadata$celltype == "Tcell"
 
 # count the target cells among cells' neighbors:
 neighboring.targetcells <- InSituCor:::neighbor_sum(x = 1 * (istargetcell),
@@ -421,12 +422,11 @@ The below code shows how to measure the mean / total expression of a gene in eac
 # raw counts of a gene:
 x <- counts[, "CXCL14"] 
 # normalized expression of a gene:
-x <- counts[, "CXCL14"] / meta_data$nCount_RNA
+x <- counts[, "CXCL14"] / metadata$nCount_RNA
 # or you could use a pathway score, or protein expression (if measured)
 
 ## get average expression in each cell's neighborhood:
-neighbormean <- InSituCor:::neighbor_sum(x = x,
-                                         neighbors = neighbors)
+neighbormean <- InSituCor:::neighbor_sum(x = x, neighbors = neighbors)
 ```
 
 
@@ -452,9 +452,9 @@ For variables with strong skew or long tails, a quantile transformation can prev
 
 ```{r echo = TRUE, eval = FALSE}
 # inverse:
-x <- 1 / x
+x <- 1 / pmax(x, min(x[x > 0]))
 # log2-transform:
-x <- log2(x)
+x <- log2(x + 1e-3)
 # scale from 0-1:
 x <- (x - min(x)) / (max(x) - min(x))
 # scale to have unit SD:
@@ -482,7 +482,7 @@ Alteratively, using various base R packages for linear models, you can run both 
 x <- cut(x, breaks = 20)
 # break a variable into bins of equal cell numbers:
 quants <- quantile(x, seq(0,1,length.out = 21))
-x <- cut(x, breaks = quants)
+x <- cut(x, breaks = unique(quants))
 ```
 After the above, `x` is now a factor with 20 levels. 
 
