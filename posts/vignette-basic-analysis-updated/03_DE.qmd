@@ -573,7 +573,7 @@ if (TRUE) {
 }
 
 # extract the genes to analyze for your cell type (in this example, "macrophage"):
-genes_to_analyze <- overlap_metrics[celltype=="macrophage"][ratio < 1][["target"]]
+genes_to_analyze <- overlapres[celltype=="macrophage"][ratio < 1][["target"]]
 ```
 
 **Second, we record cells' spatial neighbors**, which smiDE uses to adjust for any lingering bias from segmentation errors:
@@ -584,6 +584,7 @@ if (TRUE) {
   pre_de_obj <- 
   pre_de(metadata = cbind(xy, metadata),
          cell_type_metadata_colname = "celltype",
+         cellid_colname = "cell_id",
          split_neighbors_by_colname = "tissue",
          mm_radius = 0.05,
          sdimx_colname = colnames(xy)[1],
@@ -628,19 +629,20 @@ Our recommended modeling approaches for different settings are below:
 ```{r echo = TRUE, eval = FALSE}
 ## define the problem:
 # which cells to analyze: (a logical vector over all cells)
-inds <- clust == "macrophage"
+inds <- metadata$celltype == "macrophage"
 
 ## run smiDE with a Negative Binomial model and no spatial correlation modeling:
 de_obj <- 
    smi_de(assay_matrix = Matrix::t(counts[inds, ]),
           metadata = metadata[inds, ],
-          formula = ~RankNorm(otherct_expr) + offset(log(totalcounts)) + distance_to_tumor,   # <----- first two terms adjust for segmentation errors and per-cell signal strength, final term is the variable to be analyzed, must be a column in metadata
+          formula = ~RankNorm(otherct_expr) + offset(log(nCount_RNA)) + distance_to_tumor,   # <----- first two terms adjust for segmentation errors and per-cell signal strength, final term is the variable to be analyzed, must be a column in metadata
           pre_de_obj = pre_de_obj,  # depends on pre_de_obj calculated earlier
-          neighbor_expr_cell_type_metadata_colname = "cell_type",
+          cellid_colname = "cell_id",
+          neighbor_expr_cell_type_metadata_colname = "celltype",
           neighbor_expr_overlap_weight_colname = NULL,
           neighbor_expr_overlap_agg ="sum",
           neighbor_expr_totalcount_normalize = TRUE,
-          neighbor_expr_totalcount_scalefactor = totalcount_scalefactors,
+          neighbor_expr_totalcount_scalefactor = NULL,
           family="nbinom2",
           targets=genes_to_analyze     # calculated in earlier code block
    ) 
@@ -655,21 +657,22 @@ str(res) # use res$pairwise for most cases. res$one.vs.rest can also be useful.
 
 ## define the problem:
 # which cells to analyze: (a logical vector over all cells)
-inds <- clust == "macrophage"
+inds <- metadata$celltype == "macrophage"
 metadata$sdimx <- xy[, 1]
-metadata$sdim2 <- xy[, 2]
+metadata$sdimy <- xy[, 2]
 
 ## run smiDE with a Negative Binomial model and no spatial correlation modeling:
 de_obj <- 
    smi_de(assay_matrix = Matrix::t(counts[inds, ]),
           metadata = metadata[inds, ],
-          formula = ~RankNorm(otherct_expr) + offset(log(totalcounts)) + distance_to_tumor,   # <----- first two terms adjust for segmentation errors and per-cell signal strength, final term is the variable to be analyzed, must be a column in metadata
+          formula = ~RankNorm(otherct_expr) + offset(log(nCount_RNA)) + distance_to_tumor,   # <----- first two terms adjust for segmentation errors and per-cell signal strength, final term is the variable to be analyzed, must be a column in metadata
           pre_de_obj = pre_de_obj,  # depends on pre_de_obj calculated earlier
-          neighbor_expr_cell_type_metadata_colname = "cell_type",
+          cellid_colname = "cell_id",
+          neighbor_expr_cell_type_metadata_colname = "celltype",
           neighbor_expr_overlap_weight_colname = NULL,
           neighbor_expr_overlap_agg ="sum",
           neighbor_expr_totalcount_normalize = TRUE,
-          neighbor_expr_totalcount_scalefactor = totalcount_scalefactors,
+          neighbor_expr_totalcount_scalefactor = NULL,
           family="nbinom2",
           targets=genes_to_analyze,     # calculated in earlier code block
           spatial_model = list(name="GP_INLA",
@@ -688,16 +691,17 @@ str(res) # use res$pairwise for most cases. res$one.vs.rest can also be useful.
 ```{r echo = TRUE, eval = FALSE}
 ## define the problem:
 # which cells to analyze: (a logical vector over all cells)
-inds <- clust == "macrophage"
+inds <- metadata$celltype == "macrophage"
 # variable to analyze (defined over all cells):
 x <- distance_to_tumor
 # normalized data:
-normfactor <- metadata$nCount_RNA / mean(metadata$nCount_RNA) * 1000
+normfactor <- mean(metadata$nCount_RNA) / metadata$nCount_RNA 
 norm <- counts
 norm@x <- counts@x * normfactor[ counts@i + 1L ]
-# to put genes on similar scales, scale the columns of norm:
+## to put genes on similar scales, scale the columns of norm:
 genefactors <- 1 / pmax(0.05, Matrix::colMeans(norm))  
-normscaled <- norm %*% Matrix::Diagonal(genefactors)
+normscaled <- norm %*% Matrix::Diagonal(x = genefactors)
+colnames(normscaled) <- colnames(norm)
 
 ## source the fast DE function:
 source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/refs/heads/Main/_code/PatchDE/DEutils.R")
@@ -730,16 +734,17 @@ As a solution, we propose the following procedure, which will produce conservati
 ```{r echo = TRUE, eval = FALSE}
 ## define the problem:
 # which cells to analyze: (a logical vector over all cells)
-inds <- clust == "macrophage"
+inds <- metadata$celltype == "macrophage"
 # variable to analyze (defined over all cells):
 x <- distance_to_tumor
 # normalized data:
-normfactor <- metadata$nCount_RNA / mean(metadata$nCount_RNA) * 1000
+normfactor <- mean(metadata$nCount_RNA) / metadata$nCount_RNA 
 norm <- counts
 norm@x <- counts@x * normfactor[ counts@i + 1L ]
 # to put genes on similar scales, scale the columns of norm:
 genefactors <- 1 / pmax(0.05, Matrix::colMeans(norm))  
 normscaled <- norm %*% Matrix::Diagonal(genefactors)
+colnames(normscaled) <- colnames(norm)
 
 ## source the fast DE function:
 source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/refs/heads/Main/_code/PatchDE/DEutils.R")
@@ -754,8 +759,6 @@ topgenes <- names(fastres$p)[order(abs(fastres$effect) * (fastres$p < quantile(f
 
 # Run smiDE on the top genes with the optimal / spatial-aware call to smiDE:
 ## define the problem:
-# which cells to analyze: (a logical vector over all cells)
-inds <- clust == "macrophage"
 metadata$sdimx <- xy[, 1]
 metadata$sdim2 <- xy[, 2]
 
@@ -763,13 +766,14 @@ metadata$sdim2 <- xy[, 2]
 de_obj <- 
    smi_de(assay_matrix = Matrix::t(counts[inds, ]),
           metadata = metadata[inds, ],
-          formula = ~RankNorm(otherct_expr) + offset(log(totalcounts)) + distance_to_tumor,   # <----- first two terms adjust for segmentation errors and per-cell signal strength, final term is the variable to be analyzed, must be a column in metadata
+          formula = ~RankNorm(otherct_expr) + offset(log(nCount_RNA)) + distance_to_tumor,   # <----- first two terms adjust for segmentation errors and per-cell signal strength, final term is the variable to be analyzed, must be a column in metadata
           pre_de_obj = pre_de_obj,  # depends on pre_de_obj calculated earlier
-          neighbor_expr_cell_type_metadata_colname = "cell_type",
+          cellid_colname = "cell_id",
+          neighbor_expr_cell_type_metadata_colname = "celltype",
           neighbor_expr_overlap_weight_colname = NULL,
           neighbor_expr_overlap_agg ="sum",
           neighbor_expr_totalcount_normalize = TRUE,
-          neighbor_expr_totalcount_scalefactor = totalcount_scalefactors,
+          neighbor_expr_totalcount_scalefactor = NULL,
           family="nbinom2",
           targets=topgenes,     # only analyze the genes of greatest interest
           spatial_model = list(name="GP_INLA",
@@ -796,7 +800,7 @@ ps.spatial.adjusted <- p.adjust(c(ps.spatial, ps.null), method = "BH")[1:length(
 
 When your models have finished, it remains to prioritize the most promising genes for reporting and further analysis, then validate and explore their results.
 
-## Priotitizing genes
+## Prioritizing genes
 
 How you prioritize genes depends on your setting. There are two basic cases:
 
