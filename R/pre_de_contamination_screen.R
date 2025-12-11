@@ -193,7 +193,7 @@ overlap_ratio_metric <- function(assay_matrix
     cellsplit <- split(xx, by = cluster_col)
     for(ii in 1:length(cellsplit)){
       if(verbose) message(names(cellsplit)[ii])
-      cells_ii <- cellsplit[[ii]][,cell_ID]  
+      cells_ii <- cellsplit[[ii]][[cellid_col]]
       other_cells <- setdiff(grpcells, cells_ii)
       
       ## column standardized in order to take the average
