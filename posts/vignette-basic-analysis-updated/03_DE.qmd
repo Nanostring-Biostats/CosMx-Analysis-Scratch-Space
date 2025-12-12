@@ -630,10 +630,11 @@ Our recommended modeling approaches for different settings are below:
 ## define the problem:
 # which cells to analyze: (a logical vector over all cells)
 inds <- metadata$celltype == "macrophage"
-
+totalcounts <- metadata$nCount_RNA
+names(totalcounts) <- metadata$cell_id
 ## run smiDE with a Negative Binomial model and no spatial correlation modeling:
 de_obj <- 
-   smi_de(assay_matrix = Matrix::t(counts[inds, ]),
+   smi_de(assay_matrix = Matrix::t(counts),
           metadata = metadata[inds, ],
           formula = ~RankNorm(otherct_expr) + offset(log(nCount_RNA)) + distance_to_tumor,   # <----- first two terms adjust for segmentation errors and per-cell signal strength, final term is the variable to be analyzed, must be a column in metadata
           pre_de_obj = pre_de_obj,  # depends on pre_de_obj calculated earlier
@@ -641,13 +642,13 @@ de_obj <-
           neighbor_expr_cell_type_metadata_colname = "celltype",
           neighbor_expr_overlap_weight_colname = NULL,
           neighbor_expr_overlap_agg ="sum",
-          neighbor_expr_totalcount_normalize = TRUE,
+          neighbor_expr_totalcount_normalize = FALSE,    #<--------- @Dan: correct, since I have that offset term above?
           neighbor_expr_totalcount_scalefactor = NULL,
           family="nbinom2",
           targets=genes_to_analyze     # calculated in earlier code block
    ) 
-res <- results(de_obj)
-str(res) # use res$pairwise for most cases. res$one.vs.rest can also be useful. 
+res <- smiDE::results(de_obj)  # use res$pairwise for most cases. res$one.vs.rest can also be useful. 
+str(res) 
 ```
 
 ## Optimal/slow
@@ -660,10 +661,15 @@ str(res) # use res$pairwise for most cases. res$one.vs.rest can also be useful.
 inds <- metadata$celltype == "macrophage"
 metadata$sdimx <- xy[, 1]
 metadata$sdimy <- xy[, 2]
+totalcounts <- metadata$nCount_RNA
+names(totalcounts) <- metadata$cell_id
+
+# which genes: (this method is SLOW, so don't just test everything)
+selected_genes <- c("KRT16", "EPCAM")
 
 ## run smiDE with a Negative Binomial model and no spatial correlation modeling:
 de_obj <- 
-   smi_de(assay_matrix = Matrix::t(counts[inds, ]),
+   smi_de(assay_matrix = Matrix::t(counts),
           metadata = metadata[inds, ],
           formula = ~RankNorm(otherct_expr) + offset(log(nCount_RNA)) + distance_to_tumor,   # <----- first two terms adjust for segmentation errors and per-cell signal strength, final term is the variable to be analyzed, must be a column in metadata
           pre_de_obj = pre_de_obj,  # depends on pre_de_obj calculated earlier
@@ -672,17 +678,17 @@ de_obj <-
           neighbor_expr_overlap_weight_colname = NULL,
           neighbor_expr_overlap_agg ="sum",
           neighbor_expr_totalcount_normalize = TRUE,
-          neighbor_expr_totalcount_scalefactor = NULL,
+          neighbor_expr_totalcount_scalefactor = totalcounts,
           family="nbinom2",
-          targets=genes_to_analyze,     # calculated in earlier code block
+          targets=selected_genes,    
           spatial_model = list(name="GP_INLA",
                                x_coord_col = "sdimx",  
                                y_coord_col = "sdimy",
                                quantiles = c(0.025/nrow(targs), 0.025, 0.5, 0.975, 1-0.025/nrow(targs)),
                                num.threads=1)          
    ) 
-res <- results(de_obj)$pairwise   
-str(res) # use res$pairwise for most cases. res$one.vs.rest can also be useful. 
+res <- smiDE::results(de_obj)$pairwise    # use res$pairwise for most cases. res$one.vs.rest can also be useful. 
+str(res) 
 ```
 
 ## Hasty/exploratory
@@ -743,7 +749,7 @@ norm <- counts
 norm@x <- counts@x * normfactor[ counts@i + 1L ]
 # to put genes on similar scales, scale the columns of norm:
 genefactors <- 1 / pmax(0.05, Matrix::colMeans(norm))  
-normscaled <- norm %*% Matrix::Diagonal(genefactors)
+normscaled <- norm %*% Matrix::Diagonal(x = genefactors)
 colnames(normscaled) <- colnames(norm)
 
 ## source the fast DE function:
@@ -755,16 +761,18 @@ fastres <- hastyDE(y = normscaled[, genes_to_analyze], df = data.frame(distance2
 # Extract top genes:
 # This example takes the top 10 genes by effect size from the top 1% of p-values.
 # We recommend extracting top genes with some human oversight. 
-topgenes <- names(fastres$p)[order(abs(fastres$effect) * (fastres$p < quantile(fastres$p, 0.01)), 1:10)]  
+topgenes <- names(fastres$p)[order(abs(fastres$effect) * (fastres$p <= quantile(fastres$p, 0.01)), 1:5)]  
 
 # Run smiDE on the top genes with the optimal / spatial-aware call to smiDE:
 ## define the problem:
 metadata$sdimx <- xy[, 1]
 metadata$sdim2 <- xy[, 2]
+totalcounts <- metadata$nCount_RNA
+names(totalcounts) <- metadata$cell_id
 
-## run smiDE with a Negative Binomial model and no spatial correlation modeling:
+## run smiDE with a Negative Binomial model and with spatial correlation modeling:
 de_obj <- 
-   smi_de(assay_matrix = Matrix::t(counts[inds, ]),
+   smi_de(assay_matrix = Matrix::t(counts),
           metadata = metadata[inds, ],
           formula = ~RankNorm(otherct_expr) + offset(log(nCount_RNA)) + distance_to_tumor,   # <----- first two terms adjust for segmentation errors and per-cell signal strength, final term is the variable to be analyzed, must be a column in metadata
           pre_de_obj = pre_de_obj,  # depends on pre_de_obj calculated earlier
@@ -773,7 +781,7 @@ de_obj <-
           neighbor_expr_overlap_weight_colname = NULL,
           neighbor_expr_overlap_agg ="sum",
           neighbor_expr_totalcount_normalize = TRUE,
-          neighbor_expr_totalcount_scalefactor = NULL,
+          neighbor_expr_totalcount_scalefactor = totalcounts,
           family="nbinom2",
           targets=topgenes,     # only analyze the genes of greatest interest
           spatial_model = list(name="GP_INLA",
