@@ -47,10 +47,6 @@ When a matrix has mainly zeroes, which is generally the case for single cell dat
 storing it in sparse matrix format has huge memory savings. Given the size of CosMx
 data, it is vital to be memory-efficient. 
 
-Note: we'll store our count matrices with cells in rows and genes in columns. 
-Many protocols arrange their count matrix the other way around, 
-but our approach here will be more performant for most operations. 
-
 ```{r echo = TRUE, eval = FALSE}
 # necessary libraries
 library(data.table) # for more memory efficient data frames
@@ -60,6 +56,7 @@ library(InSituCor) # devtools::install_github("https://github.com/Nanostring-Bio
 library(HieraType) # remotes::install_github("Nanostring-Biostats/CosMx-Analysis-Scratch-Space", subdir = "_code/HieraType", ref = "Main")
 library(Seurat)
 ```
+
 
 [AtoMx flat file exports](../flat-file-exports/flat-files-compare.qmd){target="_blank"} come with each slide packaged in its own directory. 
 Our example here has one slide, titled "BreastCancer"; its contents look like this:
@@ -80,6 +77,10 @@ In the code below, we load the counts matrices in chunks.
 * First, we'll use `data.table::fread` function which can directly read gzipped files, and determine how many rows and columns we're working with.  
 * Then, we'll read each chunk of data in, and convert it to a low-memory sparse matrix format before moving onto the next chunk.  
 * At the end, we'll combine our sparse matrices to create the full data matrix.
+
+Note: we'll store our count matrices with cells in rows and genes in columns. 
+Many protocols arrange their count matrix the other way around, 
+but our approach here will be more performant for most operations. 
 
 To begin, tell your script where to operate:
 
@@ -189,17 +190,15 @@ to analyze is worth some hassle.
 
 # Customizing the tissues' spatial arrangements {#xy}
 
-To show multiple slides in the same spatial plot, or just to produce spatial plots without a lot of extraneous white space, 
- we often have to shift around tissues' and/or FOVs' xy positions. 
-(We if course will preserve the relative xy positions of any cells we plan to analyze together spatially.) 
-Only a small number of operations are required to do so; 
- below are some tools and code chunks for facilitating these operations,
+To show multiple slides in the same spatial plot, or just to produce spatial plots without a lot of extraneous white space, we often have to shift around tissues' and/or FOVs' xy positions. 
+(We of course will preserve the relative xy positions of any cells we plan to analyze together spatially.) 
+Below are some tools and code chunks for facilitating these operations,
  some borrowed from [this post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/visuals-reduce-whitespace/){target="_blank"}.
 
 The basic operations of customized xy layouts are as follows:
 
 **First**, for multi-slide studies, adjust the slides' xy positions do they don't overlap. 
-This function is called within our flat file reader, but you will often want to customize how slides are tiled.
+This function is called within our flat file reader, but you can call it again to customize how slides are tiled.
 
 ```{r echo = TRUE, eval = FALSE}
 # source the tiling function:
@@ -214,7 +213,7 @@ xy <- condenseTissues(xy = xy,
 ```
 
 **Second**, break your cells into spatially contiguous groups (which may be separate tissues from one slide, or merely discontinuous FOV blocks from the same tissue). 
-This can be done manually, e.g. below where we select cells in a selected xy range:
+This can be done manually, as in the below chunk where we select cells in a selected xy range:
 
 ```{r echo = TRUE, eval = FALSE}
 # select a group of cells based on cutoffs in xy:
@@ -275,7 +274,7 @@ For smaller studies it could still be reasonable to hold on to the pre-QC .RDS f
 ## Per-cell QC:
 
 First, we'll apply a threshold on cells' total counts. 
-Our defaults are fairly permissive; it would be reasonable double them in datasets where you can do so without throwing out too many cells. 
+Our defaults are fairly permissive; it would be reasonable to double them in datasets where you can do so without throwing out too many cells. 
 
 ```{r echo = TRUE, eval = FALSE}
 # require sufficient counts per cell 
@@ -286,7 +285,7 @@ hist(log2(metadata$nCount_RNA), breaks = 100, xlab = "Log2 counts per cell", yla
 # - 6000plex: 50 (permissive) or 100 (conservative)
 # - WTX: 100 (permissive) or 200 (conservative)
 # - all panels: no more than 5% of cells (permissive) or 10% of cells (conservative)
-count_threshold <- min(200, quantile(metadata$nCount_RNA, 0.05)) # apply threshold, but don't flag >5% of cells
+count_threshold <- min(200, quantile(metadata$nCount_RNA, 0.10)) # apply threshold, but don't flag >10% of cells
 abline(v = log2(count_threshold), col = "red")
 flag <- metadata$nCount_RNA < count_threshold
 legend("topleft", legend = paste0(round(mean(flag) * 100, 1), "% rejected"))
@@ -318,7 +317,7 @@ mean(flag)
 knitr::include_graphics("figures/QC_area_histogram.png")
 ```
 
-Note: some tissues do have very large cells, e.g. purkinje cells in the brain or cardiomyocytes in the heart. 
+Note: some tissues do have very large cells, e.g. purkinje cells in the brain or cardiomyocytes in the heart. You'll want to skip the area filter in those studies. 
 
 To check for segmentation errors, consider our R package [FastReseg](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/){target="_blank"}, which uses transcript positions to flag cells with likely segmentation errors, then remove or reassign transcripts assigned to the wrong cells. 
 We also advise examining the segmentation results in AtoMx's tissue viewer; studies will occasionally need to be re-segmented under a different set of parameters. 
@@ -427,7 +426,7 @@ legend("bottomright", pch = 16,
        legend = c("Spatially smoothed totalcounts-normalized background:", paste0(c(0.5,1,2,5,10), "x median")))
 ```
 
-```{r echo = FALSE, eval = TRUE}
+```{r echo = FALSE, eval = TRUE, out.width = "115%"}
 knitr::include_graphics("figures/spatial_bgoversignal.png")
 ```
 
@@ -436,7 +435,7 @@ Of greater note is a band of higher-background FOVs towards the lower left of th
 No immediate action is needed, but by becoming aware of this small technical effect 
  we'll be armed to interpret any strange results driven by it. 
 
-Finally, we just flagged cells in space:
+Finally, we plot flagged cells in space:
 
 ```{r echo = TRUE, eval = FALSE}
 # plot flagged cells in space:
@@ -477,7 +476,7 @@ saveRDS(xy, file = paste0(outdir, "/processed_data/xy.RDS"))
 We typically normalize each cell's expression profile to its total counts. 
 The below code does this efficiently. 
 In fact, given the size of the matrix and the speed of this calculation, there is no need to save a normalized data object; 
-it's usually cheaper to re-compute it that to store it. 
+it's cheaper to re-compute it that to store it. 
 
 Note that no steps in this workflow actually use the normalized data, 
  although the dimension reduction step performs its own normalization under the hood. 
@@ -500,8 +499,8 @@ However, Pearson residuals are dense, meaning we cannot encode them with a spars
 them computationally intractable for larger datasets.
 To benefit from Pearson residuals without taxing our compute instances,
 we have developed a method of calculating the principal components of a Pearson residual matrix
-without ever having to store the entire matrix. We demonstrate this function below. 
-(Scratch Space post on the subject coming soon.)
+without ever having to store the entire matrix. A full description is [here](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/pearsonpca/){target="_blank"}.
+We demonstrate this function below. 
 
 We'll start by identifying highly variable genes. 
 In this section we'll take advantage of some of the functions in the Seurat ecosystem.
@@ -619,10 +618,10 @@ knitr::include_graphics("figures/umap_totalcounts.png")
 
 # Cell typing {#clust}
 
-Here we demo the most consistently-successful approach to cell typing we have found.
+Here we demonstrate the most consistently-successful approach to cell typing we have found.
 First, we perform unsupervised clustering using a set of a few thousand highly variable genes (hvg's).
 This approach is robust, and requires minimal configuration and re-running.
-Naming clusters used to be time-consuming, but we have found that the right prompts to a large language model (LLM), **combined with rigorous oversight**, minimize the burden of cluster naming.
+Naming clusters used to be time-consuming, but we have found that the right prompts to a large language model (LLM), *combined with rigorous oversight*, minimize the burden of cluster naming.
 We will demonstrate two approaches to unsupervised clustering:
 
 - Louvain clustering, using PC's derived from Pearson residuals of hvg's.
@@ -709,6 +708,12 @@ if (TRUE) {
 }
 # save results
 metadata$clust <- clust <- unsup$clust
+
+# Quick xy and umap plots of clusters to confirm resolution looks right:
+plot(umapobj$ump@cell.embeddings, pch = 16, asp = 1, cex = 0.1, 
+     col = scales::alpha(cellcols[as.numeric(as.factor(clust))], 0.05))
+plot(xy, pch = 16, asp = 1, cex = 0.1, 
+     col = cellcols[as.numeric(as.factor(clust))])
 ```
 
 :::
@@ -947,7 +952,9 @@ For tumor studies, additional techniques can help classify cancer cells:
 
 1. Cancer cells tend to be extremely transcriptionally active. Clusters with high total counts per cell are usually cancer.
 2. The [scMalignantFinder algorithm](https://github.com/Jonyyqn/scMalignantFinder){target="_blank"} promises to call cells as cancer vs. non-cancer. We have not tried it, but it seems promising.
-3. For WTX studies, it's possible to estimate cells' copy number variants. We have used [insituCNV](https://github.com/Moldia/InSituCNV){target="_blank"} successfully. 
+3. For WTX studies, it's possible to estimate cells' copy number variants.
+Cells with clear CNV's will usually be cancer. 
+We have used [insituCNV](https://github.com/Moldia/InSituCNV){target="_blank"} successfully. 
 A newer method, [ClonalScope](https://github.com/seasoncloud/Clonalscope){target="_blank"}, also looks promising.
 :::
 
@@ -1084,64 +1091,10 @@ merged <- HieraType::celltype_label_integration(
 
 celltype <- metadata$celltype <- merged$celltype[match(metadata$cell_id, merged$cell_id)]
 
-# # combine hieratype and clustering:
-# immune.ids <- hieratyperes$post_probs$l1$cell_ID[
-#   !is.element(hieratyperes$post_probs$l1$celltype_thresh, c("epithelial", "fibroblast", "endothelial", "smooth_muscle"))]
-# celltype <- clust
-# names(celltype) <- metadata$cell_id
-# celltype[immune.ids] <- htclust[immune.ids]
-# # which clusters to reassign: >90% taken by hieratype, and < 5% of total cells left.
-# propoverwritten <- by(clust != celltype, clust, mean)
-# proppercluster <- table(celltype) / length(celltype)
-# clusterstodrop <- union(
-#   intersect(
-#     names(which(propoverwritten > 0.9)),
-#     names(which(proppercluster < 0.05))),
-#   intersect(
-#     names(which(propoverwritten > 0.5)),
-#     names(which(proppercluster < 0.01)))
-# )
-# # find nearest neighbors (in valid clusters) for cells in target clusters:
-# cellstoreclassify <- names(celltype)[is.element(celltype, clusterstodrop)]
-# neighborclusts <- InSituCor:::neighbor_tabulate(celltype, neighbors = umapobj$grph)
-# neighborclusts <- neighborclusts[, !is.element(colnames(neighborclusts), clusterstodrop)]
-# # reclassify by most common nearest neighbor among valid clusters:
-# celltype[cellstoreclassify] <- colnames(neighborclusts)[apply(neighborclusts[cellstoreclassify, ], 1, which.max)]
-#   
-# table(celltype)[order(table(celltype))]
-
-
-# # what to do with the leftover immune cells from clustering?
-# setdiff(unique(celltype), unique(htclust))
-# louvain_immune_names <- c("Macrophages (APOE+/C1QA+ TAMs)",
-#                           "Neutrophils (state A; S100A8/A9-max)",
-#                           "Neutrophils (state C, degranulating/secretory-high)",
-#                           "T cells (CD4-like, resting)",
-#                           "Antigen-presenting myeloid (cDC2 / moDC)",
-#                           "Neutrophils (state B)",
-#                           "Plasma cells",
-#                           "Antigen-presenting cells (B/cDC; cycling, uncertain)",
-#                           "Cytotoxic T / NK cells")
-# 
-# # check overlaps, making sure there aren't huge numbers of cells called immune by Louvain but not HieraType:
-# par(mar = c(22,4,2,1))
-# barplot(table(celltype), las = 2, 
-#         col = c("grey", "orange", "cornflowerblue")[1 + is.element(names(table(celltype)), louvain_immune_names) + 2 * is.element(names(table(celltype)), unique(htclust))])
-# legend("topleft", fill = c("grey", "orange", "cornflowerblue"), legend = c("Louvain non-immune", "Louvain immune", "HieraType immune"))
-# 
-# # overwrite left-behind louvain immune clusters:
 # celltype[is.element(celltype, louvain_immune_names)] <- "immune_unspecified"
 saveRDS(celltype, file = paste0(outdir, "/processed_data/celltype.RDS"))
 saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
 ```
-
-
-```{r echo = FALSE, eval = TRUE, out.width = "75%"}
-knitr::include_graphics("figures/celltype_merge_barplot.png")
-```
-
-Note that in the above plot, we have 3 tall bars from neutrophil clusters called by Louvain. 
-This result would be concerning for a merge of HieraType and Louvain, implying many immune cells were getting left behind. In our case, these are the 3 clusters that the LLM misclassified; we renamed them to "cancer" for our analysis.
 
 Once our cell types are complete, we re-generate the spatial plots:
 
@@ -1169,21 +1122,9 @@ for (name in unique(celltype)) {
 The code above provides a direct path through the basic preprocessing of CosMx data. 
 With these results secured, you're ready to proceed to the rewarding parts of data analysis: 
  exploring your data and testing hypotheses. 
-We will have posts on these subjects soon. 
-For now, here are some reasonable next steps:
-
-Exploratory analysis:
-
-- If your experiment has baseline / control tissues, try  [InSituDiff](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/insitudiff/){target="_blank"}.
-- To explore genes' spatial correlation in studies without control tissues (e.g. tumors), try [InSituCor](https://github.com/Nanostring-Biostats/InSitucor){target="_blank"}.
-- Calculate pathway scores using [AUCell](https://github.com/aertslab/AUCell){target="_blank"}.
-
-Hypothesis testing:
-
-- Use [smiDE](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/){target="_blank"} for differential expression testing.
-- Try Ligand-Receptor analysis (many packages exist; we have no recommendation yet).
-
-We recommend containing those analyses in standalone scripts, each beginning by loading the data we've prepared here:
+The next pages of this vignette discuss those topics. 
+For exploratory analysis, differential expression, or any other further analysis, 
+we recommend containing distinct analyses in standalone scripts, each beginning by loading the data we've prepared here:
 
 ```{r echo = TRUE, eval = FALSE}
 # load basic data:
