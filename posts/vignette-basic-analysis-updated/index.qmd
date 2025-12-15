@@ -50,7 +50,46 @@ Analyses can meander and sprawl, but often enough they are reducible to 3 phases
  We see DE as the workhorse of spatial analyses, but there are other useful tools: e.g., 
  you might calculate changes in cell type abundance or co-localization across space, or compute various metrics of ligand-receptor interactions. 
  
- 
+A high-level view of our workflow is below:
+
+### Basic pre-processing
+
+| **Step** | **Inputs** | **Outputs** |
+|------|--------|---------|
+| Load flat files | Flat files | Raw counts, metadata, xy |
+| Customize xy | xy | xy |
+| QC | Raw counts, metadata, xy | Raw counts, metadata, xy (filtered) |
+| Normalization | Raw counts | Normalized counts |
+| Dim reduction: HVGs | Raw counts | HVGs |
+| Dim reduction: PCA | xy, metadata, HVGs | PCs |
+| Dim reduction: UMAP | PCs | UMAP projection, nearest neighbors |
+| Graph clustering (Louvain or Leiden) | Nearest neighbors | Clusters |
+| InSituType clustering | Raw counts, HVGs | Clusters |
+| Cluster naming / marker gene ID | Clusters, raw counts | Suggested cluster names |
+| HieraType: immune cell typing | Raw counts, nearest neighbors | HieraType calls |
+| HieraType: merge with prior clusters | HieraType calls, clusters | Cell type calls |
+
+### Exploratory analysis
+
+| **Step** | **Inputs** | **Outputs** |
+|------|--------|---------|
+| Pathway scoring with AUCell	| raw counts	| pathway scores |
+| Moran's I for spatially variable genes |	normalized counts, xy, cell type	per-gene Moran's I stats |
+| InSituCor: spatially correlated genes |	normalized counts, xy, cell type	modules of spatially correlated genes |
+| InSituDiff: perturbations from baseline |	normalized counts, xy	diverse outputs |
+
+### Differential expression
+
+| **Step** | **Inputs** | **Outputs** |
+|------|--------|---------|
+| Defining predictor variables | Diverse & bespoke | Predictor variables |
+| Find safe genes via overlap ratio metric | Raw counts, xy, cell type | Genes to analyze per cell type |
+| pre-DE | xy | preDE (object for modeling segmentation errors) |
+| “Standard” DE with smiDE | Raw counts, preDE, cell type, list of genes to analyze per cell type | DE outputs: p-values, effect sizes, etc. |
+| “Optimal / slow” DE with smiDE | Raw counts, preDE, cell type, genes to analyze per cell type | DE outputs: p-values, effect sizes, etc. |
+| “Hasty / exploratory” DE with hastyDE | Normalized counts, cell type, genes to analyze per cell type | DE outputs: p-values, effect sizes, etc. |
+| “Stepwise” DE with hastyDE & smiDE | Normalized counts, cell type, genes to analyze per cell type | DE outputs: p-values, effect sizes, etc. |
+
 
 ## Basic analysis strategy: large studies 
 
