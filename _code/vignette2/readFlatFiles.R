@@ -1,12 +1,17 @@
 #' Read flat files, return a sparse matrix of counts and a metadata data table
 #' @param myflatfiledir Parent directory for flat files. Should hold one subdirectory of results for each slide;
 #'   each of those subdirectories should have a exprMat_file.csv (or .csv.gz) and a metadata_file.csv (or .csv.gz).
+#'   Of note:
+#'   \itemize{
+#'    \item{The possibly non-unique metadata column "fov" is replaced by the column "FOV", for which a given FOV ID will only appear in a single slide.}
+#'    \item{The possibly non-unique metadata column "cell_ID" is deleted, leaving the column "cell_id", for which a given cell ID will only appear in a single slide & FOV.}
+#'   }
 #' @param slidenames Optional vector of which slide folders to read. If left NULL, all slide folders will be read.
 #' @param return_negprobes Logical for whether to return the expression matrix of negprobes
 #' @param return_negprobes Logical for whether to return the expression matrix of falsecodes
 #' @param offset_slides Logical, for whether to shift slide positions so they're non-overlapping.
 #' @param thisinstrument_nanometers_per_pixel Nanometers per pixel in your data. Default of 120.280945 applies to all commercial instruments. Your RunSummary file specifies the value for your instrument.
-#' @return A list with two elements: "counts" and "metadata"
+#' @return A list: "counts", "metadata", "xy", and optionally "negcounts" and "falsecounts" 
 #' @importFrom data.table fread
 #' @importFrom R.utils gunzip
 #' @importFrom Matrix rowSums
@@ -31,6 +36,7 @@ readFlatFiles <- function(myflatfiledir, slidenames = NULL, return_negprobes = F
     
     # load in metadata:
     thisslidesmetadata <- thisslidesfiles[grepl("metadata\\_file.csv", thisslidesfiles)]
+    if(length(thisslidesmetadata) != 1){stop(paste0("Check slide ", slidename, " for format issue. Not finding exactly one metadata file."))}
     tempdatatable <- data.table::fread(paste0(myflatfiledir, "/", slidename, "/", thisslidesmetadata))
     
     # numeric slide ID 
@@ -41,6 +47,12 @@ readFlatFiles <- function(myflatfiledir, slidenames = NULL, return_negprobes = F
     # if two files, take the one that's been unzipped:
     if (length(thisslidescounts) == 2) {
       thisslidescounts <- thisslidescounts[!grepl("\\.gz", thisslidescounts)]
+    }
+    if (length(thisslidescounts) == 0) {
+      warning(paste0("No exprMat files found for ", slidename))
+    }
+    if (length(thisslidescounts) > 2) {
+      warning(paste0("> 2 exprMat files found for ", slidename, '. Expecting 2 or less (zipped and unzipped)'))
     }
     # unzip counts file if needed:
     if (substr(thisslidescounts, nchar(thisslidescounts)-2, nchar(thisslidescounts)) == ".gz") {
@@ -108,7 +120,15 @@ readFlatFiles <- function(myflatfiledir, slidenames = NULL, return_negprobes = F
     if(i==1){
       sharedgenes <- colnames(countlist[[i]]) 
       sharedcolumns <- colnames(tempdatatable)
-    }  else {
+    } else {
+      lostgenes <- setdiff(sharedgenes, colnames(countlist[[i]]))
+      if (length(lostgenes) > 0) {
+        warnings(paste0("Dropping genes not present in other slides: ", paste0(lostgenes, collapse = ", ")))
+      }
+      lostgenes2 <- setdiff(colnames(countlist[[i]]), sharedgenes)
+      if (length(lostgenes2) > 0) {
+        warnings(paste0("Dropping genes not present in other slides: ", paste0(lostgenes2, collapse = ", ")))
+      }
       sharedgenes <- intersect(sharedgenes, colnames(countlist[[i]]))
       sharedcolumns <- intersect(sharedcolumns, colnames(tempdatatable))
     }

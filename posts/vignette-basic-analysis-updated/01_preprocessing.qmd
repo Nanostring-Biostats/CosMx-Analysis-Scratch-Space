@@ -24,6 +24,8 @@ categories:
   - quality control
   - cell typing
   - normalization
+  - overview
+  - how-tos
 image: figures/DAPI-blue.png
 description: Best practices for CosMx RNA analysis. Post 1 of 3, covering data loading through cell typing.
 draft: false
@@ -55,10 +57,10 @@ A high-level view of our workflow is below:
 | [QC cells and FOVs](#qc) | Raw counts, metadata, xy | Raw counts, metadata, xy (filtered) |
 | [Normalization](#norm) | Raw counts | Normalized counts |
 | [Dimension reduction](#dimred): get HVGs | Raw counts | HVGs |
-| [Dimension reduction](#dimred): PCA | xy, metadata, HVGs | PCs |
+| [Dimension reduction](#dimred): PCA | Raw counts, metadata, HVGs | PCs |
 | [Dimension reduction](#dimred): UMAP | PCs | UMAP projection, nearest neighbors |
 | [Graph clustering (Louvain or Leiden)](#louvain) | Nearest neighbors | Clusters |
-| [InSituType clustering](#insitutype) | Raw counts, HVGs | Clusters |
+| [InSituType clustering](#insitutype) | Raw counts, HVGs, metadata (mean negprobe column) | Clusters |
 | [Cluster naming / marker gene ID](#naming) | Clusters, raw counts | Suggested cluster names |
 | [Cluster QC](#clustqc) | Clusters, raw counts | Suggested cluster names |
 | [Immune cell typing with HieraType](#hieratyperun) | Raw counts, nearest neighbors | HieraType calls |
@@ -67,7 +69,6 @@ A high-level view of our workflow is below:
 
 ::: {.callout-note title="Note on large studies"}
 When your data is too large to fit into memory -- and this can happen with just a few slides of WTX data --
- you need  modify the above strategy. 
 At this point, we recommend the below workflow, which we will demonstrate in a separate vignette in early 2026:
 
 1. Obtain a subsample of the larger study. This could be FOVs chosen at random from all the tissues in the study, or just the first couple slides to come off the instrument. 
@@ -151,8 +152,9 @@ The below code performs the loading and merging operations, producing 4 data obj
 
 * A cell metadata matrix (cells x variables)
 * A counts matrix (cells x genes)
-* A negative control probe ("negprobe") counts matrix (cells x negprobes)
-* A SystemControl ("falsecode") counts matrix (cells x falsecodes)
+* A matrix of cells' xy positions (in mm)
+* (Optional) A negative control probe ("negprobe") counts matrix (cells x negprobes)
+* (Optional) A SystemControl ("falsecode") counts matrix (cells x falsecodes)
 
 If given a flat files directory with multiple slides, it will seamlessly load and combine their data into a unified dataset. 
 
@@ -228,14 +230,13 @@ Below are some tools and code chunks for facilitating these operations,
 
 The basic operations of customized xy layouts are as follows:
 
-**First**, for multi-slide studies, adjust the slides' xy positions do they don't overlap. 
+**First**, for multi-slide studies, adjust the slides' xy positions so they don't overlap. 
 This function is called within our flat file reader, but you can call it again to customize how slides are tiled.
 
 ```{r echo = TRUE, eval = FALSE}
 # source the tiling function:
 source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/vignette2/utils/readFlatFiles.R")
 # define new xy positions in which multiple slides no longer overlap each other:
-set.seed(1)
 xy <- condenseTissues(xy = xy, 
                       tissue = metadata$Run_Tissue_name, 
                       tissueorder = NULL,  # optional, specify the order tissues are tiled in
@@ -278,7 +279,6 @@ xy[thisgroup, 2] <- xy[thisgroup, 2] + 5
 ...or we can move them automatically using the same `condenseTissues` function we used above:
 
 ```{r echo = TRUE, eval = FALSE}
-set.seed(1)
 xy <- condenseTissues(xy = xy, 
                       tissue = cellgroups, 
                       tissueorder = NULL,  # optional, specify the order tissues are tiled in
@@ -332,7 +332,7 @@ This step typically removes very few cells.
 
 ```{r echo = TRUE, eval = FALSE}
 # what's the distribution of areas?
-hist(metadata$Area, breaks = 100, xlab = "Cell Area", main = "")
+hist(metadata$Area, breaks = 100, xlab = "Cell Area", main = "", xlab = "Cell area (pixels)")
 
 # based on the above, set a threshold well out into the tail:
 area_threshold <- 30000
@@ -348,7 +348,9 @@ mean(flag)
 knitr::include_graphics("figures/QC_area_histogram.png")
 ```
 
-Note: some tissues do have very large cells, e.g. purkinje cells in the brain or cardiomyocytes in the heart. You'll want to skip the area filter in those studies. 
+::: {.callout-note}
+Note: some tissues do have very large cells, e.g. purkinje cells in the brain or cardiomyocytes in the heart. You'll likely want to skip the area filter in those studies. 
+:::
 
 To check for segmentation errors, consider our R package [FastReseg](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/segmentation-error-evaluation/){target="_blank"}, which uses transcript positions to flag cells with likely segmentation errors, then remove or reassign transcripts assigned to the wrong cells. 
 We also advise examining the segmentation results in AtoMx's tissue viewer; studies will occasionally need to be re-segmented under a different set of parameters. 
@@ -399,7 +401,8 @@ knitr::include_graphics("figures/QC_FOVQC.png")
 ```
 
 We don't have any flagged FOVs in this study. For examples of studies with more flagged FOVs, 
- see [the FOV QC post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/){target="_blank"} and [this older vignette](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/assets/2.-QC-and-normalization.html){target="_blank"}.
+ see [the FOV QC post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/){target="_blank"} and [this older vignette](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis/assets/2.-QC-and-normalization.html){target="_blank"}. 
+The FOV signal loss plot above does show variation in signal strength, but that variation appears to track spatially smooth biology, likely contours of tumor glands, rather than sharp FOV boundaries.
 
 ## Descriptive QC plots
 
@@ -461,10 +464,10 @@ legend("bottomright", pch = 16,
 knitr::include_graphics("figures/spatial_bgoversignal.png")
 ```
 
-FOV edge effects are also notable here, presumably downstream from suppressed signal in those locations.
-Of greater note is a band of higher-background FOVs towards the lower left of the tissue. 
-No immediate action is needed, but by becoming aware of this small technical effect 
- we'll be armed to interpret any strange results driven by it. 
+We see some regions of elevated background. 
+No immediate action is needed, but by becoming aware of these isolated technical effects 
+ we'll be armed to interpret any strange results driven by them. 
+High local background often occurs in regions of necrosis. 
 
 Finally, we plot flagged cells in space:
 
@@ -473,10 +476,6 @@ Finally, we plot flagged cells in space:
 par(mar = c(0,0,0,0))
 plot(xy[, 2:1], pch = 16, cex = 0.1, asp = 1, 
      col = c("grey80", "red")[1 + flag])
-legendvals <- signif(median(smoothedgbrate) * c(0.5,1,2,5,10), 2)
-legend("bottomright", pch = 16, 
-       col = c("white", viridis_pal(option = "B")(101)[signif(1 + 100 * pmin(legendvals / quantile(smoothedgbrate, 0.9995), 1), 2)]),
-       legend = c("Spatially smoothed totalcounts-normalized background:", paste0(c(0.5,1,2,5,10), "x median")))
 ```
 
 ```{r echo = FALSE, eval = TRUE, out.width = "115%"}
@@ -502,24 +501,26 @@ saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
 saveRDS(xy, file = paste0(outdir, "/processed_data/xy.RDS"))
 ```
 
-## Normalization {#norm}
+# Normalization {#norm}
 
 We typically normalize each cell's expression profile to its total counts. 
 The below code does this efficiently. 
 In fact, given the size of the matrix and the speed of this calculation, there is no need to save a normalized data object; 
-it's cheaper to re-compute it that to store it. 
-
-Note that no steps in this workflow actually use the normalized data, 
- although the dimension reduction step performs its own normalization under the hood. 
-Normalized data will be useful in later analyses, e.g. for plotting expression over space or running differential expression. 
+it's cheaper to re-compute it than to store it. 
 
 ```{r echo = TRUE, eval = FALSE}
-# normalize counts matrix using efficent sparse matrix calls:
+# normalize counts matrix using efficient sparse matrix calls:
+# (recall our counts matrix has cells in rows and genes in columns)
 scale_row <- mean(metadata$nCount_RNA) / metadata$nCount_RNA
 norm <- counts
 norm@x <- norm@x * scale_row[norm@i + 1L]
 ```
 
+Note that no steps in this workflow actually use the normalized data, 
+ although the dimension reduction step performs its own normalization under the hood. 
+Normalized data will be useful in later analyses, e.g. for plotting expression over space or running differential expression. 
+
+We do not generally use a log1p transformation. Pearson residuals have nice properties, but they produce a dense matrix, which is too memory-intensive for most studies. (See below for how we nonetheless get PC's based on Pearson residuals.)
 
 # Dimension reduction {#dimred}
 
@@ -643,14 +644,20 @@ legend("topleft", pch = 16,
 ```
 
 
-```{r echo = FALSE, eval = TRUE, out.width = "100%"}
+```{r echo = FALSE, eval = TRUE, out.width = "85%"}
 knitr::include_graphics("figures/umap_totalcounts.png")
 ```
 
+
+
 # Cell typing {#clust}
 
-Here we demonstrate the most consistently-successful approach to cell typing we have found.
+## Unsupervised clustering
+
+Here we demonstrate the most consistently successful approach to cell typing we have found.
+(Supervised cell typing with InSituType can also work quite well, but depends on a good reference marix.)
 First, we perform unsupervised clustering using a set of a few thousand highly variable genes (hvg's).
+Second, we use the HieraType algorithm to obtain accurate immune cell classification, then overwrite our initial clustering results with HieraType's calls wherever it finds immune cells.
 This approach is robust, and requires minimal configuration and re-running.
 Naming clusters used to be time-consuming, but we have found that the right prompts to a large language model (LLM), *combined with rigorous oversight*, minimize the burden of cluster naming.
 We will demonstrate two approaches to unsupervised clustering:
@@ -660,10 +667,11 @@ We will demonstrate two approaches to unsupervised clustering:
 
 Of the above two methods, Louvain tends to be faster, while InSituType is easier to refine,
  and, more importantly, straightforward to project onto future datasets.
+ (InSituType clusters come with mean expression profiles which can be used as input to InSituType's supervised cell typing mode.)
 
 ::: {.panel-tabset}
 
-## Louvain clustering {#louvain}
+### Louvain clustering {#louvain}
 
 **Note:** Here we run louvain clustering with a high resolution, intentionally over-clustering with the plan to condense afterwards.
 It's often better to run with the default resolution (0.8) at first, then subcluster selected cell types afterwards.
@@ -715,7 +723,7 @@ knitr::include_graphics("figures/cluster_xy_1stlook.png")
 
 
 
-## Clustering with InSituType {#insitutype}
+### Clustering with InSituType {#insitutype}
 
 Here we refer you to the [InSituType vignette](https://github.com/Nanostring-Biostats/InSituType/blob/main/vignettes/NSCLC-RNA_InsituType-vignette.Rmd){target="_blank"}. Running in unsupervised mode is simplest, though supervised and semi-supervised modes can work well provided with good reference profiles. 
 
@@ -822,7 +830,7 @@ prompt_preamble <- paste0(
 # info on cluster frequencies:
 prompt_frequencies <- paste0(
 "
-The cluster frquencies are: ", 
+The cluster frequencies are: ", 
 paste0(paste0("cluster ", names(table(clust)), ":", table(clust)), collapse = ", "))
 
 ## give the LLM each cluster's mean expression profile over relevant genes:
@@ -837,8 +845,6 @@ meanexpression <- meanexpression[allusefulmarkers, ]
 # reduce to just lineage genes with decent expression (but keep de novo markers):
 isdenovo <- is.element(rownames(meanexpression), markersshort)
 meanexpression <- meanexpression[isdenovo | apply(meanexpression, 1, max) > 0.2, ]
-
-meanexpressionastext <- write.table(round(meanexpression[1:5,1:5], 1), sep = ",", row.names = TRUE, col.names = TRUE)
 
 prompt_profiles <- paste0(
   "And here is a table of each cluster's mean expression of selected data- and biology-derived marker genes: ",
@@ -905,7 +911,7 @@ colnames(meanexpression) <- cluster_labels[as.character(gsub("cluster", "", coln
 ```
 
 
-# QC of clustering results {#clustqc}
+## QC of clustering results {#clustqc}
 
 The LLM gave us a good guess at cluster names, but we still need to verify them.
 To assist in this process, we recommend looking at 4 outputs:
@@ -994,11 +1000,13 @@ A newer method, [ClonalScope](https://github.com/seasoncloud/Clonalscope){target
 
 # Optimizing immune cell calling with the HieraType algorithm {#hieratype}
 
-### Running HieraType {#hieratyperun}
+## Running HieraType {#hieratyperun}
 
 We created the [HieraType algorithm](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth/){target="_blank"} to classify immune cells in a way that is informed by marker genes. 
 We have found it to consistently outperform other algorithms in immune cell typing. 
-Our standard approach now is to overwrite our initial clustering results with HieraType's results whenever it calls an immune cell.
+Our standard approach now is to overwrite our initial clustering results with HieraType's results whenever it calls an immune cell. 
+
+**An important caveat:** the HieraType workflow below was designed for solid tissues containing the typical infiltrating immune cell classes, i.e. everything you might expect to find in a solid tumor. For tissues with specialized immune cell types, e.g. progenitor cells, or immune-derived cancer cells, HieraType could still run but would need modifications to its marker genes / "pipeline" data object. See the [HieraType package](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HieraType){target="_blank"} for a deeper read before setting that up. 
 
 Below, we run HieraType in two steps. 
 In the first, we call broad cell types (e.g. epithelial, immune, ...) then subclassify the immune cells (B, T, macrophage...)
@@ -1020,10 +1028,10 @@ pipeline_io_rna <- HieraType::make_pipeline(
 
 if (TRUE) {
   hieratyperes <- HieraType::run_pipeline(
-    pipeline = pipeline_io_rna
-    ,counts_matrix = counts
-    ,totalcounts = metadata$nCount_RNA
-    ,adjacency_matrix = umapobj$grph[rownames(counts), rownames(counts)]
+    pipeline = pipeline_io_rna,
+    counts_matrix = counts,
+    totalcounts = metadata$nCount_RNA,
+    adjacency_matrix = umapobj$grph[rownames(counts), rownames(counts)]
   )
   saveRDS(hieratyperes, file = "processed_data/hieratyperes.RDS")
 } else {
@@ -1034,10 +1042,12 @@ if (TRUE) {
 tcell_ids <- hieratyperes$post_probs$l1[celltype_granular=="tcell"][["cell_ID"]]
 if (TRUE) {
   tcell_typing <- 
-    HieraType::run_pipeline(pipeline = HieraType::pipeline_tcell
-                 ,counts_matrix = counts[tcell_ids, ]
-                 ,adjacency_matrix = umapobj$grph[tcell_ids,tcell_ids]
-                 ,celltype_call_threshold = 0.5
+    HieraType::run_pipeline(
+      pipeline = HieraType::pipeline_tcell,
+      counts_matrix = counts[tcell_ids, ],
+      totalcounts = metadata$nCount_RNA,
+      adjacency_matrix = umapobj$grph[tcell_ids, tcell_ids],
+      celltype_call_threshold = 0.5
     )
   saveRDS(tcell_typing, file = "processed_data/tcell_typing.RDS")
 } else {
@@ -1057,12 +1067,11 @@ Now we'll use a simple marker heatmap to confirm HieraType worked as hoped:
 
 ```{r echo = TRUE, eval = FALSE}
 
-# pull out canonical ("index") markers for immune cells:
+# pull out canonical ("index") markers:
 indexmarkers <- unique(c(
-  unlist(pipeline_io_rna$markerslists)[grepl("index_marker", names(unlist(pipeline_io_rna$markerslists)))],
+  unlist(pipeline_io_rna$markerslists$l2)[grepl("index_marker", names(unlist(pipeline_io_rna$markerslists$l2)))],
   unlist(HieraType::pipeline_tcell)[grepl("index_marker", names(unlist(HieraType::pipeline_tcell)))]
 ))
-indexmarkers <- intersect(indexmarkers, hvgs)
 
 # make a marker heatmap for the hieratype immune cell calls:
 fcmetrics <- HieraType::clusterwise_foldchange_metrics(
@@ -1070,9 +1079,9 @@ fcmetrics <- HieraType::clusterwise_foldchange_metrics(
   metadata = data.frame("cell_ID" = names(htclust), "hieratype_call" = htclust),
   cluster_column = "hieratype_call"
 )
-hm_unsup <- HieraType::marker_heatmap(fcmetrics, extras = NULL)
+hm_hier <- HieraType::marker_heatmap(fcmetrics, extras = NULL)
 
-print(hm_unsup)
+print(hm_hier)
 ```
 
 ```{r echo = FALSE, eval = TRUE, out.width = "80%"}
@@ -1098,7 +1107,7 @@ print(hm_unsup)
 knitr::include_graphics("figures/hieratype_marker_heatmap2.png")
 ```
 
-### Merging clustering and HieraType results {#hieratypemerge}
+## Merging clustering and HieraType results {#hieratypemerge}
 
 To finish our cell typing exercise, we now merge the Louvain and HieraType results.
 All cells called immune by HieraType will get HieraType labels. 
