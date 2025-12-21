@@ -24,20 +24,61 @@ categories:
   - quality control
   - cell typing
   - normalization
-image: figures/thumbnail.png
+image: figures/DAPI-blue.png
 draft: false
 ---
 
-# Outline
 
-Here we'll walk through a full pipeline for getting your data ready to explore and analyze.  We will:
+# Introduction
 
-1. [Load in flat files exported by AtoMx<sup>&#174;</sup> SIP](#loading)
-2. [Create a custom spatial layout of our tissues for better visualization (optional)](#xy)
-3. [QC our data, removing cells and FOVs with bad data](#qc)
-4. [Perform dimension reduction (features a new algorithm for obtaining better PC projections)](#dimred)
-5. [Cluster our data and name the clusters we discover](#clust)
-6. [Perform immune cell typing using the HieraType algorithm](#hieratype)
+Here we propose an updated pipeline for basic CosMx<sup>&#174;</sup> analysis in R, 
+ from data loading through cell typing. 
+Also see the companion posts on [exploratory data analysis]() and confirmatory analysis with [differential expression testing](). 
+A complete analysis will typically begin with the pre-processing described here,
+ use exploratory analyses to generate hypotheses, then conclude by using differential expression analysis to test those hypotheses.
+
+This code assumes a whole study can be fit into your compute environment's memory. 
+For very large studies, see our upcoming vignette on the topic. 
+
+This post is exclusively in R. Many steps have easy python analogs, but some, like the HieraType immune cell typing algorithm and the FOV QC functions, only have R implementations. 
+
+## Outline
+
+A high-level view of our workflow is below:
+
+| **Step** | **Inputs** | **Outputs** |
+|------|--------|---------|
+| [Load flat files](#loading) | Flat files | Raw counts, metadata, xy |
+| [Customize tissues' xy arrangement](#xy) | xy | xy |
+| [QC cells and FOVs](#qc) | Raw counts, metadata, xy | Raw counts, metadata, xy (filtered) |
+| [Normalization](#norm) | Raw counts | Normalized counts |
+| [Dimension reduction](#dimred): get HVGs | Raw counts | HVGs |
+| [Dimension reduction](#dimred): PCA | xy, metadata, HVGs | PCs |
+| [Dimension reduction](#dimred): UMAP | PCs | UMAP projection, nearest neighbors |
+| [Graph clustering (Louvain or Leiden)](#louvain) | Nearest neighbors | Clusters |
+| [InSituType clustering](#insitutype) | Raw counts, HVGs | Clusters |
+| [Cluster naming / marker gene ID](#naming) | Clusters, raw counts | Suggested cluster names |
+| [Cluster QC](#clustqc) | Clusters, raw counts | Suggested cluster names |
+| [Immune cell typing with HieraType](#hieratyperun) | Raw counts, nearest neighbors | HieraType calls |
+| [Harmonize HieraType with prior clusters](#hieratypemerge) | HieraType calls, clusters | Cell type calls |
+
+
+::: {.callout-note title="Note on large studies"}
+When your data is too large to fit into memory -- and this can happen with just a few slides of WTX data --
+ you need  modify the above strategy. 
+At this point, we recommend the below workflow, which we will demonstrate in a separate vignette in early 2026:
+
+1. Obtain a subsample of the larger study. This could be FOVs chosen at random from all the tissues in the study, or just the first couple slides to come off the instrument. 
+2. Use this subsample to fix a basic pre-processing pipeline. Importantly, this pipeline has to be applicable to new samples: their data has to be projected onto the same dimension-reduced embedding, and their cell typing has to map to the cell typing of the subsample. 
+3. Apply the above pre-processing pipeline separately to each tissue/slide in the study.
+4. Define an additional "hypothesis testing" pipeline, also to be applied separately to each tissue. 
+ This pipeline will compute whatever summary statistics you're interested in, e.g. DE results, cell type abundance, LR interaction scores.
+5. Perform meta-analysis of every tissues' summary statistics together. E.g. contrast DE results or cell type abundances across responders and non-responders. 
+6. Custom subset analyses: you may also have to load in custom subsets of the data for analysis, e.g. just the macrophages from every tissue. 
+:::
+
+
+
 
 # Loading flat files {#loading}
 
@@ -174,18 +215,6 @@ you can safely delete the flat files - you won't be using them again.
 If you do need to go back to them, they'll be on AtoMx, ready to be downloaded again:
 AtoMx acts as a persistent, authoritative source of unmodified data.
 
-::: {.callout-note}
-**Note on data size:** 
-A reasonably high-performance compute instance can generally handle a few slides of 
- CosMx data using the scripts we use here. But once studies get to millions of cells, they
- can overwhelm the memory available to most analysts. At this point, you have two options:
-
-1. Use data formats that store data on disk, not in memory, e.g. TileDB, SeuratDisk, hdf5... 
-2. Analyze your data one tissue at a time. Put all tissues through a standard analysis pipeline, then, for multi-tissue analyses, judiciously load in just the data you need for a given analysis. This is our recommendation; vignettes demonstrating this workflow are coming in 2026. 
-
-Neither option is terribly convenient, but having millions or tens of millions of cells 
-to analyze is worth some hassle. 
-:::
 
 
 # Customizing the tissues' spatial arrangements {#xy}
@@ -471,7 +500,7 @@ saveRDS(metadata, file = paste0(outdir, "/processed_data/metadata.RDS"))
 saveRDS(xy, file = paste0(outdir, "/processed_data/xy.RDS"))
 ```
 
-## Normalization
+## Normalization {#norm}
 
 We typically normalize each cell's expression profile to its total counts. 
 The below code does this efficiently. 
@@ -632,7 +661,7 @@ Of the above two methods, Louvain tends to be faster, while InSituType is easier
 
 ::: {.panel-tabset}
 
-## Louvain clustering
+## Louvain clustering {#louvain}
 
 **Note:** Here we run louvain clustering with a high resolution, intentionally over-clustering with the plan to condense afterwards.
 It's often better to run with the default resolution (0.8) at first, then subcluster selected cell types afterwards.
@@ -683,7 +712,7 @@ knitr::include_graphics("figures/cluster_xy_1stlook.png")
 
 
 
-## Clustering with InSituType
+## Clustering with InSituType {#insitutype}
 
 Here we refer you to the [InSituType vignette](https://github.com/Nanostring-Biostats/InSituType/blob/main/vignettes/NSCLC-RNA_InsituType-vignette.Rmd){target="_blank"}. Running in unsupervised mode is simplest, though supervised and semi-supervised modes can work well provided with good reference profiles. 
 
@@ -718,7 +747,7 @@ plot(xy, pch = 16, asp = 1, cex = 0.1,
 
 :::
 
-## Naming clusters
+## Naming clusters {#naming}
 
 Determining which cell type a cluster corresponds to is a complex exercise that should take into account:
 
@@ -961,7 +990,7 @@ A newer method, [ClonalScope](https://github.com/seasoncloud/Clonalscope){target
 
 # Optimizing immune cell calling with the HieraType algorithm {#hieratype}
 
-### Running HieraType
+### Running HieraType {#hieratyperun}
 
 We created the [HieraType algorithm](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth/){target="_blank"} to classify immune cells in a way that is informed by marker genes. 
 We have found it to consistently outperform other algorithms in immune cell typing. 
@@ -971,7 +1000,7 @@ Below, we run HieraType in two steps.
 In the first, we call broad cell types (e.g. epithelial, immune, ...) then subclassify the immune cells (B, T, macrophage...)
 
 ```{r echo = TRUE, eval = FALSE}
-### set up hieratype pipeline:
+### set up HieraType pipeline:
 pipeline_io_rna <- HieraType::make_pipeline(
   markerslists = list(
     "l1" = HieraType::markerslist_l1
@@ -1065,7 +1094,7 @@ print(hm_unsup)
 knitr::include_graphics("figures/hieratype_marker_heatmap2.png")
 ```
 
-### Merging clustering and HieraType results
+### Merging clustering and HieraType results {#hieratypemerge}
 
 To finish our cell typing exercise, we now merge the Louvain and HieraType results.
 All cells called immune by HieraType will get HieraType labels. 

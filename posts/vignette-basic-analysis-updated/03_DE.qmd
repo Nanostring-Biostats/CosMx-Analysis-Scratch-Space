@@ -17,27 +17,40 @@ number-depth: 4
 format:
   html:
     code-fold: true
-date: "2025-12-11"
+date: "2025-12-22"
 date-modified: last-modified
 categories:
 - recommended
 - differential expression
-image: figures/thumbnail.png
+image: figures/DAPI-red.png
 draft: false
 ---
   
 # Introduction
+
+Here we provide workflows for differential expression testing. 
+Also see the companion posts on [pre-processing]() and [exploratory analysis]().
+A complete analysis will typically begin with the pre-processing workflow,
+ use exploratory analyses to generate hypotheses, then conclude by using differential expression analysis to test those hypotheses.
 
 Whether you crafted your study with specific hypotheses in mind or discovered interesting trends while exploring your data,
  most CosMx<sup>&#174;</sup> analyses will culminate in differential expression (DE) analyses. 
 DE is a remarkably versatile tool for posing biological questions about how cells' behavior changes in response to exposures like spatial context or patient-level attributes. 
 Here we provide a convenient framework for posing your biological questions as DE tests. 
 
-Code is organized into the following sections:
+Code is organized into the following sections, with the following inputs and outputs:
 
-1. A collection of code chunks that can be edited and recombined to produce exactly the DE question you want. 
-2. A collection of code chunks for run DE under different conditions
-3. Recommended code for exploring DE results
+| **Step** | **Inputs** | **Outputs** |
+|------|--------|---------|
+| Defining predictor variables | xy, cell type, custom inputs | Predictor variables |
+| Find safe genes via overlap ratio metric | Raw counts, xy, cell type | Genes to analyze per cell type |
+| pre-DE calculations | xy | preDE (object for modeling segmentation errors) |
+| “Standard” DE with smiDE | Raw counts, preDE, cell type, list of genes to analyze per cell type | DE outputs: p-values, effect sizes, etc. |
+| “Optimal / slow” DE with smiDE | Raw counts, preDE, cell type, genes to analyze per cell type | DE outputs: p-values, effect sizes, etc. |
+| “Hasty / exploratory” DE with hastyDE | Normalized counts, cell type, genes to analyze per cell type | DE outputs: p-values, effect sizes, etc. |
+| “Stepwise” DE with hastyDE & smiDE | Normalized counts, cell type, genes to analyze per cell type | DE outputs: p-values, effect sizes, etc. |
+| Analysis of DE results | DE results | plots and tables |
+
 
 This document exists to facilitate the coding of DE analyses, not as a literature review or an unveiling of new methods. 
 For an extensive discussion of DE in spatial data, see [this ealier post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/DE-guide/){target="_blank"}. 
@@ -45,6 +58,7 @@ We'll be relying on the
 [smiDE package](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/smiDE){target="_blank"}, described in 
 [this post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/smiDE/){target="_blank"} and 
 [this preprint](https://www.biorxiv.org/content/10.1101/2024.08.02.606405v2.abstract){target="_blank"}.
+
 
 
 ## Getting started
