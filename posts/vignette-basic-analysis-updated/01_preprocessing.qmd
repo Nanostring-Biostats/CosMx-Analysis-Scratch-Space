@@ -17,7 +17,7 @@ number-depth: 4
 format:
   html:
     code-fold: true
-date: "2025-12-11"
+date: "2025-12-22"
 date-modified: last-modified
 categories:
   - recommended
@@ -25,6 +25,7 @@ categories:
   - cell typing
   - normalization
 image: figures/DAPI-blue.png
+description: Best practices for CosMx RNA analysis. Post 1 of 3, covering data loading through cell typing.
 draft: false
 ---
 
@@ -33,6 +34,7 @@ draft: false
 
 Here we propose an updated pipeline for basic CosMx<sup>&#174;</sup> analysis in R, 
  from data loading through cell typing. 
+This workflow applies to all our RNA assays.
 Also see the companion posts on [exploratory data analysis]() and confirmatory analysis with [differential expression testing](). 
 A complete analysis will typically begin with the pre-processing described here,
  use exploratory analyses to generate hypotheses, then conclude by using differential expression analysis to test those hypotheses.
@@ -672,6 +674,7 @@ Use `smiDE::overlap_ratio_metric` to do so. (smiDE is available on the scratch s
 # use Seurat to run Louvain clustering on the graph from our umap object
 if (TRUE) {
   seu[["pearsongraph"]] <- Seurat::as.Graph(umapobj$grph) ## nearest neighbors / adjacency matrix used for unsupervised clustering
+  set.seed(0)
   seu <- Seurat::FindClusters(seu, graph = "pearsongraph", resolution = 1.2)  # choosing a high resolution with the plan to condense afterwards
   clust <- seu@meta.data$seurat_clusters
   saveRDS(clust, file = paste0(outdir, "/processed_data/clust.RDS"))
@@ -720,6 +723,7 @@ A call to InSituType that would work with our setup here is:
 
 ```{r echo = TRUE, eval = FALSE}
 if (TRUE) {
+  set.seed(0)
   unsup <- insitutype(
     x = counts[, hvgs],  # only use HVG's. InSituType's computation time scales with the number of genes, so analyzing the full WTX panel is very slow. 
     neg = metadata$negmean,
