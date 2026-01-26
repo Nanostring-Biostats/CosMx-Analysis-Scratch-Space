@@ -138,13 +138,16 @@ First we'll use R to prepare our data for Novae, writing it to a h5ad file:
 
 ```{r echo = TRUE, eval = FALSE}
 # create a seurat object:
+obj <- CreateSeuratObject(
+  counts = Matrix::t(counts),
+  meta.data = metadata
+)
 
 # Convert to single cell experiment
 sce <- as.SingleCellExperiment(seu.obj)
 
 # Save as h5ad
 h5ad_path <- paste0(objects_dir, "/assay_data.h5ad")
-#writeH5AD(se_hdf5, file = h5ad_path)
 writeH5AD(sce, file = h5ad_path, X_name = "counts", assay = "counts")
 ```
 
@@ -205,7 +208,6 @@ novae.plot.connectivities(adata)
 model1 = novae.Novae.from_pretrained("MICS-Lab/novae-human-0")
 
 # Fine tune model based on CosMx data in this study
-#model1.fine_tune(adata, max_epochs=50, logger=True, accelerator='cuda', num_workers=4)
 model1.fine_tune(adata, max_epochs=50, logger=True) # Took ~24 hours on an r5b.12xlarge with CPU only
 model1.compute_representations(adata, zero_shot=False) # Took ~8 hrs
 
@@ -575,10 +577,15 @@ The intuition is simple: if a gene is more highly expressed in the neighbors of 
 We formalize this intuition in the function ```smiDE::overlap_ratio_metric```, demonstrated below:
 
 ```{r echo = TRUE, eval = FALSE}
+# normalize:
+normfactor <- mean(metadata$nCount_RNA) / metadata$nCount_RNA 
+norm <- counts
+norm@x <- counts@x * normfactor[ counts@i + 1L ]
+
 # obtain the overlap ratio metrics:
 if (TRUE) {
   overlapres <- smiDE::overlap_ratio_metric(
-    assay_matrix = Matrix::t(counts),
+    assay_matrix = Matrix::t(norm),
     metadata = cbind(xy, metadata),
     cellid_col = "cell_id",
     cluster_col = "celltype",
