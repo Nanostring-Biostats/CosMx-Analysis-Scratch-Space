@@ -39,8 +39,8 @@ sparse_quasipoisson_pca_seurat_batch <- function(x
                                                  ,cellid_colname = "cell_ID"
                                                  ,scale.max=10
                                                  ,reduction.key="PC_"
-                                                 ,do.scale=FALSE
-                                                 ,do.center= FALSE
+                                                 ,do.scale=TRUE
+                                                 ,do.center= TRUE
                                                  ,totalcounts = NULL
                                                  ,grate = NULL
                                                  ,quasi_poisson_variance_inflation = 1.01
@@ -231,19 +231,21 @@ sparse_quasipoisson_pca_seurat_batch <- function(x
                            Matrix::Diagonal(x=sqrt(totalcounts[splitidx[[kk]]])) %*% batch_mat[splitidx[[kk]],]  %*%
                            Matrix::t(root_grate_phi_row)
                          
+                         scx <- as.matrix(scx)
                          if(doscale & docenter){
-                           scx <- scale(as.matrix(scx), center = centers, scale = scales) 
+                           scx <- scale(scx, center = centers, scale = scales) 
                          } else if (docenter) {
-                           scx <- scale(as.matrix(scx), center = centers, scale = FALSE) 
+                           scx <- scale(scx, center = centers, scale = FALSE) 
                            
                          } else if (doscale) {
-                           scx <- scale(as.matrix(scx), center = FALSE, scale = scales) 
+                           scx <- scale(scx, center = FALSE, scale = scales) 
                          }
                          return(scx %*% feature.loadings)
                        },mc.cores=ncores
     ) 
   cell.embeddings <- do.call(rbind, cell.embeddings)
-  
+  cell.embeddings <- as.matrix(cell.embeddings)
+  feature.loadings <- as.matrix(feature.loadings)
   if(return_seurat_reduction){
     sdev <- sqrt(svdd$d / (ncol(x)-1)) 
     reduction.data <- 
