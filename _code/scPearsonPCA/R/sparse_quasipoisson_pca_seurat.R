@@ -229,14 +229,13 @@ sparse_quasipoisson_pca_seurat <- function(x
                          scx <-  
                            Matrix::t(ytilde[,splitidx[[kk]],drop=FALSE]) - 
                            matrix(sqrt(totalcounts[splitidx[[kk]]]),ncol=1) %*% matrix(sqrt(grate/phi),nrow=1)
-                         
+                         scx <- as.matrix(scx) 
                          if(doscale & docenter){
-                           scx <- scale(as.matrix(scx), center = centers, scale = scales) 
+                           scx <- scale(scx, center = centers, scale = scales) 
                          } else if (docenter) {
-                           scx <- scale(as.matrix(scx), center = centers, scale = FALSE) 
-                           
+                           scx <- scale(scx, center = centers, scale = FALSE) 
                          } else if (doscale) {
-                           scx <- scale(as.matrix(scx), center = FALSE, scale = scales) 
+                           scx <- scale(scx, center = FALSE, scale = scales) 
                          }
                          return(scx %*% feature.loadings)
                        },mc.cores=ncores
