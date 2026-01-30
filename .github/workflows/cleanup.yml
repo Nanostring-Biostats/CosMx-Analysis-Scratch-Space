@@ -17,10 +17,16 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: Remove PR preview directory
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          rm -rf pr-${{ github.event.pull_request.number }}
-          git add .
-          git commit -m "Remove preview for PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
-          git push
+              run: |
+                git config user.name "github-actions[bot]"
+                git config user.email "github-actions[bot]@users.noreply.github.com"
+                
+                # Check if directory exists before trying to remove it
+                if [ -d "pr-${{ github.event.pull_request.number }}" ]; then
+                  # 'git rm -r' removes the files from disk AND stages the deletion in one step
+                  git rm -r pr-${{ github.event.pull_request.number }}
+                  git commit -m "Remove preview for PR #${{ github.event.pull_request.number }}"
+                  git push
+                else
+                  echo "Directory pr-${{ github.event.pull_request.number }} does not exist. Skipping."
+                fi
