@@ -15,7 +15,7 @@ One common hazard is attempting to directly apply analysis pipelines designed fo
 in situ
  hybridization, has fundamentally different characteristics. Simply copy-pasting scRNA-seq methods without adaptation can lead to suboptimal or incomplete cell type assignments. Instead, we must employ or adapt methods that leverage the strengths of high-plex, direct hybridization data to achieve reliable annotations. In doing so it’s possible to achieve the most comprehensive and biologically-rich cell typing and sub-typing possible in spatial transcriptomics.
 
-It’s also crucial to remember that cell typing, while essential, isn’t the final destination of our journey. It’s a powerful tool for organizing our cellular map, allowing us to ask spatially-aware questions. However, other organizational frameworks, such as classifying cells based on their spatial neighborhood or “niche,” are equally important for understanding the tissue’s complex ecosystem.
+It’s also crucial to remember that cell typing, while essential, isn’t the final destination of our journey. It’s a powerful tool for organizing our cellular map, allowing us to ask spatially-aware questions. However, other organizational frameworks, such as classifying cells based on their spatial neighborhood or “niche,” are equally important for understanding the tissue’s complex ecosystem. Ultimately, cell typing is foundational: it establishes the structural anatomy of the dataset, paving the way for us to investigate its functional physiology in the next chapters.
 
 In this chapter, we will navigate the cell typing process in the colon dataset. The main goal is to generate cell type labels that are “close” while also being approachable. I’ll begin (
 Section 6.1
@@ -81,7 +81,9 @@ Nested / Hierarchical Clustering Analysis:
 e.g.
 , distinguishing CD4+ from CD8+ T cells, or identifying different fibroblast subtypes. This iterative approach allows for a hierarchical understanding of cell identity; however, the imperfect segmentation noted above is amplified in this approach. Consider a workflow where one uses HVGs to create an initial set of “Elementary” clusters and uses a marker gene-based approach to label these broad clusters. When subsetting down to, say, fibroblasts and rerunning the above HVG -> Leiden -> marker gene workflow, one may get non-fibroblast marker genes returned. The reason for this is twofold. First the general fibroblast marker genes are no longer as differentially expressed in the subset of Fibroblasts as they were in the full data and 2) if there are cell segmentation errors of fibroblast sub-populations that are spatially-associated with unrelated cell types – like plasma cells – the HVG algorithm may identify spurious gene markers as highly variable. The result would be markers like 
 JCHAIN
- in fibroblasts that happen to be located near a germinal center, tertiary lymphoid structure, or similar. Thus, while this nested approach can be valuable, it should be used with caution.
+ in fibroblasts that happen to be located near a germinal center, tertiary lymphoid structure, or similar. Thus, while this nested approach can be valuable, it should be used with caution. For more information on this overlap concept, see Dan McGuire’s 
+blog post
+ on smiDE.
 
 Reference-Based Annotation:
  Instead of relying solely on 
@@ -1883,6 +1885,14 @@ human colon cancer dataset
 1.3
  Setting up Your Own Analysis Environment
 
+Note
+
+For this initial release the 
+renv.lock
+, 
+requirements.txt
+, and other helper files are not yet available. Check back later for the source code for this book.
+
 This subsection in primarily for those who wish to use this book as a springboard for their own analysis.
 
 When working in a mixed R and python environment, I make use of RStudio IDE and work within an analysis “Project”. While your version of R will likely be different, this particular version is R version 4.5.1 (2025-06-13) and managing packages with 
@@ -2047,7 +2057,7 @@ B signaling).
 
 While we can measure thousands of pathways from any number of databases, in this primer we’ll keep things tractable and estimate the activity of 14 cancer-relevant signaling pathways using the PROGENy
 1
- database.
+ database (see below).
 
 Here is our approach:
 
@@ -2084,11 +2094,13 @@ if 'adata' not in dir():
 
 flipping the y-axis so that the tissue is in the same orientation as the rest of the analysis.
 
-We’ll use the PROGENy
+We’ll use the PROGENy (Pathway RespOnsive GENes)
 1
  database available within decoupler
 2
- to estimate the single cell enrichment scores of each of the 14 cancer-relevant pathways and their significant values. The code below adapts 
+ to estimate the single cell enrichment scores of each of the 14 cancer-relevant pathways and their significant values. PROGENy is a resource that estimates pathway activity by analyzing the downstream genes known to change in response to perturbation experiments across a wide variety of human cancer cell lines. I find that it is useful in a wide range of cancer samples but it might not be ideal for, say, transplant or viral infection samples.
+
+The code below adapts 
 decoupler’s tutorial
  which uses the 
 univarte linear model method (ulm) function
@@ -3004,7 +3016,7 @@ adata = ad.read_h5ad(os.path.join(r.analysis_dir, "anndata-1-qc-filtered.h5ad"))
 
 There are two different pre-processing workflows that I use. The first one is borrowed from spatially-unaware scRNA-seq. The main advantage of this approach is that it is fast, the normalization matrix can remain sparse, the values are easy to understand (
 e.g.,
- counts of gene X per 10,000 or some transformation of such), and often times for WTX data provides the basis for good clustering of cells in downstream UMAP. Moreover, Scanpy and Seurat each have built-in methods for these steps which make it relatively low friction. However, there are cases were this standard workflow provides unexpected results. One reason is that total counts-based normalization might have unstable variance
+ counts of gene X per 10,000 or some transformation of such), and often times for WTX data provides the basis for good clustering of cells in downstream UMAP. Moreover, Scanpy and Seurat each have built-in methods for these steps which make it relatively low friction. However, there are cases were this standard (“legacy”) workflow provides unexpected results. One reason is that total counts-based normalization might have unstable variance
 1
  such that high-expressing housekeeping genes might have high variance and disproportionately effect downstream dimensional reduction and clustering.
 
@@ -4095,7 +4107,7 @@ Figure 
 
 Figure 3.3: Number of genes impacted in a given number of FOVs.
 
-To see details how these FOVs might have been impacted, we can use the function below to plot the signal lostt found for each cycle-by-reporter combination.
+To see details how these FOVs might have been impacted, we can use the function below to plot the signal lost found for each cycle-by-reporter combination.
 
 R Code
 
@@ -4151,9 +4163,9 @@ Any report cycles that show systematically reduced signal across many FOVs
 
 Any FOVs that show underperforming multiple reporter cycles.
 
-While we do see two reporter cycles (19 and 27) with two flagged FOVs (155 and 239), each, there’s no evidence of a systemic signal lostt in any reporter cycle. If we did find strong evidence, one could conservatively filter out the genes that are present in that reporter cycle. This would be roughly 2,000 genes for a given reporter cycle. Looking from the perspective of the FOVs (#2), we see only a handful of FOVs showed one (or two) underperforming reporter cycles. These include FOVs 92, 113, 155, 160, and 239. At this point, one could remove all FOVs that were flagged (
+While we do see two reporter cycles (19 and 27) with two flagged FOVs (155 and 239), each, there’s no evidence of a systemic signal lost in any reporter cycle. If we did find strong evidence, one could conservatively filter out the genes that are present in that reporter cycle. This would be roughly 2,000 genes for a given reporter cycle. Looking from the perspective of the FOVs (#2), we see only a handful of FOVs showed one (or two) underperforming reporter cycles. These include FOVs 92, 113, 155, 160, and 239. At this point, one could remove all FOVs that were flagged (
 length(res$flaggedfovs)
-; 23 in this case), just the five that we found evidence of signal lostt in one or more reporter cycles, or flag the cells within the impacted FOVs and see if any downstream results are impacted. For this analysis, I’ll simply do the “flag and monitor” approach.
+; 23 in this case), just the five that we found evidence of signal lost in one or more reporter cycles, or flag the cells within the impacted FOVs and see if any downstream results are impacted. If you wanted to be on the conservative side, you would remove all flagged FOVs unless you have biological justification that the signal difference isn’t due to FOV effects. For this analysis, I’ll simply do the “flag and monitor” approach.
 
 R Code
 
@@ -4180,7 +4192,7 @@ imperfect segmentation of cells – especially around FOV borders
 
 and so our aim is to filter out cells from the latter two scenarios.
 
-Counts-based filtering has a trade-off. While several downstream “tertiary” analyses account for low signal in a variety of ways (discussed later), many of the pre-processing steps are sensitive to the quality of cells that are feed into them. Setting a lenient cutoff can introduce low-quality cells in dimensional reductions like PCA and UMAP and can break up clustering patterns (creating spurious clusters or merging otherwise distinct clusters). On the other hand, a stringent cutoff can introduce unexpected signal lostt. This is because cell types vary in their transcript counts so removing cells based on counts will distort the composition of cells in your data.
+Counts-based filtering has a trade-off. While several downstream “tertiary” analyses account for low signal in a variety of ways (discussed later), many of the pre-processing lenient cutoff can introduce low-quality cells in dimensional reductions like PCA and UMAP and can break up clustering patterns (creating spurious clusters or merging otherwise distinct clusters). On the other hand, a stringent cutoff can introduce unexpected signal lost. This is because cell types vary in their transcript counts so removing cells based on counts will distort the composition of cells in your data.
 
 Best practice for counts based filtering of CosMx data includes:
 
@@ -4204,7 +4216,7 @@ this Scratch Space blog post
 3.2.1
  Counts and Features
 
-For the distribution of transcript and gene counts, I like to look at the joint distribution in addition to the univariate distributions. In the code below I set a permissive, symmetrical threshold of 2.5 standard deviations (SDs) around the mean (in log10 space).
+For the distribution of transcript and gene counts, I like to look at the joint distribution in addition to the univariate distributions. In the code below I set a permissive, symmetrical threshold of 2.5 standard deviations (SDs) around the mean (in log10 space) but this thresholding is sample-dependent so different values might make more sense on your data.
 
 ```
 # meta <- py$adata$obs
