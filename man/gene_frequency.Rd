@@ -2,7 +2,7 @@
 % Please edit documentation in R/gene_frequency.R
 \name{gene_frequency}
 \alias{gene_frequency}
-\title{Run sparse PCA Using Quasi-poisson pearson residuals (skip dense normalization)}
+\title{Compute the frequency of each gene from a sparse counts matrix}
 \usage{
 gene_frequency(
   x,
@@ -22,9 +22,8 @@ Or, row names of the data frame indicating 'cell id'.}
 \item{cellid_colname}{column in \code{obs} indicating the cell identifier, i.e., 'cell_ID'.}
 }
 \description{
-Recreate Seurat RunPCA output from pearson residual normalization (described in Lause 2021),
-WITHOUT creating a dense cells x genes scaled data matrix.
-This function uses Quasi-poisson instead of Negative Binomial distribution for computational convenience.
-Computes PCA via SVD decomposition of genes x genes matrix instead of
-SVD decomposition of cells x genes dense matrix, which is useful for memory when cells x genes >> genes^2 .
+This function computes the frequency of each gene from the provided sparse counts matrix \code{x}.
+Returned is a gene-named vector of frequencies which sum to 1.
+If obs, batch_variable, and cellid_colname are provided, these frequencies are calculated separately per batch,
+returning a genes x batches matrix with columns summing to 1.
 }
