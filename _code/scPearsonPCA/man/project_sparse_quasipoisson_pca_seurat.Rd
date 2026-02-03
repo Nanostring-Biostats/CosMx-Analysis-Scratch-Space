@@ -7,6 +7,7 @@
 project_sparse_quasipoisson_pca_seurat(
   x,
   pcaobj,
+  totalcounts = NULL,
   ncores = 1,
   verbose = TRUE,
   block.size = 10^4,
@@ -18,8 +19,7 @@ project_sparse_quasipoisson_pca_seurat(
 \arguments{
 \item{x}{A sparse genes x cells counts matrix}
 
-\item{pcaobj}{generated from \code{sparse_quasipoisson_pca_seurat}
-Analogous to Seurat::ScaleData scale.max argument, with same default of "10".}
+\item{pcaobj}{generated from \code{sparse_quasipoisson_pca_seurat}}
 
 \item{ncores}{the # of cores to use to project embeddings}
 

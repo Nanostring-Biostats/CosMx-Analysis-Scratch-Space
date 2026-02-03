@@ -1,2 +1,2 @@
-#' @importFrom data.table .N .I ':=' copy uniqueN
+#' @importFrom data.table .N .I ':=' copy uniqueN setnames
 NULL

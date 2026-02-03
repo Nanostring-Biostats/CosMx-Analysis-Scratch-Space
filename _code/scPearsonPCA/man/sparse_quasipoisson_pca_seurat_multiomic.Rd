@@ -15,7 +15,7 @@ sparse_quasipoisson_pca_seurat_multiomic(
   do.center = TRUE,
   quasi_poisson_variance_inflation = 1.01,
   npcs = 50,
-  ncores = 4,
+  ncores = 1,
   verbose = TRUE,
   block.size = 10^4,
   ndims.print = 1:5,
