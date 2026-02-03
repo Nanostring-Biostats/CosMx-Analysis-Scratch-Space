@@ -96,8 +96,9 @@ cluster_metagenes <- function(metagenes = NULL
     if(!fit_single_positive_only){
       criteria_2 <- (npos.2==1 & conds[,ii]==1) ## passes prior_prob_level threshold and yhat > 0 and ypost(erior) > 0
       if(!is.null(discourage_double_positive[[ii]])){
-        if(discourage_double_positive[[ii]] %in% colnames(yp)){
-          double_pos_pass_yhat <- apply(yp[,discourage_double_positive[[ii]],drop=FALSE] > 0, 1, mean) ## check if posterior scores for forbidden cell types are > 0
+        if(any(discourage_double_positive[[ii]] %in% colnames(yp))){
+          otherct <- intersect(discourage_double_positive[[ii]],colnames(yp))
+          double_pos_pass_yhat <- apply(yp[,otherct,drop=FALSE] > 0, 1, mean) ## check if posterior scores for forbidden cell types are > 0
           double_pos_pass <- double_pos_pass_yhat==0  ## if none of the forbidden celltypes have posterior scores > 0, then the cell passes
           criteria_2 <- criteria_2 & double_pos_pass  
         } else {
