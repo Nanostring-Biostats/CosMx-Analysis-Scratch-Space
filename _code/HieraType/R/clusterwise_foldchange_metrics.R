@@ -16,9 +16,10 @@
 #' @param metadata metadata including (at minimum) 'cellid_column' and a 'cluster_column'
 #' @param cluster_column column in metadata corresponding to cell type 
 #' @param cellid_column column in metadata corresponding to cell id. Should also correspond to the column names of the `counts` and `normed` expression matrices.
-#' @param totalcounts optional user-specified vector of totalcounts used for normalizing the counts matrix.  
+#' @param totalcounts optional user-specified vector of totalcounts used for normalizing the counts matrix.
 #' (useful if a subsetted counts matrix is passed)
-#' 
+#' @return A data.table with columns: cluster, cluster_expr, clusterprime_expr, gene, cluster_prop,
+#'         clusterprime_prop, ncells, typ, fold_change, and fold_change_prop.
 #' @export
 clusterwise_foldchange_metrics <- function(counts=NULL, normed = NULL, totalcounts = NULL, metadata, cluster_column, cellid_column = "cell_ID"){
 

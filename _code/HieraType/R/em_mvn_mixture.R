@@ -141,9 +141,9 @@ em_mvn_mixture <- function(scores
     
     message(paste0("iteration ",iter, ", ll: ",llvec[iter])) 
     
-    if(is.na(llvec[iter])) stop("NA likelihoood; need to debug")
+    if(is.na(llvec[iter])) stop("NA likelihood; need to debug")
     if(iter > 1){
-      if(llvec[iter] < llvec[iter - 1] && iter > 100) stop("likelihoood got worse (?); need to debug")
+      if(llvec[iter] < llvec[iter - 1] && iter > 100) stop("likelihood got worse (?); need to debug")
       rel.eps <- (llvec[iter] - llvec[iter - 1])/llvec[iter]
       if(verbose > 0){
         message(paste0("rel.eps = ", rel.eps))

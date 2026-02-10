@@ -1,7 +1,8 @@
 
 #' Make a marker gene heatmap showing fold changes and proportion of cells expressing the marker gene by cluster.
-#' 
+#'
 #' @param foldchange_metrics metrics calculated using `clusterwise_foldchange_metrics()` function.
+#' @return A ggplot2 object showing the marker heatmap.
 #' @param extras if provided, these extra genes will be included in the plot, even if they are not in the `topn` in terms of 
 #' `foldchange` for a particular cluster based on fold change or don't meet the `cluster_prop_min` requirement.
 #' @param topn plot the `topn` genes (in terms of fold_change, which are expressed in at least cluster_prop_min pct of cells) from each cluster.
@@ -30,6 +31,12 @@ marker_heatmap <- function(foldchange_metrics
                       ,orient_diagonal = TRUE
                       ,topleft_to_bottomright = FALSE
 ){
+  if (!requireNamespace("ComplexHeatmap", quietly = TRUE)) {
+    stop("Package 'ComplexHeatmap' is required for marker_heatmap(). Please install it.")
+  }
+  if (!requireNamespace("RColorBrewer", quietly = TRUE)) {
+    stop("Package 'RColorBrewer' is required for marker_heatmap(). Please install it.")
+  }
   fctable <- data.table::copy(foldchange_metrics)
   fctable[,scaled_fold_change:=fold_change/max(fold_change),by=gene]
   fctable[,scaled_expr:=cluster_expr/max(cluster_expr),by=gene]

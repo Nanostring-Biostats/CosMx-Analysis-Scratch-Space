@@ -1,8 +1,9 @@
 
 #' add_ncells
-#' 
+#'
 #' @description show the number of cells next to the cluster in a marker heatmap plot.
-#' 
+#' @param heatmap_plot A ggplot2 heatmap object created by \code{marker_heatmap()}.
+#' @return A modified ggplot2 object with cell counts appended to cluster labels.
 #' @export 
 add_ncells <- function(heatmap_plot){
   newp <- copy(heatmap_plot)

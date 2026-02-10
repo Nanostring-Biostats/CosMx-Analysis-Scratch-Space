@@ -16,7 +16,12 @@
 #' @param return_all_columns_postprobs Whether to return individual posterior probabilities for every celltype in the `post_probs` data.table. 
 #' See `combine_postprob_tables()` function; these columns can be returned later if needed without needing to rerun a pipeline.
 #' @param ... Other arguments to be passed to `fit_metagene_scores` and/or `cluster_metagenes` functions.
-#' 
+#' @return A list containing:
+#' \itemize{
+#'   \item \code{post_probs} - Combined posterior probability tables from all pipeline stages
+#'   \item \code{models} - List of fitted clustering models for each pipeline stage
+#'   \item \code{metagene_scores} - List of metagene score fits for each pipeline stage
+#' }
 #' @export
 run_pipeline <- function(pipeline, counts_matrix
                          ,adjacency_matrix = NULL
@@ -24,12 +29,35 @@ run_pipeline <- function(pipeline, counts_matrix
                          ,celltype_call_threshold = 0.5
                          ,return_all_columns_postprobs = FALSE
                          , ...){
-  stopifnot("`pipeline` must have class 'pipeline', typically creaed with `make_pipeline()` function. " = inherits(pipeline, "pipeline"))
- 
-  dots <- list(...) 
+  stopifnot("`pipeline` must have class 'pipeline', typically created with `make_pipeline()` function. " = inherits(pipeline, "pipeline"))
 
+  dots <- list(...)
 
-   
+  # Warn on unrecognized ... arguments
+  recognized_args <- unique(c(
+    names(formals(fit_metagene_scores)),
+    names(formals(cluster_metagenes))
+  ))
+  dropped <- setdiff(names(dots), recognized_args)
+  if (length(dropped) > 0) {
+    warning("Unrecognized arguments in `...` will be ignored: ",
+            paste(dropped, collapse = ", "),
+            "\nRecognized arguments are forwarded to fit_metagene_scores() and cluster_metagenes().")
+  }
+
+  # Validate and align initial_prior_weights with counts_matrix
+  if (!is.null(initial_prior_weights)) {
+    if (!is.null(names(initial_prior_weights)) && !is.null(rownames(counts_matrix))) {
+      if (!all(rownames(counts_matrix) %in% names(initial_prior_weights))) {
+        stop("initial_prior_weights is missing entries for some cells in counts_matrix")
+      }
+      initial_prior_weights <- initial_prior_weights[rownames(counts_matrix)]
+    } else if (length(initial_prior_weights) != nrow(counts_matrix)) {
+      stop("length of initial_prior_weights (", length(initial_prior_weights),
+           ") does not match nrow(counts_matrix) (", nrow(counts_matrix), ")")
+    }
+  }
+
   ### markerslists which dont inherit from another markerslist are the starting points
   parent_lists <- setdiff(names(pipeline$markerslists), names(pipeline$priors))
   metagene_scores <- models <- vector(mode = 'list',length=length(pipeline$markerslists)) 
@@ -38,7 +66,7 @@ run_pipeline <- function(pipeline, counts_matrix
   for(parnt in parent_lists){
      metagene_scores[[parnt]]  <- 
          do.call(fit_metagene_scores
-                 ,c(list(markerslist = pipeline$markerslist[[parnt]]
+                 ,c(list(markerslist = pipeline$markerslists[[parnt]]
                          ,counts_matrix = counts_matrix
                          ,adjacency_matrix = adjacency_matrix
                          ,prior_level_weights = initial_prior_weights
@@ -66,7 +94,7 @@ run_pipeline <- function(pipeline, counts_matrix
       prior_wts <- models[[pipeline$priors[[chld]]]]$post_probs[[pipeline$priors_category[[chld]]]]
        metagene_scores[[chld]]  <-
          do.call(fit_metagene_scores
-                 ,c(list(markerslist = pipeline$markerslist[[chld]]
+                 ,c(list(markerslist = pipeline$markerslists[[chld]]
                          ,counts_matrix = counts_matrix
                          ,adjacency_matrix = adjacency_matrix
                          ,prior_level_weights = prior_wts
