@@ -137,7 +137,7 @@ em_mvn_mixture_overfit <- function(scores
       message(paste0("iteration ",iter, ", ll: ",llvec[iter])) 
     } 
     
-    if(is.na(llvec[iter])) stop("NA likelihoood; need to debug")
+    if(is.na(llvec[iter])) stop("NA likelihood; need to debug")
     if(iter > 1){
       rel.eps <- (llvec[iter] - llvec[iter - 1])/llvec[iter]
       if(verbose > 0) message(paste0("rel.eps = ", rel.eps))
