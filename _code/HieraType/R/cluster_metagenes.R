@@ -127,9 +127,9 @@ cluster_metagenes <- function(metagenes = NULL
       scoresfit_anchor <- scores[criteria_1 | criteria_2,]  ## either single-positive OR [ both yhat AND ypost are positive AND none of the forbidden cell types are positive] 
     }
     nfit[ii] <- nrow(scoresfit_anchor)
-    if(nfit[ii] > 0){
+    if(nfit[ii] > 2){
       message(paste0("fitting mixture component for ", ii))
-      ktry <- k_components; tryagain <- 1
+      ktry <- min(k_components, nrow(scoresfit_anchor)-1); tryagain <- 1
       while(tryagain & ktry > 0){
         tryagain <- 0
         set.seed(seed)
