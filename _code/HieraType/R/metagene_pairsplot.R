@@ -10,13 +10,16 @@
 #' @param colorvar  Optional categorical variable by which to color the cells.  This should be provided as a .
 #' @param ptalpha  alpha value controlling transparency of plotted points.
 #' @param ptsize  controls size of plotted points.
-#' @param obs optional cell-level data frame / data.table that is inner-joined onto the metagene scores.  
+#' @param obs optional cell-level data frame / data.table that is inner-joined onto the metagene scores.
 #'        This can be used to subset the cells plotted (by only passing `obs` for the cells you want to plot) and/or including `colorvar` variable to be used for plotting.
-
+#' @return A ggplot2/GGally pairs plot object.
 #' @export
 metagene_pairsplot <- function(metagenes, var, nsamples = NULL, wts = NULL
                                ,colorvar=NULL, wtlim = 0.5
                                ,ptalpha = 0.5, ptsize = 0.1, obs = NULL){
+  if (!requireNamespace("GGally", quietly = TRUE)) {
+    stop("Package 'GGally' is required for metagene_pairsplot(). Please install it.")
+  }
   pd <- 
     data.table::rbindlist(
       lapply(names(metagenes), function(xx){

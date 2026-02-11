@@ -28,9 +28,15 @@
 #' @param row_standardize_adjacency_matrix  default is TRUE; row-standardize the adjacency matrix , such that the sum of neighbor weights across rows adds up to 1.
 #' @param obs Optional data.frame or data.table of metadata with a column for `batch_variable` and the `cell id`.  If provided and `pearson.response=TRUE` this is used to construct the pearson residuals
 #' @param batch_variable Optional column name of 'batch_variable' in `obs` dataframe. If provided and `pearson.response=TRUE` this is used to construct the pearson residuals
-#' @param cellid_colname column name of 'cell ids' in the `obs` dataframe.  
-#' @return a 'markerslist' list object which can be passed to `fit_metagene_scores`
-#'
+#' @param cellid_colname column name of 'cell ids' in the `obs` dataframe.
+#' @return A list of metagene fits, one per cell type class, containing:
+#' \itemize{
+#'   \item \code{bhat} - fitted regression coefficients
+#'   \item \code{yhat} - predicted metagene scores
+#'   \item \code{y} - observed (transformed) index gene values
+#'   \item \code{ypost} - posterior mean scores
+#'   \item \code{nnpcfit} - nsprcomp fit object (for multi-index markers)
+#' }
 #' @export
 fit_metagene_scores <- function(
                          markerslist
@@ -224,10 +230,11 @@ fit_metagene_scores <- function(
             muhat <- (Matrix::Diagonal(x = totalcounts, names = TRUE) %*% (Matrix::t(batch_mat) %*% grate[,index_marker]))[,1]
           }
           if(pearson.family == "poisson"){
-            yresp <- (yresp -  muhat) / sqrt(muhat )#+ muhat^2/10
+            yresp <- (yresp -  muhat) / sqrt(pmax(muhat, .Machine$double.eps))
           } else if (pearson.family == "nonzero_bernoulli"){
             nzprob <- 1-dpois(0, lambda = muhat)
-            yresp <- ((yresp > 0) - nzprob) / (sqrt(nzprob * (1-nzprob)))
+            nzprob_var <- pmax(nzprob * (1-nzprob), .Machine$double.eps)
+            yresp <- ((yresp > 0) - nzprob) / sqrt(nzprob_var)
           }
           if(pearson.scale.max < Inf){
             yresp[yresp > pearson.scale.max*sd(yresp) + mean(yresp)] <- pearson.scale.max*sd(yresp) + mean(yresp)
@@ -317,8 +324,10 @@ fit_metagene_scores <- function(
   ### summarize a metagene score for each cell type class in one dimension
   ### Note - Non-negative sparse PCA (used to summarize scores in 1 dimension across index gene)
   ###        uses an em-algorithm for loadings.  Need to set a seed for full reproducibility
-  orig_seed <- .Random.seed
-  on.exit({.Random.seed <<- orig_seed})
+  if (exists(".Random.seed", envir = .GlobalEnv)) {
+    orig_seed <- get(".Random.seed", envir = .GlobalEnv)
+    on.exit(assign(".Random.seed", orig_seed, envir = .GlobalEnv), add = TRUE)
+  }
   nsprcomp_seed <- 123
   set.seed(nsprcomp_seed) 
   nnpc_for_multi_index <- TRUE

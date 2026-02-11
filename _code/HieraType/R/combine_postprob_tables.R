@@ -6,8 +6,10 @@
 #' @param models list of models, created using `run_pipeline`
 #' @param celltype_call_threshold Used to determing the celltype_thresh column in returned table.  
 #' This column shows the most granular cell type with posterior probability > `celltype_call_threshold` for each cell.
-#' @param return_all_columns if FALSE (default), columns with posterior probability scores for 
+#' @param return_all_columns if FALSE (default), columns with posterior probability scores for
 #' individual cell type classes are dropped from the returned table.
+#' @return A named list of data.tables (one per parent pipeline), each containing cell_ID,
+#'         celltype_thresh, celltype_granular, best_score_thresh, and best_score_granular columns.
 #' @export
 combine_postprob_tables <- function(pipeline
                                     ,models

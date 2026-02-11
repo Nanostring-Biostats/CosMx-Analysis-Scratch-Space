@@ -11,17 +11,17 @@
 #'
 #' @examples
 #' 
-#' pipeline_tcell <- 
-#' make_pipeline(markerslists = list("tmajor" = smiSmooth::markerslist_tcellmajor
-#'                                   ,"t4minor" = smiSmooth::markerslist_cd4tminor
-#'                                   ,"t8minor" = smiSmooth::markerslist_cd8tminor)
+#' pipeline_tcell <-
+#' make_pipeline(markerslists = list("tmajor" = HieraType::markerslist_tcellmajor
+#'                                   ,"t4minor" = HieraType::markerslist_cd4tminor
+#'                                   ,"t8minor" = HieraType::markerslist_cd8tminor)
 #'               ,priors = list("t4minor" = "tmajor"
 #'                              ,"t8minor" = "tmajor")
 #'               ,priors_category = list("t4minor" = "cd4t"
 #'                                       ,"t8minor" = "cd8t")
 #' )
 #'
-#' 
+#' @return A 'pipeline' object (list with class "pipeline") containing markerslists, priors, and priors_category.
 #' @export
 #'
 #' 
@@ -76,18 +76,3 @@ make_pipeline <- function(markerslists
   class(pipeline) <- append(class(pipeline), "pipeline")
   return(pipeline)
 }
-
-
-#classify_t <- function(
-#    markerslists = list("tmajor" = smiSmooth::markerslist_tcellmajor
-#                        ,"t4minor" = smiSmooth::markerslist_cd4tminor
-#                        ,"t8minor" = smiSmooth::markerslist_cd8tminor
-#                        ,)
-#    priors = list("t4minor" = "tmajor"
-#                  ,"t8minor" = "tmajor")
-#    
-#    ){
-#    
-#}
-
-

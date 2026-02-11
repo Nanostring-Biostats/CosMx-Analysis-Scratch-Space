@@ -13,9 +13,7 @@
 #' @param ptsize point size for plotting
 #' @param alphasize alpha (transparency) for plotting
 #' @param plotfirst optional vector of celltypes which should be plotted first (under) the rest.
-#' 
-#' 
-#'
+#' @return A ggplot2 object showing cells colored by cluster in x/y space.
 #' @export
 #' 
 xyplot <- function(cluster_column, x_column = "x_slide_mm", y_column = "y_slide_mm", cls=NULL

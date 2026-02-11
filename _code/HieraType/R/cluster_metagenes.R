@@ -22,7 +22,12 @@
 #' @param training_cellids  If provided, the metagenes or scores object will be subset to only this set of cells before clustering and scoring.
 #' @param seed  seed to be set in local environment before using k-means to initialize starting parameters.  Ensures consistency after re-running.
 #' Global seed is reset on function exit.
-#'
+#' @return A list containing:
+#' \itemize{
+#'   \item \code{models} - fitted mixture models for each cell type
+#'   \item \code{post_probs} - data.table of posterior probabilities with cell_ID, best_class, and best_score
+#'   \item \code{llmat} - matrix of log-likelihoods
+#' }
 #' @export
 cluster_metagenes <- function(metagenes = NULL
                               ,scores = NULL
@@ -45,8 +50,10 @@ cluster_metagenes <- function(metagenes = NULL
   ### scores to be modeled 
   to_model <- match.arg(to_model) 
   
-  orig_seed <- .Random.seed
-  on.exit({.Random.seed <<- orig_seed})
+  if (exists(".Random.seed", envir = .GlobalEnv)) {
+    orig_seed <- get(".Random.seed", envir = .GlobalEnv)
+    on.exit(assign(".Random.seed", orig_seed, envir = .GlobalEnv), add = TRUE)
+  }
   
   
   if(is.null(scores)){
@@ -86,10 +93,19 @@ cluster_metagenes <- function(metagenes = NULL
   names(models) <- intersect(colnames(scores), unique(anchorid))
   nfit <- vector(mode = 'numeric', length=length(models))
   names(nfit) <- names(models)
-  yh <- make_scores_matrix(metagenes, "yhat")
-  y <- make_scores_matrix(metagenes, "y")
-  yp <- make_scores_matrix(metagenes, "ypost")
-  conds <- yh > 0 & y > 0 ## both observed and predicted score are positive
+
+  # Handle case when only scores provided (not metagenes)
+  if(!is.null(metagenes)){
+    yh <- make_scores_matrix(metagenes, "yhat")
+    y <- make_scores_matrix(metagenes, "y")
+    yp <- make_scores_matrix(metagenes, "ypost")
+    conds <- yh > 0 & y > 0 ## both observed and predicted score are positive
+  } else {
+    yh <- scores
+    y <- scores
+    yp <- scores
+    conds <- scores > 0
+  }
   for(ii in intersect(colnames(scores), unique(anchorid))){
     criteria_1 <- (npos.2==1 & npos == 1 & (scores[,ii] > 0))
     scoresfit_anchor <- scores[criteria_1,]
@@ -139,12 +155,23 @@ cluster_metagenes <- function(metagenes = NULL
     }
   }
   
-  priork <- prop.table(nfit)
-  ll_scores <- vector(mode = 'list', length=length(models))
-  names(ll_scores) <- names(models)
-  
-  for(ii in names(models)){
-    ll_scores[[ii]] <- 
+  # Handle cell types with zero anchor cells: only score fitted models
+  fitted_classes <- names(models)[!vapply(models, is.null, logical(1))]
+  if (length(fitted_classes) == 0) {
+    stop("No cell types had positive anchor cells. Cannot fit any mixture models.")
+  }
+  if (length(fitted_classes) < length(models)) {
+    unfitted <- setdiff(names(models), fitted_classes)
+    warning("No anchor cells found for: ", paste(unfitted, collapse = ", "),
+            ". These cell types will be assigned -Inf log-likelihood.")
+  }
+
+  priork <- prop.table(nfit[fitted_classes])
+  ll_scores <- vector(mode = 'list', length=length(fitted_classes))
+  names(ll_scores) <- fitted_classes
+
+  for(ii in fitted_classes){
+    ll_scores[[ii]] <-
     score_mixture_overfit(models[[ii]]
                           ,scores = scores
                           ,denom_only = TRUE ## total loglik across K clusters
@@ -152,10 +179,13 @@ cluster_metagenes <- function(metagenes = NULL
     ll_scores[[ii]] <- ll_scores[[ii]] + log(priork[ii])
   }
   llmat <- do.call(cbind, ll_scores)
-  ppmatdenom <- apply(llmat, 1, matrixStats::logSumExp)
-  ppmatnum <- exp(llmat)
-  ppmat <- Matrix::Diagonal(x=1/exp(ppmatdenom),names=TRUE)%*% ppmatnum  
-  
+
+  # Numerically stable posterior computation: subtract row max before exp
+  row_max <- apply(llmat, 1, max)
+  ppmat <- exp(llmat - row_max)
+  ppmat <- ppmat / rowSums(ppmat)
+
+  # Handle any remaining NA/Inf rows (e.g., all -Inf log-likelihoods)
   isna <- apply(ppmat, 1, function(x) sum(is.na(x) | is.infinite(x)))
   if(sum(isna > 0) > 0){
     whichisna <- which(isna > 0)
@@ -164,17 +194,16 @@ cluster_metagenes <- function(metagenes = NULL
       ppmat[whichisna[j],] <- 0
       ppmat[whichisna[j],maxll[j]] <- 1
     }
-  } 
+  }
   if(!is.null(prior_prob_level)){
     ppmat <- (Matrix::Diagonal(x=prior_prob_level,names=TRUE) %*% ppmat)
-  } 
-  
+  }
+
   post_probs <- data.table::data.table(as.matrix(ppmat))
-  colnames(post_probs) <- colnames(scores)
+  colnames(post_probs) <- colnames(llmat)
   post_probs[,best_score:=do.call(pmax,.SD)]
   post_probs[,best_class:=colnames(post_probs)[apply(.SD,1,which.max)],.SDcols=1:(ncol(post_probs)-1)]
-#  post_probs[,best_class:=colnames(post_probs)[which.max(.SD)],by=.I,.SDcols=(1:(ncol(post_probs)-1))]
-  post_probs[,cell_ID:=rownames(llmat)] 
+  post_probs[,cell_ID:=rownames(llmat)]
   data.table::setcolorder(post_probs, c("cell_ID", "best_class", "best_score")) 
   lx_model <- list(models = models, post_probs = post_probs, llmat = llmat) 
   
