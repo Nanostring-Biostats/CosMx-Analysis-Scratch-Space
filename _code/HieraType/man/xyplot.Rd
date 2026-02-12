@@ -35,6 +35,9 @@ xyplot(
 
 \item{alphasize}{alpha (transparency) for plotting}
 }
+\value{
+A ggplot2 object showing cells colored by cluster in x/y space.
+}
 \description{
 Plot celltypes in x/y space
 }

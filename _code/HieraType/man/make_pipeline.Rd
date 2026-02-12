@@ -16,20 +16,22 @@ i.e., \code{priors = list("A" = "B")}}
 \item{priors_category}{if a celltyping stage 'A' depends on another celltyping stage 'B', then specify the parent category in 'B' that 'A' is inheriting from ,
 i.e., \code{priors_category = list("A" = "B_type")}}
 }
+\value{
+A 'pipeline' object (list with class "pipeline") containing markerslists, priors, and priors_category.
+}
 \description{
 Create a 'pipeline' object that can be used to chain together hierarchical cell typing steps.
 }
 \examples{
 
-pipeline_tcell <- 
-make_pipeline(markerslists = list("tmajor" = smiSmooth::markerslist_tcellmajor
-                                  ,"t4minor" = smiSmooth::markerslist_cd4tminor
-                                  ,"t8minor" = smiSmooth::markerslist_cd8tminor)
+pipeline_tcell <-
+make_pipeline(markerslists = list("tmajor" = HieraType::markerslist_tcellmajor
+                                  ,"t4minor" = HieraType::markerslist_cd4tminor
+                                  ,"t8minor" = HieraType::markerslist_cd8tminor)
               ,priors = list("t4minor" = "tmajor"
                              ,"t8minor" = "tmajor")
               ,priors_category = list("t4minor" = "cd4t"
                                       ,"t8minor" = "cd8t")
 )
-
 
 }

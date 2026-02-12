@@ -23,6 +23,10 @@ This column shows the most granular cell type with posterior probability > \code
 \item{return_all_columns}{if FALSE (default), columns with posterior probability scores for
 individual cell type classes are dropped from the returned table.}
 }
+\value{
+A named list of data.tables (one per parent pipeline), each containing cell_ID,
+celltype_thresh, celltype_granular, best_score_thresh, and best_score_granular columns.
+}
 \description{
 Utility function for making / remaking or restyling
 combined posterior probability tables from clustering models (possibly at different thresholds).

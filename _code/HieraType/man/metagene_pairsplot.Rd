@@ -36,6 +36,9 @@ metagene_pairsplot(
 \item{obs}{optional cell-level data frame / data.table that is inner-joined onto the metagene scores.
 This can be used to subset the cells plotted (by only passing \code{obs} for the cells you want to plot) and/or including \code{colorvar} variable to be used for plotting.}
 }
+\value{
+A ggplot2/GGally pairs plot object.
+}
 \description{
 Make a pairsplot for metagene scores and classifications using GGally and ggplot2.
 }
