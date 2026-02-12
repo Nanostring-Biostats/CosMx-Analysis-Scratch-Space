@@ -44,6 +44,9 @@ Probably should only used if the exact set of features is also provided with \co
 \item{colorordervar}{column in foldchange_metrics used in ComplexHeatmap::Heatmap function, which
 determines row and column positions for clusters and genes.}
 }
+\value{
+A ggplot2 object showing the marker heatmap.
+}
 \description{
 Make a marker gene heatmap showing fold changes and proportion of cells expressing the marker gene by cluster.
 }

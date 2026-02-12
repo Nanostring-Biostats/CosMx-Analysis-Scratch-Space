@@ -70,7 +70,14 @@ See \code{gene_frequency()} for examples in generating this.}
 \item{cellid_colname}{column name of 'cell ids' in the \code{obs} dataframe.}
 }
 \value{
-a 'markerslist' list object which can be passed to \code{fit_metagene_scores}
+A list of metagene fits, one per cell type class, containing:
+\itemize{
+\item \code{bhat} - fitted regression coefficients
+\item \code{yhat} - predicted metagene scores
+\item \code{y} - observed (transformed) index gene values
+\item \code{ypost} - posterior mean scores
+\item \code{nnpcfit} - nsprcomp fit object (for multi-index markers)
+}
 }
 \description{
 Construct celltype metagene scores for clustering using \code{make_markerslist} object via non-negative least squares.

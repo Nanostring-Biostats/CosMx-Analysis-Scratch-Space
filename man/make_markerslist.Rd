@@ -12,11 +12,14 @@ make_markerslist(
 )
 }
 \arguments{
-\item{index_marker}{}
+\item{index_marker}{Named list of character vectors specifying the primary marker gene(s) for each cell type class.
+Names should correspond to cell type class names.}
 
-\item{predictors}{}
+\item{predictors}{Named list of character vectors specifying predictor genes for each cell type class.
+Names should match those in \code{index_marker}.}
 
-\item{use_offclass_markers_as_negative_predictors}{if TRUE, predictors of a cell type class are added as negative predictors
+\item{use_offclass_markers_as_negative_predictors}{Logical (or named logical vector).
+If TRUE, predictors of a cell type class are added as negative predictors
 of other celltype classes
 (unless they are specified as positive predictors in both classes).}
 }

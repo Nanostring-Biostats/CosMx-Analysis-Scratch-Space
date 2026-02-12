@@ -50,6 +50,14 @@ Goal is to have 'enough', to flexibly model the distribution of metagene scores.
 \item{seed}{seed to be set in local environment before using k-means to initialize starting parameters.  Ensures consistency after re-running.
 Global seed is reset on function exit.}
 }
+\value{
+A list containing:
+\itemize{
+\item \code{models} - fitted mixture models for each cell type
+\item \code{post_probs} - data.table of posterior probabilities with cell_ID, best_class, and best_score
+\item \code{llmat} - matrix of log-likelihoods
+}
+}
 \description{
 Cluster metagene scores using a mixture of overfitted gaussian mixture models.
 }

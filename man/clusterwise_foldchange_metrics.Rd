@@ -32,6 +32,10 @@ If you desire to use raw counts for computing fold change, use like \code{normed
 
 \item{cellid_column}{column in metadata corresponding to cell id. Should also correspond to the column names of the \code{counts} and \code{normed} expression matrices.}
 }
+\value{
+A data.table with columns: cluster, cluster_expr, clusterprime_expr, gene, cluster_prop,
+clusterprime_prop, ncells, typ, fold_change, and fold_change_prop.
+}
 \description{
 This function computes metrics by gene by cluster which can be passed as input to the \code{marker_heatmap()} function.
 }

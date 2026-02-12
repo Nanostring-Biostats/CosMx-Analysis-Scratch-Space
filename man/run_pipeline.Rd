@@ -36,6 +36,14 @@ See \code{combine_postprob_tables()} function; these columns can be returned lat
 
 \item{...}{Other arguments to be passed to \code{fit_metagene_scores} and/or \code{cluster_metagenes} functions.}
 }
+\value{
+A list containing:
+\itemize{
+\item \code{post_probs} - Combined posterior probability tables from all pipeline stages
+\item \code{models} - List of fitted clustering models for each pipeline stage
+\item \code{metagene_scores} - List of metagene score fits for each pipeline stage
+}
+}
 \description{
 Run a hierarchical cell typing pipeline
 }

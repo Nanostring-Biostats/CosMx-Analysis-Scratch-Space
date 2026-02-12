@@ -6,6 +6,12 @@
 \usage{
 add_ncells(heatmap_plot)
 }
+\arguments{
+\item{heatmap_plot}{A ggplot2 heatmap object created by \code{marker_heatmap()}.}
+}
+\value{
+A modified ggplot2 object with cell counts appended to cluster labels.
+}
 \description{
 show the number of cells next to the cluster in a marker heatmap plot.
 }
