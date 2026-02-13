@@ -140,7 +140,7 @@ Here we describe the experimental setup and the raw data that will form the
 basis of our analysis.
 
 <details>
-<summary>Click to show/hide study design overview</summary>
+<summary>Click to show/hide a description of the study design</summary>
 
 ## Slides and Profiling Strategy 
 
@@ -242,7 +242,7 @@ p <- easyalluvial::alluvial_wide(sample_overview,
                                  col_vector_flow = as.vector(pal_main[[sankey_focal_factor]]))
 ggsave(p, filename = "Main_Alluvial.svg", path = qc_dir, device = "svg", width=7, height=7)
 
-# Add hover option details to plot
+# For an interactive plot, use the code below:
 pc <- parcats(p,
         marginal_histograms = FALSE,
         data_input = sample_overview,
@@ -253,22 +253,11 @@ pc <- parcats(p,
 saveRDS(pc, file = paste0(qc_dir, "/pc_interactive.rds"))
 ```
 
-This makes both a static Sankey diagram:
+Here we show the static Sankey diagram:
 ```{r}
 #| echo: false
 #| eval: true
 knitr::include_graphics(paste0(qc_dir, "/Main_Alluvial.svg"))
-```
-
-And an interactive Sankey diagram:
-```{r}
-#| echo: false
-#| eval: true
-#| warning: true
-#| message: true
-
-pc <- readRDS(paste0(qc_dir, "/pc_interactive.rds"))
-pc
 ```
 
 </details>
@@ -448,7 +437,9 @@ The tabs below visualize the segment QC distributions for various sequence and s
 
 The plot below shows the distribution of trimmed reads in the data with the
 percent threshold as set in the QC parameters code block shown as a vertical
-dotted line.
+dotted line. Typically we want to see very few reads getting trimmed (ie high
+percentage remaining after trimming) as this
+indicates a high quality sequencing run.
 
 ```{r qc_trimmed, fig.width=6, fig.height=6}
 #| echo: true
@@ -475,7 +466,9 @@ knitr::include_graphics(file.path(qc_dir, "trimmed.svg"))
 
 The plot below shows the distribution of aligned reads in the data with the 
 percent threshold of aligned reads as set in the QC parameters code block 
-shown as a vertical dotted line.
+shown as a vertical dotted line. Typically we look to see high levels of percent
+alignment as this indicates a high quality sequencing run without contaminating
+sequences present.
 
 
 ```{r qc_aligned, fig.width=6, fig.height=6}
@@ -500,7 +493,8 @@ knitr::include_graphics(file.path(qc_dir, "aligned.svg"))
 
 The plot below shows the distribution of stitched reads in the data with the 
 percent threshold of stitched reads as set in the QC parameters code block 
-shown as a vertical dotted line.
+shown as a vertical dotted line. Typically we look to see high levels of percent
+stitched as this indicates a high quality sequencing run.
 
 
 ```{r qc_stitched, fig.width=6, fig.height=6}
@@ -530,6 +524,9 @@ shown as a vertical dotted line. Saturation is defined as:
 
 $$100* \left( 1 - \frac{deduplicated}{aligned} \right)$$
 
+Typically we look to see about 50% saturation or higher, with lower values
+indicating that the sample may benefit from additional sequencing.
+
 ```{r qc_saturated, fig.width=6, fig.height=6}
 #| echo: true
 #| eval: false
@@ -555,7 +552,9 @@ knitr::include_graphics(file.path(qc_dir, "saturated.svg"))
 
 The plot below shows the distribution of area in the data with the area 
 threshold in μm<sup>2</sup> as set in the QC parameters code block shown as a 
-vertical dotted line.
+vertical dotted line. AOI area is dependent on experimental design and so
+thresholds may vary between studies. However, one thing to check for is large
+outliers in area, which may introduce technical artifacts.
 
 ```{r qc_area, fig.width=6, fig.height=6}
 #| echo: true
@@ -579,8 +578,10 @@ knitr::include_graphics(file.path(qc_dir, "area.svg"))
 
 The plot below shows the distribution of nuclei counts in the data with the 
 threshold of nuclei as set in the QC parameters code block shown as a vertical
-dotted line.
-.
+dotted line. Nuclei number per AOI is dependent on experimental design and so
+thresholds may vary between studies. However, one thing to check for is large
+outliers, which may introduce technical artifacts. 
+
 ```{r qc_nuclei, fig.width=6, fig.height=6}
 #| echo: true
 #| eval: false
@@ -750,7 +751,7 @@ Plot the joint expression of each pairwise `IgG` control molecule to see
 if: 
 
 1. There's evidence that one `IgG` is noisy compared to others
-2. There's clustering by predictors
+2. There's clustering by predictors, which could bias the normalized data
 
 
 
@@ -997,14 +998,16 @@ knitr::include_graphics(file.path(qc_dir, "snr_plot.png"))
 :::
 
 ::: {.callout-note}
-The signal to noise ratio is above background for most proteins in at least one AOI, though note a few proteins with relatively low signal. We will not be dropping any proteins at this point, but will use these results as context while investigating the data further.
+Most proteins show signal‑to‑noise ratios above background in at least one AOI, though a few have relatively low overall signal. As expected, different antibodies exhibit different background levels, so we look for AOIs with high outlier values as evidence of true expression. For example, compare the `Ms IgG1` control towards the left, whose distribution is very tight, to `CD38`, the first protein on the left, which has a much wider spread. The AOIs at the upper end of the `CD38` distribution are likely true positives because they rise well above the main background range. Another illustrative case is `Cytokeratin 19` towards the right side of the plot, which shows a long high‑signal tail and a clear separation between CK+ and CK– segments.
+
+We will not be dropping any proteins at this point, but will use these results as context while investigating the data further.
 :::
 
 ## Normalization 
 
 The purpose of normalization is to adjust for technical variables, such as ROI/AOI surface area and tissue quality, and enable meaningful biological and statistical discoveries. 
 
-Two common methods for normalization of GeoMx DSP Protein data are i) Background (IgGs) or ii) Housekeeper normalization. Both methods estimate a normalization factor per ROI/AOI segment to bring the segment data distributions together. Background is typically the preferred approach. We demonstrate both approaches here.
+Two common methods for normalization of GeoMx DSP Protein data are i) Background (IgGs) or ii) Housekeeper normalization. Both methods estimate a normalization factor per ROI/AOI segment to bring the segment data distributions together. Background is typically the preferred approach as off-target binding means the negative controls end up measuring the total amount of bindable biological material, which is exactly what we're trying to normalize out. We demonstrate both approaches here.
 
 ::: {.callout-note}
 High correlation between the geometric mean of the negative control probe counts and the geometric mean of the housekeeper protein counts suggests that both background and housekeeper-based normalization would work well in this dataset. We generally recommend background normalization as we find it to be robust in the majority of datasets. Therefore, this dataset will undergo background normalization using the isotype controls.
@@ -1329,20 +1332,33 @@ For a given comparison, we will subset the data down to the relevant segments an
 
 
 ## Contrasting groups with linear mixed models
-In a given contrast, we are interested in comparing the magnitude of differences between groups
-and quantifying the significance. In many GeoMx experiments, multiple areas of illumination (AOIs)
-or regions of interest (ROIs) are sampled in a given slide. To account for the nested, non-independent
-sampling, we often use a linear mixed effect model (LMM) with slide as a random effect. The LMM accounts
-for the subsampling per tissue, allowing us to adjust for the fact that the multiple regions of interest
-placed per tissue section are not independent observations, as is the assumption with other 
-traditional statistical tests.
 
-Overall, there are two main types of the LMM models when used with GeoMx data: A) 
-with random slope and B) without random slope. 
+In a given contrast, we are interested in comparing the magnitude of differences
+between groups and quantifying their significance. In many GeoMx experiments, 
+multiple areas of illumination (AOIs) or regions of interest (ROIs) are sampled 
+from each slide. Because these AOIs are nested within a slide and therefore not 
+independent, we use a linear mixed‑effects model (LMM) with slide as a random 
+effect. This allows us to correctly account for subsampling within each tissue 
+section, rather than treating all AOIs as independent in a traditional 
+statistical test.
 
-When comparing features that co-exist in a given tissue section, a random slope is
-included in the LMM model. When comparing features that are mutually exclusive in a 
-given tissue section the LMM model does not require a random slope. 
+There are two common versions of the LMM used for GeoMx data:
+A) with a random slope, and B) without a random slope.
+
+A random slope is used when the groups being compared co‑exist within a slide 
+(for example, different Regions drawn on the same tissue section). In this case, 
+different slides may show different magnitudes of the Region effect, and the 
+random slope allows each slide to have its own version of that effect. This 
+captures the fact that slides can differ not just in baseline expression (random 
+intercept) but also in how strongly the contrast appears.
+
+When the features being compared are mutually exclusive at the slide level 
+(e.g., each slide is entirely “healthy” or entirely “disease”), the contrast 
+does not vary within any single slide. In such cases, a random slope is 
+unnecessary because there is no within‑slide effect whose size could vary across 
+slides; the model only needs a random intercept to account for per‑slide 
+baseline shifts.
+ 
 We represent the two variations on the LMM in the schematic below. Note that the 
 schematic says 'gene' but the same logic applies to proteins. In this example,
 there are a number of slides ("Slide"). A slide is classified as either healthy
@@ -1369,7 +1385,7 @@ non-responders?*
 
 
 
-## Contrast 1: CK- Responder vs Non-responder
+## CK- Responder vs Non-responder
 
 We will compare the stromal compartment between responders vs non-responders in the CK negative compartment.
 
