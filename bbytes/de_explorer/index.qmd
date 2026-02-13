@@ -23,8 +23,7 @@ webr:
     - https://r-lib.r-universe.dev
 ---
 
-<!-- note: do not change the line below; it is replaced during deployment.  -->
-
+<!-- Note: do not remove the following line. It is used when rendering. -->
 REPLACEME
 
 Welcome to the **Differential Expression Explorer**, a serverless dashboard for interactive analysis of CosMx SMI differential expression results. This tool utilizes WebAssembly (WebR) and ObservableJS to run entirely in your web browser, allowing you to visualize **Volcano Plots**, **Marginal Means**, and **Spatial Mappings** without uploading data to a remote server. You can explore existing DE results that 
@@ -115,20 +114,17 @@ sparkbar = (max) => {
       .style("align-items", "center")
       .style("width", "100%"); // Let it fill the cell
 
-    // 2. Determine color and bar width
     const color = x >= 0 ? "#E41A1C" : "#377EB8"; 
     const widthPercent = Math.min((Math.abs(x) / max) * 100, 100);
 
-    // 3. Append TEXT first (Number)
     div.append("span")
        .text(x.toFixed(2))
        .style("font-size", "0.85em")
        .style("color", "#666")
-       .style("width", "35px")
-       .style("text-align", "right")
-       .style("margin-right", "8px");r
+       .style("width", "35px")         // Fixed width for alignment
+       .style("text-align", "right")   // Align numbers to the right
+       .style("margin-right", "8px");  // Space between number and bar
 
-    // 4. Append BAR second
     div.append("div")
       .style("width", `${widthPercent}%`)
       .style("height", "12px")
@@ -225,18 +221,15 @@ processed_new_study <- NULL
 
 if(length(new_zip_data) > 1){
   cat(paste0("Processing new user data. Timestamp: ", Sys.time()))
-  
-  # 1. Setup paths
+
   zip_file_name <- as.character(new_zip_data$filename)
   target_dir <- as.character(new_zip_data$id)
-  
-  # 2. Unzip
+
   writeBin(as.raw(new_zip_data$data), zip_file_name)
   if(dir.exists(target_dir)) unlink(target_dir, recursive=TRUE)
   utils::unzip(zip_file_name, exdir = target_dir, junkpaths = TRUE)
   if(file.exists(zip_file_name)) unlink(zip_file_name, recursive=TRUE)
-  
-  # 3. Validation
+
   isValid <- verify(target_dir)
   
   if(!isValid){
@@ -246,10 +239,8 @@ if(length(new_zip_data) > 1){
     study_name <- paste0("Custom: ", zip_file_name) 
     header_df <- data.frame(Name = study_name, Description = "User Data", Formala = "NA") # Fallback
 
-    # 4. Read the Header File using DuckDB
     tryCatch({
        con_peek <- dbConnect(duckdb())
-       # Read the whole header row
        df <- dbGetQuery(con_peek, paste0("SELECT * FROM '", header_path, "' LIMIT 1"))
        
        if(nrow(df) > 0) {
@@ -268,7 +259,7 @@ if(length(new_zip_data) > 1){
       id = target_dir,
       name = study_name,
       description = "User Uploaded Data", 
-
+      
       header_data = header_df, 
       
       url_header   = header_path,
@@ -299,7 +290,6 @@ mutable latest_upload = null
 //| echo: false
 //| output: false
 
-// Reactively adds user info to the available_studies
 {
   if (processed_new_study) {
     const new_record = JSON.parse(processed_new_study);
@@ -308,6 +298,7 @@ mutable latest_upload = null
       const exists = available_studies.find(d => d.id === new_record.id);
       
       if (!exists) {
+         // 1. Update the list
          mutable available_studies.push(new_record);
          mutable available_studies = mutable available_studies;
          
@@ -393,29 +384,29 @@ if (!is.null(study_data_payload)) {
     if (!is.null(study_data_payload$header_data)) {
        header_json_str <- jsonlite::toJSON(study_data_payload$header_data)
        header_df <- jsonlite::fromJSON(header_json_str)
-       
+
        dbWriteTable(con, "study_meta", header_df, overwrite = TRUE)
        cat("R: Header table written successfully.\n")
     }
     
   } else {
-    # 1. Header
+
     if (!is.na(study_data_payload$url_header)) {
        dbExecute(con, paste0("CREATE OR REPLACE VIEW study_meta AS SELECT * FROM '", study_data_payload$url_header, "'"))
     }
-    # 2. Pairwise
+
     if (!is.na(study_data_payload$url_pairwise)) {
        dbExecute(con, paste0("CREATE OR REPLACE VIEW de_results AS SELECT * FROM '", study_data_payload$url_pairwise, "'"))
     }
-    # 3. Cell Metadata
+
     if (!is.na(study_data_payload$url_meta)) {
        dbExecute(con, paste0("CREATE OR REPLACE VIEW cell_meta AS SELECT * FROM '", study_data_payload$url_meta, "'"))
     }
-    # 4. Emmeans
+
     if (!is.na(study_data_payload$url_emmeans)) {
        dbExecute(con, paste0("CREATE OR REPLACE VIEW emmeans_data AS SELECT * FROM '", study_data_payload$url_emmeans, "'"))
     }
-    # 5. Overlap (future development)
+    # Overlap (furture feature)
     if (!is.na(study_data_payload$url_overlap)) {
        dbExecute(con, paste0("CREATE OR REPLACE VIEW overlap_data AS SELECT * FROM '", study_data_payload$url_overlap, "'"))
     }
@@ -497,7 +488,7 @@ slides_from_js = {
   if (payload.mode === "remote_js_bridge") {
     try {
       const conn = await duck_db_client;
-      
+
       const query = `SELECT DISTINCT "slide_id_numeric" FROM '${payload.url_meta}' ORDER BY "slide_id_numeric"`;
       const result = await conn.query(query);
       const raw_list = result.toArray().map(row => row.slide_id_numeric);
@@ -704,7 +695,6 @@ viewof aesthetics_raw = Inputs.form({
   volcano_pt_size:       Inputs.range([0.1, 5], {step: 0.1, label: "Pt. Size"}),
   volcano_alpha:         Inputs.range([0, 1], {step: 0.01, label: "Pt. Alpha", value: 1.0}),
   
-  // Note: We can still customize width by creating the element first
   volcano_pt_color:      Inputs.color({label: "Pt. Color", value: "#3C3F40"}),
   volcano_sig_color:     Inputs.color({label: "Significant targets", value: "#b44697"}),
   
@@ -751,10 +741,8 @@ volcano_data_js = {
   const contrast = contrast_selection;
   const term = term_selection;
   
-  // 1. Safety Checks
   if (!payload || !contrast || !term || payload.mode === "local") return null;
 
-  // 2. Remote Mode
   if (payload.mode === "remote_js_bridge") {
     
     try {
@@ -858,11 +846,16 @@ viewof pairwise_table = Inputs.table(pairwise_search, {
 
 ```
 
+<!-- ```{ojs} -->
+<!-- selected_genes -->
+<!-- ``` -->
+
 
 ```{ojs}
 //| echo: false
 //| output: false
 
+// captures any selected genes (up to 30)
 selected_genes = {
   if (!current_volcano_data || !pairwise_table) return ['notagene'];
   if (pairwise_table.length === current_volcano_data) {
@@ -875,6 +868,7 @@ selected_genes = {
 }
 
 selectionWarning = {
+  // 1. Wait for data
   if (!pairwise_table || !current_volcano_data) return `Select between 1 and 30 genes to label.`;
 
   const count = pairwise_table.length;
@@ -961,6 +955,7 @@ if(!inherits(current_volcano_data, "data.frame") && is.na(current_volcano_data))
 
 ```
 
+<!-- Save Image -->
 
 ```{ojs}
 //| echo: false
@@ -998,6 +993,7 @@ if(save_btn>0){
     units = save_request$units
   )
   if(file.exists(fname)){
+    # cat(paste0("file created: ", fname))
     file_bytes <- readBin(fname, "raw", n = file.info(fname)$size)
     downloaded_file <- list(
       data = file_bytes,
@@ -1157,10 +1153,11 @@ means_color_1         = means_debounced.means_color_1
 means_color_2         = means_debounced.means_color_2
 
 combined_selection = {
+
   const manual = means_highlight 
     ? means_highlight.toUpperCase().split(',').map(s => s.trim()).filter(s => s.length > 0) 
     : [];
-
+    
   let from_volcano = [];
   if (means_show_labeled && typeof vplot_labels !== "undefined") {
       if(Array.isArray(vplot_labels)) {
@@ -1169,7 +1166,7 @@ combined_selection = {
         from_volcano = [vplot_labels];
       }
   }
-
+  
   return Array.from(new Set([...manual, ...from_volcano]));
 }
 means_level = {
@@ -1193,6 +1190,7 @@ means_level = {
 //| input: means_search
 
 {
+
   if (!means_search || means_search.length === 0) {
     yield html`<div style="height:400px; display:flex; align-items:center; justify-content:center; background:#f9f9f9; border:1px border-radius:8px;">
       <p style="color:#888;">Select levels in the sidebar to visualize...</p>
@@ -1216,7 +1214,7 @@ means_level = {
     const targetGroups = d3.groups(means_search, d => d.target);
     
     const levels = [...new Set(means_search.map(d => d.level))].sort();
-    
+
     const traces = [];
 
     const alpha_scaler = means_alpha;
@@ -1231,6 +1229,7 @@ means_level = {
       const x = v1.log2fc;
       if(x == null || isNaN(x)) return;
 
+      // Transform Response to Log2 for Y-axis
       const ys = values.map(d => Math.log2(d.response)); 
       
       const min_y = Math.min(...ys);
@@ -1286,7 +1285,6 @@ means_level = {
         traces.push(lvl_trace);
     });
 
-
     if(highlight_list.length > 0) {
        const highlightData = means_search.filter(d => highlight_list.includes(d.target) && d.log2fc != null);
        
@@ -1305,7 +1303,6 @@ means_level = {
       });
     }
 
-    // 3. Layout
     const layout = {
       height: 500,
       margin: { t: 30, b: 50, l: 60, r: 20 },
@@ -1354,7 +1351,7 @@ viewof means_search = Inputs.search(current_means_data, {placeholder: "Additiona
 
 viewof means_table = Inputs.table(means_search, {
   multiple: true,
-  value: combined_selection,
+  value: combined_selection, // Pre-check the combined selection
   rows: 20,
   format: {
     response: sparkbar(d3.max(means_search, d => d.response))
@@ -1417,6 +1414,7 @@ if (!is.null(study_data_payload) && !is.null(means_level)) {
      }
   } else {
     if (dbExistsTable(con, "emmeans_data")) {
+
         lvl_in_clause <- paste0("'", means_level, "'", collapse = ", ")
         
         query <- paste0(
@@ -1474,6 +1472,7 @@ viewof spatial_options = Inputs.form({
   pt_opacity: Inputs.range([0.1, 1], {value: 0.7, step: 0.1, label: "Opacity"}),
   bg_color:   Inputs.color({label: "Background Color", value: "#e0e0e0"}),
   
+  // Scale Bar
   scale_len:   Inputs.number({label: "Scale Bar (mm)", value: 1, step: 0.1}),
   scale_color: Inputs.color({label: "Scale Color", value: "#000000"}),
   show_scale:  Inputs.toggle({label: "Show Scale Bar", value: true})
@@ -1568,13 +1567,10 @@ viewof slide_selection = {
   });
 }
 
-// a bind of the contrast selection (placed in controls card)
 viewof term_copy2 = {
   
-  // 1. Safety check (same as the original)
   if (!available_terms || available_terms.length === 0) return md`_Loading..._`;
 
-  // 2. Create the new visual input (Visual Duplicate)
   const mirror_input3 = Inputs.select(available_terms, {
     label: "Available Terms:",
     multiple: false,
@@ -1585,7 +1581,6 @@ viewof term_copy2 = {
 }
 
 viewof contrast_copy2 = {
-  
   if (!available_contrasts || available_contrasts.length === 0) return md`_Loading..._`;
 
   const mirror_input2 = Inputs.select(available_contrasts, {
@@ -1603,12 +1598,12 @@ viewof contrast_copy2 = {
 ```{ojs}
 //| echo: false
 //| output: false
-
+// 2. Fetch Spatial Data (Filtered by Slide)
 spatial_data = {
   const payload = study_data_payload;
   const term = term_selection;
   const slide = slide_selection; 
-
+  
   if (!payload || !term || slide === null || typeof slide === "undefined") return null;
 
   if (payload.mode === "remote_js_bridge") {
@@ -1640,7 +1635,8 @@ spatial_filtered = {
   if(!spatial_data) return [];
 
   if(!filter_col || !filter_vals) return spatial_data;
-
+  
+  // LOGIC SWITCH:
   if(is_numeric_filter) {
      // Numeric Filter: filter_vals is an object {min: x, max: y}
      const { min, max } = filter_vals;
@@ -1665,13 +1661,13 @@ spatial_filtered = {
   const colors = spatial_colors;
   const width = 1200; 
   const height = 1200; 
-
+  
   const useLog = log_scale_opt === true; 
   
   if (!data || data.length === 0) return md`_Loading spatial data..._`;
 
   const isContinuous = typeof data[0].group_id === 'number';
-
+  
   let colorScale = null;
   let termExtent = [0, 1];
   
@@ -1721,6 +1717,7 @@ spatial_filtered = {
   
   const pixelsPerMm = scale;
 
+  // --- 3. DOM Setup ---
   const div = document.createElement("div");
   div.style.position = "relative";
   div.style.width = "100%";
@@ -1736,7 +1733,8 @@ spatial_filtered = {
   canvas.style.height = "auto";
   canvas.style.display = "block";
   div.appendChild(canvas);
-
+  
+  // Legend 
   const legend = document.createElement("div");
   legend.style.position = "absolute";
   legend.style.top = "10px";
@@ -2278,15 +2276,8 @@ argsVolcano <- list(vfc=volcano_fc_range,
 
 :::
 
-<!-- ::::{.callout-note} -->
-<!-- The variable 'df' is reserved for the data itself and is passed reactively  -->
-<!-- during the execution. 'df' is appended to argsVolcano just before execution for -->
-<!-- efficiency.  -->
-<!-- :::: -->
 
-# Console
-
-You can use this for a generic R console. 
+# Debugging
 
 ```{webr}
 
