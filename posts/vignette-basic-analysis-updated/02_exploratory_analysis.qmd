@@ -129,7 +129,7 @@ We use Moran's I, a very old approach from the world of spatial statistics.
 
 ```{r echo = TRUE, eval = FALSE}
 # Source the efficient Moran's function
-source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/vignette2/utils/moransMultiFast.R")
+source("https://raw.githubusercontent.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/Main/_code/vignette2/moransMultiFast.R")
 
 # compute neighbors matrix:
 neighbors <- InSituCor:::nearestNeighborGraph(xy[, 1], xy[, 2], N = 50, subset = metadata$slide_ID)  
@@ -176,12 +176,13 @@ The top genes from such an analysis will suggest ways the cell type is changing 
 inds <- celltype == "macrophage"
 # Get the neighbor relationships within just the cell type:
 # (Here we'll use a radius-based approach to account for the fact that cells from a given cell type may fall quite far from their nearest neighbors from the same cell type.)
-tempneighbors <- InSituCor:::radiusBasedGraph(xy[inds, 1], xy[inds, 2], R = 0.25, subset = metadata$slide_ID)  
+tempneighbors <- InSituCor:::radiusBasedGraph(xy[inds, 1], xy[inds, 2], R = 0.03, subset = metadata$slide_ID[inds])
+
 # check there's a reasonable number of neighbors per cell:
 hist(Matrix::rowSums(tempneighbors > 0))
 
 # compute moran's:
-morans_mycelltype <- moransMultiFast(X = norm[inds, ], W = neighbors[inds, inds], perm = 10, compute_sparse = TRUE, compute_perm = FALSE)
+morans_mycelltype <- moransMultiFast(X = norm[inds, ], W = tempneighbors, perm = 10, compute_sparse = TRUE, compute_perm = FALSE)
 
 # plot moran's vs. mean expression
 meanexpr_mycelltype <- Matrix::colMeans(counts[inds, ])
