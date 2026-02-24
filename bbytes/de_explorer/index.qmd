@@ -1,0 +1,2918 @@
+---
+title: "Differential Expression Explorer"
+format:
+  live-dashboard:
+    orientation: rows
+    engine: knitr
+    theme:
+      light: 
+        - sandstone
+        - dashboard.scss
+webr:
+  packages:
+    - dplyr
+    - dbplyr
+    - DBI
+    - duckdb
+    - ggplot2
+    - ggrepel
+    - svglite
+    - jsonlite
+    - plotly
+  repos:
+    - https://r-lib.r-universe.dev
+---
+
+<!-- Note: do not remove the following line. It is used when rendering. -->
+REPLACEME
+
+<!-- This line is for debugging.  -->
+<!-- {{< include ../../_extensions/r-wasm/live/_knitr.qmd >}} -->
+
+
+Welcome to the **Differential Expression Explorer**, a serverless dashboard for interactive analysis of CosMx SMI differential expression results. This tool utilizes WebAssembly [(WebR)](https://docs.r-wasm.org/webr/latest/){target="_blank"} and [ObservableJS](https://quarto.org/docs/interactive/ojs/){target="_blank"} to run entirely in your web browser, allowing you to visualize **Volcano Plots**, **Marginal Means**, and **Spatial Mappings** without uploading data to a remote server. You can explore existing DE results that 
+we've added or load your own results. Advanced users should check out the `Advanced`
+tab if they want to customize their volcano plot even further. 
+
+::: {.callout-warning appearance="simple"}
+**Beta Notice:** This dashboard is currently in an **experimental / beta testing phase**. Features, performance, and data formats are subject to change. When you first load the site, you will see temporary `
+OJS Runtime Error` messages displayed until data are initialized. Please report any issues you encounter.
+:::
+
+# {.sidebar width="500px"}
+
+:::{.card .hidden}
+
+```{ojs}
+//| echo: false
+//| output: false
+
+duck_db_client = {
+  const duckdb = await import("https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm");
+  
+  console.log("🔧 Initializing DuckDB-Wasm Client...");
+  
+  const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
+  const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
+  
+  const worker_url = URL.createObjectURL(
+    new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" })
+  );
+
+  const worker = new Worker(worker_url);
+  const logger = new duckdb.ConsoleLogger();
+  const db = new duckdb.AsyncDuckDB(logger, worker);
+  
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  
+  const conn = await db.connect();
+  conn.instance = db; // Attach the engine to the connection
+  console.log("✅ DuckDB-Wasm Ready (Engine + Connection)");
+  return conn;
+}
+```
+
+```{webr}
+#| echo: false
+#| output: false
+#| autorun: true
+#| input: 
+#|   - selected_study
+
+if(exists("con") && dbIsValid(con)){
+  cat("Closing previous connection!")
+  dbDisconnect(con)
+} 
+cat("\nCreating new connection.")
+con <- dbConnect(duckdb())
+```
+
+```{webr}
+#| echo: false
+#| autorun: true
+
+# function to does a quick verification of user data
+verify <- function(vfs_dir){
+  valid <- TRUE
+  files <- list.files(vfs_dir)
+  required_files <- c(
+    "cell_metadata.parquet", "emmeans.parquet",
+    "pairwise.parquet", "study_header.parquet"
+  )
+  if(!all(required_files %in% files)){
+    cat(paste0("The zip file must contain the following: ", paste0(
+      required_files, collapse=", "), "."))
+    valid <- FALSE
+  }
+  return(valid)
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+sparkbar = (max) => {
+  return (x) => {
+    // 1. Create container
+    const div = d3.create("div")
+      .style("display", "flex")
+      .style("align-items", "center")
+      .style("width", "100%"); // Let it fill the cell
+
+    const color = x >= 0 ? "#E41A1C" : "#377EB8"; 
+    const widthPercent = Math.min((Math.abs(x) / max) * 100, 100);
+
+    div.append("span")
+       .text(x.toFixed(2))
+       .style("font-size", "0.85em")
+       .style("color", "#666")
+       .style("width", "35px")         // Fixed width for alignment
+       .style("text-align", "right")   // Align numbers to the right
+       .style("margin-right", "8px");  // Space between number and bar
+
+    div.append("div")
+      .style("width", `${widthPercent}%`)
+      .style("height", "12px")
+      .style("background-color", color)
+      .style("border-radius", "2px");
+
+    return div.node();
+  }
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+d3 = require("d3@7")
+Plotly = require("https://cdn.plot.ly/plotly-2.24.1.min.js")
+manifest_raw = FileAttachment("https://raw.githubusercontent.com/Nanostring-Biostats/ScratchSpaceDatasets/refs/heads/main/browser_bytes/manifest.tsv").tsv({typed: true})
+
+mutable available_studies = {
+  if (!manifest_raw) return [];
+
+  return manifest_raw.map(d => ({
+    id: d.id,
+    name: d.name,
+    description: d.description,
+    
+    // Direct mapping of your TSV columns
+    url_header:   d.url_header,
+    url_pairwise: d.url_pairwise,
+    url_meta:     d.url_meta,
+    url_emmeans:  d.url_emmeans,
+    url_overlap: d.url_overlap,
+
+    type: 'remote',
+    valid: true
+  }));
+}
+```
+:::
+
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof selected_study = Inputs.select(available_studies, {
+  label: "Select Study:",
+  format: d => d.name,
+  value: latest_upload || available_studies[0] 
+})
+```
+
+```{ojs}
+//| echo: false
+
+{
+  const data = study_data_payload;
+  const contrast = contrast_selection; 
+  const volcano = current_volcano_data || [];
+
+  if (!data || !data.header_data || data.header_data.length === 0) {
+    return html`<div style="font-size: 0.9em; color: #888; font-style: italic;">⏳ Waiting for study data...</div>`;
+  }
+
+  const row = data.header_data[0];
+  const pretty_contrast = contrast ? contrast.replace(" / ", " vs. ") : "None selected";
+  const count = volcano.length ? volcano.length.toLocaleString() : "0";
+
+  return html`
+  <div style="font-size: 0.9em; color: #444;">
+    
+    <h5 style="text-transform: uppercase; color: #888; font-size: 0.75em; margin-top: 20px; margin-bottom: 4px; border-top: 1px solid #ddd; padding-top: 12px;">
+      Study Description
+    </h5>
+    <p style="margin-bottom: 16px; font-weight: 500;">${row.Description || "No description available."}</p>
+    
+    <h5 style="text-transform: uppercase; color: #888; font-size: 0.75em; margin-top: 15px; margin-bottom: 8px; border-top: 1px solid #ddd; padding-top: 12px;">
+      Model Formula
+    </h5>
+    <div style="background: #f4f4f4; padding: 10px; border-radius: 6px; font-family: monospace; color: #d63384; font-size: 0.9em; margin-bottom: 20px;">
+      ${row.Formala || "NA"}
+    </div>
+    
+    <div style="display: flex; gap: 20px; border-top: 1px solid #ddd; padding-top: 15px;">
+      <div style="flex: 1;">
+        <h5 style="text-transform: uppercase; color: #888; font-size: 0.75em; margin-bottom: 4px;">Current Contrast</h5>
+        <div style="font-weight: 600; color: #007bff;">${pretty_contrast}</div>
+      </div>
+      <div style="flex: 0 0 100px; border-left: 1px solid #ddd; padding-left: 15px;">
+        <h5 style="text-transform: uppercase; color: #888; font-size: 0.75em; margin-bottom: 4px;">Total Targets</h5>
+        <div style="font-weight: bold; font-size: 1.1em;">${count}</div>
+      </div>
+    </div>
+    
+    <h5 style="text-transform: uppercase; color: #888; font-size: 0.75em; margin-top: 20px; margin-bottom: 4px; border-top: 1px solid #ddd; padding-top: 12px;">
+    </h5>
+  </div>
+  `;
+}
+```
+
+<h5 style="text-transform: uppercase; color: #888; font-size: 0.75em; margin-top: 20px; margin-bottom: 8px; border-top: 1px solid #ddd; padding-top: 12px;">
+  Data Generation Options
+</h5>
+
+You can use your own results in this dashboard! Whether your DE results come 
+from AtoMx SIP's DE Module or the open-sourced smiDE package, we can show you
+how to load your results.
+
+* **AtoMx SIP**: ✅ [Convert data in browser](#sec-convert-atomx)
+* **smiDE (R Package)**: ✅ [View instructions](#sec-convert-smide)
+
+<div style="background: #fdfdfe; border: 1px solid #eee; padding: 10px; border-radius: 6px; margin-top: 10px;">
+  <p style="margin-bottom: 0; font-size: 0.85em; color: #666; font-style: italic;">
+    Note: Both methods generate a dashboard-ready .zip file.
+  </p>
+</div>
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof new_zip_file = Inputs.file({
+  label: "Import the formatted results (.zip):",
+  accept: ".zip",
+  multiple: false
+})
+```
+
+:::{.card .hidden}
+
+```{ojs}
+//| echo: false
+//| output: false
+
+// 1. Declare the container as mutable
+mutable new_zip_data = null;
+
+// 2. This "watcher" cell handles manual file uploads
+{
+  if (new_zip_file) {
+    const buf = await new_zip_file.arrayBuffer();
+    mutable new_zip_data = {
+      id: Date.now(),
+      filename: new_zip_file.name,
+      data: new Uint8Array(buf)
+    };
+  }
+}
+```
+
+```{webr}
+#| echo: false
+#| autorun: true
+#| output: false
+#| input: 
+#|   - new_zip_data
+#| define: 
+#|   - processed_new_study
+
+processed_new_study <- NULL
+
+if(length(new_zip_data) > 1){
+  cat(paste0("Processing new user data. Timestamp: ", Sys.time()))
+
+  zip_file_name <- as.character(new_zip_data$filename)
+  target_dir <- as.character(new_zip_data$id)
+
+  writeBin(as.raw(new_zip_data$data), zip_file_name)
+  if(dir.exists(target_dir)) unlink(target_dir, recursive=TRUE)
+  utils::unzip(zip_file_name, exdir = target_dir, junkpaths = TRUE)
+  if(file.exists(zip_file_name)) unlink(zip_file_name, recursive=TRUE)
+
+  isValid <- verify(target_dir)
+  
+  if(!isValid){
+    cat("\n❌ Validation Failed.")
+  } else {
+    header_path <- file.path(target_dir, "study_header.parquet")
+    study_name <- paste0("Custom: ", zip_file_name) 
+    header_df <- data.frame(Name = study_name, Description = "User Data", Formala = "NA") # Fallback
+
+    tryCatch({
+       con_peek <- dbConnect(duckdb())
+       df <- dbGetQuery(con_peek, paste0("SELECT * FROM '", header_path, "' LIMIT 1"))
+       
+       if(nrow(df) > 0) {
+         header_df <- df
+         if("Name" %in% names(df)) study_name <- as.character(df$Name[1])
+       }
+       dbDisconnect(con_peek, shutdown=TRUE)
+    }, error = function(e) {
+       if(exists("con_peek") && dbIsValid(con_peek)) dbDisconnect(con_peek, shutdown=TRUE)
+       cat("Warning: Could not read header file. Using defaults.\n")
+    })
+    
+    cat(paste0("\n✅ Validated: ", study_name))
+
+    new_study_list <- list(
+      id = target_dir,
+      name = study_name,
+      description = "User Uploaded Data", 
+      
+      header_data = header_df, 
+      
+      url_header   = header_path,
+      url_pairwise = file.path(target_dir, "pairwise.parquet"),
+      url_meta     = file.path(target_dir, "cell_metadata.parquet"),
+      url_emmeans  = file.path(target_dir, "emmeans.parquet"),
+      url_overlap = file.path(target_dir, "overlap.parquet"),
+      type = "local",
+      valid = TRUE
+    )
+    
+    processed_new_study <- as.character(jsonlite::toJSON(new_study_list, auto_unbox = TRUE))
+  }
+  
+} else {
+  cat(paste0("new_zip_data is NA. Timestamp: ", Sys.time()))
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+mutable latest_upload = null
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+{
+  if (processed_new_study) {
+    const new_record = JSON.parse(processed_new_study);
+    
+    if (new_record && new_record.valid) {
+      const exists = available_studies.find(d => d.id === new_record.id);
+      
+      if (!exists) {
+         // 1. Update the list
+         mutable available_studies.push(new_record);
+         mutable available_studies = mutable available_studies;
+         
+         mutable latest_upload = new_record; 
+      }
+      console.log("✅ Loaded:", new_record.name);
+    }
+  }
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+study_data_payload = {
+  const selection = selected_study;
+  if (!selection) return null;
+
+  console.log("🔄 Processing selection:", selection.name);
+
+  if (selection.type === "local") {
+    console.log("👉 Mode: Local");
+    return {
+      mode: "local",
+      ...selection
+    };
+  }
+
+  if (selection.type === "remote") {
+    console.log("👉 Mode: Remote (JS Bridge)");
+    
+    try {
+      const conn = await duck_db_client;
+      
+      const header_table = await conn.query(`SELECT * FROM '${selection.url_header}'`);
+      
+      const header_json = header_table.toArray().map(row => row.toJSON());
+      
+      console.log("✅ Header received:", header_json);
+
+      return {
+        mode: "remote_js_bridge",
+        id: selection.id,
+        name: selection.name,
+        header_data: header_json,
+        url_pairwise: selection.url_pairwise,
+        url_meta: selection.url_meta,
+        url_emmeans: selection.url_emmeans,
+        url_overlap: selection.url_overlap
+      };
+      
+    } catch (e) {
+      console.error("❌ JS Bridge Error:", e);
+      return null;
+    }
+  }
+}
+```
+
+```{webr}
+#| echo: false
+#| autorun: true
+#| output: false
+#| input: 
+#|   - study_data_payload
+#| define: 
+#|   - db_ready
+#|   - r_status_proxy
+
+db_ready <- FALSE
+r_status_proxy <- "Waiting for data..."
+print(con)
+
+if (!is.null(study_data_payload)) {
+  
+  cat(paste0("R: Received payload mode: ", study_data_payload$mode, "\n"))
+
+  if (study_data_payload$mode == "remote_js_bridge") {
+    
+    if (!is.null(study_data_payload$header_data)) {
+       header_json_str <- jsonlite::toJSON(study_data_payload$header_data)
+       header_df <- jsonlite::fromJSON(header_json_str)
+
+       dbWriteTable(con, "study_meta", header_df, overwrite = TRUE)
+       cat("R: Header table written successfully.\n")
+    }
+    
+  } else {
+
+    if (!is.na(study_data_payload$url_header)) {
+       dbExecute(con, paste0("CREATE OR REPLACE VIEW study_meta AS SELECT * FROM '", study_data_payload$url_header, "'"))
+    }
+
+    if (!is.na(study_data_payload$url_pairwise)) {
+       dbExecute(con, paste0("CREATE OR REPLACE VIEW de_results AS SELECT * FROM '", study_data_payload$url_pairwise, "'"))
+    }
+
+    if (!is.na(study_data_payload$url_meta)) {
+       dbExecute(con, paste0("CREATE OR REPLACE VIEW cell_meta AS SELECT * FROM '", study_data_payload$url_meta, "'"))
+    }
+
+    if (!is.na(study_data_payload$url_emmeans)) {
+       dbExecute(con, paste0("CREATE OR REPLACE VIEW emmeans_data AS SELECT * FROM '", study_data_payload$url_emmeans, "'"))
+    }
+    # Overlap (furture feature)
+    #if (!is.na(study_data_payload$url_overlap)) {
+    #   dbExecute(con, paste0("CREATE OR REPLACE VIEW overlap_data AS SELECT * FROM '", study_data_payload$url_overlap, "'"))
+    #}
+      }
+  
+  r_status_proxy <- paste("Active:", study_data_payload$name)
+  db_ready <- TRUE
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+contrasts_from_js = {
+  const payload = study_data_payload;
+  // If local, let webR/R handle the contrast list to avoid path errors
+  if (!payload || payload.type === "local") return null;
+
+  if (payload.mode === "remote_js_bridge") {
+    try {
+      const conn = await duck_db_client;
+      const table = payload.isAtoMx ? 'pairwise_harmonized' : `"${payload.url_pairwise}"`;
+      
+      const query = `SELECT DISTINCT "contrast" FROM ${table} ORDER BY "contrast"`;
+      const result = await conn.query(query);
+      return result.toArray().map(row => row.contrast).filter(d => !d.includes("otherct_expr"));
+    } catch (e) {
+      console.error("❌ Contrast Fetch Error:", e);
+      return []; 
+    }
+  }
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+terms_from_js = {
+  const payload = study_data_payload;
+  // Guard against local studies to allow R-based term population
+  if (!payload || payload.type === "local") return null;
+
+  if (payload.mode === "remote_js_bridge") {
+    try {
+      const conn = await duck_db_client;
+      const table = payload.isAtoMx ? 'pairwise_harmonized' : `"${payload.url_pairwise}"`;
+      
+      const query = `SELECT DISTINCT "term" FROM ${table} ORDER BY "term"`;
+      const result = await conn.query(query);
+      return result.toArray().map(row => row.term);
+    } catch (e) {
+      console.error("❌ Terms Fetch Error:", e);
+      return [];
+    }
+  }
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+slides_from_js = {
+  const payload = study_data_payload;
+  // If local, return null to let R query the local cell_meta table
+  if (!payload || payload.type === "local") return null;
+
+  if (payload.mode === "remote_js_bridge") {
+    if (payload.isAtoMx) return [1]; 
+
+    try {
+      const conn = await duck_db_client;
+      const query = `SELECT DISTINCT "slide_id_numeric" FROM "${payload.url_meta}" ORDER BY "slide_id_numeric"`;
+      const result = await conn.query(query);
+      const list = result.toArray().map(row => row.slide_id_numeric);
+      return list.length > 0 ? list : [1];
+    } catch (e) {
+      return [1];
+    }
+  }
+}
+```
+
+```{webr}
+#| echo: false
+#| autorun: true
+#| output: false
+#| input: 
+#|   - study_data_payload
+#|   - contrasts_from_js
+#|   - terms_from_js
+#|   - slides_from_js
+#| define: 
+#|   - available_contrasts
+#|   - available_terms
+#|   - available_slides
+
+# print(Sys.time())
+# print(contrasts_from_js)
+# print(terms_from_js)
+# print(slides_from_js)
+
+available_contrasts <- if(exists("available_contrasts")) available_contrasts else NULL
+available_terms <- if(exists("available_terms")) available_terms else NULL
+available_slides <- if(exists("available_slides")) available_slides else 1
+
+if (!is.null(study_data_payload)) {
+  # REMOTE MODE
+  if (study_data_payload$mode == "remote_js_bridge") {
+    if (!is.null(contrasts_from_js)) available_contrasts <- unlist(contrasts_from_js)
+    if (!is.null(terms_from_js)) available_terms <- unlist(terms_from_js)
+    if (!is.null(slides_from_js)) available_slides <- unlist(slides_from_js)
+    
+  # LOCAL MODE
+  } else if (dbExistsTable(con, "de_results")) {
+    available_contrasts <- dbGetQuery(con, "SELECT DISTINCT contrast FROM de_results")$contrast
+    available_contrasts <- available_contrasts[!grepl("otherct_expr", available_contrasts)]
+    available_terms <- dbGetQuery(con, "SELECT DISTINCT term FROM de_results")$term
+    
+    if (dbExistsTable(con, "cell_meta")) {
+      available_slides <- dbGetQuery(con, "SELECT DISTINCT slide_id_numeric FROM cell_meta")$slide_id_numeric
+    }
+  }
+}
+```
+
+:::
+
+:::{.card}
+
+<br>
+
+For best results, use Chrome, Edge, or Safari. This is optimized for desktop and 
+tablet view.
+
+Tool Version: 1.0
+
+Tool Type: Serverless (OJS + webr)
+
+Source Code Available:     ✅ Yes
+
+
+
+:::
+
+
+
+
+
+# Volcano Plots
+
+## Row {height=100%}
+
+
+### Column {width=60%}
+
+
+#### Row {height=50%}
+
+##### Column {width=50%}
+
+###### Row {height=100%}
+
+::: {.card title="SUMMARY STATISTICS"}
+
+```{webr}
+#| echo: false
+#| autorun: true
+#| input: 
+#|   - vplot_stats
+#| results: asis
+
+if (inherits(vplot_stats, "data.frame")) {
+  knitr::kable(vplot_stats, format = "html", 
+               col.names = c("", ""), # Hide headers if self-explanatory
+               table.attr = "style='width:100%; font-size: 0.9em; border-collapse: collapse;'")
+} else {
+  cat("<span style='color:#ccc'>Waiting for data...</span>")
+}
+```
+
+:::
+
+##### Column {width=50%}
+
+```{ojs}
+//| title: ADJUST IMAGE AESTHETICS
+//| echo: false
+//| scrolling: true
+
+viewof aesthetics_raw = Inputs.form({
+  volcano_fc_range:      Inputs.range([0, 10], {step: 0.001, label: "Abs. log2FC", value: 1}),
+  volcano_pval_threshold: Inputs.range([0, 1], {step: 0.00001, label: "P-value threshold", value: 0.05}),
+  volcano_pt_size:       Inputs.range([0.1, 5], {step: 0.1, label: "Pt. Size"}),
+  volcano_alpha:         Inputs.range([0, 1], {step: 0.01, label: "Pt. Alpha", value: 1.0}),
+  
+  volcano_pt_color:      Inputs.color({label: "Pt. Color", value: "#3C3F40"}),
+  volcano_sig_color:     Inputs.color({label: "Significant targets", value: "#b44697"}),
+  
+  volcano_high_fc_label: Inputs.range([0, 10], {step: 1, label: "Label high FC", value: 3}),
+  volcano_low_fc_label:  Inputs.range([0, 10], {step: 1, label: "Label low FC", value: 3}),
+  volcano_pval_label:    Inputs.range([0, 10], {step: 1, label: "Label Sig.", value: 3}),
+  volcano_include_selected_genes: Inputs.radio(["Yes", "No"], {label: "Label selected?", value: "Yes"})
+})
+
+aesthetics_debounced = {
+  const raw = aesthetics_raw;
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve(raw), 600); 
+    invalidation.then(() => clearTimeout(timer));
+  });
+}
+
+
+aesthetics = aesthetics_debounced
+
+volcano_fc_range               = aesthetics.volcano_fc_range
+volcano_pval_threshold         = aesthetics.volcano_pval_threshold
+volcano_pt_size                = aesthetics.volcano_pt_size
+volcano_alpha                  = aesthetics.volcano_alpha
+volcano_pt_color               = aesthetics.volcano_pt_color
+volcano_sig_color              = aesthetics.volcano_sig_color
+volcano_high_fc_label          = aesthetics.volcano_high_fc_label
+volcano_low_fc_label           = aesthetics.volcano_low_fc_label
+volcano_pval_label             = aesthetics.volcano_pval_label
+volcano_include_selected_genes = aesthetics.volcano_include_selected_genes
+
+```
+
+
+#### Row {height=50%}
+
+##### Column {width=100%}
+
+:::{.card .hidden}
+
+```{ojs}
+//| echo: false
+//| output: false
+
+volcano_data_js = {
+  const payload = study_data_payload;
+  const contrast = contrast_selection;
+  const term = term_selection;
+  
+  // 1. DONT PROCEED if essential selections are missing
+  if (!payload || !contrast || !term || payload.mode === "local") return null;
+
+  if (payload.mode === "remote_js_bridge") {
+    try {
+      const conn = await duck_db_client;
+      const tableSource = payload.isAtoMx ? `pairwise_harmonized` : `"${payload.url_pairwise}"`;
+
+      // 2. CHECK IF VIEW EXISTS (For AtoMx)
+      if (payload.isAtoMx) {
+         const viewCheck = await conn.query(`SELECT count(*) as n FROM ${tableSource}`);
+         if (viewCheck.toArray()[0].n === 0) return null; // Wait for data
+      }
+
+      const query = `
+        SELECT term, contrast, target, log2fc, "p.value", ncells_1, ncells_2
+        FROM ${tableSource}
+        WHERE contrast = '${contrast}' AND term = '${term}'
+      `;
+      
+      const result = await conn.query(query);
+      const data = result.toArray().map(row => row.toJSON());
+      
+      // 3. ONLY RETURN IF WE HAVE DATA
+      if (data.length === 0) return null; 
+
+      console.log(`✅ Pairwise data fetched from ${tableSource} (${data.length} rows)`);
+      return data;
+      
+    } catch (e) {
+      console.error("❌ Failed to fetch pairwise data:", e);
+      return null; // Return null so webR doesn't try to process an error
+    }
+  }
+}
+```
+
+```{webr}
+#| echo: false
+#| autorun: true
+#| output: false
+#| input: 
+#|   - study_data_payload
+#|   - volcano_data_js
+#|   - contrast_selection
+#|   - term_selection
+#| define: 
+#|   - current_volcano_data
+
+current_volcano_data <- data.frame('term'='unknown', 
+                                   'contrast' = 'B / A',
+                                   'target' = 'NA',
+                                   'log2fc' = 0,
+                                   'p.value' = 1,
+                                   'ncells_1' = 0,
+                                   'ncells_2' = 0)
+
+if (!is.null(study_data_payload) && !is.null(contrast_selection)) {
+
+  if (study_data_payload$mode == "remote_js_bridge") {
+    if (!is.null(volcano_data_js)) {
+       json_str <- jsonlite::toJSON(volcano_data_js)
+       current_volcano_data <- jsonlite::fromJSON(json_str)
+       
+       cat(paste0("R: Received ", nrow(current_volcano_data), " rows from Remote.\n"))
+    }
+    
+  } else {
+    
+    cat(paste0("R: Querying Local DB for: ", contrast_selection, "\n"))
+
+    if (dbExistsTable(con, "de_results")) {
+        query <- sprintf(
+          "SELECT term, contrast, target, log2fc, \"p.value\", ncells_1, ncells_2 
+           FROM de_results 
+           WHERE contrast = '%s' AND term = '%s'", 
+          contrast_selection, 
+          term_selection
+        )
+
+       current_volcano_data <- dbGetQuery(con, query)
+       cat(paste0("R: Loaded ", nrow(current_volcano_data), " rows from Local.\n"))
+    }
+  }
+  
+  current_volcano_data <- current_volcano_data %>% mutate(log2fc = log2(fold_change), padj = p.adjust(p.value, method="BH")) %>%
+    select(target, log2fc, p.value, padj, ncells_1, ncells_2, term, contrast)
+}
+```
+
+:::
+
+```{ojs}
+//| echo: false
+//| content: card-toolbar
+//| input:  current_volcano_data
+viewof pairwise_search = Inputs.search(current_volcano_data, {placeholder: "Search Results"})
+
+```
+
+::: {.card title="PAIRWISE DETAILS"}
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof pairwise_table = Inputs.table(pairwise_search, {
+  multiple: true,
+  rows: 20,
+  format: {
+    log2fc: sparkbar(d3.max(pairwise_search, d => d.log2fc))
+  }})
+
+```
+
+<!-- ```{ojs} -->
+<!-- selected_genes -->
+<!-- ``` -->
+
+
+```{ojs}
+//| echo: false
+//| output: false
+
+// captures any selected genes (up to 30)
+selected_genes = {
+  if (!current_volcano_data || !pairwise_table) return ['notagene'];
+  if (pairwise_table.length === current_volcano_data) {
+    return ['notagene'];
+  }
+  if (pairwise_table.length > 30) {
+    return ['notagene'];
+  }
+  return pairwise_table.map(d => d.target);
+}
+
+selectionWarning = {
+  // 1. Wait for data
+  if (!pairwise_table || !current_volcano_data) return `Select between 1 and 30 genes to label.`;
+
+  const count = pairwise_table.length;
+  const total = current_volcano_data.length;
+  const isSelectAll = (count === total);
+
+  if(isSelectAll){
+    return `Select up to 30 genes to label in the volcano plot.`;
+  }
+  if (count > 30) {
+    return `⚠️ Too many targets selected (${count}). Limit is 30.`;
+  }
+
+  return `Currently selected: ${count} gene${count === 1 ? '' : 's'}.`;
+}
+```
+
+${selectionWarning}
+
+:::
+
+### Column {width=40%}
+
+
+
+```{ojs}
+//| echo: false
+//| content: card-toolbar
+
+// must occur before volcano plot card
+viewof term_selection = {
+  if (!available_terms || available_terms.length === 0) return md`_Loading terms..._`;
+
+  return Inputs.select(available_terms, {
+    label: "Available Terms:",
+    multiple: false,
+    size: 3
+  });
+}
+viewof contrast_selection = {
+  if (!available_contrasts || available_contrasts.length === 0) return md`_Loading contrasts..._`;
+
+  return Inputs.select(available_contrasts, {
+    label: "Available Contrasts:",
+    format: d => d.replace(" / ", " vs. "),
+    multiple: false,
+    size: 3
+  });
+}
+
+```
+
+
+::: {.card title="VOLCANO PLOT"}
+
+
+```{webr}
+#| warning: false
+#| echo: false
+#| autorun: true
+#| input: 
+#|    - volcano_plot_emit
+#|    - argsVolcano
+#|    - current_volcano_data
+#| define:
+#|    - vplot_stats
+#|    - vplot_plot
+#|    - vplot_labels
+
+if(!inherits(current_volcano_data, "data.frame") && is.na(current_volcano_data)){
+    cat("Waiting on contrast selection.")
+  vplot_stats <- ""
+  vplot_labels <- c()
+} else {
+  argsCombined <- c(list(df=current_volcano_data %>% 
+                           select(contrast, target, 
+                                  log2fc, p.value, any_of(c("ncells_1", "ncells_2")))), argsVolcano)
+  vplot_result <- rlang::exec("plotVolcano", !!!argsCombined)
+  vplot_stats <- vplot_result[[2]]
+  vplot_plot <- vplot_result[[1]]
+  vplot_labels <- vplot_result[[3]]
+  vplot_plot
+}
+
+# print(Sys.time())
+
+```
+
+<!-- Save Image -->
+
+```{ojs}
+//| echo: false
+viewof save_settings = Inputs.form({
+  width:  Inputs.number({label: "Width", value: 6, step: 0.5}),
+  height: Inputs.number({label: "Height", value: 4, step: 0.5}),
+  units:  Inputs.select(["in", "cm", "mm", "px"], {label: "Units", value: "in"}),
+  format: Inputs.select(["png", "svg"], {label: "Format", value: "png"})
+})
+viewof save_btn = Inputs.button("Download Plot", {value: 0, color: "#2C3E50"})
+save_request = {
+  save_btn; 
+  return save_settings;
+}
+```
+
+```{webr}
+#| echo: false
+#| autorun: true
+#| input: 
+#|    - save_btn
+#|    - save_request
+#| define: 
+#|   - downloaded_file
+
+if(save_btn>0){
+  cat('saving')
+  fname <- paste0("volcano_plot.", save_request$format)
+  ggsave(
+    filename = fname, 
+    plot = vplot_plot, 
+    device = save_request$format,
+    width = as.numeric(save_request$width),
+    height = as.numeric(save_request$height),
+    units = save_request$units
+  )
+  if(file.exists(fname)){
+    # cat(paste0("file created: ", fname))
+    file_bytes <- readBin(fname, "raw", n = file.info(fname)$size)
+    downloaded_file <- list(
+      data = file_bytes,
+      filename = fname,
+      mime = ifelse(save_request$format == "svg", "image/svg+xml", "image/png"),
+      ts = as.character(Sys.time()) # Timestamp to force OJS update
+    )
+  }
+}
+
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+{
+  if (downloaded_file) {
+    const blob = new Blob([new Uint8Array(downloaded_file.data)], { type: downloaded_file.mime });
+    
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = downloaded_file.filename;
+    document.body.appendChild(a);
+    a.click();
+    
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+}
+```
+
+
+:::
+
+# Marginal Means
+
+## Row {height=40%}
+
+### Column {width=50%}
+
+:::: {.card title="Description"}
+
+This plot shows the estimated mean expression of a gene (_i.e._, marginal means) between 
+the pairwise contrast that is currently selected. This can help you gauge the magnitude 
+of the difference between the two groups after accounting for any other variables in the model.
+
+Like the volcano plot, the x-axis shows the log2 fold change. The y-axis shows marginal mean response (log2 transformed).
+Each gene is represented by up to two points (one for each level of the contrast) with error bars. When "vs rest" or "vs all" is
+selected, only a single level is shown.
+
+```{ojs}
+//| echo: false
+//| output: false
+
+available_levels = {
+  const payload = study_data_payload;
+  // Prevents OJS from crashing on local VFS paths
+  if (!payload || payload.type === "local") return null;
+  
+  if (payload.mode === "remote_js_bridge") {
+    try {
+      const conn = await duck_db_client;
+      const query = `SELECT DISTINCT level FROM '${payload.url_emmeans}' ORDER BY level`;
+      const result = await conn.query(query);
+      return result.toArray().map(row => row.level).filter(t => !t.startsWith("otherct_"));
+    } catch (e) {
+      console.error("❌ Available Levels Fetch Error:", e);
+      return [];
+    }
+  }
+}
+```
+
+```{webr}
+#| echo: false
+#| autorun: true
+#| input: 
+#|    - study_data_payload
+#|    - available_levels
+#| define: 
+#|    - r_available_levels
+
+r_available_levels <- NULL
+if (!is.null(study_data_payload)) {
+  if (study_data_payload$mode == "remote_js_bridge") {
+    r_available_levels <- available_levels
+  } else {
+    if (dbExistsTable(con, "emmeans_data")) {
+        df <- dbGetQuery(con, "SELECT DISTINCT level FROM emmeans_data ORDER BY level")
+        r_available_levels <- df$level[!grepl("^otherct_", df$level)]
+    }
+  }
+}
+```
+::::
+
+### Column {width=50%}
+
+```{ojs}
+//| echo: false
+//| content: card-toolbar
+
+viewof term_copy = {
+  
+  if (!available_terms || available_terms.length === 0) return md`_Loading..._`;
+
+  const mirror_input = Inputs.select(available_terms, {
+    label: "Available Terms:",
+    multiple: false,
+    size: 3
+  });
+
+  return Inputs.bind(mirror_input, viewof term_selection);
+}
+
+viewof contrast_copy = {
+
+  if (!available_contrasts || available_contrasts.length === 0) return md`_Loading..._`;
+
+  const mirror_input = Inputs.select(available_contrasts, {
+    label: "Available Contrasts:",
+    format: d => d.replace(" / ", " vs. "),
+    multiple: false,
+    size: 3
+  });
+
+  return Inputs.bind(mirror_input, viewof contrast_selection);
+}
+```
+
+:::: {.card title="Controls"}
+
+```{ojs}
+//| echo: false
+
+viewof means_raw = Inputs.form({
+  means_highlight: Inputs.text({label: "Highlight Target:", placeholder: "e.g. A1BG,A1CF"}),
+  means_show_labeled:       Inputs.toggle({label: "Also highlight Volcano-labeled Genes", value: true}),
+  means_alpha: Inputs.range([0.1, 1], {value: 0.8, step: 0.1, label: "Dot Transparency"}),
+  means_color_1: Inputs.color({label: "Level 1 Color", value: "#e15759"}),
+  means_color_2: Inputs.color({label: "Level 2 Color", value: "#4e79a7"})
+})
+
+means_debounced = {
+  const raw = means_raw;
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve(raw), 600); 
+    invalidation.then(() => clearTimeout(timer));
+  });
+}
+
+means_highlight       = means_debounced.means_highlight
+means_show_labeled    = means_debounced.means_show_labeled
+means_alpha           = means_debounced.means_alpha
+means_color_1         = means_debounced.means_color_1
+means_color_2         = means_debounced.means_color_2
+
+combined_selection = {
+
+  const manual = means_highlight 
+    ? means_highlight.toUpperCase().split(',').map(s => s.trim()).filter(s => s.length > 0) 
+    : [];
+    
+  let from_volcano = [];
+  if (means_show_labeled && typeof vplot_labels !== "undefined") {
+      if(Array.isArray(vplot_labels)) {
+        from_volcano = vplot_labels;
+      } else if (typeof vplot_labels === 'string') {
+        from_volcano = [vplot_labels];
+      }
+  }
+  
+  return Array.from(new Set([...manual, ...from_volcano]));
+}
+means_level = {
+  const contrast = contrast_selection;
+  if (!contrast) return [];
+
+  return contrast.split(/\/|vs\./).map(s => s.trim());
+}
+```
+
+::::
+
+## Row {height=60%}
+
+### Column {width=50%}
+
+:::: {.card title='Marginal Means Plot'}
+
+```{ojs}
+//| echo: false
+//| input: means_search
+
+{
+
+  if (!means_search || means_search.length === 0) {
+    yield html`<div style="height:400px; display:flex; align-items:center; justify-content:center; background:#f9f9f9; border:1px border-radius:8px;">
+      <p style="color:#888;">Select levels in the sidebar to visualize...</p>
+    </div>`;
+  } else {
+
+    const colorScale = d3.schemeTableau10;
+    
+    let table_targets = [];
+    
+    if (typeof means_table !== "undefined" && means_table && means_search) {
+        if (means_table.length !== means_search.length) {
+          table_targets = means_table.map(d => d.target);
+        }
+    }
+    
+    const manual_targets = combined_selection || [];
+    
+    const highlight_list = Array.from(new Set([...table_targets, ...manual_targets]));
+    
+    const targetGroups = d3.groups(means_search, d => d.target);
+    
+    const levels = [...new Set(means_search.map(d => d.level))].sort();
+
+    const traces = [];
+
+    const alpha_scaler = means_alpha;
+    const line_segments_high = { x: [], y: [], hoverinfo: 'skip', showlegend: false, mode: 'lines', line: {color: '#888', width: 1.5}, opacity: 0.8 * alpha_scaler, type: 'scatter' }; 
+    const line_segments_med  = { x: [], y: [], hoverinfo: 'skip', showlegend: false, mode: 'lines', line: {color: '#888', width: 1}, opacity: 0.4 * alpha_scaler, type: 'scatter' };
+    const line_segments_low  = { x: [], y: [], hoverinfo: 'skip', showlegend: false, mode: 'lines', line: {color: '#ccc', width: 1}, opacity: 0.3 * alpha_scaler, type: 'scatter' };
+
+    targetGroups.forEach(([target, values]) => {
+      if(values.length < 2) return;
+      
+      const v1 = values[0];
+      const x = v1.log2fc;
+      if(x == null || isNaN(x)) return;
+
+      // Transform Response to Log2 for Y-axis
+      const ys = values.map(d => Math.log2(d.response)); 
+      
+      const min_y = Math.min(...ys);
+      const max_y = Math.max(...ys);
+      
+      const val_p = v1["p.value"];
+      const p = val_p != null ? val_p : 1;
+      
+      let seg = line_segments_low;
+      if(p < 0.001) seg = line_segments_high;
+      else if(p < 0.05) seg = line_segments_med;
+      
+      seg.x.push(x, x, null);
+      seg.y.push(min_y, max_y, null);
+    });
+
+    traces.push(line_segments_low, line_segments_med, line_segments_high);
+
+    levels.forEach((lvl, i) => {
+        const color = (i === 0) ? means_color_1 : means_color_2; 
+        
+        const lvl_trace = {
+          x: [], y: [], text: [], ids: [],
+          mode: 'markers',
+          type: 'scatter',
+          name: lvl, 
+          marker: { color: color, size: 6, opacity: means_alpha },
+          error_y: {
+            type: 'data', symmetric: false, array: [], arrayminus: [],
+            visible: true, color: color, thickness: 1, width: 2, opacity: 0.6
+          }
+        };
+
+        const lvlData = means_search.filter(d => d.level === lvl);
+        
+        lvlData.forEach(d => {
+           if (d.log2fc == null || isNaN(d.log2fc)) return;
+           
+           // Log2 Transformation
+           const y_log = Math.log2(d.response);
+           const ucl_log = Math.log2(d.UCL);
+           const lcl_log = Math.log2(d.LCL);
+
+           lvl_trace.x.push(d.log2fc);
+           lvl_trace.y.push(y_log);
+           lvl_trace.text.push(`<b>${d.target}</b><br>Level: ${d.level}<br>Log2 Resp: ${y_log.toFixed(2)}<br>FC: ${d.log2fc.toFixed(2)}`);
+           lvl_trace.ids.push(`${d.target}_${d.level}`);
+           
+           lvl_trace.error_y.array.push(ucl_log - y_log);
+           lvl_trace.error_y.arrayminus.push(y_log - lcl_log);
+        });
+        
+        traces.push(lvl_trace);
+    });
+
+    if(highlight_list.length > 0) {
+       const highlightData = means_search.filter(d => highlight_list.includes(d.target) && d.log2fc != null);
+       
+        traces.push({
+        x: highlightData.map(d => d.log2fc),
+        y: highlightData.map(d => Math.log2(d.response)),
+        mode: 'markers+text',
+        type: 'scatter', 
+        name: 'Highlights',
+        text: highlightData.map(d => d.target),
+        textposition: 'top center',
+        textfont: { color: 'black', size: 11, weight: 'bold' },
+        marker: { color: 'black', size: 10, symbol: 'circle-open', line: {width: 2} },
+        hoverinfo: 'skip',
+        cliponaxis: false
+      });
+    }
+
+    const layout = {
+      height: 500,
+      margin: { t: 30, b: 50, l: 60, r: 20 },
+      hovermode: 'closest',
+      title: { text: 'Marginal Means vs Fold Change', font: {size: 14} },
+      xaxis: { 
+        title: 'Log2 Fold Change (Contrast)', 
+        zeroline: true, 
+        zerolinecolor: '#eee',
+        gridcolor: '#f9f9f9'
+      },
+      yaxis: { 
+        title: 'Log2 Expression (Response)', 
+        gridcolor: '#f9f9f9',
+        zeroline: false
+      },
+      legend: { orientation: 'h', y: -0.15 },
+      showlegend: true
+    };
+
+    const div = document.createElement("div");
+    Plotly.newPlot(div, traces, layout, { responsive: true, displayModeBar: true });
+    yield div;
+  }
+}
+```
+
+
+::::
+
+### Column {width=50%}
+
+```{ojs}
+//| echo: false
+//| content: card-toolbar
+//| input: current_means_data
+viewof means_search = Inputs.search(current_means_data, {placeholder: "Additional Target Filtering"})
+
+```
+
+:::: {.card title="Details"}
+
+```{ojs}
+//| echo: false
+//| input:  current_means_data
+
+viewof means_table = Inputs.table(means_search, {
+  multiple: true,
+  value: combined_selection, // Pre-check the combined selection
+  rows: 20,
+  format: {
+    response: sparkbar(d3.max(means_search, d => d.response))
+  }})
+
+```
+
+
+```{ojs}
+//| echo: false
+//| output: false
+means_data_js = {
+  const payload = study_data_payload;
+  const lvl = means_level; 
+  
+  if (!payload || !lvl || lvl.length === 0 || payload.mode === "local") return null;
+
+  if (payload.mode === "remote_js_bridge") {
+    try {
+      const conn = await duck_db_client;
+
+      const formattedLevels = lvl.map(d => `'${d}'`).join(',');
+
+      const query = `
+        SELECT level, target, response, "asymp.LCL" as LCL, "asymp.UCL" as UCL
+        FROM '${payload.url_emmeans}' 
+        WHERE level IN (${formattedLevels})
+      `;
+
+      const result = await conn.query(query);
+      return result.toArray().map(row => row.toJSON());
+    } catch (e) {
+      console.error("Mean Fetch Error:", e);
+      return [];
+    }
+  }
+}
+```
+
+```{webr}
+#| echo: false
+#| autorun: true
+#| input: 
+#|    - study_data_payload
+#|    - means_data_js
+#|    - means_level
+#|    - means_highlight
+#|    - means_show_labeled
+#|    - selected_genes
+#| define: 
+#|    - current_means_data
+
+if (!is.null(study_data_payload) && !is.null(means_level)) {
+  current_means_data <- NULL
+  
+  if (study_data_payload$mode == "remote_js_bridge") {
+     if(!is.null(means_data_js)){
+       current_means_data <- jsonlite::fromJSON(jsonlite::toJSON(means_data_js))
+       current_means_data <- as.data.frame(current_means_data)
+     }
+  } else {
+    if (dbExistsTable(con, "emmeans_data")) {
+
+        lvl_in_clause <- paste0("'", means_level, "'", collapse = ", ")
+        
+        query <- paste0(
+          "SELECT level, target, response, \"asymp.LCL\" as LCL, \"asymp.UCL\" as UCL ",
+          "FROM emmeans_data WHERE level IN (", lvl_in_clause, ")"
+        )
+        
+        current_means_data <- dbGetQuery(con, query)
+      }
+  }
+  
+  if(!is.null(current_means_data)){
+    # 1. Join with Volcano Data to get log2fc AND p.value (FIXED: Use p.value)
+    if(exists("current_volcano_data") && !is.null(current_volcano_data) && nrow(current_volcano_data) > 0){
+
+       volcano_cols <- current_volcano_data %>% 
+          select(target, log2fc, p.value) %>% 
+          distinct(target, .keep_all = TRUE)
+          
+       current_means_data <- current_means_data %>% 
+          left_join(volcano_cols, by="target")
+    } else {
+       current_means_data$log2fc <- NA_real_
+       current_means_data$p.value <- NA_real_
+    }
+
+    target_order <- current_means_data %>%
+      group_by(target) %>%
+      summarise(avg_resp = mean(response, na.rm = TRUE)) %>%
+      arrange(avg_resp) %>%
+      mutate(idx = row_number()) %>%
+      select(target, idx)
+
+    current_means_data <- current_means_data %>%
+      left_join(target_order, by = "target")
+  
+  }
+}
+```
+
+::::
+
+# Spatial Plots
+
+## Row {height=100%}
+
+### Column {width=25%}
+
+::: {.card title="Spatial Controls"}
+
+
+
+```{ojs}
+//| echo: false
+viewof spatial_options = Inputs.form({
+  pt_size:    Inputs.range([0.5, 10], {value: 2, step: 0.5, label: "Point Size"}),
+  pt_opacity: Inputs.range([0.1, 1], {value: 0.7, step: 0.1, label: "Opacity"}),
+  bg_color:   Inputs.color({label: "Background Color", value: "#e0e0e0"}),
+  
+  // Scale Bar
+  scale_len:   Inputs.number({label: "Scale Bar (mm)", value: 1, step: 0.1}),
+  scale_color: Inputs.color({label: "Scale Color", value: "#000000"}),
+  show_scale:  Inputs.toggle({label: "Show Scale Bar", value: true})
+})
+
+viewof log_scale_opt = {
+  if(!spatial_data || spatial_data.length === 0) return md``;
+  
+  const val = spatial_data[0].group_id;
+  
+  if (typeof val === 'number') {
+    return Inputs.toggle({label: "Log Scale Color (n+1)", value: false});
+  } else {
+    return Inputs.toggle({label: "Log Scale Color (n+1)", value: false, disabled: true});
+  }
+}
+
+spatial_colors = {
+   return {
+     l1: means_color_1 || "#e15759",
+     l2: means_color_2 || "#4e79a7",
+     other: spatial_options.bg_color
+   }
+}
+```
+
+<br>
+
+**Metadata Filtering**
+```{ojs}
+//| echo: false
+// 1. Column Selection
+viewof filter_col = Inputs.select(spatial_meta_columns, {label: "Filter By:", value: null, multiple: false})
+
+is_numeric_filter = {
+  if(!spatial_data || !filter_col) return false;
+  const val = spatial_data[0][filter_col];
+  return typeof val === 'number';
+}
+
+viewof filter_vals = {
+  if(!filter_col || !spatial_data) return md`_Select a column..._`;
+  
+  if (is_numeric_filter) {
+
+    const extent = d3.extent(spatial_data, d => d[filter_col]);
+    
+    return Inputs.form({
+      min: Inputs.number({label: "Min", value: extent[0]}),
+      max: Inputs.number({label: "Max", value: extent[1]})
+    });
+    
+  } else {
+
+    const unique_vals = [...new Set(spatial_data.map(d => d[filter_col]))].sort();
+    
+    return Inputs.select(unique_vals, {
+      label: "Include Values:", 
+      multiple: true,
+      sort: true,
+      unique: true
+    });
+  }
+}
+```
+
+<br>
+**Stats**
+```{ojs}
+//| echo: false
+md`
+- **Total Loaded**: ${spatial_data ? spatial_data.length.toLocaleString() : "..."}
+- **Visible**: ${spatial_filtered ? spatial_filtered.length.toLocaleString() : "..."}
+`
+```
+
+:::
+
+### Column {width=75%}
+
+
+
+```{ojs}
+//| echo: false
+//| content: card-toolbar
+
+viewof slide_selection = {
+  if (!available_slides || available_slides.length === 0) return md`_Loading slides..._`;
+
+  return Inputs.select(available_slides, {
+    label: "Available Slides:",
+    multiple: false,
+    size: 3
+  });
+}
+
+viewof term_copy2 = {
+  
+  if (!available_terms || available_terms.length === 0) return md`_Loading..._`;
+
+  const mirror_input3 = Inputs.select(available_terms, {
+    label: "Available Terms:",
+    multiple: false,
+    size: 3
+  });
+
+  return Inputs.bind(mirror_input3, viewof term_selection);
+}
+
+viewof contrast_copy2 = {
+  if (!available_contrasts || available_contrasts.length === 0) return md`_Loading..._`;
+
+  const mirror_input2 = Inputs.select(available_contrasts, {
+    label: "Available Contrasts:",
+    format: d => d.replace(" / ", " vs. "),
+    multiple: false,
+    size: 3
+  });
+
+  return Inputs.bind(mirror_input2, viewof contrast_selection);
+}
+```
+
+
+```{ojs}
+//| echo: false
+//| output: false
+
+spatial_data = {
+  const payload = study_data_payload;
+  const r_push = r_spatial_data_export; // Reactive link to the webR block above
+  
+  if (!payload) return null;
+
+  // 1. LOCAL MODE: Always use the R-side DuckDB data
+  if (payload.type === "local") {
+    if (r_push && r_push.length > 0) {
+       console.log("📍 Spatial Data: Received via R-Side DuckDB Bridge");
+       return r_push;
+    }
+    // Return empty array to clear the canvas during transitions
+    return []; 
+  }
+
+  // 2. REMOTE MODE: Keep the URL-based JS-bridge for manifest studies
+  const term = term_selection;
+  const slide = slide_selection;
+  if (!term || slide === null) return null;
+
+  try {
+    const conn = await duck_db_client;
+    const result = await conn.query(`SELECT * FROM "${payload.url_meta}" WHERE slide_id_numeric = ${slide}`);
+    const rows = result.toArray().map(row => row.toJSON());
+    rows.forEach(r => { r.group_id = r[term]; });
+    return rows;
+  } catch (e) {
+    console.error("❌ Remote Spatial Fetch Error:", e);
+    return [];
+  }
+}
+
+spatial_meta_columns = {
+  if (!spatial_data || spatial_data.length === 0) return [];
+  
+  // Dynamically grab columns from whatever study is currently loaded
+  const keys = Object.keys(spatial_data[0]);
+  
+  return keys.filter(k => 
+    !["x_slide_mm", "y_slide_mm", "group_id", "__index_level_0__", "slide_id_numeric"].includes(k)
+  );
+}
+
+spatial_filtered = {
+  if(!spatial_data) return [];
+
+  if(!filter_col || !filter_vals) return spatial_data;
+  
+  // LOGIC SWITCH:
+  if(is_numeric_filter) {
+     // Numeric Filter: filter_vals is an object {min: x, max: y}
+     const { min, max } = filter_vals;
+     return spatial_data.filter(d => d[filter_col] >= min && d[filter_col] <= max);
+  } else {
+     // Categorical Filter: filter_vals is an array of selected strings
+     if(filter_vals.length === 0) return spatial_data;
+     return spatial_data.filter(d => filter_vals.includes(d[filter_col]));
+  }
+}
+
+```
+
+```{ojs}
+//| echo: false
+//| padding: 0px
+
+{
+  const data = spatial_filtered;
+  const levels = means_level; 
+  const opts = spatial_options;
+  const colors = spatial_colors;
+  const width = 1200; 
+  const height = 900; 
+  
+  const useLog = log_scale_opt === true; 
+  
+  //if (!data || data.length === 0) return md`_Loading spatial data..._`;
+
+  const isMock = !data || data.length === 0 || 
+                 (data.length === 4 && d3.max(data, d => d.x_slide_mm) <= 1);
+  
+  if (isMock) {
+    return html`
+      <div style="height: 600px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fdfdfd; border: 2px dashed #dee2e6; border-radius: 12px; text-align: center; padding: 40px;">
+        <div style="font-size: 3em; opacity: 0.4;">📍</div>
+        <h3 style="color: #3C3F40; margin-top: 15px;">Spatial Plot Unavailable</h3>
+        <p style="max-width: 440px; color: #888; font-size: 0.9em; line-height: 1.6;">
+          This study (AtoMx SIP or smiDE) does not contain any cell-level spatial metadata to display.
+        </p>
+        <div style="margin-top: 20px; font-size: 0.75em; border-top: 1px solid #eee; padding-top: 15px; font-style: italic; color: #b44697;">
+          R users: Use <code>create_mock_sp_data()</code> to generate placeholder coordinates.
+        </div>
+      </div>
+    `;
+  }
+
+  const isContinuous = typeof data[0].group_id === 'number';
+  
+  let colorScale = null;
+  let termExtent = [0, 1];
+  
+  if(isContinuous) {
+     termExtent = d3.extent(data, d => d.group_id);
+     
+     if (useLog) {
+        // Log Scale: Map Log(Min+1) -> Log(Max+1)
+        const logMin = Math.log(termExtent[0] + 1);
+        const logMax = Math.log(termExtent[1] + 1);
+        
+        colorScale = d3.scaleSequential(d3.interpolateRgb(colors.l2, colors.l1))
+          .domain([logMin, logMax]);
+          
+     } else {
+        // Linear Scale
+        colorScale = d3.scaleLinear()
+          .domain(termExtent)
+          .range([colors.l2, colors.l1]);
+     }
+  }
+
+  const xExtent = d3.extent(data, d => d.x_slide_mm);
+  const yExtent = d3.extent(data, d => d.y_slide_mm);
+  
+  const xMin = xExtent[0], xMax = xExtent[1];
+  const yMin = yExtent[0], yMax = yExtent[1];
+  
+  const dataWidth = xMax - xMin;
+  const dataHeight = yMax - yMin;
+  
+  const xScaleFactor = width / dataWidth;
+  const yScaleFactor = height / dataHeight;
+  const scale = Math.min(xScaleFactor, yScaleFactor) * 0.95; 
+  
+  const cx = width / 2;
+  const cy = height / 2;
+  const dx = (xMin + xMax) / 2;
+  const dy = (yMin + yMax) / 2;
+
+  const project = (x, y) => {
+    return [
+      cx + (x - dx) * scale,
+      cy - (y - dy) * scale 
+    ];
+  }
+  
+  const pixelsPerMm = scale;
+
+  // --- 3. DOM Setup ---
+  const div = document.createElement("div");
+  div.style.position = "relative";
+  div.style.width = "100%";
+  div.style.maxWidth = "100%";
+  div.style.height = "auto";
+  div.style.border = "1px solid #eee";
+  div.style.background = "#fff";
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = "100%"; // Responsive CSS
+  canvas.style.height = "auto";
+  canvas.style.display = "block";
+  div.appendChild(canvas);
+  
+  // Legend 
+  const legend = document.createElement("div");
+  legend.style.position = "absolute";
+  legend.style.top = "10px";
+  legend.style.right = "10px";
+  legend.style.background = "rgba(255, 255, 255, 0.9)";
+  legend.style.padding = "8px";
+  legend.style.borderRadius = "4px";
+  legend.style.border = "1px solid #ccc";
+  legend.style.fontSize = "12px";
+  legend.style.fontFamily = "sans-serif";
+  
+  if (isContinuous) {
+     const label = useLog ? `Log(${term_selection} + 1)` : term_selection;
+     const minLabel = useLog ? Math.log(termExtent[0] + 1).toFixed(2) : termExtent[0].toFixed(2);
+     const maxLabel = useLog ? Math.log(termExtent[1] + 1).toFixed(2) : termExtent[1].toFixed(2);
+     
+     legend.innerHTML = `
+       <strong>${label}</strong><br>
+       <div style="display:flex; align-items:center; gap:5px; margin-top:4px;">
+         <span>${minLabel}</span>
+         <div style="width:60px; height:10px; background: linear-gradient(to right, ${colors.l2}, ${colors.l1});"></div>
+         <span>${maxLabel}</span>
+       </div>
+     `;
+  } else {
+     const L1 = (levels && levels.length > 0) ? levels[0] : "Level 1";
+     const L2 = (levels && levels.length > 1) ? levels[1] : "Level 2";
+     legend.innerHTML = `
+       <strong>${term_selection}</strong><br>
+       <div style="display:flex; align-items:center; gap:5px; margin-top:2px;">
+         <span style="display:inline-block; width:10px; height:10px; background:${colors.l1};"></span> ${L1}<br>
+       </div>
+       <div style="display:flex; align-items:center; gap:5px; margin-top:2px;">
+         <span style="display:inline-block; width:10px; height:10px; background:${colors.l2};"></span> ${L2}
+       </div>
+     `;
+  }
+  div.appendChild(legend);
+
+  const ctx = canvas.getContext("2d");
+  let transform = d3.zoomIdentity;
+
+  function draw() {
+    ctx.save();
+    ctx.clearRect(0, 0, width, height);
+    
+    ctx.translate(transform.x, transform.y);
+    ctx.scale(transform.k, transform.k);
+    
+    const radius = opts.pt_size / transform.k;
+    ctx.globalAlpha = opts.pt_opacity;
+
+    const cOther = colors.other;
+    const cL1 = colors.l1;
+    const cL2 = colors.l2;
+    const L1 = (levels && levels.length > 0) ? levels[0] : null;
+    const L2 = (levels && levels.length > 1) ? levels[1] : null;
+
+    for (let i = 0; i < data.length; i++) {
+      const d = data[i];
+      let fill = cOther;
+      
+      if (isContinuous) {
+         if (d.group_id != null) {
+            const val = useLog ? Math.log(d.group_id + 1) : d.group_id;
+            fill = colorScale(val);
+         }
+      } else {
+         if (L1 && d.group_id === L1) fill = cL1;
+         else if (L2 && d.group_id === L2) fill = cL2;
+      }
+      
+      const xy = project(d.x_slide_mm, d.y_slide_mm);
+      
+      ctx.beginPath();
+      ctx.fillStyle = fill;
+      ctx.fillRect(xy[0] - radius, xy[1] - radius, radius*2, radius*2);
+    }
+    
+    ctx.restore();
+    
+    if (opts.show_scale) {
+       const barLenMm = opts.scale_len;
+       const barLenPx = barLenMm * pixelsPerMm * transform.k; 
+       
+       const margin = 20;
+       const barX = width - margin - barLenPx;
+       const barY = height - margin;
+       
+       ctx.save();
+       ctx.beginPath();
+       ctx.strokeStyle = opts.scale_color;
+       ctx.lineWidth = 4;
+       ctx.moveTo(barX, barY);
+       ctx.lineTo(barX + barLenPx, barY);
+       ctx.stroke();
+       
+       ctx.fillStyle = opts.scale_color;
+       ctx.font = "bold 14px sans-serif";
+       ctx.textAlign = "center";
+       ctx.textBaseline = "bottom";
+       ctx.fillText(`${barLenMm} mm`, barX + barLenPx/2, barY - 5);
+       ctx.restore();
+    }
+  }
+
+  draw();
+
+  const zoom = d3.zoom()
+    .scaleExtent([0.5, 50]) 
+    .on("zoom", (event) => {
+      transform = event.transform;
+      requestAnimationFrame(draw);
+    });
+
+  d3.select(canvas).call(zoom);
+
+  return div;
+}
+```
+
+::: {.card .hidden}
+
+
+```{webr}
+#| echo: false
+#| autorun: true
+#| input: 
+#|   - term_selection
+#|   - slide_selection
+#|   - db_ready
+#| define:
+#|   - r_spatial_data_export
+
+r_spatial_data_export <- NULL
+
+if (db_ready && !is.null(term_selection) && !is.null(slide_selection)) {
+  # Query the view we already established during study loading
+  query <- paste0(
+    "SELECT *, ", term_selection, " as group_id ",
+    "FROM cell_meta WHERE slide_id_numeric = ", slide_selection
+  )
+  
+  tryCatch({
+    # Fetch from the existing DuckDB connection
+    r_spatial_data_export <- dbGetQuery(con, query)
+  }, error = function(e) {
+    cat("Spatial query waiting for view initialization...\n")
+    r_spatial_data_export <- NULL
+  })
+}
+```
+
+:::
+
+
+# Convert Your AtoMx SIP Results {scrolling="true" #sec-convert-atomx}
+
+## Row {height=20%}
+
+::: {.card title="How to use this dashboard with your results derived from AtoMx SIP"}
+
+In AtoMx SIP, when your differential expression (DE) results are ready you can 
+download them. This download will be a zip file named something like `output_results.zip`. 
+This file is relatively large but luckily for this "Byte-sized" dashboard we only
+need a few of the columns. You can use this section to format that large zip file
+into a dashboard-ready zip file that contains essential information. See the card
+below to load your AtoMx-derived DE zip file. You'll be given the option to add
+optional study description and model formula that can be handy when you are comparing
+multiple studies at once. When the processing is finished, you will have the option
+to download the dashboard-ready and formatted zip file, load it directly into this
+dashboard, or both. One thing to note is that the DE zip file that is downloaded
+from AtoMx SIP does not contain cell-level metadata and so the Spatial Plots section
+will only contain a placeholder dataset (just four 'cells') and not actual data.
+
+:::
+
+## Row {height=30%}
+
+### Column {width=50%}
+
+::: {.card title="Step 1: Load AtoMx SIP DE Results"}
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof atomx_zip_file = Inputs.file({
+  label: "Import AtoMx SIP DE Results (.zip):",
+  accept: ".zip"
+})
+
+atomx_surgical_ingestor = {
+  if (!atomx_zip_file) return null;
+  
+  try {
+    console.log("🛠️ INGESTOR START: Reading ArrayBuffer...");
+    const buffer = await atomx_zip_file.arrayBuffer();
+    const z = await import("https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.34/+esm");
+    
+    // Create the reader from the Uint8Array of the full zip
+    const reader = new z.ZipReader(new z.Uint8ArrayReader(new Uint8Array(buffer)));
+    const entries = await reader.getEntries();
+    
+    const targets = ["emmeans.csv", "pairwise.csv", "one.vs.rest.csv", "one.vs.all.csv"];
+    const conn = await duck_db_client;
+    const db = conn.instance || conn.db || conn;
+
+    for (const entry of entries) {
+      const match = targets.find(t => entry.filename.toLowerCase().includes(t));
+      if (match) {
+        console.log(`📦 ZIP ENTRY FOUND: ${entry.filename}`);
+        
+        // FIX: Ensure we are awaiting the full data extraction
+        const uint8 = await entry.getData(new z.Uint8ArrayWriter());
+        
+        if (uint8 && uint8.length > 0) {
+          await db.registerFileBuffer(match, uint8);
+          console.log(`✅ REGISTERED: ${match} (${uint8.length.toLocaleString()} bytes)`);
+        } else {
+          console.warn(`⚠️ WARNING: ${match} extracted as 0 bytes!`);
+        }
+      }
+    }
+    
+    await reader.close();
+    return { status: "ready", timestamp: Date.now() };
+  } catch (err) {
+    console.error("❌ INGESTOR CRITICAL ERROR:", err);
+    return { status: "error", message: err.message };
+  }
+}
+```
+
+
+```{ojs}
+//| echo: false
+//| output: false
+
+atomx_parquet_generator = {
+  if (!atomx_surgical_ingestor || atomx_surgical_ingestor.status !== "ready") return null;
+  if (!atomx_metadata || atomx_metadata.process_btn === 0) return null;
+  
+  const conn = await duck_db_client;
+  console.log("🪄 GENERATOR START: Building SQL Views...");
+
+  try {
+    // FIX: Use DuckDB's internal schema field mapping
+    console.log("🔍 Probing columns in pairwise.csv...");
+    const schemaRes = await conn.query("SELECT * FROM read_csv_auto('pairwise.csv') LIMIT 0");
+    const cols = schemaRes.schema.fields.map(f => f.name);
+    console.log("📋 Detected Columns:", cols);
+    
+    const n1 = cols.includes("ncells_1") ? "ncells_1" : "NULL as ncells_1";
+    const n2 = cols.includes("ncells_2") ? "ncells_2" : "NULL as ncells_2";
+
+    // 1. Harmonize EMMEANS
+    await conn.query(`
+      CREATE OR REPLACE VIEW emmeans_final AS
+      WITH base AS (
+        SELECT *,
+          regexp_replace(level, term, '') as suffix_str,
+          TRY_CAST(regexp_replace(level, term, '') AS DOUBLE) as suffix_val,
+          (level LIKE term || '%') AND (TRY_CAST(regexp_replace(level, term, '') AS DOUBLE) IS NOT NULL) as is_continuous
+        FROM read_csv_auto('emmeans.csv')
+        WHERE term != 'otherct_expr'
+      )
+      SELECT 
+        term,
+        CASE 
+          WHEN is_continuous AND category = 'c1' THEN 'mean + 1SD (' || printf('%.2f', suffix_val) || ')'
+          WHEN is_continuous AND category = 'c2' THEN 'mean  (' || printf('%.2f', suffix_val) || ')'
+          ELSE level 
+        END as level,
+        target, response, "asymp.LCL", "asymp.UCL"
+      FROM base
+    `);
+
+    // 2. Build Master PAIRWISE Union
+    await conn.query(`
+      CREATE OR REPLACE VIEW pairwise_final AS
+      SELECT 'pairwise' as contrast_type, term, contrast, target, log2(fold_change) as log2fc, "p.value", ${n1}, ${n2} FROM read_csv_auto('pairwise.csv')
+      UNION ALL
+      SELECT 'one_vs_rest', term, contrast, target, log2(fold_change), "p.value", ${n1}, ${n2} FROM read_csv_auto('one.vs.rest.csv')
+      UNION ALL
+      SELECT 'one_vs_all', term, contrast, target, log2(fold_change), "p.value", ${n1}, ${n2} FROM read_csv_auto('one.vs.all.csv')
+    `);
+
+    console.log("✅ GENERATOR SUCCESS!");
+    return { ready: true, timestamp: Date.now() };
+
+  } catch (err) {
+    console.error("❌ GENERATOR SQL ERROR:", err);
+    return { ready: false, error: err.message };
+  }
+}
+```
+
+:::
+
+### Column {width=50%}
+
+::: {.card title="Step 2: Add Additional Information"}
+
+
+```{ojs}
+//| echo: false
+//| output: true
+viewof atomx_metadata = {
+  
+  if (!atomx_surgical_ingestor || atomx_surgical_ingestor.status !== "ready") {
+    return html`
+      <div style="margin-top: 10px; padding: 15px; border: 1px dashed #ddd; border-radius: 8px; background: #fafafa; color: #666;">
+        <h5 style="text-transform: uppercase; color: #888; font-size: 0.75em; margin-bottom: 8px;">AtoMx Ingestor Status</h5>
+        <div style="font-size: 0.9em; display: flex; align-items: center; gap: 10px;">
+          <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+          <span>Waiting for AtoMx SIP results import from Step 1...</span>
+        </div>
+      </div>
+    `;
+  }
+
+  
+  const form = Inputs.form({
+    study_name:  Inputs.text({label: "Study Name", value: "AtoMx Analysis"}),
+    description: Inputs.text({label: "Description", value: "AtoMx SIP Export"}),
+    formula:     Inputs.text({label: "Model Formula", placeholder: "e.g. ~annotated_domain"}),
+    process_btn: Inputs.button("🚀 Format Results", {value: 0})
+  });
+
+
+  form.style.border = "1px solid #eee";
+  form.style.borderRadius = "8px";
+  form.style.padding = "20px";
+  form.style.background = "#fff";
+  form.style.marginTop = "10px";
+
+  // Prepend the header inside the form card
+  const header = html`
+    <h5 style="text-transform: uppercase; color: #888; font-size: 0.75em; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+      Optional Study Metadata
+    </h5>
+  `;
+  form.prepend(header);
+
+  return form;
+}
+```
+
+:::
+
+## Row {height=50%}
+
+::: {.card title="Step 3: Choose What To Do With Formatted Results"}
+
+
+<div id="atomx-download-container" style="margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa;">
+  </div>
+
+```{ojs}
+//| echo: false
+//| output: false
+
+atomx_downloader_manager = {
+  const container = d3.select("#atomx-download-container");
+  
+  // Guard: Hide container if data isn't processed yet
+  if (!atomx_parquet_generator || !atomx_parquet_generator.ready) {
+    container.style("display", "none");
+    return null;
+  }
+
+  container.style("display", "block").html(""); // Clear and show
+
+
+  const ui = html`
+    <h5 style="margin-top: 0;">🚀 Formatting Complete</h5>
+    <p style="font-size: 0.9em; color: #555;">Choose how you would like to proceed with your harmonized study:</p>
+    
+    <div class="d-grid gap-2 d-md-block">
+      <button id="btn-atomx-download-only" class="btn btn-outline-primary">💾 Download Only</button>
+      <button id="btn-atomx-launch-only" class="btn btn-outline-success">⚡ Launch Only</button>
+      <button id="btn-atomx-both" class="btn btn-primary">🚀 Download & Launch</button>
+    </div>
+    
+    <div id="atomx-download-status" style="margin-top: 12px; font-weight: 500;"></div>
+  `;
+
+
+  container.node().appendChild(ui);
+
+
+  const status = ui.querySelector("#atomx-download-status");
+  const btnDownload = ui.querySelector("#btn-atomx-download-only");
+  const btnLaunch = ui.querySelector("#btn-atomx-launch-only");
+  const btnBoth = ui.querySelector("#btn-atomx-both");
+
+
+  const runConversion = async () => {
+      const conn = await duck_db_client;
+      const db = conn.instance || conn.db || conn;
+      
+
+      await conn.query(`
+        CREATE OR REPLACE VIEW pairwise_scrubbed AS 
+        SELECT * FROM pairwise_final WHERE term != 'otherct_expr'
+      `);
+      
+      await conn.query(`
+        CREATE OR REPLACE VIEW emmeans_scrubbed AS 
+        SELECT * FROM emmeans_final WHERE term != 'otherct_expr'
+      `);
+  
+
+      const termRes = await conn.query("SELECT DISTINCT term FROM pairwise_scrubbed LIMIT 1");
+      const activeTerm = termRes.toArray()[0]?.term || "Term";
+      
+      const levelRes = await conn.query("SELECT DISTINCT level FROM emmeans_scrubbed LIMIT 2");
+      const levels = levelRes.toArray().map(row => row.level);
+      const l1 = levels[0] || 'Level_A';
+      const l2 = levels[1] || l1;
+  
+      console.log(`🧼 FILTERING: Removed 'otherct_expr'. Active Term: ${activeTerm}`);
+  
+
+      await conn.query("COPY (SELECT * FROM pairwise_scrubbed) TO 'pairwise.parquet' (FORMAT 'PARQUET')");
+      await conn.query("COPY (SELECT * FROM emmeans_scrubbed) TO 'emmeans.parquet' (FORMAT 'PARQUET')");
+  
+
+      await conn.query(`
+        CREATE OR REPLACE VIEW spatial_smart_placeholder AS
+        SELECT 0.0 as x_slide_mm, 0.0 as y_slide_mm, 1 as slide_id_numeric, '${l1}' as "${activeTerm}" UNION ALL
+        SELECT 0.0, 1.0, 1, '${l1}' UNION ALL
+        SELECT 1.0, 0.0, 1, '${l2}' UNION ALL
+        SELECT 1.0, 1.0, 1, '${l2}'
+      `);
+      await conn.query("COPY (SELECT * FROM spatial_smart_placeholder) TO 'cell_metadata.parquet' (FORMAT 'PARQUET')");
+  
+
+      const countRes = await conn.query("SELECT COUNT(DISTINCT target) as n FROM pairwise_scrubbed");
+      const targetCount = Number(countRes.toArray()[0].n);
+      await conn.query(`
+        COPY (SELECT '${atomx_metadata.study_name}' as Name, '${atomx_metadata.description}' as Description, 
+              '${atomx_metadata.formula}' as Formala, ${targetCount} as "Targets tested") 
+        TO 'study_header.parquet' (FORMAT 'PARQUET')`);
+  
+
+      return {
+        p: await db.copyFileToBuffer('pairwise.parquet'),
+        e: await db.copyFileToBuffer('emmeans.parquet'),
+        m: await db.copyFileToBuffer('cell_metadata.parquet'),
+        h: await db.copyFileToBuffer('study_header.parquet')
+      };
+    };
+
+  const createZipBlob = async (buffers) => {
+    const z = await import("https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.34/+esm");
+    const zipWriter = new z.ZipWriter(new z.BlobWriter("application/zip"));
+    await zipWriter.add("pairwise.parquet", new z.Uint8ArrayReader(new Uint8Array(buffers.p)));
+    await zipWriter.add("emmeans.parquet", new z.Uint8ArrayReader(new Uint8Array(buffers.e)));
+    await zipWriter.add("cell_metadata.parquet", new z.Uint8ArrayReader(new Uint8Array(buffers.m)));
+    await zipWriter.add("study_header.parquet", new z.Uint8ArrayReader(new Uint8Array(buffers.h)));
+    return await zipWriter.close();
+  };
+
+  const triggerDownload = (blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${atomx_metadata.study_name}_smiDE.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+
+  btnDownload.onclick = async () => {
+    status.innerHTML = "⚙️ Generating Zip...";
+    const buffers = await runConversion();
+    const blob = await createZipBlob(buffers);
+    triggerDownload(blob);
+    status.innerHTML = "✅ Download Complete.";
+  };
+
+  btnLaunch.onclick = async () => {
+    status.innerHTML = "🚀 Launching Study...";
+    const buffers = await runConversion();
+    const blob = await createZipBlob(buffers);
+
+    mutable new_zip_data = {
+      id: Date.now(),
+      filename: `${atomx_metadata.study_name}_smiDE.zip`,
+      data: new Uint8Array(await blob.arrayBuffer())
+    };
+    status.innerHTML = "✅ Study Launched! Check the sidebar.";
+  };
+
+  btnBoth.onclick = async () => {
+    status.innerHTML = "⚙️ Processing Both...";
+    const buffers = await runConversion();
+    const blob = await createZipBlob(buffers);
+    triggerDownload(blob);
+    mutable new_zip_data = {
+      id: Date.now(),
+      filename: `${atomx_metadata.study_name}_smiDE.zip`,
+      data: new Uint8Array(await blob.arrayBuffer())
+    };
+    status.innerHTML = "✅ Success! Zip downloaded and Study launched.";
+  };
+
+  return ui;
+}
+```
+
+:::
+
+# Convert Your smiDE Results {scrolling="true" #sec-convert-smide}
+
+::: {.card title="How to use this dashboard with your results derived from smiDE"}
+
+You can use this dashboard to explore your own `smiDE` results. For now this
+dashboard only works using differential expression results obtained directly 
+from the `smiDE` R package. So far I have tested it with two cases: a discrete/
+categorical grouping variable and a continuous one. 
+
+Let's say you have a differential expression object obtained from calling the 
+`smiDE::smi_de` function:
+
+```{r}
+#| echo: true
+#| eval: false
+
+library(smiDE)
+
+# Example function call below that examines tumor cell expression across
+# different spatial domains (annotated_domains). 
+de_obj <- 
+   smi_de(assay_matrix = assay_matrix_use
+          ,metadata = meta_use
+          ,formula = ~RankNorm(otherct_expr) + annotated_domain + offset(log(nCount_RNA)) 
+          ,pre_de_obj = pre_de_obj
+          ,neighbor_expr_cell_type_metadata_colname = "celltype_broad"
+          ,neighbor_expr_overlap_weight_colname = NULL
+          ,neighbor_expr_overlap_agg ="sum"
+          ,neighbor_expr_totalcount_normalize = TRUE
+          ,neighbor_expr_totalcount_scalefactor =  tc_scalefactors 
+          ,family="nbinom2"
+          ,cellid_colname = "cell_id_numeric"
+          ,targets=genes_to_analyze,
+          nCores=30
+   ) 
+res_list <- results(de_obj)
+```
+
+Since the output structure differs slighlty depending on whether your DE results
+are based on discrete or continous terms, we'll use this harmonizing function
+to format the results into a single format that the dashboard can understand. 
+Specifically, the function below converts the _pairwise results_ and the 
+_emmeans results_. 
+```{webr}
+#| echo: true
+#| eval: false
+
+library(data.table)
+library(dplyr)
+library(stringr)
+
+#' Harmonize smiDE Results for Dashboard
+#'
+#' @param res_list The output list directly from smiDE::results(de_obj)
+#' @return A list containing 'pairwise' and 'emmeans' data.frames with synchronized continuous labels
+harmonize_de_results <- function(res_list) {
+  
+  emmeans_raw <- res_list$emmeans
+  if ("term" %in% names(emmeans_raw)) {
+    emmeans_raw <- emmeans_raw[term != "otherct_expr"]
+  }
+  
+  emmeans_processed <- emmeans_raw %>%
+    mutate(
+      # Extract numeric suffix from level (e.g., "term42.697" -> "42.697")
+      suffix_str = str_remove(level, fixed(term)),
+      suffix_val = suppressWarnings(as.numeric(suffix_str)),
+      
+      is_continuous = !is.na(suffix_val) & str_starts(level, fixed(term))
+    ) %>%
+    mutate(
+      clean_level = case_when(
+        is_continuous ~ {
+          direction <- case_when(
+            category == "c1" ~ "+ 1SD",
+            category == "c2" ~ "",
+            TRUE ~ ""
+          )
+          paste0("mean ", direction, " (", sprintf("%.2f", suffix_val), ")")
+        },
+        TRUE ~ level
+      ),
+      
+      lookup_key = ifelse(is_continuous, 
+                          paste0(term, "_", sprintf("%.2f", suffix_val)), 
+                          NA_character_)
+    )
+  
+  continuous_map <- emmeans_processed %>%
+    filter(is_continuous) %>%
+    select(lookup_key, clean_level) %>%
+    distinct() %>%
+    tibble::deframe() 
+  
+  emmeans_out <- emmeans_processed %>%
+    select(term, level = clean_level, target, response, asymp.LCL, asymp.UCL) %>%
+    as.data.frame()
+  
+  pairwise_combined <- rbindlist(
+    res_list[c("pairwise", "one.vs.rest", "one.vs.all")], 
+    idcol = "contrast_type", 
+    use.names = TRUE, 
+    fill = TRUE 
+  )
+  
+  if ("term" %in% names(pairwise_combined)) {
+    pairwise_combined <- pairwise_combined[term != "otherct_expr"]
+  }
+  
+  if (!"ncells_1" %in% names(pairwise_combined)) pairwise_combined[, ncells_1 := NA]
+  if (!"ncells_2" %in% names(pairwise_combined)) pairwise_combined[, ncells_2 := NA]
+  
+  pairwise_out <- pairwise_combined %>%
+    mutate(
+      log2fc = log2(fold_change),
+      
+      is_continuous_row = is.na(ncells_1) & is.na(ncells_2)
+    ) %>%
+    rowwise() %>%
+    mutate(
+      contrast = if (is_continuous_row) {
+        parts <- str_split(contrast, " / ", simplify = TRUE)
+
+        val1 <- as.numeric(str_remove(parts[1], fixed(term)))
+        val2 <- as.numeric(str_remove(parts[2], fixed(term)))
+        
+        key1 <- paste0(term, "_", sprintf("%.2f", val1))
+        key2 <- paste0(term, "_", sprintf("%.2f", val2))
+        
+        label1 <- ifelse(key1 %in% names(continuous_map), continuous_map[key1], parts[1])
+        label2 <- ifelse(key2 %in% names(continuous_map), continuous_map[key2], parts[2])
+        
+        paste0(label1, " / ", label2)
+        
+      } else {
+        contrast
+      }
+    ) %>%
+    ungroup() %>%
+    select(term, contrast, target, log2fc, p.value, ncells_1, ncells_2) %>%
+    as.data.frame()
+  
+  return(list(pairwise = pairwise_out, emmeans = emmeans_out))
+}
+```
+
+Now convert the `res_list` into the formatted parts. 
+
+```{r}
+#| echo: true
+#| eval: false
+
+res_formatted <- harmonize_de_results(res_list)
+pairwise <- res_formatted$pairwise
+emmeans <- res_formatted$emmeans
+
+```
+
+
+The `pairwise` table and the `emmeans` table two of the four required components.
+To create the `study_header` -- which is simply a description data set that helps
+provide a little more context to the data displayed on the dashboard itself, we'll
+create it like this: 
+
+```{r}
+#| echo: true
+#| eval: false
+
+study_header <- data.frame( # <1>
+  `Name` = "Tumor cells across spatial domains",
+  `Description` = "Colon Cancer WTX sample",
+  `Formala` = "~RankNorm(otherct_expr) + annotated_domain + offset(log(nCount_RNA))",
+  `Targets tested` = length(genes_to_analyze)
+)
+```
+Note: The column names must **match exactly** as given.
+
+
+And finally, it can be useful view the cells in space to get a sense of the 
+spatial structure of groupings. We'll do this by selecting columns within
+our cell-level metadata object. Keep in mind that this dataset is loaded fully
+in your browser's memory and so very large dataframes might slow down or even
+crash your browser.
+
+In the code snippet below, I'm interested in looking at the broad cell types 
+and the annotated domain. Note that there are a minimum of four required columns that
+are expected in the dashboard. The first three are `x_slide_mm`,
+`y_slide_mm`, and `slide_id_numeric`. These are used to facet the spatial plot.
+The other required columns are the metadata columns used for your grouping variable. 
+In the example above, that grouping column was named `annotated_domain` but this
+can vary based on the study. These columns are used to _color_ the spatial plots
+when a given contrast is selected. Other columns can optionally be added. For example,
+`celltype_broad` is useful to include here is we used that column to filter our
+data and in the spatial plots section we can filter the cells to include only
+cells that have a `celltype_broad` value of `tumor` to match our DE analysis.
+
+```{r}
+#| echo: true
+#| eval: false
+
+# meta_df == the full cell-level metadata (i.e., obs)
+meta_display <- data.table(meta_df)
+meta_display <- meta_display[, .(
+  x_slide_mm = sdimx, 
+  y_slide_mm = sdimy, 
+  celltype_broad,
+  annotated_domain
+)]
+if('slide_id_numeric' %in% colnames(meta_df)){
+  meta_display$slide_id_numeric <- meta_df$slide_id_numeric
+} else {
+  meta_display$slide_id_numeric <- 1L
+}
+
+```
+
+Alternatively, if you just want the volcano plots and emmeans and want to skip 
+the spatial plotting together, just create and pass a placeholder data.frame like
+so:
+
+```{r}
+#| echo: true
+#| eval: false
+
+create_mock_sp_data <- function(emmeans_formatted) {
+  terms <- emmeans_formatted %>% 
+    select(term) %>% 
+    pull()
+  
+  mock_template <- data.frame(
+    'x_slide_mm' = c(0, 0, 1, 1),
+    'y_slide_mm' = c(0, 1, 0, 1), 
+    'slide_id_numeric' = rep(1L, 4)
+  )
+  
+  for(i in seq_len(length(terms))){
+    mock_template[[terms[i]]] <- rep(NA, 4)
+  }
+  
+return(mock_template)
+}
+# this will just add 4 rows data which the dashboard uses as a signature for
+# "Not Applicable"
+meta_display <- create_mock_sp_data(emmeans)
+
+```
+
+At this point we are ready to package these four components so they can be loaded
+in your browser's tab (specifically, in the virtual file system [VFS] that webR uses). 
+The two steps to this procedure is:
+
+1. convert data to parquet.
+2. zip up all parquet files into a single zip file.
+
+When converting data to parquet, we'll use this `write_opt_parquet` function. It's just a wrapper function
+for writing to parquet but, to save memory, one could reduce the numeric precision
+of columns from R's float64 to either 32 bit or 16 bit, if desired. Keep in mind
+that things like p-values will likely need greater precision.
+
+```{webr}
+#| echo: true
+#| eval: false
+#| autorun: true
+#| edit: false
+
+library(arrow)
+write_opt_parquet <- function(df, filename, f32_cols = NULL, f16_cols = NULL) {
+  
+  # Convert to Arrow Table
+  arrow_table <- as_arrow_table(df)
+  
+  # Cast Float32 columns
+  if (!is.null(f32_cols)) {
+    # Check which requested columns actually exist in this dataframe
+    valid_cols <- intersect(names(df), f32_cols)
+    if(length(valid_cols) > 0) {
+      arrow_table <- arrow_table %>% 
+        mutate(across(all_of(valid_cols), ~ cast(.x, float32())))
+    }
+  }
+
+  # Cast Float16 columns
+  if (!is.null(f16_cols)) {
+    valid_cols <- intersect(names(df), f16_cols)
+    if(length(valid_cols) > 0) {
+      arrow_table <- arrow_table %>% 
+        mutate(across(all_of(valid_cols), ~ cast(.x, float16())))
+    }
+  }
+
+  # Write to disk
+  write_parquet(arrow_table, filename)
+}
+
+
+```
+
+Write the parquet files to disk. Note that the folder names can vary but
+the file names must match exactly.
+
+```{r}
+#| echo: true
+#| eval: false
+
+parquet_dir <- "./your_parquet_folder"
+dir.create(parquet_dir)
+
+write_opt_parquet(study_header, file.path(parquet_dir, "study_header.parquet"))
+
+write_opt_parquet(
+  pairwise, 
+  file.path(parquet_dir, "pairwise.parquet")
+)
+
+write_opt_parquet(
+  emmeans, 
+  file.path(parquet_dir, "emmeans.parquet")
+)
+
+write_opt_parquet(
+  meta_display,
+  file.path(parquet_dir, "cell_metadata.parquet"),
+  f32_cols = c('x_slide_mm', 'y_slide_mm'),
+  f16_cols = NULL
+)
+```
+
+And finally, zip it up! You can name the zip file whatever you like.
+```{r}
+#| echo: true
+#| eval: false
+
+files_to_zip <- c("study_header.parquet", 
+                  "pairwise.parquet", 
+                  "emmeans.parquet", 
+                  "cell_metadata.parquet")
+
+zip::zip(
+  zipfile = "you_can_name_this_whatever_you_like.zip",
+  files = files_to_zip, 
+  root = parquet_dir 
+)
+```
+
+And that should be it. You should be able to "upload" that zip file on the left 
+side panel of the dashboard. 
+
+:::
+
+# Advanced
+
+## Row {height="80%"}
+
+### Column {width="100%"}
+
+::: {.card title="Description"}
+This is the code that generates the volcano plot. For advanced users who wish
+to modify the volcano plot aesthetics 
+beyond what is available within `ADJUST IMAGE AESTHETICS`, you can adjust the code
+and click `Run Code`. This will, in turn, use your custom code reactively. If any
+errors occur, you can simply click `START OVER` or simply refresh your browser, 
+to return the plotting function back to its original state. You can install and use
+additional R packages if you like if they are already [compiled to WebAssembly](https://repo.r-wasm.org/sembly){target="_blank"}.
+
+
+. This is "living code"
+is used to generate the and adjustmentused to reactively generate the plots of the dashboard. You can modify them to generate completely custom aesthetics. If run into issues, you can always press 'START OVER' to return the plotting function back to its original form.
+
+```{webr}
+#| title: Volcano Plot Source Code
+#| edit: true
+#| output: true
+#| autorun: true
+#| warning: false
+#| input: 
+#|   - volcano_fc_range
+#|   - volcano_pval_threshold
+#|   - volcano_pt_size
+#|   - volcano_alpha
+#|   - volcano_pt_color
+#|   - volcano_sig_color
+#|   - volcano_high_fc_label
+#|   - volcano_low_fc_label
+#|   - volcano_pval_label
+#|   - volcano_include_selected_genes
+#|   - selected_genes
+#| define: 
+#|   - volcano_plot_emit
+#|   - plotVolcano
+#|   - argsVolcano
+
+volcano_plot_emit <- TRUE
+if(exists(".Random.seed")){
+  rm(.Random.seed)
+}
+set.seed(42L)
+plotVolcano <- function(df, vfc, vpl, vpt, valpha, vptcolor){
+
+  contrast_string <- gsub(" vs. ", " / ", df$contrast[1])
+  levels <- unlist(strsplit(contrast_string, " / "))
+
+  if(length(levels) == 2) {
+    numerator <- levels[1]
+    if("ncells_1" %in% colnames(df) && !is.na(df$ncells_1[1])){
+      numerator <- paste0(numerator, " (n=",df$ncells_1[1], ")" )
+    }    
+    denominator <- levels[2]
+    if("ncells_2" %in% colnames(df) && !is.na(df$ncells_2[1])){
+      denominator <- paste0(denominator, " (n=",df$ncells_2[1], ")" )
+    }  
+    dynamic_label <- paste(denominator, "\u2190 log2(FC) \u2192", numerator)
+  } else {
+    dynamic_label <- "log2(FC)"
+  }
+  
+  df$color_group <- ifelse(
+    df$p.value < vpl & abs(df$log2fc) > vfc, 
+    "Significant", 
+    "Not Significant"
+  )
+  genes_to_label <- c()
+  if(length(selected_genes)>0 && volcano_include_selected_genes=="Yes"){
+    genes_to_label <- c(genes_to_label, 
+                        selected_genes)
+  }
+  if(volcano_high_fc_label>0){
+    genes_to_label <- c(genes_to_label,
+                        df %>% arrange(-log2fc) %>% head(volcano_high_fc_label) %>% select(target))
+  }
+  if(volcano_low_fc_label>0){
+    genes_to_label <- c(genes_to_label,
+                        df %>% arrange(log2fc) %>% head(volcano_low_fc_label) %>% select(target))
+  }  
+  if(volcano_pval_label>0){
+    genes_to_label <- c(genes_to_label,
+                        df %>% arrange(p.value) %>% head(volcano_pval_label) %>% select(target))
+  }  
+  genes_to_label <- unique(unlist(genes_to_label))
+  
+  p <- ggplot(df, aes(x=log2fc, y=-log10(p.value))) + 
+      geom_point(aes(color = color_group), 
+                 size=vpt, alpha=valpha) +
+      scale_color_manual(values = c("Significant" = volcano_sig_color, "Not Significant" = vptcolor)) + 
+      geom_vline(xintercept = c(-vfc, vfc)) + 
+      geom_hline(yintercept = -log10(vpl)) + 
+      labs(x = dynamic_label) + 
+      theme_bw() + 
+      theme(legend.position = "none")
+  
+  if(length(genes_to_label)>0){
+    p <- p + ggrepel::geom_label_repel(data=filter(df, target %in% genes_to_label),
+                                  aes(x=log2fc, y=-log10(p.value), label=target))
+  }
+  stats = data.frame(
+    `Category` = c(paste0("Significant at P-value ", vpl, " threshold: "),
+                   paste0("Number genes with log2FC >= ",  vfc, ":"),
+                   paste0("Number genes with log2FC <= ",  -vfc, ":"),
+                   paste0("Signifant and high log2FC:"),
+                   paste0("Signifant and low log2FC:")
+                   ),
+    `Value` = c(filter(df, p.value <= vpl) %>% nrow(),
+                filter(df, log2fc >= vfc) %>% nrow(),
+                filter(df, log2fc <= -vfc) %>% nrow(),
+                filter(df, log2fc >= vfc, p.value <= vpl) %>% nrow(),
+                filter(df, log2fc <= -vfc, p.value <= vpl) %>% nrow()
+                )
+  )
+  return(list(p, stats, genes_to_label)) # Return labeled genes as the 3rd element
+}
+
+argsVolcano <- list(vfc=volcano_fc_range, 
+                    vpl=volcano_pval_threshold,
+                    vpt=volcano_pt_size,
+                    valpha=volcano_alpha,
+                    vptcolor=volcano_pt_color)
+```
+
+:::
+
+
+# webR Console
+
+This `webR` console is available for anything from quick calculations to creating additional plots. For a list of pre-compiled
+R packages that are available take a look at [https://repo.r-wasm.org/](https://repo.r-wasm.org/){target="_blank"}.
+
+```{webr}
+
+ls()
+
+```
+
+# Testing: The Living Volcano {#sec-testing}
+
+## Row 
+
+::: {.card title="Interactive Prototyping"}
+Use the plot below to explore your data. You can drag the dashed lines to adjust Fold-Change and P-value thresholds manually. These changes will reflect back into the dashboard's global state.
+:::
+
+### Row {height=700px}
+
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof nudge_volcano = {
+  const width = 800;
+  const height = 500;
+  
+  let current_fc = 1.0;
+  let current_pval = 0.05;
+
+  const mock_data = Array.from({length: 300}, (_, i) => ({
+    log2fc: (Math.random() - 0.5) * 8,
+    p_value: Math.max(0.0001, Math.random() * 0.1)
+  }));
+
+  // Styled Container
+  const container = html`
+    <div style="border: 1px solid #dee2e6; border-radius: 12px; padding: 25px; background: #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
+      
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; border-bottom: 2px solid #f8f9fa; padding-bottom: 15px;">
+        <div style="display: flex; gap: 30px;">
+          
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="text-transform: uppercase; color: #999; font-size: 0.7em; letter-spacing: 0.05em; font-weight: 700;">Threshold: log2FC</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <button id="fc-down" class="btn btn-outline-secondary btn-sm" style="width: 32px;">-</button>
+              <span id="fc-label" style="font-family: monospace; font-weight: bold; width: 45px; text-align: center;">1.00</span>
+              <button id="fc-up" class="btn btn-outline-secondary btn-sm" style="width: 32px;">+</button>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="text-transform: uppercase; color: #999; font-size: 0.7em; letter-spacing: 0.05em; font-weight: 700;">Threshold: P-Value</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <button id="pval-down" class="btn btn-outline-secondary btn-sm" style="width: 32px;">+</button>
+              <span id="pval-label" style="font-family: monospace; font-weight: bold; width: 60px; text-align: center;">0.050</span>
+              <button id="pval-up" class="btn btn-outline-secondary btn-sm" style="width: 32px;">-</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="stat-summary" style="font-size: 0.8em; color: #666; font-style: italic;">
+          Updating results...
+        </div>
+      </div>
+
+      <div id="plot-area" style="background: #fdfdfd; border-radius: 8px;"></div>
+    </div>
+  `;
+
+  function render() {
+    const plot = Plot.plot({
+      width, height: 450, grid: true,
+      x: { label: "log2FoldChange", domain: [-5, 5] },
+      y: { label: "-log10 P-value", domain: [0, 5] },
+      marks: [
+        Plot.ruleX([-current_fc, current_fc], {stroke: "#b44697", strokeWidth: 2, strokeDasharray: "4,4"}),
+        Plot.ruleY([-Math.log10(current_pval)], {stroke: "#3C3F40", strokeWidth: 2, strokeDasharray: "4,4"}),
+        Plot.dot(mock_data, {
+          x: "log2fc", 
+          y: d => -Math.log10(d.p_value),
+          r: 3,
+          fill: d => (Math.abs(d.log2fc) >= current_fc && d.p_value <= current_pval) ? "#b44697" : "#dee2e6",
+          fillOpacity: 0.7
+        })
+      ]
+    });
+    
+    // Calculate Stats
+    const sigCount = mock_data.filter(d => Math.abs(d.log2fc) >= current_fc && d.p_value <= current_pval).length;
+    
+    container.querySelector("#plot-area").replaceChildren(plot);
+    container.querySelector("#fc-label").textContent = current_fc.toFixed(2);
+    container.querySelector("#pval-label").textContent = current_pval.toFixed(3);
+    container.querySelector("#stat-summary").textContent = `${sigCount} significant targets identified`;
+    
+    container.value = {fc: current_fc, pval: current_pval};
+    container.dispatchEvent(new CustomEvent("input"));
+  }
+
+  // Button Listeners with Logic
+  container.querySelector("#fc-up").onclick = () => { current_fc = Math.min(5, current_fc + 0.05); render(); };
+  container.querySelector("#fc-down").onclick = () => { current_fc = Math.max(0, current_fc - 0.05); render(); };
+  
+  // P-Value nudge (logarithmic step feels better for p-values)
+  container.querySelector("#pval-up").onclick = () => { current_pval = Math.max(0.00001, current_pval * 0.5); render(); };
+  container.querySelector("#pval-down").onclick = () => { current_pval = Math.min(1, current_pval * 2.0); render(); };
+
+  render();
+  return container;
+}
+```
+
+<!-- This script simply changes out the temporary OJS runtime error messages  -->
+<!-- that pop up when the cells are initializing.  -->
+```{ojs}
+//| echo: false
+//| output: false
+
+{
+  const catchRuntimeLoadingErrors = () => {
+    // Target the specific Quarto callout structure you captured
+    const errors = document.querySelectorAll('.observablehq--error, .ojs-in-a-box-waiting-for-module-import');
+    
+    errors.forEach(el => {
+      const callout = el.querySelector('.callout-important');
+      if (callout) {
+        callout.style.display = 'none'; 
+        
+        if (!el.querySelector('.custom-loading-label')) {
+          const label = document.createElement('div');
+          label.className = 'custom-loading-label';
+          label.innerHTML = `
+            <div style="padding: 2rem; border: 1px dashed #ccc; border-radius: 8px; 
+                        background: #f9f9f9; color: #888; text-align: center; font-style: italic;">
+              ⌛ Initializing Dashboard Components...
+            </div>`;
+          el.prepend(label);
+        }
+      }
+    });
+  };
+
+  catchRuntimeLoadingErrors();
+
+  const observer = new MutationObserver(catchRuntimeLoadingErrors);
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  invalidation.then(() => observer.disconnect());
+}
+```
