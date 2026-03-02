@@ -161,7 +161,10 @@ filteredLinePubs = pubs_clean.filter(d => {
   if (selectedPlatforms.includes("nCounter") && d.Has_nCounter === 'True') keep = true;
   return keep;
 })
-
+// Calculate ALL TIME top papers for the right-hand panel
+allTimeTopPapers = [...filteredLinePubs]
+  .sort((a,b) => (b["Cited By"] || 0) - (a["Cited By"] || 0))
+  .slice(0, 3)
 // Generate cumulative data and capture top papers per year
 chartData = {
   const minYear = 2008;
@@ -193,11 +196,9 @@ chartData = {
 mutable selectedYearVal = null
 
 selectedYearData = {
-  // Wait for chartData to populate
-  if (!chartData || chartData.length === 0) return null;
-  const maxYear = Math.max(...chartData.map(d => d.YearVal));
-  const y = selectedYearVal === null ? maxYear : selectedYearVal;
-  return chartData.find(d => d.YearVal === y) || chartData[chartData.length - 1];
+  // If null, return nothing so the UI defaults to All Time
+  if (selectedYearVal === null || !chartData || chartData.length === 0) return null;
+  return chartData.find(d => d.YearVal === selectedYearVal);
 }
 
 // Interactive Plot
@@ -230,7 +231,7 @@ selectedYearData = {
         x: "Year",
         y: "Cumulative",
         r: 10,
-        fill: "#0077c8",
+        fill: "#f97316", // Made it orange to pop
         stroke: "white",
         strokeWidth: 4,
         pointerEvents: "none"
@@ -278,7 +279,9 @@ selectedYearData = {
       mutable selectedYearVal = closest.YearVal;
     }
   });
-
+  svg.on("dblclick", function() {
+    mutable selectedYearVal = null;
+  });
   return node;
 }
 ```
@@ -306,13 +309,27 @@ viewof selectedPlatforms = Inputs.checkbox(
   <!-- Top Papers Card -->
   <div class="w-full bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm flex flex-col flex-grow min-h-[300px]">
 ```
+
 ```{ojs}
 //| echo: false
+activePapersList = selectedYearVal === null ? allTimeTopPapers : (selectedYearData ? selectedYearData.TopPapers : [])
+
 html`
-<h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Top Cited Papers <span class="text-primary">${selectedYearData ? selectedYearData.YearVal : ""}</span></h3>
-${selectedYearData && selectedYearData.TopPapers.length > 0 
+<div class="mb-4">
+  <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center justify-between">
+    Top Cited Papers 
+    <span class="text-primary font-black bg-blue-50 px-2 py-0.5 rounded-md">${selectedYearVal === null ? "All Time" : selectedYearVal}</span>
+  </h3>
+  <p class="text-[11px] text-slate-400 italic">
+    ${selectedYearVal === null 
+      ? "Displaying top cited publications across all years. Click anywhere on the chart line to view a specific year." 
+      : "Double-click the chart to return to all-time top cited publications."}
+  </p>
+</div>
+
+${activePapersList.length > 0 
   ? `<div class="flex flex-col gap-4">
-      ${selectedYearData.TopPapers.map((p, i) => `
+      ${activePapersList.map((p, i) => `
         <a href="${p.DOI}" target="_blank" class="group block bg-slate-50 hover:bg-slate-100 rounded-xl p-4 border border-slate-100 transition-colors">
            <div class="flex items-start gap-3">
              <div class="w-6 h-6 rounded-full ${i===0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'} flex items-center justify-center font-bold text-xs shrink-0">${i+1}</div>
@@ -327,7 +344,7 @@ ${selectedYearData && selectedYearData.TopPapers.length > 0
         </a>
       `).join('')}
      </div>` 
-  : `<div class="flex-grow flex items-center justify-center text-slate-400 text-sm h-full italic text-center p-4">Click anywhere on the chart line to view the top cited papers for that year.</div>`
+  : `<div class="flex-grow flex items-center justify-center text-slate-400 text-sm h-full italic text-center p-4">No publications found for this selection.</div>`
 }`
 ```
 ```{=html}
