@@ -615,6 +615,7 @@ ${activePapersList.length > 0
       <strong class="text-slate-700">Click a bubble</strong> to burst it into its specific topics. 
       <strong class="text-slate-700">Click any grey bubble</strong> to include it and
       <strong class="text-slate-700">click any non-grey bubble</strong> to filter it.
+      <strong class="text-slate-700">Holding shift while clicking any bubble</strong> will focus to only that selection.
       <strong class="text-slate-700">Double-click</strong> anywhere in the background to reset everything.
     </p>
   </div>
@@ -693,6 +694,7 @@ viewof activeBubbleFilters = {
   }));
 
   let focusedNodes = new Set();
+  let focusTopic = null; // New: Tracks if a single topic is "Solo Focused"
   svg.node().value = []; // This array is what the database table will listen to
 
   const simulation = d3.forceSimulation(nodes)
@@ -710,74 +712,100 @@ viewof activeBubbleFilters = {
   }
 
 function resetChart() {
-     focusedNodes.clear();
-     dispatchChange();
-     // Bring all subfields back, spawning near the center
-     nodes = chartNodesData.subfields.map(d => ({
+    focusTopic = null; // IMPORTANT: Clear the solo focus state
+    focusedNodes.clear();
+    dispatchChange();
+    
+    // Bring all subfields back
+    nodes = chartNodesData.subfields.map(d => ({
         ...d,
         r: rScale(d.count),
         x: width/2 + (Math.random()-0.5)*150,
         y: height/2 + (Math.random()-0.5)*150
-     }));
-     update();
+    }));
+    update();
+}
+
+function onClick(event, d) {
+  if (event.defaultPrevented) return;
+
+  // HANDLE SOLO FOCUS (shift+Click)
+  if (event.shiftKey) {
+    event.preventDefault();
+    // Toggle: if already focused, reset. Otherwise, focus this one.
+    focusTopic = (focusTopic === d.id) ? null : d.id;
+    
+    // When solo focusing, we usually want the table to only show this topic too
+    focusedNodes.clear();
+    if (focusTopic) focusedNodes.add(focusTopic);
+    
+    dispatchChange();
+    updateStyles();
+    return; // Exit early
   }
 
-  function onClick(event, d) {
-    if (event.defaultPrevented) return; // Prevent triggering if they were just dragging
-
-    // Burst Interaction for Subfields
-    if (d.type === "Subfield") {
-       nodes = nodes.filter(n => n.id !== d.id); // Remove the clicked subfield
-       
-       // Spawning the children in a geometric ring to prevent "Collision Explosions"
-       const children = chartNodesData.topics.filter(t => t.parentId === d.id).map((t, i, arr) => {
-         const angle = (i / arr.length) * Math.PI * 2; // Evenly space them around a circle
-         const spawnRadius = d.r * 0.5; // Start them halfway out from the parent's center
-         
-         return {
-           ...t,
-           r: Math.max(12, rScale(t.count) * 0.8), 
-           x: d.x + Math.cos(angle) * spawnRadius, // Trigonometry for X ring position
-           y: d.y + Math.sin(angle) * spawnRadius, // Trigonometry for Y ring position
-           vx: Math.cos(angle) * 3, // Give them a gentle, controlled push outward
-           vy: Math.sin(angle) * 3
-         };
-       });
-       
-       nodes.push(...children);
-       
-       // Immediately add all daughter topics to the focused (active) list
-       children.forEach(c => focusedNodes.add(c.id));
-       
-       dispatchChange();
-       update();
-    } 
-    // Select/Toggle Interaction for Topics
-    else {
-       if (focusedNodes.has(d.id)) focusedNodes.delete(d.id);
-       else focusedNodes.add(d.id);
-       dispatchChange();
-       updateStyles();
-    }
-  }
-
-  function updateStyles() {
-    nodeElements.selectAll("circle")
-      .transition().duration(300)
-      .attr("fill", d => {
-         if (d.type === "Subfield") {
-             if (focusedNodes.size === 0) return "#0077c8"; // All subfields start Bruker Blue
-             return focusedNodes.has(d.id) ? "#0077c8" : "#cbd5e1"; // Grey out unclicked subfields
-         } else {
-             const topicColor = colorScale(d.parentId); // Distinct color per subfield family
-             if (focusedNodes.size === 0) return topicColor; 
-             return focusedNodes.has(d.id) ? topicColor : "#cbd5e1"; // Grey out unclicked topics
-         }
+  // STANDARD INTERACTION (Normal Click)
+  if (d.type === "Subfield") {
+      nodes = nodes.filter(n => n.id !== d.id);
+      const children = chartNodesData.topics.filter(t => t.parentId === d.id).map((t, i, arr) => {
+        const angle = (i / arr.length) * Math.PI * 2;
+        const spawnRadius = d.r * 0.5;
+        return {
+          ...t,
+          r: Math.max(12, rScale(t.count) * 0.8), 
+          x: d.x + Math.cos(angle) * spawnRadius,
+          y: d.y + Math.sin(angle) * spawnRadius,
+          vx: Math.cos(angle) * 3,
+          vy: Math.sin(angle) * 3
+        };
       });
+      nodes.push(...children);
+      children.forEach(c => focusedNodes.add(c.id));
+      dispatchChange();
+      update();
+  } else {
+      // If we were in Solo Focus mode and click another bubble, 
+      // we probably want to break out of Solo Focus.
+      focusTopic = null; 
       
-    nodeElements.selectAll("text")
-      .attr("fill", d => focusedNodes.size > 0 && !focusedNodes.has(d.id) ? "#64748b" : "#ffffff");
+      if (focusedNodes.has(d.id)) focusedNodes.delete(d.id);
+      else focusedNodes.add(d.id);
+      
+      dispatchChange();
+      updateStyles();
   }
+}
+
+function updateStyles() {
+  nodeElements.selectAll("circle")
+    .transition().duration(300)
+    .attr("fill", d => {
+        const topicColor = d.type === "Subfield" ? "#0077c8" : colorScale(d.parentId);
+        
+        // 1. If Solo Focus is active (Shift+Click)
+        if (focusTopic !== null) {
+          // If it's the focused one, full color. If not, a very faint version of its OWN color
+          return d.id === focusTopic ? topicColor : "#f1f5f9"; 
+        }
+        
+        // 2. Standard Filtering View (Normal Click)
+        if (focusedNodes.size === 0) return topicColor;
+        return focusedNodes.has(d.id) ? topicColor : "#e2e8f0"; 
+    })
+    .attr("stroke", d => (focusTopic !== null && d.id === focusTopic) ? "#0077c8" : "#fff")
+    .attr("stroke-width", d => (focusTopic !== null && d.id === focusTopic) ? 3 : 1)
+    .attr("fill-opacity", d => {
+       if (focusTopic !== null) return d.id === focusTopic ? 1.0 : 0.3;
+       return 1.0;
+    });
+    
+  nodeElements.selectAll("text")
+    .attr("fill", d => {
+      if (focusTopic !== null) return d.id === focusTopic ? "#ffffff" : "#94a3b8";
+      return focusedNodes.size > 0 && !focusedNodes.has(d.id) ? "#94a3b8" : "#ffffff";
+    })
+    .style("opacity", d => (focusTopic !== null && d.id !== focusTopic) ? 0.4 : 1);
+}
 
   function update() {
     nodeElements = nodeElements.data(nodes, d => d.id);
