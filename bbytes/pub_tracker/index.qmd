@@ -54,9 +54,26 @@ updatedDateStr = {
 
 // Convert publication date string to year, filtering out pre-2008
 pubs_clean = pubs.map(d => {
+  let y = "N/A";
+  const pd = d["Publication Date"];
+  
+  if (pd) {
+    if (pd instanceof Date) {
+      // 1. D3 auto-typed it correctly as a Date object
+      y = pd.getFullYear(); 
+    } else if (typeof pd === 'number') {
+      // 2. D3 auto-typed a year-only string (e.g., "2015") as a raw number
+      y = pd; 
+    } else if (typeof pd === 'string') {
+      // 3. It's a string. Safely extract the first 4 consecutive digits
+      const match = pd.match(/\d{4}/);
+      if (match) y = parseInt(match[0]); 
+    }
+  }
+  
   return {
     ...d,
-    Year: d["Publication Date"] ? new Date(d["Publication Date"]).getFullYear() : "N/A"
+    Year: Number.isInteger(y) ? y : "N/A"
   }
 }).filter(d => d.Year !== "N/A" && d.Year >= 2008)
 ```
@@ -81,7 +98,7 @@ Editorial Volume 26.1
   <span class="font-serif italic font-bold gradient-text pr-2 tracking-normal">Pulse</span>
 </h1>
 <p class="max-w-xl text-lg md:text-xl text-slate-600 font-light leading-relaxed mb-10 border-l-4 border-primary pl-6">
-  Visualize the cumulative publication growth across select Bruker Spatial Biology platforms. 
+  Explore the research landscape and publication trends driving spatial biology. 
 </p>
 <a href="https://brukerspatialbiology.com/product-roadmap/" target="_blank" class="inline-flex h-12 items-center justify-center rounded-full px-8 bg-[#0077c8] text-white font-bold tracking-wide hover:bg-[#0077c8]/90 transition-all shadow-lg shadow-[#0077c8]/20">
   EXPLORE NEW INNOVATIONS
@@ -104,266 +121,13 @@ Editorial Volume 26.1
 </section>
 ```
 
-<section class="py-10 relative bg-white border-y border-slate-100">
-<div class="container mx-auto px-6">
-```{=html}
-<div class="flex flex-col md:flex-row justify-between items-end mb-10 gap-6 w-full">
-```
-```{ojs}
-//| echo: false
-html`
-<div class="w-full">
-  <h2 class="text-4xl font-bold text-slate-900 mb-3 flex items-center gap-3">
-    <span class="material-symbols-outlined text-primary text-4xl">show_chart</span>
-    Publication Pulse
-  </h2>
-  
-  <div class="flex flex-col xl:flex-row gap-6 justify-between items-start xl:items-end w-full mt-4">
-    <div class="flex-1 max-w-5xl">
-      <p class="text-slate-400 text-sm flex items-center gap-1 font-medium">
-        <span class="material-symbols-outlined text-sm">schedule</span> Last updated from OpenAlex: ${updatedDateStr}
-      </p>
-    </div>
-    
-  </div>
-</div>
-`
-```
-```{=html}
-</div> <!-- Close header row -->
-```
-
-```{=html}
-<div class="flex flex-col md:flex-row gap-6 lg:gap-8 items-start w-full">
-<!-- Left side: The Chart -->
-<div class="relative bg-[#F8FAFC] rounded-[2rem] border border-slate-100 p-8 shadow-inner flex flex-col gap-8 overflow-hidden min-h-[400px]" style="flex: 1.4; min-width: 0;">
-  <div class="absolute inset-0" style="background-image: linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px); background-size: 40px 40px; opacity: 0.5;"></div>
-  <div class="relative z-10 w-full overflow-x-auto min-h-[400px]">
-```
-```{ojs}
-//| echo: false
-html`<h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Platforms</h3>`
-
-viewof selectedPlatforms = Inputs.checkbox(
-  ["CellScape", "CosMx", "GeoMx", "AtoMx", "nCounter"], 
-  {value: ["CellScape","CosMx", "GeoMx", "AtoMx", "nCounter"]}
-)
-```
-```{ojs}
-//| echo: false
-
-// Filter pubs by selected platforms
-filteredLinePubs = pubs_clean.filter(d => {
-  if (selectedPlatforms.length === 0) return false;
-  let keep = false;
-  if (selectedPlatforms.includes("CellScape") && d.Has_CellScape === 'True') keep = true;
-  if (selectedPlatforms.includes("CosMx") && d.Has_CosMx === 'True') keep = true;
-  if (selectedPlatforms.includes("GeoMx") && d.Has_GeoMx === 'True') keep = true;
-  if (selectedPlatforms.includes("AtoMx") && d.Has_AtoMx === 'True') keep = true;
-  if (selectedPlatforms.includes("nCounter") && d.Has_nCounter === 'True') keep = true;
-  return keep;
-})
-// Calculate ALL TIME top papers for the right-hand panel
-allTimeTopPapers = [...filteredLinePubs]
-  .sort((a,b) => (b["Cited By"] || 0) - (a["Cited By"] || 0))
-  .slice(0, 3)
-// Generate cumulative data and capture top papers per year
-chartData = {
-  const minYear = 2008;
-  const maxYear = Math.max(...pubs_clean.map(d => d.Year).filter(y => Number.isInteger(y)));
-  let cumulative = 0;
-  const result = [];
-  
-  // Calculate pre-2008 cumulative baseline
-  const preBase = filteredLinePubs.filter(d => Number.isInteger(d.Year) && d.Year < minYear).length;
-  cumulative += preBase;
-  
-  for (let y = minYear; y <= maxYear; y++) {
-    const pubsInYear = filteredLinePubs.filter(d => d.Year === y);
-    cumulative += pubsInYear.length;
-    
-    // Top 3 papers this year
-    const topItems = [...pubsInYear].sort((a,b) => (b["Cited By"] || 0) - (a["Cited By"] || 0)).slice(0, 3);
-    
-    result.push({ 
-      YearVal: y,
-      Year: new Date(y, 0, 1), 
-      Cumulative: cumulative,
-      TopPapers: topItems
-    });
-  }
-  return result;
-}
-
-mutable selectedYearVal = null
-
-selectedYearData = {
-  // If null, return nothing so the UI defaults to All Time
-  if (selectedYearVal === null || !chartData || chartData.length === 0) return null;
-  return chartData.find(d => d.YearVal === selectedYearVal);
-}
-
-// Interactive Plot
-{
-  const minYear = 2008;
-  const maxYear = Math.max(...pubs_clean.map(d => d.Year).filter(y => Number.isInteger(y)));
-  
-  const minDate = new Date(minYear, 0, 1);
-  const maxDate = new Date(maxYear, 0, 1);
-  
-  const node = Plot.plot({
-    width: 900,
-    height: 400,
-    marginTop: 20,
-    marginRight: 40,
-    marginBottom: 30,
-    marginLeft: 50,
-    style: {
-      background: "transparent",
-      fontFamily: "Space Grotesk, sans-serif",
-      fontSize: "14px"
-    },
-    x: { type: "time", grid: true, label: null, domain: [minDate, maxDate], insetRight: 20 },
-    y: { grid: true, label: "Cumulative Publications" },
-    marks: [
-      Plot.lineY(chartData, {x: "Year", y: "Cumulative", stroke: "#0077c8", strokeWidth: 4, curve: "catmull-rom"}),
-      Plot.areaY(chartData, {x: "Year", y: "Cumulative", fill: "url(#gradient-blue)", fillOpacity: 0.2, curve: "catmull-rom"}),
-      // Visible indicator for the selected year
-      Plot.dot([selectedYearData].filter(Boolean), {
-        x: "Year",
-        y: "Cumulative",
-        r: 10,
-        fill: "#f97316", // Made it orange to pop
-        stroke: "white",
-        strokeWidth: 4,
-        pointerEvents: "none"
-      })
-    ]
-  });
-  
-  const svg = d3.select(node);
-  
-  // Make SVG responsive
-  svg.attr("width", "100%")
-     .attr("height", "100%")
-     .attr("viewBox", "0 0 900 400")
-     .attr("preserveAspectRatio", "xMidYMid meet");
-  
-  // Allow cursor to indicate interactivity
-  svg.style("cursor", "pointer");
-  
-  // Add gradient def
-  svg.append("defs").append("linearGradient")
-      .attr("id", "gradient-blue")
-      .attr("x1", "0%").attr("y1", "0%").attr("x2", "0%").attr("y2", "100%")
-      .selectAll("stop")
-      .data([{offset: "0%", color: "#0077c8"}, {offset: "100%", color: "transparent"}])
-      .join("stop")
-      .attr("offset", d => d.offset)
-      .attr("stop-color", d => d.color);
-
-  // Bind click event directly to SVG to set nearest year
-  svg.on("click", function(event) {
-    const coords = d3.pointer(event, svg.node());
-    const x = coords[0];
-    const innerWidth = 900 - 50 - 40;
-    const plotX = Math.max(0, Math.min(innerWidth, x - 50)); 
-    
-    const ratio = plotX / innerWidth;
-    const clickedTime = minDate.getTime() + ratio * (maxDate.getTime() - minDate.getTime());
-    const clickedYear = new Date(clickedTime).getFullYear();
-    
-    // snap to nearest existing chartData year
-    if (chartData.length > 0) {
-      const closest = chartData.reduce((prev, curr) => {
-        return (Math.abs(curr.YearVal - clickedYear) < Math.abs(prev.YearVal - clickedYear)) ? curr : prev;
-      });
-      mutable selectedYearVal = closest.YearVal;
-    }
-  });
-  svg.on("dblclick", function() {
-    mutable selectedYearVal = null;
-  });
-  return node;
-}
-```
-```{=html}
-  </div>
-</div> <!-- End Left side Chart -->
-
-<!-- Right side: Sidebar -->
-<div class="flex flex-col gap-6 relative" style="flex: 1; min-width: 0;">
-
-  <!-- Top Papers Card -->
-  <div class="w-full bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm flex flex-col flex-grow min-h-[300px]">
-```
-
-```{ojs}
-//| echo: false
-activePapersList = selectedYearVal === null ? allTimeTopPapers : (selectedYearData ? selectedYearData.TopPapers : [])
-
-html`
-<div class="mb-4">
-  <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center justify-between">
-    Top Cited Papers 
-    <span class="text-primary font-black bg-blue-50 px-2 py-0.5 rounded-md">${selectedYearVal === null ? "All Time" : selectedYearVal}</span>
-  </h3>
-  <p class="text-[11px] text-slate-400 italic">
-    ${selectedYearVal === null 
-      ? "Displaying top cited publications across all years. Click anywhere on the chart line to view a specific year." 
-      : "Double-click the chart to return to all-time top cited publications."}
-  </p>
-</div>
-
-${activePapersList.length > 0 
-  ? `<div class="flex flex-col gap-4">
-      ${activePapersList.map((p, i) => `
-        <a href="${p.DOI}" target="_blank" class="group block bg-slate-50 hover:bg-slate-100 rounded-xl p-4 border border-slate-100 transition-colors">
-           <div class="flex items-start gap-3">
-             <div class="w-6 h-6 rounded-full ${i===0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'} flex items-center justify-center font-bold text-xs shrink-0">${i+1}</div>
-             <div>
-               <h4 class="text-slate-900 font-bold text-sm group-hover:text-primary transition-colors line-clamp-3 leading-snug">${p.Title}</h4>
-               <div class="text-[11px] text-slate-500 mt-2 flex flex-col gap-1">
-                 <span class="font-serif italic line-clamp-1">${p.Journal}</span>
-                 <span class="font-mono text-emerald-700 font-bold">${p["Cited By"]} Citations</span>
-               </div>
-             </div>
-           </div>
-        </a>
-      `).join('')}
-     </div>` 
-  : `<div class="flex-grow flex items-center justify-center text-slate-400 text-sm h-full italic text-center p-4">No publications found for this selection.</div>`
-}`
-```
-```{=html}
-  </div>
-</div> <!-- End Right side Sidebar -->
-
-
-</div>
-  
-  <div class="relative z-10 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mt-2 border-t border-slate-200/60 pt-6">
-    <div class="text-amber-700 text-sm font-bold bg-amber-50/80 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-amber-200 shadow-sm leading-snug max-w-2xl">
-      <span class="material-symbols-outlined text-amber-600 align-middle mr-1 text-lg">info</span>
-      Note: This is a sample query, not an exhaustive list. It was generated automatically by searching specific terms like "CellScape", "CosMx", "AtoMx", "GeoMx", and "nCounter" that were found in the title, abstract, and full text (if applicable). It may miss publications using broader terminology or publications not found on openAlex.
-    </div>
-    
-    <a href="https://brukerspatialbiology.com/resources/publications/?paged=1" target="_blank" class="shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold shadow-sm transition-all hover:shadow-md group">
-      <span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">verified</span>
-      See Additional Publications 
-    </a>
-  </div>
-
-</div>
-
-</div> <!-- End Flex Container -->
-</section>
-```
-
 
 <section class="py-12 bg-[#F5F7FA]">
 <div class="container mx-auto px-6">
-<h3 class="text-xl font-bold text-slate-900 mb-6 font-display">Platform Metrics</h3>
+  <h2 class="text-4xl font-bold text-slate-900 mb-3 flex items-center gap-3">
+    <span class="material-symbols-outlined text-primary text-4xl">view_quilt</span>
+    Platform Metrics
+  </h2>
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
 <!-- Card 1: Total Publications -->
@@ -382,7 +146,7 @@ ${activePapersList.length > 0
 //| echo: false
 html`<h4 class="text-5xl font-extrabold tracking-tight mb-2">${filteredLinePubs.length.toLocaleString()}</h4>`
 ```
-<p class="text-sm font-medium text-white/70">Total Publications</p>
+<p class="text-sm font-medium text-white/70">Total Publications and Mentions</p>
 </div>
 </div>
 
@@ -568,11 +332,284 @@ html`
 </div>
 </section>
 
+
+<section class="py-10 relative bg-white border-y border-slate-100">
+<div class="container mx-auto px-6">
+```{=html}
+<div class="flex flex-col md:flex-row justify-between items-end mb-10 gap-6 w-full">
+```
+```{ojs}
+//| echo: false
+html`
+<div class="w-full">
+  <h2 class="text-4xl font-bold text-slate-900 mb-3 flex items-center gap-3">
+    <span class="material-symbols-outlined text-primary text-4xl">show_chart</span>
+    Publications by Year
+  </h2>
+  
+  <div class="flex flex-col xl:flex-row gap-6 justify-between items-start xl:items-end w-full mt-4">
+    <div class="flex-1 max-w-5xl">
+      <p class="text-slate-400 text-sm flex items-center gap-1 font-medium">
+        <span class="material-symbols-outlined text-sm">schedule</span> Last updated from OpenAlex: ${updatedDateStr}
+      </p>
+    </div>
+    
+  </div>
+</div>
+`
+```
+```{=html}
+</div> <!-- Close header row -->
+```
+
+```{=html}
+<div class="flex flex-col md:flex-row gap-6 lg:gap-8 items-start w-full">
+<!-- Left side: The Chart -->
+<div class="relative bg-[#F8FAFC] rounded-[2rem] border border-slate-100 p-8 shadow-inner flex flex-col gap-8 overflow-hidden min-h-[400px]" style="flex: 1.4; min-width: 0;">
+  <div class="absolute inset-0" style="background-image: linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px); background-size: 40px 40px; opacity: 0.5;"></div>
+  <div class="relative z-10 w-full overflow-x-auto min-h-[400px]">
+```
+```{ojs}
+//| echo: false
+html`<h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Platforms</h3>`
+
+viewof selectedPlatforms = Inputs.checkbox(
+  ["CellScape", "CosMx", "GeoMx", "AtoMx", "nCounter"], 
+  {value: ["CellScape","CosMx", "GeoMx", "AtoMx", "nCounter"]}
+)
+```
+```{ojs}
+//| echo: false
+
+// Filter pubs by selected platforms
+filteredLinePubs = pubs_clean.filter(d => {
+  if (selectedPlatforms.length === 0) return false;
+  let keep = false;
+  if (selectedPlatforms.includes("CellScape") && d.Has_CellScape === 'True') keep = true;
+  if (selectedPlatforms.includes("CosMx") && d.Has_CosMx === 'True') keep = true;
+  if (selectedPlatforms.includes("GeoMx") && d.Has_GeoMx === 'True') keep = true;
+  if (selectedPlatforms.includes("AtoMx") && d.Has_AtoMx === 'True') keep = true;
+  if (selectedPlatforms.includes("nCounter") && d.Has_nCounter === 'True') keep = true;
+  return keep;
+})
+// Calculate ALL TIME top papers for the right-hand panel
+allTimeTopPapers = [...filteredLinePubs]
+  .sort((a,b) => (b["Cited By"] || 0) - (a["Cited By"] || 0))
+  .slice(0, 3)
+// Generate cumulative data and capture top papers per year
+chartData = {
+  // 1. Determine the timeline bounds
+  const minYear = 2008;
+  // Use the actual data we are plotting to find the max year
+  const years = filteredLinePubs.map(d => d.Year).filter(Number.isInteger);
+  const maxYear = years.length > 0 ? Math.max(...years) : 2026;
+  
+  let cumulative = 0;
+  const result = [];
+  
+  // 2. Calculate pre-2008 baseline correctly from the PLOTTED dataset
+  const preBase = filteredLinePubs.filter(d => d.Year < minYear).length;
+  cumulative = preBase;
+  
+  // 3. Loop through years to build the cumulative total
+  for (let y = minYear; y <= maxYear; y++) {
+    // Get papers for this specific year
+    const pubsInYear = filteredLinePubs.filter(d => d.Year === y);
+    
+    // Increment the total
+    cumulative += pubsInYear.length;
+    
+    // Sort and grab top 3 by citations for the "Top Chart" tooltips
+    const topItems = [...pubsInYear]
+      .sort((a, b) => (parseInt(b["Cited By"]) || 0) - (parseInt(a["Cited By"]) || 0))
+      .slice(0, 3);
+    
+    result.push({ 
+      YearVal: y,
+      Year: new Date(y, 0, 1), 
+      Cumulative: cumulative,
+      YearlyCount: pubsInYear.length, // Useful for debugging
+      TopPapers: topItems
+    });
+  }
+  
+  return result;
+}
+
+mutable selectedYearVal = null
+
+selectedYearData = {
+  // If null, return nothing so the UI defaults to All Time
+  if (selectedYearVal === null || !chartData || chartData.length === 0) return null;
+  return chartData.find(d => d.YearVal === selectedYearVal);
+}
+
+// Interactive Plot
+{
+  const minYear = 2008;
+  const maxYear = Math.max(...pubs_clean.map(d => d.Year).filter(y => Number.isInteger(y)));
+  
+  const minDate = new Date(minYear, 0, 1);
+  const maxDate = new Date(maxYear, 0, 1);
+  
+  const node = Plot.plot({
+    width: 900,
+    height: 400,
+    marginTop: 20,
+    marginRight: 40,
+    marginBottom: 30,
+    marginLeft: 80,
+    style: {
+      background: "transparent",
+      fontFamily: "Space Grotesk, sans-serif",
+      fontSize: "14px"
+    },
+    x: { type: "time", grid: true, label: null, domain: [minDate, maxDate], insetRight: 20 },
+    y: { grid: true, label: "Cumulative Publications" },
+    marks: [
+      Plot.lineY(chartData, {x: "Year", y: "Cumulative", stroke: "#0077c8", strokeWidth: 4, curve: "catmull-rom"}),
+      Plot.areaY(chartData, {x: "Year", y: "Cumulative", fill: "url(#gradient-blue)", fillOpacity: 0.2, curve: "catmull-rom"}),
+      // Visible indicator for the selected year
+      Plot.dot([selectedYearData].filter(Boolean), {
+        x: "Year",
+        y: "Cumulative",
+        r: 10,
+        fill: "#f97316", // Made it orange to pop
+        stroke: "white",
+        strokeWidth: 4,
+        pointerEvents: "none"
+      })
+    ]
+  });
+  
+  const svg = d3.select(node);
+  
+  // Make SVG responsive
+  svg.attr("width", "100%")
+     .attr("height", "100%")
+     .attr("viewBox", "0 0 900 400")
+     .attr("preserveAspectRatio", "xMidYMid meet");
+  
+  // Allow cursor to indicate interactivity
+  svg.style("cursor", "pointer");
+  
+  // Add gradient def
+  svg.append("defs").append("linearGradient")
+      .attr("id", "gradient-blue")
+      .attr("x1", "0%").attr("y1", "0%").attr("x2", "0%").attr("y2", "100%")
+      .selectAll("stop")
+      .data([{offset: "0%", color: "#0077c8"}, {offset: "100%", color: "transparent"}])
+      .join("stop")
+      .attr("offset", d => d.offset)
+      .attr("stop-color", d => d.color);
+
+  // Bind click event directly to SVG to set nearest year
+  svg.on("click", function(event) {
+    const coords = d3.pointer(event, svg.node());
+    const x = coords[0];
+    const innerWidth = 900 - 50 - 40;
+    const plotX = Math.max(0, Math.min(innerWidth, x - 50)); 
+    
+    const ratio = plotX / innerWidth;
+    const clickedTime = minDate.getTime() + ratio * (maxDate.getTime() - minDate.getTime());
+    const clickedYear = new Date(clickedTime).getFullYear();
+    
+    // snap to nearest existing chartData year
+    if (chartData.length > 0) {
+      const closest = chartData.reduce((prev, curr) => {
+        return (Math.abs(curr.YearVal - clickedYear) < Math.abs(prev.YearVal - clickedYear)) ? curr : prev;
+      });
+      mutable selectedYearVal = closest.YearVal;
+    }
+  });
+  svg.on("dblclick", function() {
+    mutable selectedYearVal = null;
+  });
+  return node;
+}
+```
+```{=html}
+  </div>
+</div> <!-- End Left side Chart -->
+
+<!-- Right side: Sidebar -->
+<div class="flex flex-col gap-6 relative" style="flex: 1; min-width: 0;">
+
+  <!-- Top Papers Card -->
+  <div class="w-full bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm flex flex-col flex-grow min-h-[300px]">
+```
+
+```{ojs}
+//| echo: false
+activePapersList = selectedYearVal === null ? allTimeTopPapers : (selectedYearData ? selectedYearData.TopPapers : [])
+
+html`
+<div class="mb-4">
+  <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center justify-between">
+    Top Cited Papers 
+    <span class="text-primary font-black bg-blue-50 px-2 py-0.5 rounded-md">${selectedYearVal === null ? "All Time" : selectedYearVal}</span>
+  </h3>
+  <p class="text-[11px] text-slate-400 italic">
+    ${selectedYearVal === null 
+      ? "Displaying top cited publications across all years. Click anywhere on the chart line to view a specific year." 
+      : "Double-click the chart to return to all-time top cited publications."}
+  </p>
+</div>
+
+${activePapersList.length > 0 
+  ? `<div class="flex flex-col gap-4">
+      ${activePapersList.map((p, i) => `
+        <a href="${p.DOI}" target="_blank" class="group block bg-slate-50 hover:bg-slate-100 rounded-xl p-4 border border-slate-100 transition-colors">
+           <div class="flex items-start gap-3">
+             <div class="w-6 h-6 rounded-full ${i===0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'} flex items-center justify-center font-bold text-xs shrink-0">${i+1}</div>
+             <div>
+               <h4 class="text-slate-900 font-bold text-sm group-hover:text-primary transition-colors line-clamp-3 leading-snug">${p.Title}</h4>
+               <div class="text-[11px] text-slate-500 mt-2 flex flex-col gap-1">
+                 <span class="font-serif italic line-clamp-1">${p.Journal}</span>
+                 <span class="font-mono text-emerald-700 font-bold">${p["Cited By"]} Citations</span>
+               </div>
+             </div>
+           </div>
+        </a>
+      `).join('')}
+     </div>` 
+  : `<div class="flex-grow flex items-center justify-center text-slate-400 text-sm h-full italic text-center p-4">No publications found for this selection.</div>`
+}`
+```
+```{=html}
+  </div>
+</div> <!-- End Right side Sidebar -->
+
+
+</div>
+  
+  <div class="relative z-10 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mt-2 border-t border-slate-200/60 pt-6">
+    <div class="text-amber-700 text-sm font-bold bg-amber-50/80 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-amber-200 shadow-sm leading-snug max-w-2xl">
+      <span class="material-symbols-outlined text-amber-600 align-middle mr-1 text-lg">info</span>
+      Note: This is a sample query, not an exhaustive list. It was generated semi-automatically by searching specific terms like "CellScape", "CosMx", "AtoMx", "GeoMx", and "nCounter" that were found in the title, abstract, and full text (if applicable). It may miss publications using broader terminology or publications not found on openAlex.
+    </div>
+    
+    <a href="https://brukerspatialbiology.com/resources/publications/?paged=1" target="_blank" class="shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold shadow-sm transition-all hover:shadow-md group">
+      <span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">verified</span>
+      See Additional Publications 
+    </a>
+  </div>
+
+</div>
+
+</div> <!-- End Flex Container -->
+</section>
+```
+
+
 ```{=html}
 <section class="py-12 bg-white border-t border-slate-200">
 <div class="container mx-auto px-6">
   <div class="mb-8">
-    <h2 class="text-4xl font-bold text-slate-900 tracking-tight font-serif">Research Landscape</h2>
+      <h2 class="text-4xl font-bold text-slate-900 mb-3 flex items-center gap-3">
+        <span class="material-symbols-outlined text-primary text-4xl">bubble_chart</span>
+        Research Landscape
+      </h2>
     <p class="text-slate-500 text-lg mt-2">
       Explore the taxonomic hierarchy of the selected platforms. 
       <strong class="text-slate-700">Click a Blue Field</strong> to burst it into its specific Topics. 
@@ -817,8 +854,11 @@ function resetChart() {
 <div class="container mx-auto px-6">
 <div class="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
 <div class="flex flex-col gap-2">
-<h2 class="text-4xl font-bold text-slate-900 tracking-tight font-serif anchored">Scientific Database</h2>
-<p class="text-slate-500 text-lg">Search within this database.</p>
+  <h2 class="text-4xl font-bold text-slate-900 tracking-tight font-serif anchored flex items-center gap-3">
+    <span class="material-symbols-outlined text-slate-400 text-4xl">menu_book</span>
+    Database
+  </h2>
+  <p class="text-slate-500 text-lg">Search within this database.</p>
 </div>
 </div>
 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-soft overflow-hidden">
