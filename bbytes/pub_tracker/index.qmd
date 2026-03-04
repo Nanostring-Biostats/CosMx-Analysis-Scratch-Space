@@ -39,8 +39,8 @@ format:
 ```{ojs}
 //| echo: false
 // Fetch publication data
-pubs = await d3.tsv("https://raw.githubusercontent.com/Nanostring-Biostats/ScratchSpaceDatasets/main/publication_tracker/spatial_publications.tsv", d3.autoType)
-manifest = await d3.csv("https://raw.githubusercontent.com/Nanostring-Biostats/ScratchSpaceDatasets/main/publication_tracker/manifest.csv")
+pubs = await d3.tsv("https://raw.githubusercontent.com/Nanostring-Biostats/ScratchSpaceDatasets/refs/heads/main/browser_bytes/publication_tracker/spatial_publications.tsv", d3.autoType)
+manifest = await d3.csv("https://raw.githubusercontent.com/Nanostring-Biostats/ScratchSpaceDatasets/refs/heads/main/browser_bytes/publication_tracker/manifest.csv")
 
 updatedDateStr = {
   if (manifest && manifest.length > 0 && manifest[0].Last_Updated_UTC) {
@@ -145,8 +145,8 @@ html`
 html`<h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Platforms</h3>`
 
 viewof selectedPlatforms = Inputs.checkbox(
-  ["CosMx", "GeoMx", "AtoMx", "nCounter"], 
-  {value: ["CosMx", "GeoMx", "AtoMx", "nCounter"]}
+  ["CellScape", "CosMx", "GeoMx", "AtoMx", "nCounter"], 
+  {value: ["CellScape","CosMx", "GeoMx", "AtoMx", "nCounter"]}
 )
 ```
 ```{ojs}
@@ -156,6 +156,7 @@ viewof selectedPlatforms = Inputs.checkbox(
 filteredLinePubs = pubs_clean.filter(d => {
   if (selectedPlatforms.length === 0) return false;
   let keep = false;
+  if (selectedPlatforms.includes("CellScape") && d.Has_CellScape === 'True') keep = true;
   if (selectedPlatforms.includes("CosMx") && d.Has_CosMx === 'True') keep = true;
   if (selectedPlatforms.includes("GeoMx") && d.Has_GeoMx === 'True') keep = true;
   if (selectedPlatforms.includes("AtoMx") && d.Has_AtoMx === 'True') keep = true;
@@ -344,7 +345,7 @@ ${activePapersList.length > 0
   <div class="relative z-10 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mt-2 border-t border-slate-200/60 pt-6">
     <div class="text-amber-700 text-sm font-bold bg-amber-50/80 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-amber-200 shadow-sm leading-snug max-w-2xl">
       <span class="material-symbols-outlined text-amber-600 align-middle mr-1 text-lg">info</span>
-      Note: This is a sample query, not an exhaustive list. It was generated automatically by searching specific terms like "CosMx", "AtoMx", "GeoMx", and "nCounter" that were found in the title, abstract, and full text (if applicable). It may miss publications using broader terminology or publications not found on openAlex.
+      Note: This is a sample query, not an exhaustive list. It was generated automatically by searching specific terms like "CellScape", "CosMx", "AtoMx", "GeoMx", and "nCounter" that were found in the title, abstract, and full text (if applicable). It may miss publications using broader terminology or publications not found on openAlex.
     </div>
     
     <a href="https://brukerspatialbiology.com/resources/publications/?paged=1" target="_blank" class="shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold shadow-sm transition-all hover:shadow-md group">
@@ -567,6 +568,251 @@ html`
 </div>
 </section>
 
+```{=html}
+<section class="py-12 bg-white border-t border-slate-200">
+<div class="container mx-auto px-6">
+  <div class="mb-8">
+    <h2 class="text-4xl font-bold text-slate-900 tracking-tight font-serif">Research Landscape</h2>
+    <p class="text-slate-500 text-lg mt-2">
+      Explore the taxonomic hierarchy of the selected platforms. 
+      <strong class="text-slate-700">Click a Blue Field</strong> to burst it into its specific Topics. 
+      <strong class="text-slate-700">Click any grey bubble</strong> to include it and
+      <strong class="text-slate-700">click any non-grey bubble</strong> to filter it.
+      <strong class="text-slate-700">Double-click</strong> anywhere in the background to reset everything.
+    </p>
+  </div>
+  
+  <div class="bg-[#F8FAFC] rounded-[2rem] border border-slate-200 shadow-inner overflow-hidden flex justify-center items-center w-full min-h-[800px] relative">
+```
+
+
+```{ojs}
+//| echo: false
+// 1. Data Prep: Group the active papers into Subfields and Topics
+chartNodesData = {
+  const dataMap = new Map();
+  // We use filteredLinePubs so the bubbles react to the platform checkboxes!
+  filteredLinePubs.forEach(d => {
+    const sf = d.Subfield || "Unknown";
+    const tp = d["Primary Topic"] || "Unknown";
+    
+    // Initialize Subfield
+    if (!dataMap.has(sf)) dataMap.set(sf, { id: sf, type: "Subfield", count: 0, children: new Map() });
+    const sfNode = dataMap.get(sf);
+    sfNode.count += 1;
+    
+    // Initialize Topic inside Subfield
+    if (!sfNode.children.has(tp)) sfNode.children.set(tp, { id: tp, parentId: sf, type: "Topic", count: 0 });
+    sfNode.children.get(tp).count += 1;
+  });
+
+  const subfields = [];
+  const topics = [];
+  dataMap.forEach(sf => {
+    subfields.push({ id: sf.id, type: "Subfield", count: sf.count });
+    sf.children.forEach(tp => {
+      topics.push({ id: tp.id, parentId: sf.id, type: "Topic", count: tp.count });
+    });
+  });
+  return { subfields, topics };
+}
+
+// 2. D3 Physics Simulation & UI
+viewof activeBubbleFilters = {
+  const width = 1400;
+  const height = 500;
+  
+  const svg = d3.create("svg")
+    .attr("viewBox", [0, 0, width, height])
+    .style("width", "100%")
+    .style("height", "800px")
+    .attr("class", "cursor-crosshair");
+
+  // Background rect to catch double clicks for resetting
+  svg.append("rect")
+     .attr("width", width)
+     .attr("height", height)
+     .attr("fill", "transparent")
+     .on("dblclick", resetChart);
+
+  const maxCount = d3.max(chartNodesData.subfields, d => d.count) || 1;
+  const rScale = d3.scaleSqrt().domain([0, maxCount]).range([15, 85]); 
+
+  // NEW: Distinct color scale for topics based on their parent Subfield
+  const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+  function truncate(str, r) {
+    const maxLen = Math.max(5, Math.floor(r / 3.5)); 
+    if (str.length > maxLen) return str.substring(0, maxLen) + "..";
+    return str;
+  }
+
+  // Initial load: Only Subfields
+  let nodes = chartNodesData.subfields.map(d => ({
+     ...d,
+     r: rScale(d.count),
+     x: width/2 + (Math.random()-0.5)*100,
+     y: height/2 + (Math.random()-0.5)*100
+  }));
+
+  let focusedNodes = new Set();
+  svg.node().value = []; // This array is what the database table will listen to
+
+  const simulation = d3.forceSimulation(nodes)
+    .force("x", d3.forceX(width/2).strength(0.04))
+    .force("y", d3.forceY(height/2).strength(0.04))
+    .force("collide", d3.forceCollide(d => d.r + 3).iterations(4));
+
+  const nodeGroup = svg.append("g");
+  let nodeElements = nodeGroup.selectAll("g");
+
+  // Pushes changes down to the table
+  function dispatchChange() {
+    svg.node().value = Array.from(focusedNodes);
+    svg.node().dispatchEvent(new CustomEvent("input"));
+  }
+
+function resetChart() {
+     focusedNodes.clear();
+     dispatchChange();
+     // Bring all subfields back, spawning near the center
+     nodes = chartNodesData.subfields.map(d => ({
+        ...d,
+        r: rScale(d.count),
+        x: width/2 + (Math.random()-0.5)*150,
+        y: height/2 + (Math.random()-0.5)*150
+     }));
+     update();
+  }
+
+  function onClick(event, d) {
+    if (event.defaultPrevented) return; // Prevent triggering if they were just dragging
+
+    // Burst Interaction for Subfields
+    if (d.type === "Subfield") {
+       nodes = nodes.filter(n => n.id !== d.id); // Remove the clicked subfield
+       
+       // Spawning the children in a geometric ring to prevent "Collision Explosions"
+       const children = chartNodesData.topics.filter(t => t.parentId === d.id).map((t, i, arr) => {
+         const angle = (i / arr.length) * Math.PI * 2; // Evenly space them around a circle
+         const spawnRadius = d.r * 0.5; // Start them halfway out from the parent's center
+         
+         return {
+           ...t,
+           r: Math.max(12, rScale(t.count) * 0.8), 
+           x: d.x + Math.cos(angle) * spawnRadius, // Trigonometry for X ring position
+           y: d.y + Math.sin(angle) * spawnRadius, // Trigonometry for Y ring position
+           vx: Math.cos(angle) * 3, // Give them a gentle, controlled push outward
+           vy: Math.sin(angle) * 3
+         };
+       });
+       
+       nodes.push(...children);
+       
+       // Immediately add all daughter topics to the focused (active) list
+       children.forEach(c => focusedNodes.add(c.id));
+       
+       dispatchChange();
+       update();
+    } 
+    // Select/Toggle Interaction for Topics
+    else {
+       if (focusedNodes.has(d.id)) focusedNodes.delete(d.id);
+       else focusedNodes.add(d.id);
+       dispatchChange();
+       updateStyles();
+    }
+  }
+
+  function updateStyles() {
+    nodeElements.selectAll("circle")
+      .transition().duration(300)
+      .attr("fill", d => {
+         if (d.type === "Subfield") {
+             if (focusedNodes.size === 0) return "#0077c8"; // All subfields start Bruker Blue
+             return focusedNodes.has(d.id) ? "#0077c8" : "#cbd5e1"; // Grey out unclicked subfields
+         } else {
+             const topicColor = colorScale(d.parentId); // Distinct color per subfield family
+             if (focusedNodes.size === 0) return topicColor; 
+             return focusedNodes.has(d.id) ? topicColor : "#cbd5e1"; // Grey out unclicked topics
+         }
+      });
+      
+    nodeElements.selectAll("text")
+      .attr("fill", d => focusedNodes.size > 0 && !focusedNodes.has(d.id) ? "#64748b" : "#ffffff");
+  }
+
+  function update() {
+    nodeElements = nodeElements.data(nodes, d => d.id);
+    nodeElements.exit().transition().duration(300).attr("transform", "scale(0)").remove();
+
+    const enter = nodeElements.enter().append("g")
+      .attr("transform", d => `translate(${d.x},${d.y})`)
+      .style("cursor", "pointer")
+      .on("click", onClick)
+      .call(d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended));
+
+    enter.append("circle")
+      .attr("r", d => d.r)
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 2)
+      .attr("fill", d => d.type === "Subfield" ? "#0077c8" : colorScale(d.parentId));
+
+    enter.append("text")
+      .text(d => truncate(d.id, d.r))
+      .attr("text-anchor", "middle")
+      .attr("dy", ".3em")
+      .attr("fill", "#ffffff")
+      .attr("font-size", d => Math.min(14, Math.max(9, d.r / 3.5)) + "px")
+      .attr("font-weight", "600")
+      .style("pointer-events", "none");
+
+    // Tooltip on hover
+    enter.append("title").text(d => `${d.type}: ${d.id}\nPublications: ${d.count}`);
+
+    nodeElements = enter.merge(nodeElements);
+    updateStyles();
+
+    simulation.nodes(nodes);
+    simulation.alpha(1).restart();
+  }
+
+  simulation.on("tick", () => {
+    nodeElements.attr("transform", d => {
+      // Keep nodes softly constrained to the SVG canvas
+      d.x = Math.max(d.r, Math.min(width - d.r, d.x));
+      d.y = Math.max(d.r, Math.min(height - d.r, d.y));
+      return `translate(${d.x},${d.y})`;
+    });
+  });
+
+  function dragstarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x; d.fy = d.y;
+  }
+  function dragged(event, d) {
+    d.fx = event.x; d.fy = event.y;
+  }
+  function dragended(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null; d.fy = null;
+  }
+
+  update();
+  return svg.node();
+}
+```
+
+```{=html}
+  </div>
+</div>
+</section>
+```
+
+
+
+
+
 <section class="mt-auto py-24 bg-white border-t border-slate-200">
 <div class="container mx-auto px-6">
 <div class="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
@@ -603,11 +849,20 @@ viewof sortOrder = Inputs.radio(["Desc", "Asc"], {value: "Desc"})
 ```{ojs}
 //| echo: false
 filtered_pubs = {
-  // Filter
-  let filtered = pubs_clean.filter(p => 
-      String(p.Title || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
-      String(p.Authors || "").toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  // Filter using BOTH the text search and the bubble chart
+  let filtered = filteredLinePubs.filter(p => {
+      // 1. Text Search Filter
+      const matchSearch = String(p.Title || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          String(p.Authors || "").toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // 2. NEW: Bubble Chart Filter 
+      // If array is empty (nothing selected), return true. Otherwise, check if Subfield or Topic matches.
+      const matchBubble = activeBubbleFilters.length === 0 || 
+                          activeBubbleFilters.includes(p.Subfield) || 
+                          activeBubbleFilters.includes(p["Primary Topic"]);
+      
+      return matchSearch && matchBubble;
+  });
   
   // Sort
   filtered.sort((a, b) => {
@@ -653,6 +908,7 @@ html`
           ${String(p["Open Access"]).toLowerCase() === 'true' ? html`<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-100 uppercase tracking-wider"><span class="material-symbols-outlined text-[12px]">lock_open</span> Open</span>` : ''}
         </div>
         <div class="col-span-2 text-right">
+          ${p.Has_CellScape == 'True' ? html`<span class="inline-flex m-0.5 items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-cyan-800">CellScape</span>` : ''}
           ${p.Has_CosMx == 'True' ? html`<span class="inline-flex m-0.5 items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">CosMx</span>` : ''}
           ${p.Has_GeoMx == 'True' ? html`<span class="inline-flex m-0.5 items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">GeoMx</span>` : ''}
           ${p.Has_AtoMx == 'True' ? html`<span class="inline-flex m-0.5 items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">AtoMx</span>` : ''}
