@@ -1773,15 +1773,15 @@ norm_mat_use <- norm_mat[,cells_use]
 8.3.1
  Overlap Ratio Metric
 
-We want to exclude any genes that might be from abutting cells that are not tumor cells. For example, 
+We want to exclude any gene targets that might be from abutting cells that are not tumor cells. For example, 
 JCHAIN
- is often highly expressed in plasma cells and so if there is a differential 
-abundance
- of plasma cells between domains we might see 
+ is often highly expressed in plasma cells, so we might see 
 JCHAIN
- spuriously show up as higher in tumor cells in that domain. This function below mitigates that effect by considering the gene expression of a focal cell relative to close neighbors who are not of the same cell type. See the documentation 
+ spuriously show up as higher in tumor cells in a domain with a high abundance of plasma cells. The function below mitigates that effect by considering the gene expression of a focal cell relative to close neighbors who are not of the same cell type. See the documentation 
 here
- for more details.
+ and the 
+Choosing an overlap ratio
+ deep-dive box below for more details. We’ll select genes that have a ratio of less than 1.
 
 R code
 
@@ -1799,8 +1799,354 @@ genes_to_analyze <- overlap_metrics[celltype_broad=="tumor"][ratio < 1][["target
 saveRDS(genes_to_analyze, file=file.path(de_dir, "genes_to_analyze.rds"))
 ```
 
+Choosing an overlap ratio
+
+We can define the 
+intrinsic expression
+ of a cell type as the collection of gene targets demonstrating consistently higher expression within that focal cell type compared to its immediate spatial neighbors. Because pervasive, uniform gene translation across all cells is biologically improbable, spatial differential expression (DE) models can account for this localized specificity.
+
+To quantify this localized specificity, we establish an empirical 
+overlap ratio
+ for each target-by-cell-type combination (e.g., Gene A in Cell Type B). For a given gene, this statistic is calculated by taking its average expression in non-focal cells and dividing it by its average expression in the focal cell type.
+
+Leveraging these local spatial patterns prior to DE analysis provides a systematic way to:
+
+Filter spurious signals:
+ Identify genes whose expression is primarily bleeding over from adjacent cells.
+
+Reduce the multiple testing burden:
+ Limit the number of hypotheses (targets) we test to those with true biological relevance in the cells of interest.
+
+Specifically, targets driven heavily by neighboring non-focal cells (such as fibroblasts or NK cells) will yield a ratio > 1. For analytical clarity, this overlap is typically evaluated in log space, where expression predominantly originating from the non-focal neighborhood corresponds to a log2(ratio) > 0.
+
+R code
+
+```
+overlap_metrics$log2ratio <- log2(overlap_metrics$ratio)
+```
+
+Let’s explore how this transformed ratio behaves. We’ll compute the empirical cummulative distribution function (eCDF) for each focal cell type that is in the 
+overlap_metrics
+ R object. We do this simply by grouping by cell type, sorting the results, and then returning the proportion of targets that have a smaller ratio.
+
+R code
+
+```
+ecdf <- do.call(rbind, lapply(unique(overlap_metrics[['celltype_broad']]), function(fct){
+              x <- overlap_metrics[overlap_metrics[['celltype_broad']]==fct,]
+              x <- x[order(x[['log2ratio']]),]
+              return(
+                data.frame(focal_cell_type = x[['celltype_broad']],
+                           target=x[['target']], log2ratio = x[['log2ratio']],
+                           prop = (1:nrow(x)) / nrow(x))
+              )
+            }))
+saveRDS(ecdf, file=file.path(de_dir, "ecdf.rds"))
+```
+
+And here is what those eCDFs look like.
+
+R code
+
+```
+celltype_broad_colors <- results_list[['celltype_broad_colors']]
+names(celltype_broad_colors) <- results_list[['celltype_broad_names']]
+
+p <- ggplot() +
+              geom_line(data=ecdf,
+                        aes(x=log2ratio, y=prop, colour=focal_cell_type, group=focal_cell_type)) +
+              theme_bw() +
+      scale_color_manual(values=celltype_broad_colors) + 
+              xlab("log2 (Mean Expression in Neighbors of Focal Cell Type / Mean Expression in Focal Cell Type)") +
+              ylab("Empirical Cumulative Distribution Function") +
+              guides(colour=guide_legend(title="Cell Type"))
+
+ggsave(p, filename=file.path(de_dir, "ecdfs.png"),
+       width=8, height=6, dpi=150, type="cairo")
+```
+
+Figure 8.1: Empirical cummulative distribution for each cell type. Y proportion of gene targets have a log2 ratio less than X.
+
+You can see from 
+Figure 
+8.1
+ that the proportion of targets that are more abundant in a given cell type relative to other cell types depends on the cell type. If we look only at X = 0, we see the proportion of targets that have higher intrinsic expression for each cell type. Those values are shown in table 
+Table 
+8.1
+.
+
+R code
+
+```
+ecdf_at_zero <- ecdf %>%
+  group_by(focal_cell_type) %>%
+  summarize(
+    prop_at_zero = approx(x = log2ratio, y = prop, xout = 0)$y
+  ) %>% arrange(prop_at_zero)
+
+ecdf_at_zero$targets_below_zero <- round(ecdf_at_zero$prop_at_zero * length(unique(ecdf$target)))
+
+saveRDS(ecdf_at_zero, file=file.path(de_dir, "ecdf_at_zero.rds"))
+```
+
+Table 8.1: Approximate number of targets that have focal cell type expression that is greater than neighboring non-focal cell type expression.
+
+Cell Type
+
+Prop. Targets below log2(ratio) = 0
+
+Total Targets below log2(ratio) = 0
+
+neutrophil
+
+0.1940
+
+3,674
+
+plasma
+
+0.2348
+
+4,445
+
+monocyte
+
+0.2475
+
+4,686
+
+mix_NK_Lymphoid
+
+0.2529
+
+4,789
+
+nk
+
+0.2549
+
+4,827
+
+macrophage
+
+0.2993
+
+5,667
+
+mast
+
+0.3367
+
+6,376
+
+tcell
+
+0.3367
+
+6,376
+
+dendritic
+
+0.3568
+
+6,755
+
+fibroblast
+
+0.3740
+
+7,082
+
+CAF
+
+0.3833
+
+7,257
+
+pericyte
+
+0.3837
+
+7,266
+
+bcell
+
+0.4128
+
+7,817
+
+glial
+
+0.4452
+
+8,430
+
+epithelial
+
+0.4620
+
+8,749
+
+endothelial
+
+0.4757
+
+9,007
+
+undetermined
+
+0.5345
+
+10,120
+
+tumor
+
+0.6497
+
+12,303
+
+smc
+
+0.6900
+
+13,065
+
+For our cell type of interest, tumor, we see that the number of intrinsic expression is 12,303 targets. And what about our intuition about 
+JCHAIN
+ in tumor? The log2 ratio of 
+JCHAIN
+ in tumor is 2.02 (ratio = 4.07) and that is more extreme than 99% of targets. In plasma cells, on the other hand, the log2 ratio of 
+JCHAIN
+ is -2.80 (ratio = 0.14) which happens to be the lowest ratio for plasma cells which makes biological sense.
+
+R code
+
+```
+ecdf <- readRDS(file.path(de_dir, "ecdf.rds"))
+filter(ecdf, focal_cell_type %in% c("tumor", "plasma"), target=="JCHAIN")
+```
+
+```
+  focal_cell_type target log2ratio         prop
+1          plasma JCHAIN -2.800541 5.281225e-05
+2           tumor JCHAIN  2.026144 9.941907e-01
+```
+
+In this chapter we chose a log2 ratio of < 0 (ratio < 1). In practice that threshold is a good “rule of thumb” but the choice is entirely up to the user. Here’s an eCDF plot that focuses on tumor only. The rug above the x-axis shows the relative density of targets. Hover over the plot to more detail.
+
+R code
+
+```
+ecdf_file <- "./assets/interactives/ecdf.parquet"
+nanoparquet::write_parquet(ecdf %>% filter(focal_cell_type == "tumor") %>% select(-focal_cell_type), ecdf_file)
+```
+
+```
+db = DuckDBClient.of({
+  ecdf_data: FileAttachment("assets/interactives/ecdf.parquet")
+})
+
+// Query data from DuckDB
+raw_data = db.sql`SELECT * FROM ecdf_data ORDER BY log2ratio ASC`
+
+// Format data for Plot
+plotData = raw_data.map((d, i) => ({
+  ...d,
+  // Force numeric types to prevent "scale incompatible" errors
+  log2ratio: Number(d.log2ratio),
+  prop: Number(d.prop),
+  count_less: i 
+}))
+
+// Render the eCDF Chart
+chart = Plot.plot({
+  width: 800,
+  height: 500,
+  x: { 
+    label: "Log2 Ratio", 
+    type: "linear" 
+  },
+  y: { 
+    label: "Proportion", 
+    type: "linear" 
+  }, 
+  marks: [
+    // 1. The Binned Rug Plot (Optimized for 20k rows)
+    Plot.ruleX(plotData, Plot.binX(
+      { strokeOpacity: "count" }, 
+      {
+        x: "log2ratio",
+        y1: 0,             // Start at X-axis
+        y2: 0.03,          // 3% tick height
+        strokeWidth: 3,
+        thresholds: 200   
+      }
+    )),
+
+    // 2. The main eCDF line
+    Plot.line(plotData, {
+      x: "log2ratio", 
+      y: "prop", 
+      stroke: "#C11A7A",
+      strokeWidth: 2.5
+    }),
+    
+    // 3. The constrained vertical drop-line on hover
+    Plot.ruleX(plotData, Plot.pointerX({
+      x: "log2ratio",
+      y1: 0,         
+      y2: "prop",    
+      stroke: "gray",
+      strokeDasharray: "4,4",
+      strokeWidth: 1.5
+    })),
+    
+    // 4. The Hover Tooltip (with rounded formatting)
+    Plot.tip(plotData, Plot.pointerX({
+      x: "log2ratio", 
+      y: "prop", 
+      // Using .toFixed() and .toPrecision() to format the long decimals
+      title: d => `Target: ${d.target}\nTargets < Y: ${d.count_less}\nLog2 Ratio: ${d.log2ratio.toFixed(4)}\nProportion: ${d.prop.toPrecision(3)}`
+    })),
+    
+    // 5. Table Selection Highlights
+    Plot.dot(selected_targets, {
+      x: "log2ratio", 
+      y: "prop", 
+      fill: "red", 
+      r: 5
+    }),
+    Plot.text(selected_targets, {
+      x: "log2ratio", 
+      y: "prop", 
+      text: "target", 
+      dy: -12, 
+      fill: "red",
+      fontWeight: "bold"
+    })
+  ]
+})
+```
+
+If you are interested in a particular gene, you can search it in the table below. Selecting a gene will label it on the figure above.
+
+```
+viewof selected_targets = Inputs.table(plotData, {
+  multiple: true,
+  required: false,
+  columns: ["target", "log2ratio", "prop"],
+  header: {
+    target: "Target", 
+    log2ratio: "Log2 Ratio", 
+    prop: "Proportion"
+  }
+})
+```
+
 8.3.2
  Compute cell-cell adjacencies
+
+This code computes a table identifying the neighbor cells of each cell within 0.05 mm, and records the corresponding celltype (“celltype_broad”) of each neighbor.
 
 R code
 
@@ -1825,7 +2171,11 @@ Note
 
 If you want to skip ahead to see the results in the dashboard, they are already available. This particular result is the study that is labeled “Tumor differences between domains”.
 
-Focus on the tumor cells and run DE.
+In the block below, we’ll focus on the tumor cells within 
+celltype_broad
+ and run differential expression analysis between all pairwise combinations of 
+annotated_domain
+ on the filtered list of gene targets that we identified above.
 
 R code
 
@@ -1871,7 +2221,7 @@ Marginal data: the maringal means
 
 Cell metadata: cell metadata columns used in the formula + coordinates
 
-For the study header, this is simply was way to jot down a discription of the DE itself so that it can be distinugished from other results on the dashboard that are either publicaly available or that you loaded.
+For the study header, this is simply was way to jot down a description of the DE itself so that it can be distinugished from other results on the dashboard that are either publicaly available or that you loaded.
 
 R code
 
