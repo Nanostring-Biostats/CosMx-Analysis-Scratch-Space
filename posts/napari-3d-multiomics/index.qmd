@@ -13,7 +13,7 @@ toc-expand: 2
 toc-location: left
 number-sections: true
 number-depth: 4
-date: "2026-03-23"
+date: "2026-03-24"
 date-modified: last-modified
 categories:
   - napari
@@ -31,14 +31,24 @@ execute:
   engine: knitr
 ---
 <style>
-.feat-table table {
-  table-layout: fixed;
-  width: 100%;
+.feat-table table.table {
+  table-layout: auto !important;
+  width: 100% !important;
 }
-.feat-table table th:first-child,
-.feat-table table td:first-child {
-  width: 22ch;
-  white-space: normal;
+
+/* First column strict width */
+.feat-table table.table th:first-child,
+.feat-table table.table td:first-child {
+  width: 22ch !important;
+  max-width: 22ch !important;
+  white-space: normal !important;
+}
+
+/* Remaining columns behave naturally */
+.feat-table table.table th:not(:first-child),
+.feat-table table.table td:not(:first-child) {
+  width: auto !important;
+  white-space: normal !important;
 }
 </style>
 
@@ -169,11 +179,11 @@ From the `napari` menu, choose **Plugins → Stitch Images (napari CosMx)**. The
 
 **How it works:**
 
-1. Export raw data for your study from AtoMx SIP (see (earlier post)[https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/#sec-export-raw-data]{target="_blank"}) and organize them by slide. Each slide folder (@fig-raw-inputs) should contain 
+1. Export raw data for your study from AtoMx SIP (see [earlier post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/napari-cosmx-intro/#sec-export-raw-data){target="_blank"}) and organize them by slide. Each slide folder (@fig-raw-inputs) should contain 
    - `CellStatsDir`: contains per-FOV cell segmentation outcomes (`FOV*/CellLabels_F*.tif`) and morphological images (`Morphology2D` for 2D data or `Morphology3D` for 3D data).
    - `RunSummary`:  contains fov position csv file, `*FOV_Locations.csv` or `*fov_positions_file.csv.gz` (flat file). 
    - `AnalysisResults/<guid>`: contains per-FOV organized data for RNA transcripts (`FOV*/*FOV*__complete_code_cell_target_call_coord.csv`) or Protein images (`FOV*/ProteinImages/*_F*_<ProbeID>.TIF`). 
-   - `plex*.csv`: required if it's protein data; csv file listing the protein names (`ProbID` & `DisplayName`) included in your protein data. 
+   - `plex*.csv`: required if it's protein data; csv file listing the protein names (`ProbeID` & `DisplayName`) included in your protein data. 
 
 2. Click **Browse Primary Folder** and select your primary CosMx exported data folder.
    The folder must contain `CellStatsDir` and `RunSummary` sub-directories as mentioned above.
@@ -224,7 +234,7 @@ When stitching finishes, all morphological channels, segmentation masks, transcr
 #| eval: true
 #| echo: false
 #| label: "fig-raw-inputs"
-#| fig-cap: "Raw data inputs for `Stitch Images (napari CosMx)` plugin."
+#| fig-cap: "Raw data inputs for `Stitch Images (napari CosMx)` plugin in case of RNA 3D data (left), RNA 2D data (middle) and Protein 2D data (right)."
 knitr::include_graphics("./figures/fig-raw-inputs.jpg")
 ```
 
@@ -333,7 +343,7 @@ Colormap:  red
 Z plane:   2     ← loads only the Z=2 plane as 'CD3 [z=2]'
 ```
 
-When a gene and protein share the same name (e.g. **B**), `napari-CosMx` automatically assigns distinct layer names—**B [rna]** and **B [protein]**, so you can load both and compare their spatial distributions side-by-side without confusion.
+When a gene and protein share the same name (e.g. **B**), `napari-CosMx` automatically assigns distinct layer name to the newly added layer—**B [rna]** or **B [protein]**, so you can load both and compare their spatial distributions side-by-side without confusion.
 
 
 ### RNA Transcripts panel
