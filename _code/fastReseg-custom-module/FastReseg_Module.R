@@ -1,5 +1,5 @@
 # Name: FastReseg RNA Custom Module
-message("FastReseg Custom Script Version: 1.1.1")
+message("FastReseg Custom Script Version: 1.1.2")
 
 # Copyright 2023-2025 Bruker Spatial Biology, Inc.
 # This software and any associated files are distributed pursuant to the Bruker Spatial Biology AtoMx Spatial
@@ -500,10 +500,26 @@ fig <- ggplot2::ggplot(obs, ggplot2::aes(x = lrtest_nlog10P, fill = as.factor(fl
                 subtitle = sprintf("%d cells below evaluation cutoff.",  
                                 sum(is.na(obs$flagged))), 
                 fill = 'flagged')
-png(paste0(outDir, "/", "FastReseg_segmentation_flagging_score_hist.png"),
-    width = 480, height = 480, units = "px")
-print(fig)
-dev.off()
+
+
+tryCatch(
+  {
+    ggplot2::ggsave(
+      filename = fs::path(
+        outDir,
+        "FastReseg_segmentation_flagging_score_hist.png"
+      ),
+      plot = fig,
+      width = 6,
+      height = 6,
+      units = "in",
+      dpi = 150
+    )
+  },
+  error = function(e) {
+    message("ggsave PNG failed: ", conditionMessage(e))
+  }
+)
 
 rm(obs, fig)
 gc()
