@@ -152,7 +152,7 @@ getPatches <- function(xy, X, npatches,
   # get patch centroids:
   centroids <- c()
   for (name in unique(seeds)) {
-    centroids <- rbind(centroids, colMeans(xy[(seeds == name) & !is.na(seeds), ]))
+    centroids <- rbind(centroids, colMeans(xy[(seeds == name) & !is.na(seeds), , drop = FALSE]))
   }
   rownames(centroids) = unique(seeds)
   
@@ -192,7 +192,7 @@ getPatches <- function(xy, X, npatches,
     centroids <- c()
     patchnames <- setdiff(unique(celldf$patch), NA)
     for (name in patchnames) {
-      centroids <- rbind(centroids, colMeans(xy[(celldf$patch == name) & !is.na(celldf$patch), ]))
+      centroids <- rbind(centroids, colMeans(xy[(celldf$patch == name) & !is.na(celldf$patch), , drop = FALSE]))
     }
     rownames(centroids) = patchnames
     
