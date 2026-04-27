@@ -38,8 +38,8 @@ runFOVQC <- function(counts, xy, fov, tissue = NULL, barcodemap, max_prop_loss =
                                     barcodes = barcodemap$barcode) 
   
   # normalize:
-  bitcounts <- sweep(bitcounts, 1, rowSums(bitcounts), "/") * mean(rowSums(bitcounts))
-  
+  bitcounts <- sweep(bitcounts, 1, pmax(rowSums(bitcounts), 1), "/") * mean(pmax(rowSums(bitcounts), 1))
+
   ## for every grid square, match it to "control" squares from other FOVs, and get its residuals from them:
   # get neighbors:
   comparators <- getNearestNeighborsByFOV(x = bitcounts, 
