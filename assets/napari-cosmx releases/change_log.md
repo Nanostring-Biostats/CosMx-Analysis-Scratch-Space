@@ -1,5 +1,15 @@
 # Napari-CosMx plugin change log
 
+## 0.5.0.0
+
+- 3D cell segmentation and Z-plane navigation
+- Multi-omics (RNA + Protein)
+- Layer Group Manage
+- Load stitch widget from `napari` plugin menu and enable auto-detection of stitch plan
+- fix bugs in OME-TIFF export and verified to support both 2D and 3D data (per-Z & volumetrics)
+- expand `python` version support to 3.8~3.11, and ensure compatibility across multiple `napari` versions (up to latest 0.6.6)
+
+
 ## 0.4.17.4
 
 - Released Nov. 6th, 2025
