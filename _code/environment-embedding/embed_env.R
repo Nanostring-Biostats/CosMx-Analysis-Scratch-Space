@@ -17,6 +17,18 @@
 #' @param tot Vector of cells' total counts
 fitSingleCellEmbedding <- function(counts, tot) {
   
+  genefreq <- scPearsonPCA::gene_frequency(Matrix::t(counts)) ## gene frequency (across all cells)
+  
+  pcaobj <- scPearsonPCA::sparse_quasipoisson_pca_seurat(
+    x = Matrix::t(counts),
+    totalcounts = tot,
+    grate = genefreq,
+    scale.max = 10, ## PC's reflect clipping pearson residuals > 10 SDs above the mean pearson residual
+    do.scale = TRUE, ## PC's reflect as if pearson residuals for each gene were scaled to have standard deviation=1
+    do.center = TRUE ## PC's reflect as if pearson residuals for each gene were centered to have mean=0
+  )
+  
+  # return grate values and PC weights:
 }
 
 
