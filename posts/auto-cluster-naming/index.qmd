@@ -14,7 +14,7 @@ toc-location: left
 number-sections: true
 number-depth: 4
 code-fold: true
-date: "2026-04-30"
+date: "2026-05-12"
 date-modified: last-modified
 categories:
   - cell typing
@@ -136,11 +136,14 @@ Like other items in our [CosMx Analysis Scratch Space](https://nanostring-biosta
 the usual [caveats](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/about.html){target="_blank"} and [license](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/license.html){target="_blank"} apply.
 
 
-::: {.callout-note appearance="simple" title="Illustration Dataset"}
+::: {.callout-note title="Illustration Dataset"}
 To illustrate usage, this post uses a publicly available CosMx<sup>&#174;</sup> whole-transcriptomics single-slide dataset on human colon cancer FFPE tissue that you can download from the Bruker Spatial Biology [webpage](https://brukerspatialbiology.com/products/cosmx-spatial-molecular-imager/ffpe-dataset/){target="_blank"}.
 Please refer to [earlier post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/h5ad_conversion/){target="_blank"} on how to generate `AnnData` object from either post-analyzed `Seurat` object or the flat files exported by AtoMx<sup>&#174;</sup> SIP.
 :::
 
+::: {.callout-tip appearance="simple"}
+**R users**: If your data is already in `Seurat` and you prefer to stay in **R**, you can use `HierAnnot` through R's `reticulate` package. See @sec-r-integration for more details.
+:::
 
 # Basic Usage: Standard Clustering -> HierAnnot
 
@@ -784,6 +787,166 @@ pipe_custom = HierAnnotPipeline(
     input_type="raw_cluster_means",
 )
 ```
+
+# R integration via reticulate {#sec-r-integration}
+
+If your analysis pipeline is based in **R** and you use `Seurat` for clustering and quality control, you can still leverage `HierAnnot` through the `reticulate` package, which provides seamless Python-to-R interoperability. This approach is ideal for analysts who have already performed clustering in `Seurat` and want to add hierarchical annotation without leaving the R ecosystem.
+
+## Setting up a Python virtual environment for R
+
+First, create a dedicated Python virtual environment with `HierAnnot` installed. 
+
+**Option 1: From the terminal**
+
+If you already work in Python, this is just the usual Python installation flow; after that, you can point `reticulate` to the same environment from R.
+
+```{default filename="Terminal"}
+#| eval: false
+# Create virtual environment
+python -m venv hierannot_env
+
+# Activate it
+source hierannot_env/bin/activate  # on Linux/Mac
+# or
+hierannotenv\\Scripts\\activate  # on Windows
+
+# Install HierAnnot
+pip install git+https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space.git#subdirectory=_code/HierAnnot
+
+# Or install from a downloaded wheel file
+# pip install /path/to/hierannot-<version>-py3-none-any.whl
+
+# Deactivate
+deactivate
+```
+
+```{r filename="R"}
+#| eval: false
+library(reticulate)
+use_virtualenv("/path/to/hierannot_env")  # absolute path to your virtual environment
+```
+
+
+**Option 2: From R directly**
+
+You can also create and install from R using `reticulate` directly.
+
+```{r filename="R"}
+#| label: code-r-setup-venv
+#| eval: false
+library(reticulate)
+
+# Create a virtual environment named 'hierannot_env'
+virtualenv_create("hierannot_env")
+
+# Install HierAnnot from GitHub; pip will also install declared dependencies.
+virtualenv_install(
+  "hierannot_env",
+  packages = "git+https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space.git#subdirectory=_code/HierAnnot"
+)
+
+# If you already downloaded a wheel locally, install from that file instead.
+# virtualenv_install(
+#   "hierannot_env",
+#   packages = "/path/to/hierannot-<version>-py3-none-any.whl"
+# )
+
+# Use this environment for your R session
+use_virtualenv("hierannot_env")
+```
+
+
+## Using HierAnnot from Seurat
+
+The workflow is straightforward:
+
+1. Extract cluster assignments and raw counts from your `Seurat` object.
+2. Compute cluster-level means in R.
+3. Call `HierAnnot` scoring functions via `reticulate`.
+4. Merge the annotations back into your `Seurat` metadata.
+5. Visualize results with standard `Seurat` plotting functions.
+
+```{r filename="R"}
+#| label: code-r-hierannot
+#| eval: false
+library(Seurat)
+library(reticulate)
+
+# Assuming you have a Seurat object 'seurat_obj' with clustering already done.
+# Set this to the metadata column that stores your cluster IDs.
+cluster_col <- "seurat_cluster"
+
+# Point reticulate to your Python virtual environment with HierAnnot installed
+use_virtualenv("/path/to/hierannot_env")  # update to your actual path
+
+# Import HierAnnot Python module
+hierannotpkg <- import("hierannot")
+
+# (1) Add a temporary string-safe cluster column to Seurat metadata
+seurat_obj$hierannot_cluster_safe <- as.character(seurat_obj@meta.data[[cluster_col]])
+seurat_obj$hierannot_cluster_safe[is.na(seurat_obj$hierannot_cluster_safe)] <- "NA"
+
+# (2) Use Seurat's own function to compute cluster mean profiles
+cluster_means_df <- as.data.frame(
+    AverageExpression(
+        seurat_obj,
+        assays = "RNA",
+        slot = "counts",
+        group.by = "hierannot_cluster_safe",
+        verbose = FALSE
+    )$RNA
+)
+
+# (3) Pass to Python and run HierAnnot
+cluster_means_py <- cluster_means_df[, colnames(cluster_means_df) != "NA", drop = FALSE]
+
+# Choose and load an appropriate hierarchy
+hierarchy_name <- hierannotpkg$match_builtin_hierarchy("colon cancer")
+root_programs <- hierannotpkg$get_builtin_hierarchy(hierarchy_name)
+
+# Create HierAnnotPipeline and score clusters
+pipe <- hierannotpkg$HierAnnotPipeline(
+  root_programs = root_programs,
+  preset = "auto",
+  input_type = "raw_cluster_means"
+)
+result <- pipe$fit_score(cluster_means_py)
+
+# Export cluster-level annotations
+cluster_export <- hierannotpkg$make_cluster_annotation_export_summary(
+  result,
+  label_with_cluster = TRUE,
+  unknown_on_low_confidence = TRUE,
+  unknown_branch_raw_threshold = 0.1,
+  mixed_on_parent_mixing = TRUE,
+  unresolved_candidate_min_score = 1.0,
+  unresolved_candidate_min_raw_score = 0.2
+)
+
+# (4) Format results in R, add to Seurat metadata, then clean up
+annot_cols <- c("annot_export_label", "annot_export_label_with_cluster", "annot_confidence")
+annot_map <- as.data.frame(cluster_export)[, c("cluster_id", annot_cols), drop = FALSE]
+annot_map[[1]] <- as.character(annot_map[[1]])
+colnames(annot_map) <- gsub("^annot_", "hierannot_", colnames(annot_map)) # rename columns if desired
+
+# Left-merge so all original Seurat cells are kept; unmatched rows stay NA.
+cell_meta <- cbind(cell_id = rownames(seurat_obj@meta.data), cluster_id = seurat_obj$hierannot_cluster_safe)
+cell_meta <- merge(cell_meta, annot_map, by = "cluster_id", all.x = TRUE, sort = FALSE)
+rownames(cell_meta) <- cell_meta$cell_id
+cell_meta$cell_id <- NULL
+cell_meta$cluster_id <- NULL
+
+seurat_obj <- AddMetaData(seurat_obj, metadata = cell_meta)
+
+# Clean up temporary safe cluster column
+seurat_obj$hierannot_cluster_safe <- NULL
+
+# Visualize HierAnnot labels on your existing embeddings
+viz_col <- "hierannot_export_label_with_cluster"
+DimPlot(seurat_obj, group.by = viz_col) # UMAP
+ImageDimPlot(seurat_obj, fov="my_slide", group.by = viz_col)  # spatial coordinates under seurat_obj@images
+```
+
 
 # Conclusion
 
