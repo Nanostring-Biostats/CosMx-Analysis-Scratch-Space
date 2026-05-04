@@ -17,7 +17,7 @@ make_cov_reduce_list <- function(fixedterms,dat){
 prepare_mod_emmeans <- function(mod, term, fitmethod, fixed_formula, dat, cov_reduce_list){
   ## nebula (neg binomial or poisson mixed models) 
   ## requires special output coercion to emmeans format 
-  if(fitmethod=="nebula::nebula"){
+  if(fitmethod == "nebula::nebula"){
     neb_summ <- nebula_summary(mod)
     bhat <- neb_summ$msumm$est
     names(bhat) <- neb_summ$msumm$term
@@ -25,11 +25,10 @@ prepare_mod_emmeans <- function(mod, term, fitmethod, fixed_formula, dat, cov_re
     allvar <- as.character(attr(tt, "variables"))[-1]
     offsetv <- allvar[attr(tt,"offset")] 
     offsetuse <- 1
-    if(length(offsetv) > 0){
-      offsetcol <- all.vars(as.formula(paste0("~",offsetv)))  
-      offsetuse <- log(mean(dat[[offsetcol]]))
+    if(length(offsetv) > 0) {
+      offsetuse <- mean(eval(parse(text = offsetv), envir = as.data.frame(dat)))
     }
-    
+
     mod <- 
       emmeans::qdrg(formula=fixed_formula
                     ,data=dat
@@ -52,8 +51,7 @@ prepare_mod_emmeans <- function(mod, term, fitmethod, fixed_formula, dat, cov_re
     offsetv <- allvar[attr(tt,"offset")] 
     offsetuse <- 1
     if(length(offsetv) > 0){
-      offsetcol <- all.vars(as.formula(paste0("~",offsetv)))  
-      offsetuse <- log(mean(dat[[offsetcol]]))
+      offsetuse <- mean(eval(parse(text=offsetv), envir=as.data.frame(dat)))
     }
     
     vcov_mat <- vcov(mod)
