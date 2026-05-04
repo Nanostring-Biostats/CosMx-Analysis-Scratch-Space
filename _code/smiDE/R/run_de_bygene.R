@@ -52,30 +52,30 @@ function(u, k = 0.375) {
 #'                 Must contain groupVar column and any covariates in the `formula` argument used for DE.
 #'                 If cell id is not included as a column in metadata, should correspond to rownames in the metadata data.frame object.
 #' @param formula right hand side of formula used in DE, possibly containing random effects.
-#'                     Must contain groupVar fixed effect.
-#'                     It's recommended that raw count models with a log-link (i.e., negative binomial, poisson)
-#'                     , use a corresponding offset for library size in formula
-#'                     (i.e., ~de_variable + offset(log(totalcounts))), where totalcounts is a column in the metadata.
-#' @param groupVar  optional categorical variable for which you may specify the ordering of factor levels, this column must exist in meta.data slot
-#' @param groupVar_levels  optional factor ordering for groupVar.
-#' @param neighborhood_counts  Deprecated argument (will be removed in the future); optional object created by smiDE::measure_neighbor_expression_by_celltype, which contains lists of
-#'                             the expression counts in neighboring cells by cell type compared to a cell type of reference
-#'                             (see `help(measure_neighbor_expression_by_celltype)`).
-#'                             May be used to control for confounding or 'bleed-over' in DE model (see examples)
+#'                Must contain groupVar fixed effect.
+#'                It's recommended that raw count models with a log-link (i.e., negative binomial, poisson)
+#'                , use a corresponding offset for library size in formula
+#'                (i.e., ~de_variable + offset(log(totalcounts))), where totalcounts is a column in the metadata.
+#' @param groupVar optional categorical variable for which you may specify the ordering of factor levels, this column must exist in meta.data slot
+#' @param groupVar_levels optional factor ordering for groupVar.
+#' @param neighborhood_counts Deprecated argument (will be removed in the future); optional object created by smiDE::measure_neighbor_expression_by_celltype, which contains lists of
+#'                            the expression counts in neighboring cells by cell type compared to a cell type of reference
+#'                            (see `help(measure_neighbor_expression_by_celltype)`).
+#'                            May be used to control for confounding or 'bleed-over' in DE model (see examples)
 #' @param spatial_model optional list for fitting models with spatially correlated random effects.
 #'                      This list must have "name" (indicating the type of spatial random effect model), as a minimum requirement.
 #'                      See documentation and examples for details.
 #'                      \link{spatial_model}
-#' @param pre_de_obj  optional list object created by smiDE::pre_de, which contains a table of cell_adjacencies `cell_adjacency_dt` used for calculating neighbor-cell expression,
-#'                     and, if created with smiDE::pre_de(adjacencies_only = FALSE), an `nblist` object with pre-computed neighbor-cell expressions.
-#'                             (see `help(pre_de)` or `help(measure_neighbor_expression_by_celltype)` for details).
-#'                             May be used to control for confounding or 'bleed-over' in DE model (see examples)
+#' @param pre_de_obj optional list object created by smiDE::pre_de, which contains a table of cell_adjacencies `cell_adjacency_dt` used for calculating neighbor-cell expression,
+#'                   and, if created with smiDE::pre_de(adjacencies_only = FALSE), an `nblist` object with pre-computed neighbor-cell expressions.
+#'                   (see `help(pre_de)` or `help(measure_neighbor_expression_by_celltype)` for details).
+#'                   May be used to control for confounding or 'bleed-over' in DE model (see examples)
 #' @param neighbor_expr_overlap_weight_colname optional argument used in the case of provided `pre_de_obj` created with `cell_adjacencies_only = TRUE`.
-#'                                                   Used for neighbor expression control variable, default is NULL (unweighted), but can also be specified by a weight column in the `cell_adjacency_dt`
-#'                                                   (a column 'weight' is pre-computed in the `cell_adjacency_dt` as `1/distance` between neighboring cells).
-#'                                                   Cells with higher weights (closer to the modeled cells) can be given more
-#'                                                   weight in computing the neighbor expression of a given gene.  Coincides with assumption that closer cells are more likely to overlap/cause segmentation errors with the modeled cells.
-#' @param neighbor_expr_overlap_agg  whether to use the mean "sum" (sum total) or average "mean" of neighbor cell expression as the control variable. Default is "sum".
+#'                                             Used for neighbor expression control variable, default is NULL (unweighted), but can also be specified by a weight column in the `cell_adjacency_dt`
+#'                                             (a column 'weight' is pre-computed in the `cell_adjacency_dt` as `1/distance` between neighboring cells).
+#'                                             Cells with higher weights (closer to the modeled cells) can be given more
+#'                                             weight in computing the neighbor expression of a given gene.  Coincides with assumption that closer cells are more likely to overlap/cause segmentation errors with the modeled cells.
+#' @param neighbor_expr_overlap_agg whether to use the mean "sum" (sum total) or average "mean" of neighbor cell expression as the control variable. Default is "sum".
 #' @param neighbor_expr_cell_type_metadata_colname column to use for determining neighbor cell expression by cell type.  Represented in pre_de_obj$cell_adjacency_dt
 #' @param neighbor_expr_totalcount_normalize Defaults to TRUE, neighbor expression covariate is normalized by the library size or 'totalcounts' across all genes for a given cell.
 #'                                           y_norm{cell, gene} = y_counts{cell, gene} * mean(totalcounts{allcells}) / totalcounts{cell}
@@ -91,7 +91,7 @@ function(u, k = 0.375) {
 #'            See example below.
 #'
 #' @return data.table of DE results, with one row per target, marginal means and their SE's of the DE groups
-#'          , estimated fold change and p-values for non-zero difference (identity link) or ratio \eqn{\neq 1} (log link) between groups.
+#'         , estimated fold change and p-values for non-zero difference (identity link) or ratio \eqn{\neq 1} (log link) between groups.
 #'
 #' @examples
 #'
@@ -155,7 +155,6 @@ function(u, k = 0.375) {
 #'
 #' results(de_results, "pairwise", variable = "cell_type", targets = rownames(sem)[1:2])
 #' results(de_results, "one.vs.rest", variable = "cell_type", targets = rownames(sem)[1:2])
-#'
 #'
 #' @export
 #' @import data.table
@@ -560,6 +559,7 @@ smi_de <- function(assay_matrix
                                      , ...)
     } else {
       cl <- parallel::makeCluster(getOption("cl.cores", nCores))
+      on.exit(try(parallel::stopCluster(cl), silent = TRUE), add = TRUE) # NEW!!!
       mixedOut <- parallel::parLapply(cl
                                       , targets
                                       , deFunc
@@ -581,7 +581,7 @@ smi_de <- function(assay_matrix
                                       , spatial_args
                                       , verbose = verbose
                                       , ...)
-      suppressWarnings(parallel::stopCluster(cl))
+      suppressWarnings(parallel::stopCluster(cl)) # redundant with on.exit, but can be left in to ensure cluster is stopped in case of error in parLapply
     }
   } else {
     mixedOut <- lapply(targets
@@ -812,7 +812,7 @@ deFunc <- function(target, groupVar, groupVar_levels, pDat
     allterms <- attr(terms.formula(formula), "term.labels")
     fixed_terms <- setdiff(allterms, re_terms)
     if (length(fixed_terms) == 0) fixed_terms <- "1"
-    if (length(offsetv) > 0) fixed_terms <-  c(fixed_terms, offsetv)
+    if (length(offsetv) > 0) fixed_terms <-  c(fixed_terms, paste0("offset(", offsetv, ")"))
     fixed_formula <-  as.formula(paste0(response, " ~ ", paste0(fixed_terms, collapse = "+")))
 
     ### spatial random effect models
@@ -859,8 +859,7 @@ deFunc <- function(target, groupVar, groupVar_levels, pDat
          offsetcol <- NULL
          offsetuse <- NULL
          if (length(offsetv) > 0) {
-           offsetcol <- all.vars(as.formula(paste0("~", offsetv)))
-           offsetuse <- dat[[offsetcol]]
+           offsetuse <- eval(parse(text = offsetv), envir = as.data.frame(dat))
          } else {
            offsetuse <- NA
          }
@@ -952,8 +951,7 @@ deFunc <- function(target, groupVar, groupVar_levels, pDat
         offsetcol <- NULL
         offsetuse <- NULL
         if (length(offsetv) > 0) {
-          offsetcol <- all.vars(as.formula(paste0("~", offsetv)))
-          offsetuse <- dat[[offsetcol]]
+          offsetuse <- eval(parse(text=offsetv), envir=as.data.frame(dat))
         }
         mod <-
         withCallingHandlers({
