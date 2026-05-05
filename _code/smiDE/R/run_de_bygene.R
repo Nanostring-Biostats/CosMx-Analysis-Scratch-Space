@@ -24,13 +24,12 @@
 #' @export
 #'
 
-RankNorm <-
-function(u, k = 0.375) {
+RankNorm <- function(u, k = 0.375) {
   if (!is.vector(u)) {
     stop("A numeric vector is expected for u.")
   }
   if ((k < 0) || (k > 0.5)) {
-    stop("Select the offset within the interval (0,0.5).")
+    stop("Select the offset within the interval (0, 0.5).")
   }
   if (sum(is.na(u)) > 0) {
     stop("Please exclude observations with missing measurements.")
@@ -40,7 +39,6 @@ function(u, k = 0.375) {
   out <- qnorm((r - k) / (n - 2 * k + 1))
   return(out)
 }
-
 
 
 #' Run DE analysis models on SMI data.
@@ -102,36 +100,35 @@ function(u, k = 0.375) {
 #' metainfo <- data.table(sem@meta.data)
 #' totalcount_scalefactors <- mean(metainfo[["totalcounts"]]) / metainfo[["totalcounts"]]
 #' names(totalcount_scalefactors) <- colnames(sem)
-#' sem <- Seurat::SetAssayData(sem
-#'                            , "data"
-#'                            , sem[["RNA"]]@counts %*% Matrix::Diagonal(x = totalcount_scalefactors, names = colnames(sem))
-#'                            )
+#' sem <- Seurat::SetAssayData(
+#'   sem,
+#'   "data",
+#'   sem[["RNA"]]@counts %*% Matrix::Diagonal(x = totalcount_scalefactors, names = colnames(sem))
+#' )
 #'
-#' pre_de_obj <-
-#' pre_de(metadata = metainfo
-#'        , cell_type_metadata_colname = "cell_type"
-#'        , split_neighbors_by_colname = "tissue"
-#'        , mm_radius = 0.05
-#'        , sdimx_colname = "sdimx"
-#'        , sdimy_colname = "sdimy"
-#'        , verbose = TRUE
+#' pre_de_obj <- pre_de(
+#'   metadata = metainfo,
+#'   cell_type_metadata_colname = "cell_type",
+#'   split_neighbors_by_colname = "tissue",
+#'   mm_radius = 0.05,
+#'   sdimx_colname = "sdimx",
+#'   sdimy_colname = "sdimy",
+#'   verbose = TRUE
 #' )
 #'
 #' fibroblast_and_macrophage_cells <- metainfo[cell_type %in% c("fibroblast", "macrophage"), cell_ID]
-#' de_results <-
-#'   smi_de(assay_matrix = sem[["RNA"]]@counts
-#'          , metadata = metainfo[cell_ID %in% fibroblast_and_macrophage_cells]
-#'          , formula = ~RankNorm(otherct_expr) + niche + tissue + offset(log(totalcounts))
-#'          , family = "nbinom2"
-#'          , targets = rownames(sem)[1:5]
-#'          , pre_de_obj = pre_de_obj
-#'          , neighbor_expr_cell_type_metadata_colname = "cell_type"
-#'          , neighbor_expr_overlap_weight_colname = NULL
-#'          , neighbor_expr_overlap_agg ="sum"
-#'          , neighbor_expr_totalcount_normalize = TRUE
-#'          , neighbor_expr_totalcount_scalefactor = totalcount_scalefactors
-#'          )
-#'   )
+#' de_results <- smi_de(assay_matrix = sem[["RNA"]]@counts,
+#'   metadata = metainfo[cell_ID %in% fibroblast_and_macrophage_cells],
+#'   formula = ~RankNorm(otherct_expr) + niche + tissue + offset(log(totalcounts)),
+#'   family = "nbinom2",
+#'   targets = rownames(sem)[1:5],
+#'   pre_de_obj = pre_de_obj,
+#'   neighbor_expr_cell_type_metadata_colname = "cell_type",
+#'   neighbor_expr_overlap_weight_colname = NULL,
+#'   neighbor_expr_overlap_agg ="sum",
+#'   neighbor_expr_totalcount_normalize = TRUE,
+#'   neighbor_expr_totalcount_scalefactor = totalcount_scalefactors,
+#' )
 #'
 #' results(de_results, "pairwise", variable = "niche", targets = rownames(sem)[1:2])
 #' results(de_results, "one.vs.rest", variable = "tissue", targets = rownames(sem)[1:2])
@@ -139,19 +136,18 @@ function(u, k = 0.375) {
 #' ## fit a mixed model with all cells, cell type as a fixed effect covariate,
 #' ## tissue/sample id as a random effect covariate
 #'
-#' de_results <-
-#'   smi_de(assay_matrix = sem[["RNA"]]@counts
-#'          , metadata = metainfo
-#'          , formula = ~RankNorm(otherct_expr) + cell_type + (1 | tissue) + offset(log(totalcounts))
-#'          , family = "nbinom2"
-#'          , targets = rownames(sem)[1:5]
-#'          , pre_de_obj = pre_de_obj
-#'          , neighbor_expr_cell_type_metadata_colname = "cell_type"
-#'          , neighbor_expr_overlap_weight_colname = NULL
-#'          , neighbor_expr_overlap_agg ="sum"
-#'          , neighbor_expr_totalcount_normalize = TRUE
-#'          , neighbor_expr_totalcount_scalefactor = totalcount_scalefactors
-#'          )
+#' de_results <- smi_de(assay_matrix = sem[["RNA"]]@counts,
+#'   metadata = metainfo,
+#'   formula = ~RankNorm(otherct_expr) + cell_type + (1 | tissue) + offset(log(totalcounts)),
+#'   family = "nbinom2",
+#'   targets = rownames(sem)[1:5],
+#'   pre_de_obj = pre_de_obj,
+#'   neighbor_expr_cell_type_metadata_colname = "cell_type",
+#'   neighbor_expr_overlap_weight_colname = NULL,
+#'   neighbor_expr_overlap_agg ="sum",
+#'   neighbor_expr_totalcount_normalize = TRUE,
+#'   neighbor_expr_totalcount_scalefactor = totalcount_scalefactors,
+#' )
 #'
 #' results(de_results, "pairwise", variable = "cell_type", targets = rownames(sem)[1:2])
 #' results(de_results, "one.vs.rest", variable = "cell_type", targets = rownames(sem)[1:2])
@@ -161,25 +157,26 @@ function(u, k = 0.375) {
 #' @importFrom stats as.formula coef family formula logLik qnorm terms.formula
 #' @importFrom methods as
 #' @importFrom utils stack
-smi_de <- function(assay_matrix
-                   , metadata
-                   , formula
-                   , neighborhood_counts = NULL
-                   , pre_de_obj = NULL
-                   , groupVar = NULL
-                   , groupVar_levels = NULL
-                   , nCores = 1
-                   , verbose = TRUE
-                   , family = "nbinom2"
-                   , targets = NULL
-                   , cellid_colname = "cell_ID"
-                   , spatial_model = NULL
-                   , neighbor_expr_overlap_weight_colname = NULL
-                   , neighbor_expr_overlap_agg = c("sum", "mean")
-                   , neighbor_expr_cell_type_metadata_colname = "cell_type"
-                   , neighbor_expr_totalcount_normalize = TRUE
-                   , neighbor_expr_totalcount_scalefactor = NULL
-                   , ...
+smi_de <- function(
+  assay_matrix,
+  metadata,
+  formula,
+  neighborhood_counts = NULL,
+  pre_de_obj = NULL,
+  groupVar = NULL,
+  groupVar_levels = NULL,
+  nCores = 1,
+  verbose = TRUE,
+  family = "nbinom2",
+  targets = NULL,
+  cellid_colname = "cell_ID",
+  spatial_model = NULL,
+  neighbor_expr_overlap_weight_colname = NULL,
+  neighbor_expr_overlap_agg = c("sum", "mean"),
+  neighbor_expr_cell_type_metadata_colname = "cell_type",
+  neighbor_expr_totalcount_normalize = TRUE,
+  neighbor_expr_totalcount_scalefactor = NULL,
+  ...
 ) {
 
   metainfo <- data.table::copy(as.data.table(metadata))
@@ -191,15 +188,15 @@ smi_de <- function(assay_matrix
     xycols <- c(spatial_model[["x_coord_col"]], spatial_model[["y_coord_col"]])
     if (spatial_model[["name"]] == "GP_INLA") {
       if (!requireNamespace("INLA", quietly = TRUE)) {
-        stop("'GP_INLA' is specified but INLA package is not installed.  To run a spatial model using INLA 'GP_INLA', please install the INLA R package: https://www.r-inla.org/download-install")
+        stop("'GP_INLA' is specified but INLA package is not installed. To run a spatial model using INLA 'GP_INLA', please install the INLA R package: https://www.r-inla.org/download-install")
       }
       if (spatial_model[["name"]] == "GP_INLA") {
         if (!all(c("A", "priors") %in% names(spatial_model))) {
           if (!"mesh" %in% names(spatial_model)) {
             if (is.null(xycols)) {
              stop(paste0("If using a GP_INLA spatial random effect model, and not specifying 'priors', and 'A' matrix\n, need to specify 'x_coord_col' and 'y_coord_col' to proceed.  
-                              Please specify using spatial_args = list(name = 'GP_INLA', x_coord_col = 'xname', y_coord_col = 'yname'"
-                            ))
+                          Please specify using spatial_args = list(name = 'GP_INLA', x_coord_col = 'xname', y_coord_col = 'yname'"
+                          ))
             }
             if (!all(c(xycols) %in% colnames(metadata))) {
               msg <- paste0("If using a GP_INLA spatial random effect model, and not specifying 'priors', and 'A' matrix\n, need to specify 'x_coord_col' and 'y_coord_col' to proceed.  
@@ -207,7 +204,7 @@ smi_de <- function(assay_matrix
                                    , xycols[1]
                                    , " and "
                                    , xycols[2]
-                                   , " not found.  Please specify using spatial_args = list(name = 'GP_INLA', x_coord_col = 'xname', y_coord_col = 'yname'"
+                                   , " not found. Please specify using spatial_args = list(name = 'GP_INLA', x_coord_col = 'xname', y_coord_col = 'yname'"
                           )
               stop(msg)
             }
@@ -279,7 +276,7 @@ smi_de <- function(assay_matrix
                                  , xycols[1]
                                  , " and "
                                  , xycols[2]
-                                 , " not found.  Please specify using spatial_args = list(name = 'GP_INLA', x_coord_col = 'xname', y_coord_col = 'yname'"
+                                 , " not found. Please specify using spatial_args = list(name = 'GP_INLA', x_coord_col = 'xname', y_coord_col = 'yname'"
                         )
             stop(msg)
           }
@@ -309,13 +306,13 @@ smi_de <- function(assay_matrix
                                , xycols[1]
                                , " and "
                                , xycols[2]
-                               , " not found.  Please specify using spatial_args = list(name = 'GP_Matern', x_coord_col = 'xname', y_coord_col = 'yname'"
+                               , " not found. Please specify using spatial_args = list(name = 'GP_Matern', x_coord_col = 'xname', y_coord_col = 'yname'"
                       )
           stop(msg)
         }
         message("Creating k-means clusters for spatial random effects.")
         if (!is.null(spatial_args[["split_neighbors_by_colname"]])) {
-          msg <- paste0("split_neighbors_by_colname argument must be a column in metadata.  You may need to specify NULL, or column name in metadata that indicates the 'sample ID'."
+          msg <- paste0("split_neighbors_by_colname argument must be a column in metadata. You may need to specify NULL, or column name in metadata that indicates the 'sample ID'."
                         , " ", spatial_args[["split_neighbors_by_colname"]], " column not found.")
           if (!spatial_args[["split_neighbors_by_colname"]] %in% colnames(metainfo)) {
             stop(msg)
@@ -399,7 +396,7 @@ smi_de <- function(assay_matrix
   Wmat <- NULL
   celltype_ref <- NULL
   if (!missing(neighborhood_counts)) {
-    warning("'neighborhood_counts' argument is deprecated and will be removed in the future.  Use `pre_de_obj` argument instead.")
+    warning("'neighborhood_counts' argument is deprecated and will be removed in the future. Use `pre_de_obj` argument instead.")
     stopifnot("neighborhood_counts must be NULL or an object of neighborexpr class returned by 'measure_neighbor_expr_by_celltype' function" = inherits(neighborhood_counts, "neighborexpr"))
 
     if (length(setdiff(colnames(assay_matrix), metainfo[[cellid_colname]])) > 0 ||
@@ -466,7 +463,7 @@ smi_de <- function(assay_matrix
   candidate_neighbor_terms <- c()
   if (length(neighborhood_counts) > 0) {
     ## potentially lighten the list of matrices passed through to deFunc
-    neighborhood_counts$neighbor_expr_byct  <- neighborhood_counts$neighbor_expr_byct[extract_names]
+    neighborhood_counts$neighbor_expr_byct <- neighborhood_counts$neighbor_expr_byct[extract_names]
     candidate_neighbor_terms <- unlist(lapply(names(neighborhood_counts$neighbor_expr_byct)
                                       , function(x) paste0(x, c("", "_intensity", "_expr", "_cellcount"))))
 
@@ -617,7 +614,6 @@ smi_de <- function(assay_matrix
   class(return_obj) <- append(class(return_obj), "smide")
   return(return_obj)
 }
-
 
 deFunc <- function(target, groupVar, groupVar_levels, pDat
                    , formula, family
@@ -812,7 +808,7 @@ deFunc <- function(target, groupVar, groupVar_levels, pDat
     allterms <- attr(terms.formula(formula), "term.labels")
     fixed_terms <- setdiff(allterms, re_terms)
     if (length(fixed_terms) == 0) fixed_terms <- "1"
-    if (length(offsetv) > 0) fixed_terms <-  c(fixed_terms, paste0("offset(", offsetv, ")"))
+    if (length(offsetv) > 0) fixed_terms <- c(fixed_terms, paste0("offset(", offsetv, ")"))
     fixed_formula <-  as.formula(paste0(response, " ~ ", paste0(fixed_terms, collapse = "+")))
 
     ### spatial random effect models
@@ -951,7 +947,7 @@ deFunc <- function(target, groupVar, groupVar_levels, pDat
         offsetcol <- NULL
         offsetuse <- NULL
         if (length(offsetv) > 0) {
-          offsetuse <- eval(parse(text=offsetv), envir=as.data.frame(dat))
+          offsetuse <- eval(parse(text = offsetv), envir = as.data.frame(dat))
         }
         mod <-
         withCallingHandlers({
