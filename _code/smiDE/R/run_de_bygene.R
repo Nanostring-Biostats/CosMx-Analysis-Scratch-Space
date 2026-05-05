@@ -157,6 +157,7 @@ RankNorm <- function(u, k = 0.375) {
 #' @importFrom stats as.formula coef family formula logLik qnorm terms.formula
 #' @importFrom methods as
 #' @importFrom utils stack
+
 smi_de <- function(
   assay_matrix,
   metadata,
@@ -186,70 +187,75 @@ smi_de <- function(
                = "name" %in% names(spatial_model))
 
     xycols <- c(spatial_model[["x_coord_col"]], spatial_model[["y_coord_col"]])
+
+    # If spatial model is NOT GP_INLA, or GP_Matern, then stop
+    if (!spatial_model[["name"]] %in% c("GP_INLA", "GP_Matern")) {
+      stop("Currently supported spatial models are 'GP_INLA' and 'GP_Matern'. Please specify spatial_model = list(name = 'GP_INLA', ...) or spatial_model = list(name = 'GP_Matern', ...), with corresponding model fitting arguments.")
+    }
+
     if (spatial_model[["name"]] == "GP_INLA") {
       if (!requireNamespace("INLA", quietly = TRUE)) {
         stop("'GP_INLA' is specified but INLA package is not installed. To run a spatial model using INLA 'GP_INLA', please install the INLA R package: https://www.r-inla.org/download-install")
       }
-      if (spatial_model[["name"]] == "GP_INLA") {
-        if (!all(c("A", "priors") %in% names(spatial_model))) {
-          if (!"mesh" %in% names(spatial_model)) {
-            if (is.null(xycols)) {
-             stop(paste0("If using a GP_INLA spatial random effect model, and not specifying 'priors', and 'A' matrix\n, need to specify 'x_coord_col' and 'y_coord_col' to proceed.  
-                          Please specify using spatial_args = list(name = 'GP_INLA', x_coord_col = 'xname', y_coord_col = 'yname'"
-                          ))
-            }
-            if (!all(c(xycols) %in% colnames(metadata))) {
-              msg <- paste0("If using a GP_INLA spatial random effect model, and not specifying 'priors', and 'A' matrix\n, need to specify 'x_coord_col' and 'y_coord_col' to proceed.  
-                            Expected X/Y Columns: "
-                                   , xycols[1]
-                                   , " and "
-                                   , xycols[2]
-                                   , " not found. Please specify using spatial_args = list(name = 'GP_INLA', x_coord_col = 'xname', y_coord_col = 'yname'"
-                          )
-              stop(msg)
-            }
+      if (!all(c("A", "priors") %in% names(spatial_model))) {
+        if (!"mesh" %in% names(spatial_model)) {
+          if (is.null(xycols)) {
+            stop("If using a GP_INLA spatial random effect model, and not specifying 'priors', and 'A' matrix, need to specify 'x_coord_col' and 'y_coord_col' to proceed. Please specify using spatial_args = list(name = 'GP_INLA', x_coord_col = 'xname', y_coord_col = 'yname'")
+          }
+          if (!all(c(xycols) %in% colnames(metadata))) {
+            msg <- paste0("If using a GP_INLA spatial random effect model, and not specifying 'priors', and 'A' matrix, need to specify 'x_coord_col' and 'y_coord_col' to proceed.  
+                          Expected X/Y Columns: "
+                                  , xycols[1]
+                                  , " and "
+                                  , xycols[2]
+                                  , " not found. Please specify using spatial_args = list(name = 'GP_INLA', x_coord_col = 'xname', y_coord_col = 'yname'"
+                        )
+            stop(msg)
           }
         }
       }
     }
 
-    default_args <- switch(spatial_model[["name"]]
-                           , "GP_Matern" = list(fixed = list(nu = 0.5)
-                                               , x_coord_col = "sdimx"
-                                               , y_coord_col = "sdimy"
-                                               , k_prop_n = 0.2
-                                               , k = NULL
-                                               , split_neighbors_by_colname = "Run_Tissue_name"
-                                               , spatial_random_effect = ~Matern(1 | sdimx_cluster + sdimy_cluster %in% Run_Tissue_name)
-                                               )
-                           , "GP_INLA" = {
-                                         ### some defaults here computed from the data
-                                         rangey <- diff(range(metainfo[[spatial_model[["y_coord_col"]]]]))
-                                         rangex <- diff(range(metainfo[[spatial_model[["x_coord_col"]]]]))
-                                         ncells <- nrow(metainfo)
-                                         list(x_coord_col = spatial_model[["x_coord_col"]]
-                                             , y_coord_col = spatial_model[["y_coord_col"]]
-                                             , max.edge.mesh = mean(c(rangex, rangey)) / sqrt(ncells) * c(5, 10)
-                                             , offset.mesh = c(-0.05, -0.1)
-                                             , alpha.inlaprior = 2
-                                             , prior.range.inlaprior = c(mean(c(rangex, rangey)), 0.5)
-                                             , prior.sigma.inlaprior = c(0.5, 0.5)
-                                             , constr.inlaprior = TRUE
-                                             , spatial_random_effect = ~f(s, model = spde)
-                                             , quantiles = c(0.025, 0.5, 0.975)
-                                             )
-                             }
-                           )
+    default_args <- switch(
+      spatial_model[["name"]],
+      "GP_Matern" = list(
+        fixed = list(nu = 0.5),
+        x_coord_col = "sdimx",
+        y_coord_col = "sdimy",
+        k_prop_n = 0.2,
+        k = NULL,
+        split_neighbors_by_colname = "Run_Tissue_name",
+        spatial_random_effect = ~Matern(1 | sdimx_cluster + sdimy_cluster %in% Run_Tissue_name)
+      ),
+      "GP_INLA" = {
+        ### some defaults here computed from the data
+        rangey <- diff(range(metainfo[[spatial_model[["y_coord_col"]]]]))
+        rangex <- diff(range(metainfo[[spatial_model[["x_coord_col"]]]]))
+        ncells <- nrow(metainfo)
+        list(
+          x_coord_col = spatial_model[["x_coord_col"]],
+          y_coord_col = spatial_model[["y_coord_col"]],
+          max.edge.mesh = mean(c(rangex, rangey)) / sqrt(ncells) * c(5, 10),
+          offset.mesh = c(-0.05, -0.1),
+          alpha.inlaprior = 2,
+          prior.range.inlaprior = c(mean(c(rangex, rangey)), 0.5),
+          prior.sigma.inlaprior = c(0.5, 0.5),
+          constr.inlaprior = TRUE,
+          spatial_random_effect = ~f(s, model = spde),
+          quantiles = c(0.025, 0.5, 0.975)
+        )
+      }
+    )
 
     ### start with formal-default arguments for package model fitting function
-    formalss <-  switch(spatial_model[["name"]]
-                        , "GP_Matern" = names(formals(spaMM::fitme))
-                        , "GP_INLA" = names(formals(INLA::inla))
-                        )
+    formalss <- switch(
+      spatial_model[["name"]],
+      "GP_Matern" = names(formals(spaMM::fitme)),
+      "GP_INLA" = names(formals(INLA::inla))
+    )
 
     ### override any formal-defaults with defaults specified above
-    override_args <- intersect(names(spatial_model)
-                               , formalss)
+    override_args <- intersect(names(spatial_model), formalss)
     argnames <- formalss
     spatial_args <- vector(mode = "list", length = length(argnames))
     names(spatial_args) <- argnames
@@ -262,9 +268,7 @@ smi_de <- function(
       spatial_args[[arg]] <- spatial_model[[arg]]
     }
     spatial_args[c("formula", "data", "family")] <- NULL
-    for (arg in names(spatial_args)) {
-      if (is.null(spatial_args[[arg]])) spatial_args[[arg]] <- NULL
-    }
+    spatial_args <- spatial_args[!vapply(spatial_args, is.null, logical(1))] # remove any NULL args
 
     xycols <- c(spatial_args[["x_coord_col"]], spatial_args[["y_coord_col"]])
     if (spatial_model[["name"]] == "GP_INLA") {
@@ -357,32 +361,35 @@ smi_de <- function(
     cellid_colname <- "cell_ID"
     metainfo[[cellid_colname]] <- rownames(metadata)
   }
-  if (cellid_colname != "cell_ID" & "cell_ID" %in% names(metainfo)) metainfo[["cell_ID"]] <- NULL
+  if (cellid_colname != "cell_ID" & "cell_ID" %in% names(metainfo)) {
+    metainfo[["cell_ID"]] <- NULL
+  }
   setnames(metainfo, old = cellid_colname, new = "cell_ID")
 
-  if (is.null(targets)) targets <- rownames(assay_matrix)
+  if (is.null(targets)) {
+    targets <- rownames(assay_matrix)
+  }
   mTerms <- all.vars(formula)
   inla_term <- NULL
   if (!is.null(spatial_model) && spatial_model[["name"]] == "GP_INLA") {
-     term_var <- attr(terms(terms(formula)), "variables")
-     inla_term <-
-     lapply(term_var, function(x) {
-       if (is.call(x)) {
-         if (any(grepl("INLA|f\\(", as.character(x[[1]])))) {
-           unlist(lapply(x[2:length(x)], as.character))
-         }
-       } else {
-        NULL
-       }
-     })
-     inla_term <- unlist(inla_term)
-     mTerms <- setdiff(mTerms, inla_term)
+    term_var <- attr(terms(terms(formula)), "variables")
+    inla_term <-
+    lapply(term_var, function(x) {
+      if (is.call(x)) {
+        if (any(grepl("INLA|f\\(", as.character(x[[1]])))) {
+          unlist(lapply(x[2:length(x)], as.character))
+        }
+      } else {
+      NULL
+      }
+    })
+    inla_term <- unlist(inla_term)
+    mTerms <- setdiff(mTerms, inla_term)
   }
   if (!is.null(spatial_model) && spatial_model[["name"]] == "GP_Matern") {
-     spamm_terms <- all.vars(spatial_args[["spatial_random_effect"]])
-     xycols <- c(spatial_args[["x_coord_col"]], spatial_args[["y_coord_col"]])
-     mTerms <- c(mTerms, spamm_terms)
-     mTerms <- c(mTerms, xycols)
+    spamm_terms <- all.vars(spatial_args[["spatial_random_effect"]])
+    xycols <- c(spatial_args[["x_coord_col"]], spatial_args[["y_coord_col"]])
+    mTerms <- c(mTerms, spamm_terms, xycols)
   }
   mTerms <- setdiff(mTerms, "1")
 
@@ -532,105 +539,119 @@ smi_de <- function(
     assay_expr <- new.env()
     assay_expr$assay_expr <- assay_matrix
     if (Sys.info()["sysname"] != "Windows") {
-      mixedOut <- parallel::mclapply(targets
-                                     , deFunc
-                                     , groupVar
-                                     , groupVar_levels
-                                     , pDat
-                                     , updatedFormula
-                                     , family = family
-                                     , assay_expr
-                                     , neighbor_expr_overlap_weight_colname
-                                     , neighbor_expr_overlap_agg
-                                     , neighbor_expr_cell_type_metadata_colname
-                                     , neighbor_expr_totalcount_normalize
-                                     , neighbor_expr_totalcount_scalefactor
-                                     , Wmat
-                                     , celltype_ref
-                                     , neighborhood_counts
-                                     , neighbor_terms
-                                     , typ = "parallel"
-                                     , spatial_args
-                                     , verbose = verbose
-                                     , mc.cores = nCores
-                                     , ...)
+      mixedOut <- parallel::mclapply(
+        targets,
+        deFunc,
+        groupVar = groupVar,
+        groupVar_levels = groupVar_levels,
+        pDat = pDat,
+        formula = updatedFormula,
+        family = family,
+        assay_expr = assay_expr,
+        neighbor_expr_overlap_weight_colname = neighbor_expr_overlap_weight_colname,
+        neighbor_expr_overlap_agg = neighbor_expr_overlap_agg,
+        neighbor_expr_cell_type_metadata_colname = neighbor_expr_cell_type_metadata_colname,
+        neighbor_expr_totalcount_normalize = neighbor_expr_totalcount_normalize,
+        neighbor_expr_totalcount_scalefactor = neighbor_expr_totalcount_scalefactor,
+        Wmat = Wmat,
+        celltype_ref = celltype_ref,
+        neighbor_counts = neighborhood_counts,
+        neighbor_terms = neighbor_terms,
+        typ = "parallel",
+        spatial_args = spatial_args,
+        verbose = verbose,
+        mc.cores = nCores,
+        ...
+      )
     } else {
       cl <- parallel::makeCluster(getOption("cl.cores", nCores))
       on.exit(try(parallel::stopCluster(cl), silent = TRUE), add = TRUE) # NEW!!!
-      mixedOut <- parallel::parLapply(cl
-                                      , targets
-                                      , deFunc
-                                      , groupVar
-                                      , pDat
-                                      , updatedFormula
-                                      , family
-                                      , assay_expr
-                                      , neighbor_expr_overlap_weight_colname
-                                      , neighbor_expr_overlap_agg
-                                      , neighbor_expr_cell_type_metadata_colname
-                                      , neighbor_expr_totalcount_normalize
-                                      , neighbor_expr_totalcount_scalefactor
-                                      , Wmat
-                                      , celltype_ref
-                                      , neighborhood_counts
-                                      , neighbor_terms
-                                      , typ
-                                      , spatial_args
-                                      , verbose = verbose
-                                      , ...)
+      mixedOut <- parallel::parLapply(
+        cl,
+        targets,
+        deFunc,
+        groupVar = groupVar,
+        groupVar_levels = groupVar_levels,
+        pDat = pDat,
+        formula = updatedFormula,
+        family = family,
+        assay_expr = assay_expr,
+        neighbor_expr_overlap_weight_colname = neighbor_expr_overlap_weight_colname,
+        neighbor_expr_overlap_agg = neighbor_expr_overlap_agg,
+        neighbor_expr_cell_type_metadata_colname = neighbor_expr_cell_type_metadata_colname,
+        neighbor_expr_totalcount_normalize = neighbor_expr_totalcount_normalize,
+        neighbor_expr_totalcount_scalefactor = neighbor_expr_totalcount_scalefactor,
+        Wmat = Wmat,
+        celltype_ref = celltype_ref,
+        neighbor_counts = neighborhood_counts,
+        neighbor_terms = neighbor_terms,
+        typ = typ,
+        spatial_args = spatial_args,
+        verbose = verbose,
+        ...
+      )
       suppressWarnings(parallel::stopCluster(cl)) # redundant with on.exit, but can be left in to ensure cluster is stopped in case of error in parLapply
     }
   } else {
-    mixedOut <- lapply(targets
-                       , deFunc
-                       , groupVar
-                       , groupVar_levels
-                       , pDat
-                       , updatedFormula
-                       , family = family
-                       , assay_matrix
-                       , neighbor_expr_overlap_weight_colname
-                       , neighbor_expr_overlap_agg
-                       , neighbor_expr_cell_type_metadata_colname
-                       , neighbor_expr_totalcount_normalize
-                       , neighbor_expr_totalcount_scalefactor
-                       , Wmat
-                       , celltype_ref
-                       , neighborhood_counts
-                       , neighbor_terms
-                       , typ = "non-parallel"
-                       , spatial_args
-                       , verbose = verbose
-                       , ...)
+    mixedOut <- lapply(
+      targets,
+      deFunc,
+      groupVar = groupVar,
+      groupVar_levels = groupVar_levels,
+      pDat = pDat,
+      formula = updatedFormula,
+      family = family,
+      assay_expr = assay_matrix,
+      neighbor_expr_overlap_weight_colname = neighbor_expr_overlap_weight_colname,
+      neighbor_expr_overlap_agg = neighbor_expr_overlap_agg,
+      neighbor_expr_cell_type_metadata_colname = neighbor_expr_cell_type_metadata_colname,
+      neighbor_expr_totalcount_normalize = neighbor_expr_totalcount_normalize,
+      neighbor_expr_totalcount_scalefactor = neighbor_expr_totalcount_scalefactor,
+      Wmat = Wmat,
+      celltype_ref = celltype_ref,
+      neighbor_counts = neighborhood_counts,
+      neighbor_terms = neighbor_terms,
+      typ = "non-parallel",
+      spatial_args = spatial_args,
+      verbose = verbose,
+      ...
+    )
   }
   names(mixedOut) <- targets
 
-  return_obj <- list(results = mixedOut
-                     , groupVar = groupVar
-                     , modelterms = mixedOut[[1]]$terms
-                     , targets = targets
-                     )
+  return_obj <- list(
+    results = mixedOut,
+    groupVar = groupVar,
+    modelterms = mixedOut[[1]]$terms,
+    targets = targets
+  )
 
   class(return_obj) <- append(class(return_obj), "smide")
   return(return_obj)
 }
 
-deFunc <- function(target, groupVar, groupVar_levels, pDat
-                   , formula, family
-                   , assay_expr
-                   , neighbor_expr_overlap_weight_colname
-                   , neighbor_expr_overlap_agg
-                   , neighbor_expr_cell_type_metadata_colname
-                   , neighbor_expr_totalcount_normalize = TRUE
-                   , neighbor_expr_totalcount_scalefactor = NULL
-                   , Wmat
-                   , celltype_ref
-                   , neighbor_counts
-                   , neighbor_terms
-                   , typ
-                   , spatial_args
-                   , verbose = TRUE
-                   , ...) {
+deFunc <- function(
+  target,
+  groupVar,
+  groupVar_levels,
+  pDat,
+  formula,
+  family,
+  assay_expr,
+  neighbor_expr_overlap_weight_colname,
+  neighbor_expr_overlap_agg,
+  neighbor_expr_cell_type_metadata_colname,
+  neighbor_expr_totalcount_normalize = TRUE,
+  neighbor_expr_totalcount_scalefactor = NULL,
+  Wmat,
+  celltype_ref,
+  neighbor_counts,
+  neighbor_terms,
+  typ,
+  spatial_args,
+  verbose = TRUE,
+  ...
+) {
   if (isTRUE(verbose)) {
     message_parallel(paste0("Fitting model to target: ", target))
   }
@@ -809,110 +830,118 @@ deFunc <- function(target, groupVar, groupVar_levels, pDat
     fixed_terms <- setdiff(allterms, re_terms)
     if (length(fixed_terms) == 0) fixed_terms <- "1"
     if (length(offsetv) > 0) fixed_terms <- c(fixed_terms, paste0("offset(", offsetv, ")"))
-    fixed_formula <-  as.formula(paste0(response, " ~ ", paste0(fixed_terms, collapse = "+")))
+    fixed_formula <- as.formula(paste0(response, " ~ ", paste0(fixed_terms, collapse = "+")))
+
+    message(cat("Line 835: Using fixed_formula: ", deparse(fixed_formula), "\n"))
 
     ### spatial random effect models
     if (!is.null(spatial_args)) {
-       if (spatial_args[["name"]] == "GP_Matern") {
-         fittype <- "spaMM::fitme"
-         newfrmla <- update.formula(formula, paste0(".~.+", labels(terms(spatial_args[["spatial_random_effect"]]))))
-         non_model_args <- c("spatial_random_effect", "k", "k_prop_n", "x_coord_col", "y_coord_col", "split_neighbors_by_colname")
-         extra_args <- spatial_args[c(setdiff(names(spatial_args), non_model_args))]
+      if (spatial_args[["name"]] == "GP_Matern") {
+        fittype <- "spaMM::fitme"
+        newfrmla <- update.formula(formula, paste0(".~.+", labels(terms(spatial_args[["spatial_random_effect"]]))))
+        non_model_args <- c("spatial_random_effect", "k", "k_prop_n", "x_coord_col", "y_coord_col", "split_neighbors_by_colname")
+        extra_args <- spatial_args[c(setdiff(names(spatial_args), non_model_args))]
 
-         famchar <- switch(family
-                           , gaussian = "gaussian"
-                           , nbinom2 = "negbin"
-                           , poisson = "poisson")
-         mod <-
-         withCallingHandlers({
-           tryCatch({
-             capture_output(
-             do.call(spaMM::fitme
-                     , c(list(formula = newfrmla, data = dat, family = famchar), extra_args))
+        famchar <- switch(
+          family,
+          gaussian = "gaussian",
+          nbinom2 = "negbin",
+          poisson = "poisson"
+        )
 
-             )$result
+        message(cat("Line 852: Using newfrmla: ", deparse(newfrmla), "\n"))
 
-             }, error = function(e) {
-               convergence_error <<- TRUE
-                err <<- conditionMessage(e)
-               "convergence_error"
-           })
+        mod <- withCallingHandlers({
+          tryCatch({
+            capture_output(
+            do.call(spaMM::fitme
+                    , c(list(formula = newfrmla, data = dat, family = famchar), extra_args))
+
+            )$result
+
+            }, error = function(e) {
+              convergence_error <<- TRUE
+              err <<- conditionMessage(e)
+              "convergence_error"
+          })
           }, warning = function(w) {
             model_warning_msg <<- conditionMessage(w)
             invokeRestart("muffleWarning")
           })
-       }
-       if (spatial_args[["name"]] == "GP_INLA") {
-         fittype <- "INLA::inla"
-         modelmat <- model.matrix(formula, data = dat)
-         realnames <- colnames(modelmat)
-         modeldt <- as.data.table(modelmat)
-         inlanames <- paste0("Xf", 1:ncol(modeldt))
-         data.table::setnames(modeldt, names(modeldt), inlanames)
-         newfrmla <- as.formula(paste0("y ~ -1+ ", paste0(colnames(modeldt), collapse = "+")))
-         newfrmla <- update.formula(newfrmla, paste0(".~.+", labels(terms(spatial_args[["spatial_random_effect"]]))))
+      }
+      if (spatial_args[["name"]] == "GP_INLA") {
+        fittype <- "INLA::inla"
+        modelmat <- model.matrix(formula, data = dat)
+        realnames <- colnames(modelmat)
+        modeldt <- as.data.table(modelmat)
+        inlanames <- paste0("Xf", 1:ncol(modeldt))
+        data.table::setnames(modeldt, names(modeldt), inlanames)
+        newfrmla <- as.formula(paste0("y ~ -1+ ", paste0(colnames(modeldt), collapse = "+")))
+        newfrmla <- update.formula(newfrmla, paste0(".~.+", labels(terms(spatial_args[["spatial_random_effect"]]))))
 
-         offsetcol <- NULL
-         offsetuse <- NULL
-         if (length(offsetv) > 0) {
-           offsetuse <- eval(parse(text = offsetv), envir = as.data.frame(dat))
-         } else {
-           offsetuse <- NA
-         }
+        offsetcol <- NULL
+        offsetuse <- NULL
+      if (length(offsetv) > 0) {
+          offsetuse <- eval(parse(text = offsetv), envir = as.data.frame(dat))
+        } else {
+          offsetuse <- NA
+        }
 
-         plist <- list(s = 1:ncol(spatial_args[["A"]]))
-         for (nm in names(modeldt)) {
-           plist[[nm]] <- modeldt[[nm]]
-         }
-         inlastack <- INLA::inla.stack(
-           tag = "est"
-           , data = list(dat[, .(y)]) #should include outcome and offset, but not covariates
-           , effects = plist
-           , a = c(spatial_args[["A"]]
-                  , lapply(1:(length(plist) - 1), function(x) 1)
-                  )
-         )
-         lclists <- prepare_lincombs(dat = dat, fitmethod = "INLA::inla", original_formula = formula, fam = family_char, inlanames = inlanames)
-         famchar <- switch(family_char
-                           , gaussian = "gaussian"
-                           , nbinom2 = "nbinomial"
-                           , poisson = "poisson"
-                           )
+        message(cat("Line 890: offsetuse: ", deparse(offsetuse), "\n"))
 
-         non_model_args <- c("x_coord_col"
-                              , "y_coord_col"
-                              , "max.edge.mesh"
-                              , "cutoff.mesh"
-                              , "offset.mesh"
-                              , "alpha.inlaprior"
-                              , "prior.range.inlaprior"
-                              , "prior.sigma.inlaprior"
-                              , "constr.inlaprior"
-                              , "mesh"
-                              , "spatial_random_effect", "priors", "name", "A")
-         extra_args <- spatial_args[c(setdiff(names(spatial_args), non_model_args))]
-         mod <-
-         withCallingHandlers({
-           tryCatch({
-         do.call(INLA::inla
-                   , c(list(formula = newfrmla
-                     , e = offsetuse
-                     , data = INLA::inla.stack.data(inlastack, spde = spatial_args[["priors"]])
-                        , control.predictor = list(A = INLA::inla.stack.A(inlastack)
-                                                 , compute = TRUE)
-                        , family = famchar
-                        , lincomb = c(lclists[["emm_lc_list"]]
-                                    , lclists[["pairwise_lc_list"]]
-                                    , lclists[["onevrest_lc_list"]]
-                                    , lclists[["onevall_lc_list"]])
-                        , control.inla = list(int.strategy = "eb")
-                 ), extra_args)
-                 )
-           }, error = function(e) {
-             convergence_error <<- TRUE
-              err <<- conditionMessage(e)
-             "convergence_error"
-         })
+        plist <- list(s = 1:ncol(spatial_args[["A"]]))
+        for (nm in names(modeldt)) {
+          plist[[nm]] <- modeldt[[nm]]
+        }
+        inlastack <- INLA::inla.stack(
+          tag = "est"
+          , data = list(dat[, .(y)]) #should include outcome and offset, but not covariates
+          , effects = plist
+          , a = c(spatial_args[["A"]]
+                , lapply(1:(length(plist) - 1), function(x) 1)
+                )
+        )
+        lclists <- prepare_lincombs(dat = dat, fitmethod = "INLA::inla", original_formula = formula, fam = family_char, inlanames = inlanames)
+        famchar <- switch(family_char
+                          , gaussian = "gaussian"
+                          , nbinom2 = "nbinomial"
+                          , poisson = "poisson"
+                          )
+
+        non_model_args <- c("x_coord_col"
+                            , "y_coord_col"
+                            , "max.edge.mesh"
+                            , "cutoff.mesh"
+                            , "offset.mesh"
+                            , "alpha.inlaprior"
+                            , "prior.range.inlaprior"
+                            , "prior.sigma.inlaprior"
+                            , "constr.inlaprior"
+                            , "mesh"
+                            , "spatial_random_effect", "priors", "name", "A")
+        extra_args <- spatial_args[c(setdiff(names(spatial_args), non_model_args))]
+        mod <-
+        withCallingHandlers({
+          tryCatch({
+        do.call(INLA::inla
+                  , c(list(formula = newfrmla
+                    , e = offsetuse
+                    , data = INLA::inla.stack.data(inlastack, spde = spatial_args[["priors"]])
+                      , control.predictor = list(A = INLA::inla.stack.A(inlastack)
+                                                , compute = TRUE)
+                      , family = famchar
+                      , lincomb = c(lclists[["emm_lc_list"]]
+                                  , lclists[["pairwise_lc_list"]]
+                                  , lclists[["onevrest_lc_list"]]
+                                  , lclists[["onevall_lc_list"]])
+                      , control.inla = list(int.strategy = "eb")
+                ), extra_args)
+                )
+          }, error = function(e) {
+            convergence_error <<- TRUE
+            err <<- conditionMessage(e)
+            "convergence_error"
+        })
         }, warning = function(w) {
           model_warning_msg <<- conditionMessage(w)
           invokeRestart("muffleWarning")
@@ -949,6 +978,9 @@ deFunc <- function(target, groupVar, groupVar_levels, pDat
         if (length(offsetv) > 0) {
           offsetuse <- eval(parse(text = offsetv), envir = as.data.frame(dat))
         }
+
+        message(cat("Line 982: offsetuse: ", deparse(offsetuse), "\n"))
+
         mod <-
         withCallingHandlers({
           tryCatch({
