@@ -308,7 +308,7 @@ summarize_model <- function(
               ## if a leading andtrailing parenthesis is added to the contrast label,
               ## homogenize by adding to all levels.
               ## (This can happen in nested case, despite argument parens=NULL above.. may file an issue w/ emmeans to see if a bug.)
-              # onevall[!grepl("^\\(.*\\)", term_1),` :=`(term_1=paste0("(",term_1, ")")
+              # onevall[!grepl("^\\(.*\\)", term_1),`:=`(term_1=paste0("(",term_1, ")")
               onevall[!grepl("^\\(.*\\)", term_1), `:=`(
                 contrast = gsub("^", "(", gsub("\\ vs\\.", ") vs.", contrast)),
                 term_1 = paste0("(", term_1, ")")
@@ -380,12 +380,12 @@ summarize_model <- function(
 
             onevrest_list[[term]] <- rbindlist(list(
               onevrest_list[[term]],
-              onevrest[, ` :=`(term = term)]
+              onevrest[, `:=`(term = term)]
             ))
 
             onevall_list[[term]] <- rbindlist(list(
               onevall_list[[term]],
-              onevall[, ` :=`(term = term)]
+              onevall[, `:=`(term = term)]
             ))
           }
 
@@ -440,7 +440,7 @@ summarize_model <- function(
             )
           }
 
-          pw[, ` :=`(term_1 = NULL, term_2 = NULL)]
+          pw[, `:=`(term_1 = NULL, term_2 = NULL)]
           if (continuous_var) {
             pw[, l1o := tstrsplit(contrast, "\\ [\\/-]\\ ")[[1]]]
             pw[, l2o := tstrsplit(contrast, "\\ [\\/-]\\ ")[[2]]]
@@ -450,11 +450,11 @@ summarize_model <- function(
             pw[, l2 := paste0(term, " ", formatC(as.numeric(tstrsplit(l2, " ")[[2]])))]
             pw[, contrast := gsub(l1o, l1, contrast)]
             pw[, contrast := gsub(l2o, l2, contrast)]
-            pw[, ` :=`(l1 = NULL, l2 = NULL, l1o = NULL, l2o = NULL)]
+            pw[, `:=`(l1 = NULL, l2 = NULL, l1o = NULL, l2o = NULL)]
           }
           pw_list[[term]] <- rbindlist(list(
             pw_list[[term]],
-            pw[, ` :=`(term = term)]
+            pw[, `:=`(term = term)]
           ), use.names = TRUE, fill = TRUE)
         }
         emobdt[, ky := NULL]
