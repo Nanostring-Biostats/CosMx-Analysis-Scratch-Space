@@ -191,6 +191,18 @@ pcaobj <- scPearsonPCA::sparse_quasipoisson_pca_seurat(
 env <- embedCellNeighborhoods(mat = pcaobj$reduction.data@cell.embeddings, 
                               xy = xy, 
                               ks = c(5, 50)) 
+
+
+#### Simple niche definition by clustering the env matrix -------------------
+
+## with Mclust (similar to K-means)
+niche <- mclust::Mclust(env, G = 10, modelNames = "EII")$classification
+plot(xy, pch = 16, cex = 0.1, asp = 1, 
+     col = cellcols[as.numeric(as.factor(niche))])
+```
+
+```{r echo = FALSE, eval = TRUE, out.width = "170%"}
+knitr::include_graphics("figures/niche1.png")
 ```
 
 # For data exploration: coloring tissues by their environment embeddings
