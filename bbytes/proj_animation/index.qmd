@@ -1,0 +1,442 @@
+---
+title: "Projection Animator"
+format:
+  live-dashboard:
+    orientation: rows
+    engine: knitr
+    theme:
+      light: 
+        - sandstone
+        - dashboard.scss
+webr:
+  packages:
+    - ggplot2
+    - duckdb
+    - gganimate
+    - magick
+    - jsonlite
+    - scales
+    - dplyr
+    - data.table
+    - tools
+  repos:
+    - https://r-lib.r-universe.dev
+---
+
+{{< include ../../_extensions/r-wasm/live/_knitr.qmd >}}
+
+Welcome to the **Projection Diffusion Animator**, a serverless tool for creating
+animations that transition your spatial data from expression space (e.g. UMAP)
+to physical space (XY coordinates). 
+
+This tool utilizes WebAssembly [(WebR)](https://docs.r-wasm.org/webr/latest/){target="_blank"} and [ObservableJS](https://quarto.org/docs/interactive/ojs/){target="_blank"} to run entirely in your web browser without uploading data to a remote server. 
+
+You can explore one of our own examples or load your own. 
+
+Advanced users should check out the `Advanced`
+tab if they want to customize their aesthetics plot even further or download 
+the underlying plotting functions for use locally. 
+
+::: {.callout-warning appearance="simple"}
+**Beta Notice:** This dashboard is currently in an **experimental / beta testing phase**. Features, performance, and data formats are subject to change. When you first load the site, you will see temporary `
+OJS Runtime Error` messages displayed until data are initialized. Please report any issues you encounter.
+:::
+
+
+
+# {.sidebar width="350px"}
+
+:::{.card .hidden}
+
+```{ojs}
+//| echo: false
+//| output: false
+
+duck_db_client = {
+  const duckdb = await import("https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm");
+  
+  console.log("🔧 Initializing DuckDB-Wasm Client...");
+  
+  const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
+  const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
+  
+  const worker_url = URL.createObjectURL(
+    new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" })
+  );
+
+  const worker = new Worker(worker_url);
+  const logger = new duckdb.ConsoleLogger();
+  const db = new duckdb.AsyncDuckDB(logger, worker);
+  
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  
+  const conn = await db.connect();
+  conn.instance = db; // Attach the engine to the connection
+  console.log("✅ DuckDB-Wasm Ready (Engine + Connection)");
+  return conn;
+}
+```
+
+
+```{webr}
+#| echo: false
+#| output: false
+#| autorun: true
+#| input: 
+#|   - selected_study
+
+if(exists("con") && dbIsValid(con)){
+  cat("Closing previous connection!")
+  dbDisconnect(con)
+} 
+cat("\nCreating new connection.")
+con <- dbConnect(duckdb())
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+d3 = require("d3@7")
+Plotly = require("https://cdn.plot.ly/plotly-2.24.1.min.js")
+manifest_raw = FileAttachment("https://raw.githubusercontent.com/Nanostring-Biostats/ScratchSpaceDatasets/refs/heads/main/browser_bytes/projection_animator/manifest.tsv").tsv({typed: true})
+
+mutable available_studies = {
+  if (!manifest_raw) return [];
+
+  return manifest_raw.map(d => ({
+    id: d.id,
+    name: d.name,
+    description: d.description,
+    url_data:     d.url_data,
+    type: 'remote',
+    valid: true
+  }));
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+mutable latest_upload = null
+```
+
+
+:::
+
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof selected_study = Inputs.select(available_studies, {
+  label: "Select one of the available results:",
+  format: d => d.name,
+  value: latest_upload || available_studies[0]
+})
+```
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof user_upload_file = Inputs.file({
+  label: "Import new results (.csv, .tsv, .parquet):",
+  accept: ".parquet,.csv,.tsv",
+  multiple: false
+})
+```
+
+Choose a percentage of the data to render. Smaller percentage renders faster.
+```{ojs}
+//| echo: false
+//| output: true
+viewof sample_rate_raw = Inputs.range([0.1, 100], {
+  label: "Sampling Rate (%)", 
+  step: 0.1, 
+  value: 10 // Default to 10% for performance
+})
+```
+
+
+```{ojs}
+//| echo: false
+//| output: true
+
+sample_rate = {
+  const raw = sample_rate_raw;
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve(raw), 800); 
+    invalidation.then(() => clearTimeout(timer));
+  });
+}
+```
+
+
+
+
+```{ojs}
+//| echo: false
+//| output: false
+
+// This cell watches the dropdown and sends the metadata to R
+study_payload = {
+  const selection = selected_study;
+  if (!selection) return null;
+  
+  return {
+    name: selection.name,
+    url: selection.url_data,
+    type: selection.type // 'remote' or 'local'
+  };
+}
+```
+
+
+:::{.card .hidden}
+<!-- :::{.card} -->
+
+```{ojs}
+//| echo: false
+//| output: false
+
+mutable new_user_data = null;
+
+{
+  if (user_upload_file) {
+    const buf = await user_upload_file.arrayBuffer();
+    mutable new_user_data = {
+      id: Date.now(),
+      filename: user_upload_file.name,
+      data: new Uint8Array(buf)
+    };
+    console.log("✅ Loaded new user data.");
+  }
+}
+```
+
+
+<!-- Processes a user's data into parquet format and returns reference list -->
+```{webr}
+#| echo: false
+#| autorun: true
+#| output: false
+#| input: 
+#|   - new_user_data
+#| define: 
+#|   - processed_new_data
+
+processed_new_data <- NULL
+
+if(length(new_user_data) > 1){
+  cat(paste0("Processing new user data. Timestamp: ", Sys.time()))
+  
+  user_file_name <- as.character(new_user_data$filename)
+  ext <- tolower(tools::file_ext(user_file_name))
+  target_dir <- as.character(new_user_data$id)
+  dir.create(target_dir, recursive = TRUE)
+  
+  target_file <- file.path(target_dir, 
+    paste0(tools::file_path_sans_ext(user_file_name), ".parquet"))
+  
+  if(ext=="parquet"){
+    # if already a parquet, just need to write it.
+    writeBin(as.raw(new_user_data$data), target_file)
+  } else {
+    # 1. Write the raw bytes to a temporary file in the virtual filesystem
+    tmp_raw_path <- file.path(target_dir, user_file_name)
+    writeBin(as.raw(new_user_data$data), tmp_raw_path)
+    
+    # 2. Use DuckDB to convert the CSV/TSV to Parquet
+    # 'read_csv_auto' automatically detects headers and delimiters (comma vs tab)
+    query <- sprintf(
+      "COPY (SELECT * FROM read_csv_auto('%s')) TO '%s' (FORMAT 'PARQUET')", 
+      tmp_raw_path, 
+      target_file
+    )
+    
+    tryCatch({
+      dbExecute(con, query)
+      cat("\nSuccessfully converted to Parquet via DuckDB.")
+    }, error = function(e) {
+      cat("\nError during conversion: ", e$message)
+    })
+    
+    # 3. Clean up the temporary raw file to save virtual memory
+    unlink(tmp_raw_path)
+  }
+  
+  new_result_list <- list(
+      id = target_dir,
+      name = user_file_name,
+      description = "User Uploaded Data", 
+
+      url_data = target_file,
+      type = "local",
+      valid = TRUE
+    )
+    
+    processed_new_data <- as.character(jsonlite::toJSON(new_result_list, auto_unbox = TRUE))
+  
+  
+} else {
+  cat(paste0("new_user_data is NA. Timestamp: ", Sys.time()))
+}
+```
+
+
+<!-- Watches for newly processed data and adds to the dropdown menu -->
+```{ojs}
+//| echo: false
+//| output: false
+
+{
+  if (processed_new_data) {
+    const new_record = JSON.parse(processed_new_data);
+    
+    if (new_record && new_record.valid) {
+      const exists = available_studies.find(d => d.id === new_record.id);
+      
+      if (!exists) {
+         // 1. Update the list
+         mutable available_studies.push(new_record);
+         mutable available_studies = mutable available_studies;
+         
+         mutable latest_upload = new_record; 
+      }
+      console.log("✅ Loaded:", new_record.name);
+    }
+  }
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+//| echo: false
+//| output: false
+
+study_data_payload = {
+  const selection = selected_study;
+  const rate = sample_rate; 
+  if (!selection) return null;
+
+  // --- LOCAL MODE ---
+  if (selection.type === "local") {
+    console.log("👉 Mode: Local (VFS Path)");
+    return { 
+      mode: "local", 
+      name: selection.name, 
+      payload: selection.url_data, // The path string in the VFS
+      rate: rate 
+    };
+  }
+
+  // --- REMOTE MODE ---
+  if (selection.type === "remote") {
+    console.log("👉 Mode: Remote (JS Bridge)");
+    try {
+      const conn = await duck_db_client;
+      const sql = `
+        SELECT * FROM read_parquet('${selection.url_data}') 
+        USING SAMPLE ${rate} PERCENT (bernoulli)
+      `;
+      const result = await conn.query(sql);
+      const sampled_json = result.toArray().map(row => row.toJSON());
+
+      return {
+        mode: "remote_js_bridge",
+        name: selection.name,
+        payload: sampled_json, // The actual sampled data rows
+        rate: rate
+      };
+    } catch (e) {
+      console.error("❌ JS Bridge Error:", e);
+      return null;
+    }
+  }
+}
+```
+
+
+
+:::
+
+<!-- Actually pulls in the data into webR; prints the number of rows. -->
+```{webr}
+#| echo: false
+#| autorun: true
+#| input:
+#|   - study_data_payload
+
+df_main <- data.frame()
+
+if (!is.null(study_data_payload)) {
+  # cat(paste0("Processing: ", study_data_payload$name, "\n"))
+  
+  if (study_data_payload$mode == "remote_js_bridge") {
+    # payload = list of rows from JS
+    df_main <- jsonlite::fromJSON(jsonlite::toJSON(study_data_payload$payload))
+    
+  } else {
+    # payload = VFS file path string
+    query <- sprintf(
+      "SELECT * FROM '%s' USING SAMPLE %f PERCENT (bernoulli)", 
+      study_data_payload$payload, 
+      as.numeric(study_data_payload$rate)
+    )
+    
+    tryCatch({
+      df_main <- dbGetQuery(con, query)
+    }, error = function(e) {
+      cat("❌ Local Query Error: ", e$message)
+    })
+  }
+  
+  cat(sprintf("✅ Active Dataset: %s (%d rows)\n", 
+              study_data_payload$name, nrow(df_main)))
+}
+```
+
+
+:::{.card}
+
+<br>
+
+For best results, use Chrome, Edge, or Safari. This is optimized for desktop and 
+tablet view.
+
+Tool Version: 1.0
+
+Tool Type: Serverless (OJS + webr)
+
+Source Code Available:     ✅ Yes
+
+:::
+
+# Animator
+
+
+
+```{webr}
+#| echo: true
+#| autorun: true
+ls()
+```
+
+
+
+
+
+
+# Advanced
+
+```{webr}
+Sys.glob("*")
+```
+
+
+
+
