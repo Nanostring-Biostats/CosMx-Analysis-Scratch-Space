@@ -217,8 +217,6 @@ viewof user_input = Inputs.form({
 })
 ```
 
-
-
 ```{ojs}
 //| echo: false
 //| output: false
@@ -473,6 +471,29 @@ viewof run_btn = Inputs.button("▶  Generate")
 viewof download_btn = Inputs.button("▼  Download")
 ```
 
+```{ojs}
+//| echo: false
+//| output: false
+
+// Triggers ONLY when the button is clicked
+run_request = {
+  run_btn; // This line creates the dependency on the button click
+  
+  // We return a snapshot of the settings. 
+  // Adding a timestamp ensures the object is "new" even if settings didn't change,
+  // forcing WebR to re-run the logic.
+  return {
+    ...column_mapping,
+    ...user_input,
+    ...column_mapping//,
+    //timestamp: Date.now()
+  };
+}
+```
+
+
+
+
 
 # Adjust Trajectory
 
@@ -616,12 +637,60 @@ bind_params = Inputs.bind(viewof manual_form, viewof trajectory_params)
 
 # Advanced
 
+<!-- The actual function call -->
 
 ```{webr}
-#| echo: true
+#| echo: false
 #| autorun: true
-ls()
+#| input: 
+#|    - run_btn
+#|    - run_request
+
+if(run_btn>0){
+  # print(paste0("You hit the run button ", run_btn, " times."))
+  rlang::exec("make_animation", !!!run_request)
+} #else {
+  #cat("Waiting for user to press 'Generate'.")
+#}
+
 ```
 
+<!-- And the actual wrapper function -->
+
+```{webr}
+#| title: Animation Source Code
+#| edit: true
+#| output: true
+#| autorun: true
+#| warning: false
+#| define: 
+#|   - make_animation
+
+
+if(exists(".Random.seed")){
+  rm(.Random.seed)
+}
+set.seed(42L)
+make_animation <- function(df=NULL, 
+                           spatial_x,
+                           spatial_y,
+                           expression_x,
+                           expression_y,
+                           annotation,
+                           start_projection){
+
+  if (is.null(df)) {
+    df <- get0("df_main", envir = .GlobalEnv)
+    if (is.null(df)) {
+      stop("Error: 'df' is NULL and 'df_main' was not found in the environment.")
+    }
+  }
+
+  cat(sprintf("🚀 Function received %d rows for animation.\n", nrow(df)))
+  cat(sprintf("Mapping: (%s,%s) -> (%s,%s)\n", spatial_x, spatial_y, 
+              expression_x, expression_y))
+}
+
+```
 
 
