@@ -173,6 +173,49 @@ sample_rate = {
 }
 ```
 
+Map which column is which.
+```{ojs}
+//| echo: false
+//| input:  df_columns
+//| output: true
+
+viewof column_mapping = {
+  // Helper to pre-select columns based on common naming conventions
+  const guess = (cols, patterns) => {
+    const found = cols.find(c => patterns.some(p => c.toLowerCase().includes(p)));
+    return found || cols[0];
+  };
+
+  return Inputs.form({
+    spatial_x: Inputs.select(df_columns, {
+      label: "Spatial X", 
+      value: guess(df_columns, ["spatial_x", "center_x", "pxl_col", "x_coord", "x_slide_mm"])
+    }),
+    spatial_y: Inputs.select(df_columns, {
+      label: "Spatial Y", 
+      value: guess(df_columns, ["spatial_y", "center_y", "pxl_row", "y_coord", "y_slide_mm"])
+    }),
+    expression_x: Inputs.select(df_columns, {
+      label: "Expression X (e.g. UMAP1)", 
+      value: guess(df_columns, ["umap_1", "umap1", "tsne_1", "pca_1", "dim1"])
+    }),
+    expression_y: Inputs.select(df_columns, {
+      label: "Expression Y (e.g. UMAP2)", 
+      value: guess(df_columns, ["umap_2", "umap2", "tsne_2", "pca_2", "dim2"])
+    }),
+    annotation: Inputs.select(df_columns, {
+      label: "Annotation / Cluster", 
+      value: guess(df_columns, ["cell_type", "cluster", "annotation", "label", "class"])
+    })
+  });
+}
+```
+
+```{ojs}
+viewof user_input = Inputs.form({
+  start_projection: Inputs.radio(["Expression", "Spatial"], {label: "What is the starting projection?", value: "Expression"})
+})
+```
 
 
 
@@ -370,8 +413,11 @@ study_data_payload = {
 #| autorun: true
 #| input:
 #|   - study_data_payload
+#| define: 
+#|   - df_columns
 
 df_main <- data.frame()
+df_columns <- c()
 
 if (!is.null(study_data_payload)) {
   # cat(paste0("Processing: ", study_data_payload$name, "\n"))
@@ -394,6 +440,8 @@ if (!is.null(study_data_payload)) {
       cat("❌ Local Query Error: ", e$message)
     })
   }
+  
+  df_columns <- colnames(df_main)
   
   cat(sprintf("✅ Active Dataset: %s (%d rows)\n", 
               study_data_payload$name, nrow(df_main)))
@@ -430,9 +478,8 @@ viewof download_btn = Inputs.button("▼  Download")
 
 :::{.card}
 
-Adjust the placement of the starting point (green) and the ending point (red)
-on the canvas below or add your own value between 0 and 1. Stretch the yellow
-node to increase the strength of the flightpath arc. 
+Adjust the trajectory. Using the canvas, drag the starting point (green) and the ending point (red) and the magnitude of the flight path arc. You can also adjust these values
+directly. 
 
 ```{ojs}
 //| echo: false
@@ -442,7 +489,7 @@ viewof trajectory_params = {
   const size = 500;
   
   // Initial internal state (Now 0 is bottom, 1 is top)
-  let state = { x1: 0.15, y1: 0.2, x2: 0.85, y2: 0.8, arc: 2.5 };
+  let state = { x1: 0.25, y1: 0.5, x2: 0.75, y2: 0.5, arc: 3.0 };
 
   const svg = d3.create("svg")
       .attr("viewBox", [0, 0, size, size])
