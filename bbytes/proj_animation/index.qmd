@@ -1,117 +1,197 @@
 ---
-title: "Projection Animator"
+title: ""
 format:
-  live-dashboard:
-    orientation: rows
-    engine: knitr
-    theme:
-      light: 
-        - sandstone
-        - dashboard.scss
-webr:
-  packages:
-    - ggplot2
-    - duckdb
-    - gganimate
-    - magick
-    - jsonlite
-    - scales
-    - dplyr
-    - data.table
-    - tools
-  repos:
-    - https://r-lib.r-universe.dev
+  html:
+    page-layout: custom
+    theme: none
+    include-in-header:
+      text: |
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Noto+Sans:wght@300;400;500;600;700&family=Noto+Serif:ital,wght@1,400;1,700&display=swap" rel="stylesheet"/>
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+        <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+        <script>
+          tailwind.config = {
+            darkMode: "class",
+            theme: {
+              extend: {
+                colors: {
+                  primary: "#0077c8", secondary: "#10b981", accent: "#6366f1",
+                  "background-light": "#F5F7FA", "surface-light": "#ffffff",
+                  "text-main": "#1e293b", "text-sub": "#475569"
+                },
+                fontFamily: {
+                  display: ["Space Grotesk", "sans-serif"],
+                  serif: ["Noto Serif", "serif"],
+                  mono: ["Space Mono", "monospace"]
+                }
+              }
+            }
+          }
+        </script>
+        <style>
+          body { background-color:#F5F7FA; color:#1e293b; font-family:"Noto Sans", sans-serif; }
+          .gradient-text { background: linear-gradient(135deg,#0077c8 0%,#10b981 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+          .editorial-card { background:#fff; border-radius:1.5rem; box-shadow:0 10px 30px -5px rgba(0,0,0,0.06); border:1px solid #e2e8f0; }
+          .control-label { font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#475569; }
+          /* Override Observable UI defaults to match Tailwind theme */
+          form.observablehq--inputs-container { font-family:"Noto Sans", sans-serif; max-width:none; }
+          form.observablehq--inputs-container > label { padding:0; margin-bottom:0.25rem; min-width:0; width:100%; }
+          form.observablehq--inputs-container input[type=range] { width:100%; }
+          form.observablehq--inputs-container input[type=number],
+          form.observablehq--inputs-container select { width:100%; }
+          .anim-canvas-wrap { position:relative; width:100%; aspect-ratio: 1000 / 620; background:#fafbfc; border-radius:1rem; overflow:hidden; }
+          .anim-canvas-wrap canvas { position:absolute; inset:0; width:100% !important; height:100% !important; display:block; }
+          details > summary { list-style:none; cursor:pointer; }
+          details > summary::-webkit-details-marker { display:none; }
+        </style>
 ---
 
-{{< include ../../_extensions/r-wasm/live/_knitr.qmd >}}
+<div class="w-full flex justify-end p-4 sm:p-6 lg:px-8">
+  <a href="https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/bbytes/" class="inline-flex items-center gap-2 px-4 py-2 bg-surface-light border border-gray-200 rounded-full shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 text-text-sub hover:text-primary font-display font-medium text-sm">
+    <span class="material-symbols-outlined" style="font-size:1.25rem;">home</span>
+    <span>Back to Browser Bytes</span>
+  </a>
+</div>
 
-Welcome to the **Projection Diffusion Animator**, a serverless tool for creating
-animations that transition your spatial data from expression space (e.g. UMAP)
-to physical space (XY coordinates). 
+::: {.relative .flex .min-h-screen .w-full .flex-col}
 
-This tool utilizes WebAssembly [(WebR)](https://docs.r-wasm.org/webr/latest/){target="_blank"} and [ObservableJS](https://quarto.org/docs/interactive/ojs/){target="_blank"} to run entirely in your web browser without uploading data to a remote server. 
-
-You can explore one of our own examples or load your own. 
-
-Advanced users should check out the `Advanced`
-tab if they want to customize their aesthetics plot even further or download 
-the underlying plotting functions for use locally. 
-
-::: {.callout-warning appearance="simple"}
-**Beta Notice:** This dashboard is currently in an **experimental / beta testing phase**. Features, performance, and data formats are subject to change. When you first load the site, you will see temporary `
-OJS Runtime Error` messages displayed until data are initialized. Please report any issues you encounter.
-:::
-
-
-
-# {.sidebar width="350px"}
-
-:::{.card .hidden}
+```{=html}
+<section class="relative pt-6 pb-10 lg:pt-10 lg:pb-14">
+  <div class="container mx-auto px-6 max-w-6xl">
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-slate-200 shadow-sm text-slate-600 text-xs font-bold uppercase tracking-wider mb-6">
+      <span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+      Browser Byte · Interactive Tool
+    </div>
+    <h1 class="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-slate-900 mb-6 leading-[1] font-display">
+      PROJECTION<br/>
+      <span class="font-serif italic font-bold gradient-text pr-2 tracking-normal">Animator</span>
+    </h1>
+    <p class="max-w-3xl text-base md:text-lg text-slate-600 font-light leading-relaxed border-l-4 border-primary pl-5">
+      Watch your single cells migrate between expression space (e.g. UMAP) and physical space.
+      Choose from an existing dataset or bring your own data.
+    </p>
+  </div>
+</section>
+```
 
 ```{ojs}
 //| echo: false
 //| output: false
 
+// --- DuckDB-WASM client (used for both remote parquet and local uploads) ---
 duck_db_client = {
   const duckdb = await import("https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm");
-  
-  console.log("🔧 Initializing DuckDB-Wasm Client...");
-  
   const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
   const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
-  
   const worker_url = URL.createObjectURL(
     new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" })
   );
-
   const worker = new Worker(worker_url);
   const logger = new duckdb.ConsoleLogger();
   const db = new duckdb.AsyncDuckDB(logger, worker);
-  
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-  
   const conn = await db.connect();
-  conn.instance = db; // Attach the engine to the connection
-  console.log("✅ DuckDB-Wasm Ready (Engine + Connection)");
+  conn.instance = db;
+  console.log("✅ DuckDB-Wasm Ready");
   return conn;
 }
 ```
 
+```{ojs}
+//| echo: false
+//| output: false
+d3 = require("d3@7")
+```
 
-```{webr}
-#| echo: false
-#| output: false
-#| autorun: true
-#| input: 
-#|   - selected_study
+```{ojs}
+//| echo: false
+//| output: false
+manifest_raw = FileAttachment("https://raw.githubusercontent.com/Nanostring-Biostats/ScratchSpaceDatasets/refs/heads/main/browser_bytes/projection_animator/manifest.tsv").tsv({typed: true})
+```
 
-if(exists("con") && dbIsValid(con)){
-  cat("Closing previous connection!")
-  dbDisconnect(con)
-} 
-cat("\nCreating new connection.")
-con <- dbConnect(duckdb())
+```{ojs}
+//| echo: false
+//| output: false
+mutable available_studies = (manifest_raw || []).map(d => ({
+  id: String(d.id),
+  name: d.name,
+  description: d.description,
+  url_data: d.url_data,
+  type: "remote",
+  valid: true
+}))
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+mutable latest_upload = null
 ```
 
 ```{ojs}
 //| echo: false
 //| output: false
 
-d3 = require("d3@7")
-Plotly = require("https://cdn.plot.ly/plotly-2.24.1.min.js")
-manifest_raw = FileAttachment("https://raw.githubusercontent.com/Nanostring-Biostats/ScratchSpaceDatasets/refs/heads/main/browser_bytes/projection_animator/manifest.tsv").tsv({typed: true})
-
-mutable available_studies = {
-  if (!manifest_raw) return [];
-
-  return manifest_raw.map(d => ({
-    id: d.id,
-    name: d.name,
-    description: d.description,
-    url_data:     d.url_data,
-    type: 'remote',
-    valid: true
-  }));
+// --- Handle file upload ---
+// CSV/TSV are parsed in pure JS with D3 (no DuckDB VFS needed).
+// Parquet still uses DuckDB-WASM's registerFileBuffer because there's no
+// lightweight pure-JS parquet decoder.
+{
+  const file = user_upload_file;
+  if (file) {
+    // Stable id so the duplicate guard below actually works on re-evals.
+    // (Using Date.now() here would cause an infinite loop: this cell reads
+    // `available_studies`, so writing to it re-triggers the cell, and a
+    // fresh timestamp would defeat the guard every time.)
+    const stable_id = `upload_${file.name}_${file.size}_${file.lastModified}`;
+    if (!available_studies.find(d => d.id === stable_id)) {
+      const ext = file.name.split(".").pop().toLowerCase();
+      let new_record;
+      if (ext === "parquet") {
+        const conn = await duck_db_client;
+        const buf = new Uint8Array(await file.arrayBuffer());
+        await conn.instance.registerFileBuffer(stable_id, buf);
+        new_record = {
+          id: stable_id,
+          name: file.name,
+          description: "User uploaded",
+          url_data: stable_id,
+          type: "local_parquet",
+          valid: true
+        };
+      } else {
+        // CSV / TSV — parse directly with D3.
+        // Sniff the delimiter from the first line so we handle comma-,
+        // semicolon-, and tab-separated files transparently.
+        const text = await file.text();
+        const firstLine = text.slice(0, text.indexOf("\n"));
+        const counts = { ",": 0, ";": 0, "\t": 0, "|": 0 };
+        let inQuote = false;
+        for (const ch of firstLine) {
+          if (ch === '"') inQuote = !inQuote;
+          else if (!inQuote && ch in counts) counts[ch]++;
+        }
+        // Default by extension, but override if a different delimiter dominates.
+        let delim = ext === "tsv" ? "\t" : ",";
+        const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+        if (best && best[1] > 0) delim = best[0];
+        const rows = d3.dsvFormat(delim).parse(text, d3.autoType);
+        new_record = {
+          id: stable_id,
+          name: file.name,
+          description: "User uploaded",
+          url_data: null,
+          type: "local_inline",
+          rows,                                     // pre-parsed rows
+          columns: rows.columns || (rows[0] ? Object.keys(rows[0]) : []),
+          valid: true
+        };
+      }
+      mutable available_studies = [...available_studies, new_record];
+      mutable latest_upload = new_record;
+      console.log("✅ Registered upload:", file.name, "(" + new_record.type + ")");
+    }
+  }
 }
 ```
 
@@ -119,21 +199,447 @@ mutable available_studies = {
 //| echo: false
 //| output: false
 
-mutable latest_upload = null
+// --- Sampled query on the selected dataset ---
+study_data = {
+  const selection = selected_study;
+  const rate = sample_rate;
+  if (!selection) return null;
+
+  // Inline (CSV/TSV upload, already parsed in JS) — no DuckDB needed.
+  if (selection.type === "local_inline") {
+    const all = selection.rows || [];
+    const keep = Math.max(1, Math.round(all.length * rate / 100));
+    let rows;
+    if (keep >= all.length) {
+      rows = all;
+    } else {
+      // Bernoulli-style sample to match remote behavior.
+      const p = rate / 100;
+      rows = all.filter(() => Math.random() < p);
+      if (!rows.length) rows = [all[0]];
+    }
+    const columns = selection.columns || (rows[0] ? Object.keys(rows[0]) : []);
+    return { name: selection.name, rows, columns };
+  }
+
+  // Remote parquet or local_parquet (DuckDB VFS) path.
+  const conn = await duck_db_client;
+  const reader = `read_parquet('${selection.url_data}')`;
+  const sql = `SELECT * FROM ${reader} USING SAMPLE ${rate} PERCENT (bernoulli)`;
+  try {
+    const result = await conn.query(sql);
+    const rows = result.toArray().map(r => r.toJSON());
+    const columns = rows.length ? Object.keys(rows[0]) : [];
+    return { name: selection.name, rows, columns };
+  } catch (e) {
+    console.error("❌ Query error:", e);
+    return { name: selection.name, rows: [], columns: [], error: String(e) };
+  }
+}
 ```
 
+```{ojs}
+//| echo: false
+//| output: false
+df_columns = study_data ? study_data.columns : []
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+// --- Build per-point animation arrays (normalized + colored) ---
+animation_data = {
+  if (!study_data || !study_data.rows.length || !column_mapping) return null;
+  const m = column_mapping;
+  const rows = study_data.rows;
+  const n = rows.length;
+  const ex = new Float32Array(n), ey = new Float32Array(n);
+  const sx = new Float32Array(n), sy = new Float32Array(n);
+  const ann = new Array(n);
+  for (let i = 0; i < n; i++) {
+    ex[i] = +rows[i][m.expression_x];
+    ey[i] = +rows[i][m.expression_y];
+    sx[i] = +rows[i][m.spatial_x];
+    sy[i] = +rows[i][m.spatial_y];
+    ann[i] = rows[i][m.annotation];
+  }
+  const norm = (arr) => {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i];
+      if (Number.isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    }
+    const span = hi - lo || 1;
+    const out = new Float32Array(arr.length);
+    for (let i = 0; i < arr.length; i++) out[i] = (arr[i] - lo) / span;
+    return out;
+  };
+  const categories = Array.from(new Set(ann));
+  const palette = d3.schemeTableau10.concat(d3.schemeSet3, d3.schemeSet2);
+  const colorScale = d3.scaleOrdinal().domain(categories).range(palette);
+  const colors = ann.map(a => colorScale(a));
+  return {
+    n,
+    ex: norm(ex), ey: norm(ey),
+    sx: norm(sx), sy: norm(sy),
+    ann, colors, categories, colorScale
+  };
+}
+```
+
+```{=html}
+<section class="container mx-auto px-6 max-w-6xl pb-12">
+```
+
+::: {class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start"}
+
+::: {class="editorial-card p-6 lg:order-2"}
+
+```{=html}
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <div class="control-label">Live View</div>
+    <h2 class="font-display text-2xl font-bold text-slate-900">Migration</h2>
+  </div>
+</div>
+```
+
+::: {class="anim-canvas-wrap"}
+
+```{ojs}
+//| echo: false
+//| output: true
+
+animation_view = {
+  const data = animation_data;
+  const params = trajectory_params;
+  const startProj = start_direction;
+  const isPlaying = play_state === "Play";
+  const halfCycleSec = speed_seconds;
+  const dwellSec = dwell_seconds;
+  const userPointRadius = point_size;
+  const pointAlpha = point_opacity;
+  const bgColor = background_color;
+
+  const [W, H] = (() => {
+    const k = export_resolution;
+    if (k === "1280×720") return [1280, 720];
+    if (k === "1920×1080") return [1920, 1080];
+    if (k === "2560×1440") return [2560, 1440];
+    return [1000, 620];
+  })();
+  const MARGIN = Math.round(W * 0.03);
+  const canvas = html`<canvas width="${W}" height="${H}" class="projection-canvas"></canvas>`;
+  const ctx = canvas.getContext("2d");
+
+  if (!data) {
+    ctx.fillStyle = bgColor; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#94a3b8"; ctx.font = "16px 'Noto Sans', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Loading dataset…", W / 2, H / 2);
+    return canvas;
+  }
+
+  const xPix = u => MARGIN + u * (W - 2 * MARGIN);
+  const yPix = u => (H - MARGIN) - u * (H - 2 * MARGIN);
+
+  // Each projection sits centered at its trajectory anchor.
+  const ax1 = params.x1, ay1 = params.y1;
+  const ax2 = params.x2, ay2 = params.y2;
+
+  // Fit-to-canvas scale: the largest cluster footprint that keeps every
+  // point of both projections fully on-canvas. Each projection's data is
+  // normalized to [0,1], centered at its anchor, so the half-extent on each
+  // side equals projScale/2. To stay on-canvas, the anchor must be ≥ that
+  // far from every edge — hence 2 × min(distance from anchor to edge).
+  const edgeMargin = Math.min(
+    ax1, 1 - ax1, ay1, 1 - ay1,
+    ax2, 1 - ax2, ay2, 1 - ay2
+  );
+  // Floor so anchors at the corners still get a visible cluster (clipped).
+  // Cap so two centered anchors don't blow up to fill everything.
+  const projScale = Math.max(0.22, Math.min(0.7, edgeMargin * 2));
+
+  // Point size: user-controlled, but multiplied by a fit-to-canvas factor so
+  // bigger clusters get chunkier dots (stays readable, never blobs).
+  const sizeFactor = Math.max(0.7, Math.min(1.6, projScale * 2.6));
+  const pointRadius = Math.max(0.4, userPointRadius * sizeFactor);
+
+  // Great-circle ("airplane flight path") interpolation.
+  // Map canvas (u,v) to (lon, lat) to leverage spherical 
+  // interpolation (Slerp) for curved trajectories.
+  // Both projections occupy the SAME latitude band, but live at different
+  // longitudes (one west of the prime meridian, one east). Slerping on the
+  // unit sphere makes points near the equator (mid-y of their cluster)
+  // travel almost-straight, while points near the poles (top/bottom of
+  // their cluster) follow a noticeably curved great-circle path.
+  // The `arc` slider scales how "spherical" the geometry is.
+  // Clamp the angular ranges well below ±90° / ±180° to avoid the
+  // antipodal singularity in slerp.
+  const arc = params.arc;
+  const useSlerp = arc > 0.05;
+  // Keep the angular ranges below the antipodal singularity.
+  // Two anchors at opposite halves can be separated by up to 2*lonHalf
+  // in longitude — keeping that ≤ ~160° is safe for slerp.
+  const lonHalf = Math.min(80, arc * 14);  // cluster centers stay within ±80° lon
+  const latHalf = Math.min(80, arc * 11);  // points stay within ±80° lat
+  const D2R = Math.PI / 180;
+  const R2D = 180 / Math.PI;
+
+  // Convert anchored normalized canvas (u in [0,1], v in [0,1] with v=1 at top)
+  // into a (lon, lat) point in degrees.
+  function uvToLonLat(u, v) {
+    return [(u - 0.5) * 2 * lonHalf, (v - 0.5) * 2 * latHalf];
+  }
+  function lonLatToUv(lon, lat) {
+    return [lon / (2 * lonHalf) + 0.5, lat / (2 * latHalf) + 0.5];
+  }
+  function toSphere(lonDeg, latDeg) {
+    const lon = lonDeg * D2R, lat = latDeg * D2R;
+    const c = Math.cos(lat);
+    return [c * Math.cos(lon), c * Math.sin(lon), Math.sin(lat)];
+  }
+  function fromSphere(v) {
+    return [Math.atan2(v[1], v[0]) * R2D, Math.asin(Math.max(-1, Math.min(1, v[2]))) * R2D];
+  }
+  function slerp(v0, v1, tt) {
+    let dot = v0[0]*v1[0] + v0[1]*v1[1] + v0[2]*v1[2];
+    dot = Math.max(-1, Math.min(1, dot));
+    const omega = Math.acos(dot);
+    if (omega < 1e-6) {
+      return [v0[0]*(1-tt)+v1[0]*tt, v0[1]*(1-tt)+v1[1]*tt, v0[2]*(1-tt)+v1[2]*tt];
+    }
+    const so = Math.sin(omega);
+    const a = Math.sin((1 - tt) * omega) / so;
+    const b = Math.sin(tt * omega) / so;
+    return [a*v0[0]+b*v1[0], a*v0[1]+b*v1[1], a*v0[2]+b*v1[2]];
+  }
+
+  // Pre-compute the two endpoint sphere positions for every cell so the
+  // per-frame inner loop is cheap.
+  const v0x = new Float32Array(data.n);
+  const v0y = new Float32Array(data.n);
+  const v0z = new Float32Array(data.n);
+  const v1x = new Float32Array(data.n);
+  const v1y = new Float32Array(data.n);
+  const v1z = new Float32Array(data.n);
+  // Linear-fallback endpoints in normalized canvas space:
+  const e0u = new Float32Array(data.n);
+  const e0v = new Float32Array(data.n);
+  const e1u = new Float32Array(data.n);
+  const e1v = new Float32Array(data.n);
+  for (let i = 0; i < data.n; i++) {
+    const exU = ax1 + (data.ex[i] - 0.5) * projScale;
+    const eyU = ay1 + (data.ey[i] - 0.5) * projScale;
+    const sxU = ax2 + (data.sx[i] - 0.5) * projScale;
+    const syU = ay2 + (data.sy[i] - 0.5) * projScale;
+    e0u[i] = exU; e0v[i] = eyU;
+    e1u[i] = sxU; e1v[i] = syU;
+    if (useSlerp) {
+      const [lon0, lat0] = uvToLonLat(exU, eyU);
+      const [lon1, lat1] = uvToLonLat(sxU, syU);
+      const a = toSphere(lon0, lat0);
+      const b = toSphere(lon1, lat1);
+      v0x[i] = a[0]; v0y[i] = a[1]; v0z[i] = a[2];
+      v1x[i] = b[0]; v1y[i] = b[1]; v1z[i] = b[2];
+    }
+  }
+
+  let t = startProj === "Expression" ? 0 : 1;
+  let dir = startProj === "Expression" ? +1 : -1;
+  let dwellRemaining = 0;
+  let lastTs = null;
+  let raf = null;
+
+  // Expose a reset hook so the download handler can rewind the animation
+  // to the start of the chosen direction before recording, so the saved
+  // video always begins cleanly at t=0 rather than mid-sweep.
+  window.__projAnim_resetToStart = () => {
+    t = startProj === "Expression" ? 0 : 1;
+    dir = startProj === "Expression" ? +1 : -1;
+    dwellRemaining = 0;
+    lastTs = null;
+    draw(t);
+  };
+
+  function draw(tt) {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, W, H);
+
+    // Read the live legend selection (mutated outside OJS reactivity so
+    // toggling categories doesn't rebuild this canvas + reset the loop).
+    const selected = window.__projAnim_selected || new Set();
+    const hasSel = selected.size > 0;
+    const dimColor = "rgba(148, 163, 184, 0.18)";  // slate-400 @ low alpha
+    ctx.globalAlpha = pointAlpha;
+
+    if (useSlerp) {
+      // Per-point great-circle slerp.
+      for (let i = 0; i < data.n; i++) {
+        const dot = Math.max(-1, Math.min(1, v0x[i]*v1x[i] + v0y[i]*v1y[i] + v0z[i]*v1z[i]));
+        const omega = Math.acos(dot);
+        let ux, uy;
+        if (omega < 1e-6 || omega > Math.PI - 1e-3) {
+          // Degenerate (coincident or antipodal) — fall back to linear.
+          ux = e0u[i] * (1 - tt) + e1u[i] * tt;
+          uy = e0v[i] * (1 - tt) + e1v[i] * tt;
+        } else {
+          const so = Math.sin(omega);
+          const a = Math.sin((1 - tt) * omega) / so;
+          const b = Math.sin(tt * omega) / so;
+          const px = a * v0x[i] + b * v1x[i];
+          const py = a * v0y[i] + b * v1y[i];
+          const pz = a * v0z[i] + b * v1z[i];
+          const lon = Math.atan2(py, px) * R2D;
+          const lat = Math.asin(Math.max(-1, Math.min(1, pz))) * R2D;
+          ux = lon / (2 * lonHalf) + 0.5;
+          uy = lat / (2 * latHalf) + 0.5;
+        }
+        const isOn = !hasSel || selected.has(data.ann[i]);
+        ctx.fillStyle = isOn ? data.colors[i] : dimColor;
+        ctx.beginPath();
+        ctx.arc(xPix(ux), yPix(uy), pointRadius, 0, 6.283185);
+        ctx.fill();
+      }
+    } else {
+      // arc ≈ 0 → linear interpolation
+      const om = 1 - tt;
+      for (let i = 0; i < data.n; i++) {
+        const ux = e0u[i] * om + e1u[i] * tt;
+        const uy = e0v[i] * om + e1v[i] * tt;
+        const isOn = !hasSel || selected.has(data.ann[i]);
+        ctx.fillStyle = isOn ? data.colors[i] : dimColor;
+        ctx.beginPath();
+        ctx.arc(xPix(ux), yPix(uy), pointRadius, 0, 6.283185);
+        ctx.fill();
+      }
+    }
+
+    ctx.globalAlpha = 1;
+    // Status text — dark on light bg, light on dark bg.
+    {
+      // Pick a readable text color based on bg luminance.
+      const c = bgColor.replace("#", "");
+      const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const dark = lum < 140;
+      ctx.fillStyle = dark ? "#f1f5f9" : "#0f172a";
+      ctx.font = `600 ${Math.max(11, Math.round(W / 76))}px 'Space Grotesk', sans-serif`;
+      ctx.textAlign = "left";
+      const dirLabel = dir > 0 ? "Expression → Spatial" : "Spatial → Expression";
+      ctx.fillText(dirLabel, 14, 22);
+      ctx.fillStyle = dark ? "#94a3b8" : "#64748b";
+      ctx.font = `500 ${Math.max(10, Math.round(W / 90))}px 'Space Grotesk', sans-serif`;
+      const status = dwellRemaining > 0
+        ? `t = ${tt.toFixed(2)}  ·  dwell ${dwellRemaining.toFixed(1)}s`
+        : `t = ${tt.toFixed(2)}`;
+      ctx.fillText(status, 14, 40);
+    }
+  }
+
+  function frame(ts) {
+    if (!isPlaying) { lastTs = null; return; }
+    if (lastTs === null) lastTs = ts;
+    const dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+
+    if (dwellRemaining > 0) {
+      dwellRemaining = Math.max(0, dwellRemaining - dt);
+    } else {
+      const speed = 1 / Math.max(0.1, halfCycleSec);
+      t += dir * speed * dt;
+      if (t >= 1) { t = 1; dir = -1; dwellRemaining = dwellSec; }
+      else if (t <= 0) { t = 0; dir = +1; dwellRemaining = dwellSec; }
+    }
+    draw(t);
+    raf = requestAnimationFrame(frame);
+  }
+
+  draw(t);
+  if (isPlaying) raf = requestAnimationFrame(frame);
+  invalidation.then(() => { if (raf) cancelAnimationFrame(raf); });
+  return canvas;
+}
+```
 
 :::
 
+::: {class="mt-4"}
+
+```{ojs}
+//| echo: false
+//| output: true
+
+legend_view = {
+  const data = animation_data;
+  if (!data) return html`<div class="text-xs text-slate-400">Legend will appear once data loads.</div>`;
+
+  // Reset the global selection set whenever the dataset/categories change.
+  window.__projAnim_selected = new Set();
+
+  const wrap = html`<div class="flex flex-wrap items-center"></div>`;
+  const hint = html`<div class="w-full text-[11px] text-slate-400 mb-2">Click a label to isolate · click more to add · double-click any to reset</div>`;
+  wrap.appendChild(hint);
+
+  const itemEls = new Map();
+
+  function repaint() {
+    const sel = window.__projAnim_selected;
+    const hasSel = sel.size > 0;
+    for (const [c, el] of itemEls) {
+      const on = !hasSel || sel.has(c);
+      el.style.opacity = on ? "1" : "0.32";
+      el.style.borderColor = sel.has(c) ? data.colorScale(c) : "#e2e8f0";
+      el.style.boxShadow = sel.has(c) ? `inset 0 0 0 1px ${data.colorScale(c)}` : "none";
+    }
+  }
+
+  for (const c of data.categories) {
+    const el = html`<button type="button" class="inline-flex items-center gap-1.5 mr-2 mb-1.5 px-2 py-1 rounded-full bg-slate-50 border border-slate-200 cursor-pointer select-none" style="transition: opacity 120ms, border-color 120ms;">
+      <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${data.colorScale(c)};"></span>
+      <span class="text-xs text-slate-700">${c}</span>
+    </button>`;
+    el.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      const sel = window.__projAnim_selected;
+      if (sel.has(c)) sel.delete(c); else sel.add(c);
+      repaint();
+    });
+    el.addEventListener("dblclick", (ev) => {
+      ev.preventDefault();
+      window.__projAnim_selected = new Set();
+      repaint();
+    });
+    itemEls.set(c, el);
+    wrap.appendChild(el);
+  }
+  repaint();
+  return wrap;
+}
+```
+
+:::
+
+:::
+
+::: {class="flex flex-col gap-6 lg:order-1"}
+
+::: {class="editorial-card p-6"}
+
+```{=html}
+<div class="control-label mb-1">Step 1</div>
+<h3 class="font-display text-lg font-bold text-slate-900 mb-4">Pick a dataset</h3>
+```
 
 ```{ojs}
 //| echo: false
 //| output: true
 
 viewof selected_study = Inputs.select(available_studies, {
-  label: "Select one of the available results:",
+  label: "Example or your own:",
   format: d => d.name,
-  value: latest_upload || available_studies[0]
+  value: latest_upload || (available_studies[0])
 })
 ```
 
@@ -142,365 +648,348 @@ viewof selected_study = Inputs.select(available_studies, {
 //| output: true
 
 viewof user_upload_file = Inputs.file({
-  label: "Import new results (.csv, .tsv, .parquet):",
+  label: "Upload (.parquet, .csv, .tsv):",
   accept: ".parquet,.csv,.tsv",
   multiple: false
 })
 ```
 
-Choose a percentage of the data to render. Smaller percentage renders faster.
 ```{ojs}
 //| echo: false
 //| output: true
+
 viewof sample_rate_raw = Inputs.range([0.1, 100], {
-  label: "Sampling Rate (%)", 
-  step: 0.1, 
-  value: 10 // Default to 10% for performance
+  label: "Sample (%)",
+  step: 0.1,
+  value: 10
 })
 ```
 
-
 ```{ojs}
 //| echo: false
-//| output: true
+//| output: false
 
 sample_rate = {
   const raw = sample_rate_raw;
   return new Promise(resolve => {
-    const timer = setTimeout(() => resolve(raw), 800); 
-    invalidation.then(() => clearTimeout(timer));
+    const t = setTimeout(() => resolve(raw), 600);
+    invalidation.then(() => clearTimeout(t));
   });
 }
 ```
 
-Map which column is which.
 ```{ojs}
 //| echo: false
-//| input:  df_columns
+//| output: true
+
+dataset_status = {
+  if (!study_data) return html`<div class="text-xs text-slate-400 mt-2">Loading…</div>`;
+  if (study_data.error) return html`<div class="text-xs text-rose-600 mt-2">Error: ${study_data.error}</div>`;
+  return html`<div class="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-100">
+    Loaded <strong class="text-slate-700">${study_data.rows.length.toLocaleString()}</strong> rows ·
+    <strong class="text-slate-700">${study_data.columns.length}</strong> columns
+  </div>`;
+}
+```
+
+:::
+
+::: {class="editorial-card p-6"}
+
+```{=html}
+<div class="control-label mb-1">Step 2</div>
+<h3 class="font-display text-lg font-bold text-slate-900 mb-4">Map columns</h3>
+```
+
+```{ojs}
+//| echo: false
 //| output: true
 
 viewof column_mapping = {
-  // Helper to pre-select columns based on common naming conventions
-  const guess = (cols, patterns) => {
+  const cols = df_columns;
+  if (!cols || !cols.length) {
+    return html`<div class="text-xs text-slate-400 italic">Loading columns…</div>`;
+  }
+  const guess = (patterns) => {
     const found = cols.find(c => patterns.some(p => c.toLowerCase().includes(p)));
     return found || cols[0];
   };
-
   return Inputs.form({
-    spatial_x: Inputs.select(df_columns, {
-      label: "Spatial X", 
-      value: guess(df_columns, ["spatial_x", "center_x", "pxl_col", "x_coord", "x_slide_mm"])
+    spatial_x: Inputs.select(cols, {
+      label: "Spatial X",
+      value: guess(["spatial_x", "center_x", "pxl_col", "x_coord", "x_slide_mm", "x_um"])
     }),
-    spatial_y: Inputs.select(df_columns, {
-      label: "Spatial Y", 
-      value: guess(df_columns, ["spatial_y", "center_y", "pxl_row", "y_coord", "y_slide_mm"])
+    spatial_y: Inputs.select(cols, {
+      label: "Spatial Y",
+      value: guess(["spatial_y", "center_y", "pxl_row", "y_coord", "y_slide_mm", "y_um"])
     }),
-    expression_x: Inputs.select(df_columns, {
-      label: "Expression X (e.g. UMAP1)", 
-      value: guess(df_columns, ["umap_1", "umap1", "tsne_1", "pca_1", "dim1"])
+    expression_x: Inputs.select(cols, {
+      label: "Expression X (e.g. UMAP1)",
+      value: guess(["umap_1", "umap1", "tsne_1", "pca_1", "dim1"])
     }),
-    expression_y: Inputs.select(df_columns, {
-      label: "Expression Y (e.g. UMAP2)", 
-      value: guess(df_columns, ["umap_2", "umap2", "tsne_2", "pca_2", "dim2"])
+    expression_y: Inputs.select(cols, {
+      label: "Expression Y (e.g. UMAP2)",
+      value: guess(["umap_2", "umap2", "tsne_2", "pca_2", "dim2"])
     }),
-    annotation: Inputs.select(df_columns, {
-      label: "Annotation / Cluster", 
-      value: guess(df_columns, ["cell_type", "cluster", "annotation", "label", "class"])
+    annotation: Inputs.select(cols, {
+      label: "Annotation / cluster",
+      value: guess(["cell_type", "cluster", "annotation", "label", "class"])
     })
   });
 }
 ```
 
+:::
+
+::: {class="editorial-card p-6"}
+
+```{=html}
+<div class="control-label mb-1">Step 3</div>
+<h3 class="font-display text-lg font-bold text-slate-900 mb-4">Animate</h3>
+```
+
 ```{ojs}
-viewof user_input = Inputs.form({
-  start_projection: Inputs.radio(["Expression", "Spatial"], {label: "What is the starting projection?", value: "Expression"})
+//| echo: false
+//| output: true
+
+viewof start_direction = Inputs.radio(["Expression", "Spatial"], {
+  label: "Start from:",
+  value: "Expression"
 })
 ```
 
 ```{ojs}
 //| echo: false
-//| output: false
+//| output: true
 
-// This cell watches the dropdown and sends the metadata to R
-study_payload = {
-  const selection = selected_study;
-  if (!selection) return null;
-  
-  return {
-    name: selection.name,
-    url: selection.url_data,
-    type: selection.type // 'remote' or 'local'
-  };
-}
-```
-
-
-:::{.card .hidden}
-<!-- :::{.card} -->
-
-```{ojs}
-//| echo: false
-//| output: false
-
-mutable new_user_data = null;
-
-{
-  if (user_upload_file) {
-    const buf = await user_upload_file.arrayBuffer();
-    mutable new_user_data = {
-      id: Date.now(),
-      filename: user_upload_file.name,
-      data: new Uint8Array(buf)
-    };
-    console.log("✅ Loaded new user data.");
-  }
-}
-```
-
-
-<!-- Processes a user's data into parquet format and returns reference list -->
-```{webr}
-#| echo: false
-#| autorun: true
-#| output: false
-#| input: 
-#|   - new_user_data
-#| define: 
-#|   - processed_new_data
-
-processed_new_data <- NULL
-
-if(length(new_user_data) > 1){
-  cat(paste0("Processing new user data. Timestamp: ", Sys.time()))
-  
-  user_file_name <- as.character(new_user_data$filename)
-  ext <- tolower(tools::file_ext(user_file_name))
-  target_dir <- as.character(new_user_data$id)
-  dir.create(target_dir, recursive = TRUE)
-  
-  target_file <- file.path(target_dir, 
-    paste0(tools::file_path_sans_ext(user_file_name), ".parquet"))
-  
-  if(ext=="parquet"){
-    # if already a parquet, just need to write it.
-    writeBin(as.raw(new_user_data$data), target_file)
-  } else {
-    # 1. Write the raw bytes to a temporary file in the virtual filesystem
-    tmp_raw_path <- file.path(target_dir, user_file_name)
-    writeBin(as.raw(new_user_data$data), tmp_raw_path)
-    
-    # 2. Use DuckDB to convert the CSV/TSV to Parquet
-    # 'read_csv_auto' automatically detects headers and delimiters (comma vs tab)
-    query <- sprintf(
-      "COPY (SELECT * FROM read_csv_auto('%s')) TO '%s' (FORMAT 'PARQUET')", 
-      tmp_raw_path, 
-      target_file
-    )
-    
-    tryCatch({
-      dbExecute(con, query)
-      cat("\nSuccessfully converted to Parquet via DuckDB.")
-    }, error = function(e) {
-      cat("\nError during conversion: ", e$message)
-    })
-    
-    # 3. Clean up the temporary raw file to save virtual memory
-    unlink(tmp_raw_path)
-  }
-  
-  new_result_list <- list(
-      id = target_dir,
-      name = user_file_name,
-      description = "User Uploaded Data", 
-
-      url_data = target_file,
-      type = "local",
-      valid = TRUE
-    )
-    
-    processed_new_data <- as.character(jsonlite::toJSON(new_result_list, auto_unbox = TRUE))
-  
-  
-} else {
-  cat(paste0("new_user_data is NA. Timestamp: ", Sys.time()))
-}
-```
-
-
-<!-- Watches for newly processed data and adds to the dropdown menu -->
-```{ojs}
-//| echo: false
-//| output: false
-
-{
-  if (processed_new_data) {
-    const new_record = JSON.parse(processed_new_data);
-    
-    if (new_record && new_record.valid) {
-      const exists = available_studies.find(d => d.id === new_record.id);
-      
-      if (!exists) {
-         // 1. Update the list
-         mutable available_studies.push(new_record);
-         mutable available_studies = mutable available_studies;
-         
-         mutable latest_upload = new_record; 
-      }
-      console.log("✅ Loaded:", new_record.name);
-    }
-  }
-}
+viewof play_state = Inputs.radio(["Play", "Pause"], {
+  label: "Playback:",
+  value: "Play"
+})
 ```
 
 ```{ojs}
 //| echo: false
-//| output: false
+//| output: true
 
+viewof speed_seconds = Inputs.range([0.5, 10], {
+  label: "Sweep duration (sec)",
+  step: 0.25,
+  value: 4
+})
+```
+
+```{ojs}
 //| echo: false
-//| output: false
+//| output: true
 
-study_data_payload = {
-  const selection = selected_study;
-  const rate = sample_rate; 
-  if (!selection) return null;
+viewof dwell_seconds = Inputs.range([0, 5], {
+  label: "Dwell at ends (sec)",
+  step: 0.25,
+  value: 0.75
+})
+```
 
-  // --- LOCAL MODE ---
-  if (selection.type === "local") {
-    console.log("👉 Mode: Local (VFS Path)");
-    return { 
-      mode: "local", 
-      name: selection.name, 
-      payload: selection.url_data, // The path string in the VFS
-      rate: rate 
-    };
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof point_size = Inputs.range([0.4, 5], {
+  label: "Point size",
+  step: 0.1,
+  value: 1.8
+})
+```
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof point_opacity = Inputs.range([0.05, 1], {
+  label: "Point opacity",
+  step: 0.05,
+  value: 1
+})
+```
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof export_resolution = Inputs.select(
+  ["1000×620", "1280×720", "1920×1080", "2560×1440"],
+  { label: "Resolution", value: "1000×620" }
+)
+```
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof background_color = Inputs.color({
+  label: "Background color",
+  value: "#fafbfc"
+})
+```
+
+```{ojs}
+//| echo: false
+//| output: true
+
+viewof export_format = Inputs.select(
+  ["MP4 (H.264)", "WebM (VP9)"],
+  { label: "Format", value: "MP4 (H.264)" }
+)
+```
+
+```{ojs}
+//| echo: false
+//| output: true
+
+download_view = {
+  // A self-managed button that disables itself + shows progress text while
+  // the MediaRecorder is capturing, then re-enables when the file is ready.
+  const wrap = html`<div class="flex items-center gap-3"></div>`;
+  const btn = html`<button type="button" class="px-4 py-2 rounded-md bg-primary text-white font-semibold text-sm cursor-pointer hover:opacity-90 transition" style="background:#0077c8;">⬇  Download video</button>`;
+  const status = html`<span class="text-xs text-slate-500"></span>`;
+  wrap.appendChild(btn);
+  wrap.appendChild(status);
+
+  function setBusy(msg) {
+    btn.disabled = true;
+    btn.style.opacity = "0.55";
+    btn.style.cursor = "not-allowed";
+    btn.textContent = "Preparing…";
+    status.textContent = msg;
+  }
+  function setIdle(msg) {
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.style.cursor = "pointer";
+    btn.textContent = "⬇  Download video";
+    status.textContent = msg || "";
   }
 
-  // --- REMOTE MODE ---
-  if (selection.type === "remote") {
-    console.log("👉 Mode: Remote (JS Bridge)");
+  btn.addEventListener("click", async () => {
+    if (btn.disabled) return;
+    const canvas = document.querySelector(".projection-canvas");
+    if (!canvas) { status.textContent = "Canvas not ready."; return; }
+
+    // Choose MIME based on user preference + browser support.
+    const mp4Candidates = [
+      "video/mp4;codecs=avc1.42E01E",
+      "video/mp4;codecs=avc1",
+      "video/mp4"
+    ];
+    const webmCandidates = [
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm"
+    ];
+    const wantMp4 = export_format.startsWith("MP4");
+    const ordered = wantMp4 ? mp4Candidates.concat(webmCandidates) : webmCandidates.concat(mp4Candidates);
+    const mime = ordered.find(m => MediaRecorder.isTypeSupported(m));
+    if (!mime) { setIdle("This browser doesn't support MediaRecorder."); return; }
+    const ext = mime.startsWith("video/mp4") ? "mp4" : "webm";
+
+    const cycleMs = (speed_seconds * 2 + dwell_seconds * 2) * 1000;
+    setBusy(`Please wait while we prepare your file (≈ ${(cycleMs / 1000).toFixed(1)}s)…`);
+
     try {
-      const conn = await duck_db_client;
-      const sql = `
-        SELECT * FROM read_parquet('${selection.url_data}') 
-        USING SAMPLE ${rate} PERCENT (bernoulli)
-      `;
-      const result = await conn.query(sql);
-      const sampled_json = result.toArray().map(row => row.toJSON());
+      // Rewind animation to the start of the chosen direction so the saved
+      // video always begins cleanly rather than mid-sweep.
+      if (typeof window.__projAnim_resetToStart === "function") {
+        window.__projAnim_resetToStart();
+      }
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+      const chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      const done = new Promise(res => recorder.onstop = res);
+      recorder.start();
 
-      return {
-        mode: "remote_js_bridge",
-        name: selection.name,
-        payload: sampled_json, // The actual sampled data rows
-        rate: rate
-      };
-    } catch (e) {
-      console.error("❌ JS Bridge Error:", e);
-      return null;
+      // Live countdown.
+      const startedAt = performance.now();
+      const tick = setInterval(() => {
+        const remaining = Math.max(0, cycleMs - (performance.now() - startedAt));
+        status.textContent = `Recording… ${(remaining / 1000).toFixed(1)}s remaining`;
+      }, 200);
+
+      await new Promise(r => setTimeout(r, cycleMs));
+      clearInterval(tick);
+      status.textContent = "Encoding…";
+      recorder.stop();
+      await done;
+
+      const blob = new Blob(chunks, { type: mime });
+      const url = URL.createObjectURL(blob);
+      const fname = `projection_animation.${ext}`;
+      const sizeMb = (blob.size / 1024 / 1024).toFixed(1);
+
+      // We can't reliably auto-trigger a download here: the click happens
+      // after several seconds of awaits, so the user-gesture context has
+      // expired and Chromium / Safari will silently suppress a synthetic
+      // a.click(). Instead we render an inline save link the user clicks
+      // themselves — that's a real user gesture and works in every browser.
+      status.innerHTML = "";
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fname;
+      link.textContent = `\u2b07 Save ${fname} (${sizeMb} MB)`;
+      link.className = "text-xs font-semibold text-primary hover:underline";
+      link.style.color = "#0077c8";
+      status.appendChild(link);
+
+      // Also try a programmatic click — works in some browsers (e.g.
+      // recent Chrome desktop) so the file saves immediately, with the
+      // visible link as a guaranteed fallback.
+      const ghost = document.createElement("a");
+      ghost.href = url;
+      ghost.download = fname;
+      ghost.style.display = "none";
+      document.body.appendChild(ghost);
+      try { ghost.click(); } catch (_) { /* fall back to inline link */ }
+      setTimeout(() => { document.body.removeChild(ghost); }, 100);
+
+      // Keep the blob URL alive long enough for the user to click the
+      // visible link if needed.
+      setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000);
+
+      setIdle(null);
+      // Re-attach the link after setIdle clears the status.
+      status.appendChild(link);
+    } catch (err) {
+      console.error(err);
+      setIdle(`Error: ${err.message || err}`);
     }
-  }
+  });
+
+  return wrap;
 }
 ```
-
-
 
 :::
 
-<!-- Actually pulls in the data into webR; prints the number of rows. -->
-```{webr}
-#| echo: false
-#| autorun: true
-#| input:
-#|   - study_data_payload
-#| define: 
-#|   - df_columns
-
-df_main <- data.frame()
-df_columns <- c()
-
-if (!is.null(study_data_payload)) {
-  # cat(paste0("Processing: ", study_data_payload$name, "\n"))
-  
-  if (study_data_payload$mode == "remote_js_bridge") {
-    # payload = list of rows from JS
-    df_main <- jsonlite::fromJSON(jsonlite::toJSON(study_data_payload$payload))
-    
-  } else {
-    # payload = VFS file path string
-    query <- sprintf(
-      "SELECT * FROM '%s' USING SAMPLE %f PERCENT (bernoulli)", 
-      study_data_payload$payload, 
-      as.numeric(study_data_payload$rate)
-    )
-    
-    tryCatch({
-      df_main <- dbGetQuery(con, query)
-    }, error = function(e) {
-      cat("❌ Local Query Error: ", e$message)
-    })
-  }
-  
-  df_columns <- colnames(df_main)
-  
-  cat(sprintf("✅ Active Dataset: %s (%d rows)\n", 
-              study_data_payload$name, nrow(df_main)))
-}
-```
-
-
-:::{.card}
-
-<br>
-
-For best results, use Chrome, Edge, or Safari. This is optimized for desktop and 
-tablet view.
-
-Tool Version: 1.0
-
-Tool Type: Serverless (OJS + webr)
-
-Source Code Available:     ✅ Yes
+:::
 
 :::
 
+```{=html}
+</section>
 
-# Animator
-
-```{ojs}
-//| echo: false
-viewof run_btn = Inputs.button("▶  Generate")
-viewof download_btn = Inputs.button("▼  Download")
+<section class="container mx-auto px-6 max-w-6xl pb-16">
+  <details class="editorial-card p-6 group">
+    <summary class="flex items-center justify-between">
+      <div>
+        <div class="control-label mb-1">Advanced</div>
+        <h3 class="font-display text-xl font-bold text-slate-900">Trajectory shape</h3>
+        <p class="text-sm text-slate-500 mt-1">Drag the green and red handles to set where each projection sits on the canvas. The yellow handle controls the <em>arc</em> &mdash; how curved the per-point flight paths are. Bigger arc &rArr; high&#8209;y points bow more (great-circle effect).</p>
+      </div>
+      <span class="material-symbols-outlined text-slate-400 group-open:rotate-180 transition-transform">expand_more</span>
+    </summary>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+      <div>
 ```
-
-```{ojs}
-//| echo: false
-//| output: false
-
-// Triggers ONLY when the button is clicked
-run_request = {
-  run_btn; // This line creates the dependency on the button click
-  
-  // We return a snapshot of the settings. 
-  // Adding a timestamp ensures the object is "new" even if settings didn't change,
-  // forcing WebR to re-run the logic.
-  return {
-    ...column_mapping,
-    ...user_input,
-    ...column_mapping//,
-    //timestamp: Date.now()
-  };
-}
-```
-
-
-
-
-
-# Adjust Trajectory
-
-:::{.card}
-
-Adjust the trajectory. Using the canvas, drag the starting point (green) and the ending point (red) and the magnitude of the flight path arc. You can also adjust these values
-directly. 
 
 ```{ojs}
 //| echo: false
@@ -508,61 +997,45 @@ directly.
 
 viewof trajectory_params = {
   const size = 500;
-  
-  // Initial internal state (Now 0 is bottom, 1 is top)
   let state = { x1: 0.25, y1: 0.5, x2: 0.75, y2: 0.5, arc: 3.0 };
 
   const svg = d3.create("svg")
       .attr("viewBox", [0, 0, size, size])
-      .attr("style", `max-width: 100%; height: auto; border: 1px solid #eee; background: #fff; border-radius: 12px;`);
+      .attr("style", "max-width:100%; height:auto; border:1px solid #e2e8f0; background:#fff; border-radius:1rem;");
 
   svg.append("defs").append("marker")
       .attr("id", "arrowhead")
       .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 9)
-      .attr("markerWidth", 5)
-      .attr("markerHeight", 5)
+      .attr("refX", 9).attr("markerWidth", 5).attr("markerHeight", 5)
       .attr("orient", "auto")
-    .append("path")
-      .attr("d", "M0,-5L10,0L0,5")
-      .attr("fill", "#2c3e50");
+    .append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", "#0f172a");
 
   const g = svg.append("g");
-  const lensArea = g.append("path").attr("fill", "#3498db").attr("fill-opacity", 0.1);
-  const boundaryTop = g.append("path").attr("fill", "none").attr("stroke", "#3498db").attr("stroke-width", 1.5).attr("stroke-dasharray", "4,3").attr("stroke-opacity", 0.6);
-  const boundaryBottom = g.append("path").attr("fill", "none").attr("stroke", "#3498db").attr("stroke-width", 1.5).attr("stroke-dasharray", "4,3").attr("stroke-opacity", 0.6);
-  const centerLine = g.append("line").attr("stroke", "#2c3e50").attr("stroke-width", 2.5).attr("marker-end", "url(#arrowhead)");
-
-  const startNode = g.append("circle").attr("r", 12).attr("fill", "#27ae60").style("cursor", "move");
-  const endNode = g.append("circle").attr("r", 12).attr("fill", "#c0392b").style("cursor", "move");
-  const yellowHandle = g.append("circle").attr("r", 11).attr("fill", "#f1c40f").attr("stroke", "#d4ac0d").style("cursor", "ns-resize");
+  const lensArea = g.append("path").attr("fill", "#0077c8").attr("fill-opacity", 0.08);
+  const boundaryTop = g.append("path").attr("fill", "none").attr("stroke", "#0077c8").attr("stroke-width", 1.5).attr("stroke-dasharray", "4,3").attr("stroke-opacity", 0.6);
+  const boundaryBottom = g.append("path").attr("fill", "none").attr("stroke", "#0077c8").attr("stroke-width", 1.5).attr("stroke-dasharray", "4,3").attr("stroke-opacity", 0.6);
+  const centerLine = g.append("line").attr("stroke", "#0f172a").attr("stroke-width", 2.5).attr("marker-end", "url(#arrowhead)");
+  const startNode = g.append("circle").attr("r", 12).attr("fill", "#10b981").style("cursor", "move");
+  const endNode = g.append("circle").attr("r", 12).attr("fill", "#ef4444").style("cursor", "move");
+  const yellowHandle = g.append("circle").attr("r", 11).attr("fill", "#f59e0b").attr("stroke", "#b45309").style("cursor", "ns-resize");
 
   function render() {
-    // Mapping: Pixel Y = (1 - Normalized Y) * size
     const px = {
       x1: state.x1 * size, y1: (1 - state.y1) * size,
       x2: state.x2 * size, y2: (1 - state.y2) * size,
-      offset: state.arc * 20 
+      offset: state.arc * 20
     };
-
     const midX = (px.x1 + px.x2) / 2;
     const midY = (px.y1 + px.y2) / 2;
-    const dx = px.x2 - px.x1;
-    const dy = px.y2 - px.y1;
+    const dx = px.x2 - px.x1, dy = px.y2 - px.y1;
     const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-
-    const nx = -dy / dist;
-    const ny = dx / dist;
-
-    const ctx = midX + nx * px.offset;
-    const cty = midY + ny * px.offset;
-    const cbx = midX - nx * px.offset;
-    const cby = midY - ny * px.offset;
+    const nx = -dy / dist, ny = dx / dist;
+    const ctx_ = midX + nx * px.offset, cty = midY + ny * px.offset;
+    const cbx = midX - nx * px.offset, cby = midY - ny * px.offset;
 
     centerLine.attr("x1", px.x1).attr("y1", px.y1).attr("x2", px.x2).attr("y2", px.y2);
-
     if (state.arc > 0.05) {
-      const dTop = `M${px.x1},${px.y1} Q${ctx},${cty} ${px.x2},${px.y2}`;
+      const dTop = `M${px.x1},${px.y1} Q${ctx_},${cty} ${px.x2},${px.y2}`;
       const dBot = `M${px.x1},${px.y1} Q${cbx},${cby} ${px.x2},${px.y2}`;
       boundaryTop.attr("d", dTop).style("display", "block");
       boundaryBottom.attr("d", dBot).style("display", "block");
@@ -572,31 +1045,28 @@ viewof trajectory_params = {
       boundaryBottom.style("display", "none");
       lensArea.style("display", "none");
     }
-
     startNode.attr("cx", px.x1).attr("cy", px.y1);
     endNode.attr("cx", px.x2).attr("cy", px.y2);
-    yellowHandle.attr("cx", (midX + ctx)/2).attr("cy", (midY + cty)/2);
+    yellowHandle.attr("cx", (midX + ctx_)/2).attr("cy", (midY + cty)/2);
   }
 
-  const dragStart = d3.drag().on("drag", (e) => { 
-    state.x1 = Math.max(0, Math.min(1, e.x / size)); 
-    state.y1 = Math.max(0, Math.min(1, 1 - (e.y / size))); // FLIPPED
-    render();
-    svg.node().dispatchEvent(new CustomEvent("input", {bubbles: true}));
+  const fire = () => svg.node().dispatchEvent(new CustomEvent("input", {bubbles: true}));
+  const dragStart = d3.drag().on("drag", (e) => {
+    state.x1 = Math.max(0, Math.min(1, e.x / size));
+    state.y1 = Math.max(0, Math.min(1, 1 - (e.y / size)));
+    render(); fire();
   });
-  const dragEnd = d3.drag().on("drag", (e) => { 
-    state.x2 = Math.max(0, Math.min(1, e.x / size)); 
-    state.y2 = Math.max(0, Math.min(1, 1 - (e.y / size))); // FLIPPED
-    render();
-    svg.node().dispatchEvent(new CustomEvent("input", {bubbles: true}));
+  const dragEnd = d3.drag().on("drag", (e) => {
+    state.x2 = Math.max(0, Math.min(1, e.x / size));
+    state.y2 = Math.max(0, Math.min(1, 1 - (e.y / size)));
+    render(); fire();
   });
   const dragYellow = d3.drag().on("drag", (e) => {
     const midX = (state.x1 + state.x2) / 2 * size;
     const midY = (1 - (state.y1 + state.y2) / 2) * size;
     const d = Math.sqrt((e.x - midX)**2 + (e.y - midY)**2);
-    state.arc = Math.max(0, Math.min(10, d / 20)); 
-    render();
-    svg.node().dispatchEvent(new CustomEvent("input", {bubbles: true}));
+    state.arc = Math.max(0, Math.min(10, d / 20));
+    render(); fire();
   });
 
   startNode.call(dragStart);
@@ -604,7 +1074,6 @@ viewof trajectory_params = {
   yellowHandle.call(dragYellow);
 
   render();
-
   return Object.defineProperty(svg.node(), "value", {
     get: () => state,
     set: (v) => { state = v; render(); }
@@ -612,85 +1081,63 @@ viewof trajectory_params = {
 }
 ```
 
+```{=html}
+      </div>
+      <div>
+```
+
 ```{ojs}
 //| echo: false
 //| output: true
 
 viewof manual_form = Inputs.form({
-  x1: Inputs.number([0, 1], {label: "Start X", step: 0.01}),
-  y1: Inputs.number([0, 1], {label: "Start Y", step: 0.01}),
-  x2: Inputs.number([0, 1], {label: "End X", step: 0.01}),
-  y2: Inputs.number([0, 1], {label: "End Y", step: 0.01}),
-  arc: Inputs.range([0, 10], {label: "Arc Magnitude", step: 0.1})
+  x1: Inputs.number([0, 1], {label: "Start X", step: 0.01, value: 0.25}),
+  y1: Inputs.number([0, 1], {label: "Start Y", step: 0.01, value: 0.5}),
+  x2: Inputs.number([0, 1], {label: "End X",   step: 0.01, value: 0.75}),
+  y2: Inputs.number([0, 1], {label: "End Y",   step: 0.01, value: 0.5}),
+  arc: Inputs.range([0, 10], {label: "Arc",   step: 0.1,  value: 3.0})
 })
 ```
 
 ```{ojs}
 //| echo: false
+//| output: false
 bind_params = Inputs.bind(viewof manual_form, viewof trajectory_params)
 ```
 
+```{=html}
+      </div>
+    </div>
+  </details>
+</section>
 
+<section class="container mx-auto px-6 max-w-6xl pb-16">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="editorial-card p-6">
+      <div class="control-label mb-2">How it works</div>
+      <p class="text-sm text-slate-600 leading-relaxed">
+        Your data is queried in-browser with <strong>DuckDB-WASM</strong> (sampled to maintain high performance with large datasets),
+        then drawn to an HTML canvas with <strong>D3</strong>. Every point smoothly interpolates between
+        its expression coordinates and its spatial coordinates with an optional arc.
+      </p>
+    </div>
+    <div class="editorial-card p-6">
+      <div class="control-label mb-2">Privacy</div>
+      <p class="text-sm text-slate-600 leading-relaxed">
+        Uploaded files are loaded into the DuckDB-WASM virtual file system inside your browser tab.
+        Nothing is sent to a server.
+      </p>
+    </div>
+    <div class="editorial-card p-6">
+      <div class="control-label mb-2">Tips</div>
+      <ul class="text-sm text-slate-600 leading-relaxed list-disc pl-5 space-y-1">
+        <li>Lower the sample rate for very large datasets.</li>
+        <li>Open <em>Trajectory shape</em> to control the arc.</li>
+        <li>Use <em>Download video</em> to capture one full bounce cycle.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+```
 
 :::
-
-
-# Advanced
-
-<!-- The actual function call -->
-
-```{webr}
-#| echo: false
-#| autorun: true
-#| input: 
-#|    - run_btn
-#|    - run_request
-
-if(run_btn>0){
-  # print(paste0("You hit the run button ", run_btn, " times."))
-  rlang::exec("make_animation", !!!run_request)
-} #else {
-  #cat("Waiting for user to press 'Generate'.")
-#}
-
-```
-
-<!-- And the actual wrapper function -->
-
-```{webr}
-#| title: Animation Source Code
-#| edit: true
-#| output: true
-#| autorun: true
-#| warning: false
-#| define: 
-#|   - make_animation
-
-
-if(exists(".Random.seed")){
-  rm(.Random.seed)
-}
-set.seed(42L)
-make_animation <- function(df=NULL, 
-                           spatial_x,
-                           spatial_y,
-                           expression_x,
-                           expression_y,
-                           annotation,
-                           start_projection){
-
-  if (is.null(df)) {
-    df <- get0("df_main", envir = .GlobalEnv)
-    if (is.null(df)) {
-      stop("Error: 'df' is NULL and 'df_main' was not found in the environment.")
-    }
-  }
-
-  cat(sprintf("🚀 Function received %d rows for animation.\n", nrow(df)))
-  cat(sprintf("Mapping: (%s,%s) -> (%s,%s)\n", spatial_x, spatial_y, 
-              expression_x, expression_y))
-}
-
-```
-
-
