@@ -72,6 +72,40 @@ format:
           .is-focused .live-view-toggle .icon-collapse { display: inline; }
           details > summary { list-style:none; cursor:pointer; }
           details > summary::-webkit-details-marker { display:none; }
+          /* Quality help tooltip — plain CSS so it doesn't depend on
+             Tailwind variants that may not ship in the CDN build. */
+          .quality-help-row { margin: 0.25rem 0 0.5rem; }
+          .quality-help {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            cursor: help;
+            color: #64748b;
+          }
+          .quality-help-icon { font-size: 1.05rem; }
+          .quality-help-tip {
+            position: absolute;
+            left: 1.4rem;
+            top: -0.25rem;
+            z-index: 50;
+            display: none;
+            width: 18rem;
+            padding: 0.65rem 0.75rem;
+            border-radius: 0.6rem;
+            background: #0f172a;
+            color: #f1f5f9;
+            font-size: 11px;
+            line-height: 1.45;
+            box-shadow: 0 18px 40px -10px rgba(0,0,0,0.35);
+            pointer-events: none;
+          }
+          .quality-help-tip strong { color: #f8fafc; }
+          .quality-help-tip > * { display: block; }
+          .quality-help-tip > * + * { margin-top: 0.3rem; }
+          .quality-help-tip .muted { color: #94a3b8; }
+          .quality-help:hover .quality-help-tip,
+          .quality-help:focus .quality-help-tip,
+          .quality-help:focus-within .quality-help-tip { display: block; }
         </style>
 ---
 
@@ -629,10 +663,50 @@ legend_view = {
 
   // Reset the global selection set whenever the dataset/categories change.
   window.__projAnim_selected = new Set();
+  // Persist user color overrides across re-renders of this cell so picking
+  // a new dataset doesn't wipe a re-color the user already set. Keyed by
+  // `${dataset}::${category}` to avoid collisions across datasets.
+  window.__projAnim_colorOverrides = window.__projAnim_colorOverrides || {};
+  const datasetKey = String(study_data?.name || "default");
+  const overrideKey = (c) => `${datasetKey}::${c}`;
+  const colorOf = (c) => window.__projAnim_colorOverrides[overrideKey(c)] ?? data.colorScale(c);
+
+  // Apply any pre-existing overrides to data.colors so the very first frame
+  // already reflects them (e.g., if the user picks a new dataset and the
+  // colors had been customized previously, those overrides still apply if
+  // the categories match).
+  function recolorCategory(cat, hex) {
+    for (let i = 0; i < data.n; i++) {
+      if (data.ann[i] === cat) data.colors[i] = hex;
+    }
+  }
+  for (const c of data.categories) {
+    const ov = window.__projAnim_colorOverrides[overrideKey(c)];
+    if (ov) recolorCategory(c, ov);
+  }
 
   const wrap = html`<div class="flex flex-wrap items-center"></div>`;
-  const hint = html`<div class="w-full text-[11px] text-slate-400 mb-2">Click a label to isolate · click more to add · double-click any to reset</div>`;
+  const hint = html`<div class="w-full text-[11px] text-slate-400 mb-2">Click a label to isolate · click more to add · double-click to reset · <strong>${navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl"}+click</strong> a swatch to recolor</div>`;
   wrap.appendChild(hint);
+
+  // One hidden color input shared across all swatches; we re-target it per
+  // click. Browsers don't allow programmatically opening a color picker
+  // without a real input, so we keep one in the DOM.
+  const picker = html`<input type="color" style="position:absolute; width:0; height:0; padding:0; border:0; opacity:0; pointer-events:none;" tabindex="-1" aria-hidden="true">`;
+  wrap.appendChild(picker);
+  let pickerCategory = null;
+  picker.addEventListener("input", () => {
+    if (!pickerCategory) return;
+    const hex = picker.value;
+    window.__projAnim_colorOverrides[overrideKey(pickerCategory)] = hex;
+    recolorCategory(pickerCategory, hex);
+    const el = itemEls.get(pickerCategory);
+    if (el) {
+      const swatch = el.querySelector(".legend-swatch");
+      if (swatch) swatch.style.background = hex;
+    }
+    repaint();
+  });
 
   const itemEls = new Map();
 
@@ -642,21 +716,37 @@ legend_view = {
     for (const [c, el] of itemEls) {
       const on = !hasSel || sel.has(c);
       el.style.opacity = on ? "1" : "0.32";
-      el.style.borderColor = sel.has(c) ? data.colorScale(c) : "#e2e8f0";
-      el.style.boxShadow = sel.has(c) ? `inset 0 0 0 1px ${data.colorScale(c)}` : "none";
+      el.style.borderColor = sel.has(c) ? colorOf(c) : "#e2e8f0";
+      el.style.boxShadow = sel.has(c) ? `inset 0 0 0 1px ${colorOf(c)}` : "none";
     }
   }
 
   for (const c of data.categories) {
-    const el = html`<button type="button" class="inline-flex items-center gap-1.5 mr-2 mb-1.5 px-2 py-1 rounded-full bg-slate-50 border border-slate-200 cursor-pointer select-none" style="transition: opacity 120ms, border-color 120ms;">
-      <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${data.colorScale(c)};"></span>
+    const el = html`<button type="button" class="inline-flex items-center gap-1.5 mr-2 mb-1.5 px-2 py-1 rounded-full bg-slate-50 border border-slate-200 cursor-pointer select-none" title="Click to isolate · ${navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl"}+click to recolor" style="transition: opacity 120ms, border-color 120ms;">
+      <span class="legend-swatch" style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${colorOf(c)};"></span>
       <span class="text-xs text-slate-700">${c}</span>
     </button>`;
     el.addEventListener("click", (ev) => {
       ev.preventDefault();
+      // Ctrl+click (or ⌘+click on macOS) opens the color picker for this
+      // label. Plain click toggles the selection filter as before.
+      if (ev.ctrlKey || ev.metaKey) {
+        pickerCategory = c;
+        picker.value = colorOf(c);
+        picker.click();
+        return;
+      }
       const sel = window.__projAnim_selected;
       if (sel.has(c)) sel.delete(c); else sel.add(c);
       repaint();
+    });
+    el.addEventListener("contextmenu", (ev) => {
+      // Right-click also opens the color picker — discoverable on touch
+      // devices via long-press, and matches the ⌘/Ctrl+click affordance.
+      ev.preventDefault();
+      pickerCategory = c;
+      picker.value = colorOf(c);
+      picker.click();
     });
     el.addEventListener("dblclick", (ev) => {
       ev.preventDefault();
@@ -936,6 +1026,31 @@ viewof export_format = Inputs.select(
 //| echo: false
 //| output: true
 
+viewof export_quality = Inputs.select(
+  ["Standard", "High", "Maximum"],
+  { label: "Quality", value: "High" }
+)
+```
+
+```{=html}
+<div class="quality-help-row">
+  <span class="quality-help" tabindex="0" aria-label="Quality help">
+    <span class="material-symbols-outlined quality-help-icon">info</span>
+    <span class="quality-help-tip" role="tooltip">
+      <strong>Bitrate per second of video</strong>
+      <span><strong>Standard</strong> &mdash; smaller files, great for streaming or embedding on a website.</span>
+      <span><strong>High</strong> &mdash; balanced; great for sharing in slide decks or Slack.</span>
+      <span><strong>Maximum</strong> &mdash; near-lossless; great for archival, presentations on large screens, or further editing.</span>
+      <span class="muted">Higher quality means a larger file. Resolution is set separately above.</span>
+    </span>
+  </span>
+</div>
+```
+
+```{ojs}
+//| echo: false
+//| output: true
+
 download_view = {
   // A self-managed button that disables itself + shows progress text while
   // the MediaRecorder is capturing, then re-enables when the file is ready.
@@ -992,7 +1107,15 @@ download_view = {
         window.__projAnim_resetToStart();
       }
       const stream = canvas.captureStream(30);
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+      // Quality presets map to a per-pixel bitrate (bits per pixel per second
+      // at 30 fps), then are scaled by the chosen output resolution. Capped
+      // so we don't ask the encoder for unrealistic targets at 1440p.
+      const W = canvas.width, H = canvas.height;
+      const pixelsPerSecond = W * H * 30;
+      const bppsByQuality = { "Standard": 0.06, "High": 0.14, "Maximum": 0.28 };
+      const bpps = bppsByQuality[export_quality] ?? bppsByQuality.High;
+      const bitrate = Math.min(40_000_000, Math.max(1_500_000, Math.round(pixelsPerSecond * bpps)));
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bitrate });
       const chunks = [];
       recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
       const done = new Promise(res => recorder.onstop = res);
