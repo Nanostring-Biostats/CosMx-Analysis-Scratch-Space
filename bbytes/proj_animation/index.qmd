@@ -87,12 +87,22 @@ duck_db_client = {
     new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" })
   );
   const worker = new Worker(worker_url);
+  // Safe to revoke once the Worker has been constructed; the browser has
+  // already fetched the blob contents.
+  URL.revokeObjectURL(worker_url);
   const logger = new duckdb.ConsoleLogger();
   const db = new duckdb.AsyncDuckDB(logger, worker);
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
   const conn = await db.connect();
   conn.instance = db;
   console.log("✅ DuckDB-Wasm Ready");
+  // Tear down the worker / DB on OJS cell invalidation (e.g. hot reload,
+  // navigation) so we don't leak a running Worker.
+  invalidation.then(async () => {
+    try { await conn.close(); } catch (_) {}
+    try { await db.terminate(); } catch (_) {}
+    try { worker.terminate(); } catch (_) {}
+  });
   return conn;
 }
 ```
@@ -164,7 +174,8 @@ mutable latest_upload = null
         // Sniff the delimiter from the first line so we handle comma-,
         // semicolon-, and tab-separated files transparently.
         const text = await file.text();
-        const firstLine = text.slice(0, text.indexOf("\n"));
+        const newlineIndex = text.indexOf("\n");
+        const firstLine = newlineIndex === -1 ? text : text.slice(0, newlineIndex);
         const counts = { ",": 0, ";": 0, "\t": 0, "|": 0 };
         let inQuote = false;
         for (const ch of firstLine) {
@@ -224,7 +235,10 @@ study_data = {
 
   // Remote parquet or local_parquet (DuckDB VFS) path.
   const conn = await duck_db_client;
-  const reader = `read_parquet('${selection.url_data}')`;
+  // Escape single quotes so user-supplied filenames (used as the DuckDB VFS
+  // id for local uploads) can't break out of the SQL string literal.
+  const escapedUrlData = String(selection.url_data).replace(/'/g, "''");
+  const reader = `read_parquet('${escapedUrlData}')`;
   const sql = `SELECT * FROM ${reader} USING SAMPLE ${rate} PERCENT (bernoulli)`;
   try {
     const result = await conn.query(sql);
@@ -270,8 +284,14 @@ animation_data = {
       const v = arr[i];
       if (Number.isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; }
     }
-    const span = hi - lo || 1;
     const out = new Float32Array(arr.length);
+    // Guard against the no-finite-values case so we don't propagate NaNs into
+    // canvas drawing routines (e.g. ctx.arc throws on NaN in some browsers).
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
+      out.fill(0.5);
+      return out;
+    }
+    const span = hi - lo || 1;
     for (let i = 0; i < arr.length; i++) out[i] = (arr[i] - lo) / span;
     return out;
   };
@@ -391,9 +411,6 @@ animation_view = {
   // into a (lon, lat) point in degrees.
   function uvToLonLat(u, v) {
     return [(u - 0.5) * 2 * lonHalf, (v - 0.5) * 2 * latHalf];
-  }
-  function lonLatToUv(lon, lat) {
-    return [lon / (2 * lonHalf) + 0.5, lat / (2 * latHalf) + 0.5];
   }
   function toSphere(lonDeg, latDeg) {
     const lon = lonDeg * D2R, lat = latDeg * D2R;
