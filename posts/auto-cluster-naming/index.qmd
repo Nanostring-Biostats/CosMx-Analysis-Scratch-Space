@@ -14,87 +14,106 @@ toc-location: left
 number-sections: true
 number-depth: 4
 code-fold: true
-date: "2026-05-12"
+date: "2026-05-20"
 date-modified: last-modified
 categories:
   - cell typing
   - algorithms
   - python
 image: figures/fig-hierannot-thumbnail.png
-description: "HierAnnot is a hierarchical auto-annotation step for modern spatial transcriptomics pipelines. It turns query-aware clusters into interpretable labels, reports uncertainty explicitly, and bridges foundation-model embeddings with biological interpretation."
+description: "HierAnnot is a hierarchical auto-annotation step for modern spatial transcriptomics pipelines. It turns unsupervised clusters into interpretable labels, reports uncertainty explicitly, and bridges foundation-model embeddings to biological interpretation."
 draft: false
 ---
 
 # Introduction
 
-Modern spatial pipelines excel at representation learning, graph construction, and clustering, but the real bottleneck lies in the next step: interpreting clusters and assigning biologically 
-meaningful names. That interpretation is valuable but often manual, iterative, and difficult to standardize across projects.
+Modern spatial pipelines excel at representation learning, graph construction, and clustering. Yet a persistent bottleneck remains: interpreting clusters and assigning biologically 
+meaningful names. This step is critical, but often manual, iterative, and difficult to standardize across datasets and projects.
 
-`HierAnnot` is an analyst-assist annotation layer for cluster interpretation in spatial transcriptomics workflows. It is designed to accelerate this step while keeping experts in control. 
-It provides uncertainty-aware, hierarchy-aware cell-type hints that are fast to inspect and iterate on. While it is NOT a replacement for manual analysis or a substitute for iterative refinement 
-(for example, subclustering broad populations), `HierAnnot` is a structured annotation engine with four practical advantages:
+`HierAnnot` is an analyst-assist layer for this stage. Rather than replacing expert judgment, it accelerates and structures annotation by leveraging predefined cell type hierarchies and marker genes, producing hierarchy-aware, uncertainty-aware cell type suggestions that are easy to inspect and refine. Importantly, `HierAnnot` is not a substitute for iterative analysis, like subclustering broad populations, but a structured engine to guide and document the process. It offers four practical advantages:
 
 1. **Hierarchy-aware calls**: broad-to-specific label routing follows biological structure.
 2. **Explicit uncertainty**: weak or conflicted cases are exported as `unknown`, `mixed_*`, or `candidate_*` rather than over-called labels.
 3. **Auditability**: outputs keep both final calls and supporting evidence.
-4. **Flexible integration**: works with standard pipelines and with foundation-model embeddings.
+4. **Flexible integration**: works with standard pipelines and embedding-based workflow that leverages foundation model.
 
-This flexibility extends to modern embedding-based workflows where a foundation model can provide strong embeddings and even reveal finer clustering structure at the same nominal resolution, 
-but label/cluster boundaries remain dataset-dependent as tissue context, assay conditions, and segmentation properties can shift biological decision boundaries.
+In a typical workflow, cells are first embedded (e.g., via PCA or learned representations) and grouped by unsupervised clustering. `HierAnnot` then operates on these clusters, assigning candidate labels using predefined hierarchies and marker genes to provide a structured starting point for downstream interpretation.
 
-A practical pattern pairs query-aware clustering with hierarchy-constrained naming:
+![A modern spatial analysis pattern: data-driven clustering plus hierarchy-based annotation and uncertainty-aware export.](./figures/fig_pipeline_overview.png){#fig-pipeline-overview fig-alt="Pipeline schematic showing preprocessing, embedding, clustering, hierarchical annotation, and export"}
 
-```text
-raw data
-  -> preprocessing
-  -> embedding generation (classical or foundation model)
-  -> graph + query-aware clustering
-  -> hierarchical annotation (HierAnnot)
-  -> uncertainty-aware export labels
-```
+# Working Principles
 
-In this design, clustering remains query-aware and exploratory, while annotation remains biologically interpretable, uncertainty-aware, and comparable across clustering strategies. In this role, HierAnnot acts as the bridge between cluster geometry and interpretable biological hypotheses.
+`HierAnnot` starts from a tissue-appropriate marker hierarchy, which acts as the main biological prior for annotation. The marker hierarchy is a tree-shaped catalogue of cell types organized from broad categories (e.g., "immune cell") down to specific subtypes (e.g., "CD8 T cell"). Each node in this tree carries a _marker program_: a curated list of genes that are expected to be switched _ON_ (or _OFF_) in that particular cell type. Think of a marker program as a genetic fingerprint for a cell identity: if the right genes are highly expressed, the evidence points toward that label.
 
-![A modern spatial analysis pattern: query-aware clustering plus hierarchy-based annotation and uncertainty-aware export.](./figures/fig_pipeline_overview.png){#fig-pipeline-overview fig-alt="Pipeline schematic showing preprocessing, embedding, clustering, hierarchical annotation, and export"}
+In practice, the package provides several ways to facilitate this step, including built-in hierarchy catalogues, direct matching helpers, and ranked suggestions. The detailed code workflow for choosing and comparing hierarchies appears in latter @sec-choose-hierarhcy. For a concrete example of a built-in hierarchy used by `HierAnnot`, see the example `colon_tme` hierarchy in @lst-colon-tme-example.
 
-`HierAnnot` starts from a tissue-appropriate marker hierarchy, which acts as the main biological prior for annotation. In practice, the package provides several ways to facilitate this step, including built-in hierarchy catalogues, direct matching helpers, and ranked suggestions. The detailed code workflow for choosing and comparing hierarchies appears in latter @sec-choose-hierarhcy. Once a reasonable hierarchy is selected, `HierAnnot` combines multiple evidence sources to decide how far to descend and when to stop conservatively.
+Once a reasonable hierarchy is selected, `HierAnnot` combines multiple evidence sources to decide how far to descend and when to stop conservatively.
 
-# A Concise View Of The Scoring And Routing Logic
+## A Concise View Of The Scoring And Routing Logic
 
-At a high level, `HierAnnot` combines several evidence sources at each node in the hierarchy: marker enrichment, competition against sibling programs, marker-detection support, and support propagated from child nodes. The algorithm then descends only when the local winner is both strong enough and sufficiently separated from nearby alternatives; otherwise, it backs off to the deepest supported ancestor. This is what makes the routing conservative rather than over-eager.
+At each node in the hierarchy, `HierAnnot` builds up a picture of how well a cluster of cells matches that node's marker program. It does this by layering four kinds of evidence:
 
-That logic is separate from export behavior. After routing identifies the best-supported level in the hierarchy, low-margin or conflicted outcomes can still be exported as `mixed_*`, `candidate_*`, or `unknown` labels instead of being over-called as a fully resolved cell type.
+1. **Marker enrichment**: are the node's expected genes expressed more than you would expect by chance? To avoid being fooled by genes that are simply abundant everywhere, the comparison is made against control genes with similar baseline expression levels.
+
+2. **Sibling competition**: even if a node looks enriched, is it clearly *more* enriched than its sibling nodes (the other cell types at the same level)? This is measured by converting enrichment into a standardized score and asking how far apart the best candidate is from the runner-up.
+
+3. **Marker-detection support**: what fraction of the node's marker genes are actually detected in this cluster? A node whose markers are mostly undetected gets down-weighted, even if the few detected markers look enriched.
+
+4. **Child-node rescue**: sometimes the evidence at a parent node is ambiguous, but one of its children has very strong support. `HierAnnot` propagates the best child's score upward so that a well-supported deeper label can "rescue" an otherwise uncertain parent, preventing the algorithm from stopping too early.
+
+These four signals are blended into a single **branch-supported score** for every node. The algorithm then walks the tree from top to bottom. At each fork it picks the sibling with the highest branch-supported score and asks two questions: 
+
+- *Is the score high enough in absolute terms?* 
+- *Is the gap to the next-best sibling wide enough?* 
+
+If both answers are yes, it descends; if not, it backs off to the deepest ancestor that did pass both gates. This is what makes the routing conservative rather than over-eager, and thus the algorithm would rather give you a confident broad label than a shaky specific one.
+
+## Routing vs. Export
+
+That routing logic is separate from how the final labels are exported. After routing identifies the best-supported level in the hierarchy, `HierAnnot` applies a second pass decides whether the final call is trustworthy enough to report as-is:
+
+- **`mixed_*`**: the winner and runner-up are nearly tied and both have strong support, suggesting the cluster genuinely contains more than one type.
+- **`candidate_*`**: the hierarchy couldn't be resolved at the top of the tree (e.g., negative enrichment at L1), but a specific leaf far down the tree has very strong support on its own. That leaf is surfaced as a candidate worth investigating.
+- **`unknown`**: overall support is too low to commit to any label.
+
+This way, downstream users always know how much confidence backs each annotation.
+
+## Flowchat 
 
 ```{mermaid}
 flowchart TD
-    A[Choose a tissue-appropriate hierarchy] --> B[Score each node from marker evidence]
-    B --> C[Adjust with sibling competition]
-    C --> D[Incorporate marker detection support]
-    D --> E[Propagate best-child support up each branch]
-    E --> F{"Is the current winner strong enough<br/>and well separated?"}
-    F -- Yes --> G[Descend to the best-supported child]
-    F -- No --> H[Stop at the deepest supported ancestor]
+    A["Choose a tissue-appropriate hierarchy<br/><i>each node carries a marker program</i>"] --> B["Score each node:<br/>enrichment vs. matched controls"]
+    B --> C["Compare siblings:<br/>standardized specificity scores"]
+    C --> D["Weight by marker-detection support"]
+    D --> E["Propagate best-child scores upward"]
+    E --> F{"Winner strong enough<br/>AND well separated?"}
+    F -- Yes --> G["Descend to best-supported child"]
+    F -- No --> H["Stop at deepest supported ancestor"]
     G --> I{"Reached a leaf or<br/>failed a downstream gate?"}
     I -- No --> F
-    I -- Yes --> J[Finalize routed label]
+    I -- Yes --> J["Finalize routed label"]
     H --> J
-    J --> K[Apply conservative export logic:<br/>mixed, candidate, or unknown when needed]
+    J --> K["Export with conservative labeling:<br/><i>mixed</i>, <i>candidate</i>, or <i>unknown</i><br/>when evidence is uncertain"]
 ```
 
 The detailed equations are included below for readers who want to know more about the scoring mechanism.
 
-::: {.callout-note collapse="true" title="Detailed scoring and routing formulation"}
-`HierAnnot` uses two complementary scores at each marker program: a raw enrichment score and a sibling-specific decision score.
+::: {.callout-note collapse="true" title="Under the hood: scoring and routing math"}
+`HierAnnot` uses two complementary scores at each node in the hierarchy: a **raw enrichment score** that measures how strongly a cluster expresses a node's marker genes, and a **decision score** that measures how clearly one sibling wins over the others.
 
-For cluster $c$ and node/program $n$, the module-style raw enrichment score is:
+### Raw enrichment score
+
+For cluster $c$ and marker program/node $n$, `HierAnnot` computes an raw enrichment score:
 
 $$
 R_{c,n}=\overline{x}_{\text{markers}}-\overline{x}_{\text{matched-controls}}-w_{\text{neg}}\,\overline{x}_{\text{negative markers}}
 $$
 
-Matched controls are sampled from genes with similar bulk abundance, which reduces bias from highly expressed genes.
+The matched controls are sampled from genes with similar bulk abundance. Subtracting them out keeps highly-expressed genes from inflating the score. The optional negative-marker penalty ($w_{\text{neg}}$) down-weights programs whose _"shouldn't be on"_ genes are actually on.
 
-A sibling-competition decision score is then computed from robust z-scores of raw enrichment:
+### Sibling competition (decision score)
+
+Raw enrichment alone doesn't tell you whether a program is *the best* among its siblings. To get at that, `HierAnnot` standardizes the raw scores into robust z-scores and then looks at the gap between each program and its strongest competitor:
 
 $$
 Z_{c,n}=\frac{R_{c,n}-\operatorname{median}(R_{\cdot,n})}{\text{scale}_n},
@@ -102,13 +121,19 @@ Z_{c,n}=\frac{R_{c,n}-\operatorname{median}(R_{\cdot,n})}{\text{scale}_n},
 D_{c,n}=\left(Z_{c,n}-\max_{j\in\text{sibs}(n),\,j\neq n} Z_{c,j}\right)\left(0.5+0.5f_{\text{detect}}\right)
 $$
 
-where $f_{\text{detect}}$ is marker-detection support, and $\text{scale}_n$ is a robust dispersion term (MAD-based when available).
+Here $\text{scale}_n$ is a MAD-based dispersion (more outlier-robust than standard deviation), and $f_{\text{detect}}$ is the fraction of expected markers that are actually detected in the cluster, serving as a reality check that shrinks the score when too many markers are missing.
 
-Routing uses a branch-supported score that mixes local evidence with best-child support:
+### Branch-supported score
+
+This is where the hierarchy really kicks in. Each node gets a **local score** that blends raw enrichment with the decision score:
 
 $$
 L_{c,n}=\big(\alpha R_{c,n}+(1-\alpha)g(R_{c,n})D_{c,n}\big)\,s(m_n)
 $$
+
+where $s(m_n)$ is a marker-count scaling term and $g(\cdot)$ gates the decision component based on raw strength (so a node with near-zero raw support can't win on specificity alone).
+
+The local scores then roll up recursively via **best-child rescue**:
 
 $$
 B_{c,n}=\begin{cases}
@@ -117,9 +142,29 @@ L_{c,n}, & n\text{ is leaf}\\
 \end{cases}
 $$
 
-At each level, `HierAnnot` selects $n^*=\arg\max B_{c,n}$ among siblings, descends only when score and margin gates are met, and otherwise backs off to the deepest supported ancestor. This keeps labels specific when evidence is strong and conservative when evidence is weak.
+This way, the final routing score at each node $B_{c,n}$ is a weighted mix of its own evidence and the best evidence found among its direct children. The mixing weight $\beta$ controls how much child-rescue is allowed. By default, `HierAnnot` set this weight a bit higher at the first level of the tree (0.4 vs. 0.35 elsewhere) because top-level programs tend to be broader and benefit more from child support. You can adjust this value via `level1_branch_child_rescue_weight` and `branch_child_rescue_weight` variables when initialize `HierAnnotPipeline` class. 
 
-Export is then uncertainty-aware but separate from routing: small final-call margins can be exported as _mixed_ labels, root-unresolved but strongly supported leaves can be exported as _candidate_ labels, and low-support final calls can optionally be exported as _unknown_.
+### Top-down routing
+
+Starting from the root, `HierAnnot` picks the sibling with the largest $B_{c,n}$ and descends only when three gates are met:
+
+1. The branch-supported score is above a minimum threshold.
+2. The margin over the runner-up sibling is large enough.
+3. The node-level raw evidence isn't deeply negative.
+
+If any gate fails, the algorithm stops and backs off to the deepest ancestor on that path whose support was solid.
+
+### Export logic (post-routing)
+
+Export labels are decided *after* routing is done, so they never distort the traversal itself:
+
+| Label | Condition and default threshold value|
+|-------|-----------|
+| **mixed** | Final margin < 0.02 and both top candidates have branch score ≥ 0.35 |
+| **candidate** | Unresolved at L1 (negative raw, poor L2 fit) but a leaf has final score ≥ 1.0 and raw ≥ 0.2 |
+| **unknown** | Final-call branch score below a user-set floor (default 0.1); optionally rescued by a strong candidate |
+
+One could adjust those threshold values when using  [`make_cluster_annotation_export_summary()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/workflows.py#L1137){target="_blank"} function to create the export-ready cluster annotation summary. 
 
 :::
 
@@ -531,7 +576,7 @@ plt.savefig(out_dir / "fig_marker_canonical_dotplot.png", dpi=180, bbox_inches="
 
 `HierAnnot` works equally well when cluster structure comes from embeddings generated by pretrained foundation models such as [scGPT](https://www.nature.com/articles/s41592-024-02201-0){target="_blank"} [@Cui2024scGPT].
 
-In this pipeline, the annotation step is decoupled from how clusters were produced. Whether clusters come from classical PCA or from a foundation-model embedding space, `HierAnnot` aggregates raw expression counts per cluster and applies the same hierarchical decision logic. This makes it a practical bridge between richer embedding structure and interpretable biological naming hints.
+In this pipeline, the annotation step is decoupled from how clusters were produced. Clustering can come from either classical PCA or a foundation-model embedding space, while `HierAnnot` applies the same hierarchy-based scoring on cluster-level raw expression. This makes `HierAnnot` a practical bridge: embeddings improve structure discovery, and `HierAnnot` turns that structure into biologically interpretable, uncertainty-aware labels on the query dataset.
 
 Here, the cell embeddings were obtained using a custom scGPT-style model pre-trained on various CosMx datasets of diverse tissue types.
 
@@ -622,9 +667,14 @@ adata.obs = adata.obs.join(
 
 The annotation result depends on hierarchy choice, so selecting a tissue-appropriate hierarchy is a key practical step.
 
-`HierAnnot` ships with rich tissue-flavored built-in hierarchies. Users can discover options with `list_builtin_hierarchies()`, get a direct automatic suggestion with `match_builtin_hierarchy(description)`, or inspect ranked candidates with `suggest_builtin_hierarchies(description)`. For a complete and maintained catalog of built-ins, plus additional usage guidance, refer to the package [README](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot){target="_blank"}.
+`HierAnnot` ships with rich tissue-flavored built-in hierarchies. These built-ins are intentionally designed to work across RNA panels of different sizes, so they tend to focus on critical broad cell types rather than pushing too deeply into very fine-grained subtypes. Users can discover options with `list_builtin_hierarchies()`, get a direct automatic suggestion with `match_builtin_hierarchy(description)`, or inspect ranked candidates with `suggest_builtin_hierarchies(description)`. For a complete and maintained catalog of built-ins, plus additional usage guidance, refer to the package [README](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot){target="_blank"}.
 
-The practical workflow is:
+As a practical rule of thumb: 
+
+- If you have a small or very targeted panel, the more immediate question is often whether enough marker separation remains after intersecting the hierarchy with your measured genes; for that, see @sec-compile-hierarchy-panel. 
+- If you have a large RNA panel and want finer cell-type distinctions, start from the built-ins and then adapt them, see @sec-building-your-own-hierarchy. 
+
+A typical workflow for choosing a built-in hierarchy is:
 
 1. Call `list_builtin_hierarchies()` to see all available options.
 2. Call `match_builtin_hierarchy(description)` for the single best-matching built-in, or `suggest_builtin_hierarchies(description)` for a ranked DataFrame of candidates.
@@ -668,16 +718,16 @@ knitr::kable(df)
 ### Suggested
 
 ```{r tbl-suggested-hierarchy, message=FALSE, eval = TRUE, echo=FALSE, results ='asis'}
-#| tbl-cap: "Built-in hierarchies suggested for `colon cancer`."
+#| tbl-cap: "Built-in hierarchies suggested for free-form text `colon cancer`."
 df <- read.csv("assets/ranked_suggest_colon_cancer.csv")
 df <- df[, c("name", "score", "tissue_scope")]
 knitr::kable(df)
 ```
 
-### colon_tme
+### `colon_tme` hierarchy
 Formatted tree returned by `format_hierarchy_tree()` for built-in `colon_tme` hierarchy.
 
-```
+```{#lst-colon-tme-example lst-cap="Example built-in hierarchy"}
 - Intestinal epithelial (+6, -4, children=3)
   - Absorptive-like (+5, -1, children=0)
   - Goblet-like (+5, -1, children=0)
@@ -748,9 +798,42 @@ knitr::kable(df)
 ![Visual comparison of hierarchy-fit metrics across candidate built-ins.](./figures/fig_hierarchy_fit_compare.png){#fig-hierarchy-fit-compare fig-alt="Bar plots comparing hierarchy-fit metrics across candidates"}
 :::
 
-## Building Your Own Hierarchy
+## Compile A Built-in Hierarchy Against Your Panel {#sec-compile-hierarchy-panel}
 
-If built-ins are close but not exact, a practical pattern is to start from a built-in and replace one branch.
+The built-in hierarchies are designed to be fairly robust across different panel sizes, so in most cases you don’t need to worry about marker coverage when running `HierAnnot`. However, if you’re working with a small or targeted gene panel, it’s worth checking which markers remain at each node after filtering to genes present in your dataset. Missing markers can blur distinctions between related cell types and this inspection helps diagnose weak separation and decide whether a simpler hierarchy would be more robust.
+
+```{python}
+#| label: code-compile-hierarchy-panel
+#| eval: false
+import json
+from hierannot import (
+    compile_builtin_hierarchy_for_panel,
+    format_hierarchy_tree,
+    hierarchy_to_dict,
+)
+
+panel_genes = set(adata.var_names.str.upper())
+
+compiled_roots, report = compile_builtin_hierarchy_for_panel(
+    gene_list=panel_genes,
+    builtin_name="colon_tme", 
+    panel_name="small_1K_panel",
+    preserve_major_immune_subtypes=True,
+)
+
+# Summary report on marker retention 
+print(report)
+
+# Visualize tree format of the compiled hierarchy
+print(format_hierarchy_tree(compiled_roots))
+
+# Inspect the remaining markers in each node after panel filtering.
+print(json.dumps(hierarchy_to_dict(compiled_roots), indent=2))
+```
+
+## Building Your Own Hierarchy {#sec-building-your-own-hierarchy}
+
+If the built-ins are close but not exact, a practical pattern is to start from a built-in and replace one branch. This is useful when you have a larger RNA panel and want finer cell-type distinctions than what the default built-ins provide.
 
 ```{python}
 #| label: code-custom-hierarchy
@@ -948,7 +1031,32 @@ ImageDimPlot(seurat_obj, fov="my_slide", group.by = viz_col)  # spatial coordina
 ```
 
 
+# Troubleshooting 
+
+Even with its robust design, the cluster annotation may encounter challenges in certain datasets. Here are some common issues and how to address them:
+
+**Mixed Labels**
+
+If clusters are annotated with `mixed_*` or unexpected labels, it may indicate:
+
+- _Low Resolution Clustering_: Try increasing the resolution of your clustering algorithm to create smaller, more distinct clusters.
+- _Signal Bleedthrough_: In spatial datasets, abundant cell types may influence rare cell types due to segmentation ambiguity. Try [`HierType`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HieraType){target="_blank"} algorithm introduced in [earlier post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth/){target="_blank"} for robust marker-based fine-clustering on minority cell types. 
+
+**Targeted RNA Panels**
+
+For datasets with small RNA panels, ensure:
+
+- _Marker Gene Separation_: Check that the remaining marker genes are still sufficiently distinct after intersecting the hierarchy with your input gene list. Refer to @sec-compile-hierarchy-panel on how to inspect the markers that remain after panel filtering.
+- _Shallower Hierarchies_: If too little specific marker separation remains, remove or simplify fragile branches so the hierarchy stays broad enough for the panel.
+
+**General Tips**
+
+- Review the hierarchy structure and marker gene lists to ensure they are appropriate for your dataset.
+- For rare cell types, consider providing custom marker lists to improve detection.
+- For advanced users, the default `HierAnnot` settings are a robust starting point, especially for spatial datasets. If you want to explore tunable parameters, see the docstring of [`HierAnnotPipeline.__init__()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/pipeline.py#L58){target="_blank"} and [`make_cluster_annotation_export_summary()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/workflows.py#L1137){target="_blank"} functions for descriptions of all available knobs at both scoring/routing and exporting steps.
+
+
 # Conclusion
 
-`HierAnnot` is most useful when treated as an analyst-assist bridge between unsupervised structure discovery and biologically interpretable reporting. In standard workflows, it provides faster, uncertainty-aware first-pass cluster naming. In foundation-model workflows, it helps translate finer embedding structure into interpretable biological hints. 
+`HierAnnot` is most useful as a bridge from cluster structure to interpretable biology. In standard workflows, it provides fast, uncertainty-aware first-pass naming. In foundation-model workflows, it connects embedding-derived structure back to biologically interpretable labels on the query dataset.
 
