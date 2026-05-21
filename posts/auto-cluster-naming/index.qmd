@@ -836,7 +836,7 @@ print(json.dumps(hierarchy_to_dict(compiled_roots), indent=2))
 
 ## Building Your Own Hierarchy {#sec-building-your-own-hierarchy}
 
-If the built-ins are close but not exact, a practical pattern is to start from a built-in and replace one branch. This is useful when you have a larger RNA panel and want finer cell-type distinctions than what the default built-ins provide.
+If the built-ins are close but not exact, a practical pattern is to start from a built-in and replace one branch. This is useful when you have a larger RNA panel and want finer cell-type distinctions than what the default built-ins provide. 
 
 ```{python}
 #| label: code-custom-hierarchy
@@ -1042,8 +1042,8 @@ Even with its robust design, the cluster annotation may encounter challenges in 
 
 If clusters are annotated with `mixed_*` or unexpected labels, it may indicate:
 
-- _Low Resolution Clustering_: Try increasing the resolution of your clustering algorithm to create smaller, more distinct clusters.
-- _Signal Bleedthrough_: In spatial datasets, abundant cell types may influence rare cell types due to segmentation ambiguity. Try [`HierType`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HieraType){target="_blank"} algorithm introduced in [earlier post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth/){target="_blank"} for robust marker-based fine-clustering on minority cell types. 
+- _Low Resolution Clustering_: `mixed_*` labels indicate strong support from different L1 nodes (cell lineages) within same cluster. Try increasing the resolution of your clustering algorithm to create smaller, more distinct clusters.
+- _Signal Bleedthrough_: In spatial datasets, abundant cell types may influence rare cell types due to segmentation ambiguity. Try [`HierType`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HieraType){target="_blank"} algorithm introduced in [earlier post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth/){target="_blank"} for robust marker-based fine-clustering on minority cell types.
 
 **Targeted RNA Panels**
 
@@ -1056,6 +1056,7 @@ For datasets with small RNA panels, ensure:
 
 - Review the hierarchy structure and marker gene lists to ensure they are appropriate for your dataset.
 - For rare cell types, consider providing custom marker lists to improve detection.
+- Consider rolling up an annotation if no sibling cluster exists. For example, if you see a `CD8 T cell` cluster but no separate `CD4 T cell` cluster, it may be safer to call it `T cell`. 
 - For advanced users, the default `HierAnnot` settings are a robust starting point, especially for spatial datasets. If you want to explore tunable parameters, see the docstring of [`HierAnnotPipeline.__init__()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/pipeline.py#L58){target="_blank"} and [`make_cluster_annotation_export_summary()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/workflows.py#L1137){target="_blank"} functions for descriptions of all available knobs at both scoring/routing and exporting steps.
 
 
