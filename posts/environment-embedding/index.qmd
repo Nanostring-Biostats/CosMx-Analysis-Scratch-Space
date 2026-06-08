@@ -2,12 +2,12 @@
 title: "Fun with cellular neighborhoods"
 author:
   - name: Patrick Danaher
-orcid: 0000-0002-2844-5883
-affiliations:
-  - ref: nstg
-- ref: patrickjdanaher
-date: "2024-03-04"
-date-modified: "2024-04-17"
+     orcid: 0000-0002-2844-5883
+     affiliations:
+       - ref: nstg
+       - ref: patrickjdanaher
+date: "2026-06-08"
+date-modified: "2026-06-08"
 categories: [algorithms]
 draft: false
 image: figures/thumbnail.png
@@ -36,7 +36,7 @@ Circa 2021, we began using a simple approach:
 3. Cluster the resulting matrix to obtain domains. 
 
 Lately we favor the Novae algorithm, which uses a spatial transformer to obtain an embedding of spatial context, 
-then applies a well-crafted hierarchical clustering method to that embedding matrix to define domains. . 
+then applies a well-crafted hierarchical clustering method to that embedding matrix to define domains. 
 Novae produces spatially-nuanced domains, but it is relatively inconvenient to stand up, is slow without a GPU, and often needs computationally expensive fine-tuning. 
 
 # An updated simple embedding of cellular neighborhoods
@@ -49,7 +49,7 @@ We have not tested it extensively, but it appears in early results to offer spat
 To achieve this, we make modest updates to our previous approach to get the below procedure:
 
 1. Begin with a highly informative embedding of single cell expression data. 
-The [scPearsonPCA package](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/scPearsonPCA){target="_blank"} offers a straighforward way to obtain this. 
+The [scPearsonPCA package](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/scPearsonPCA){target="_blank"} offers a straightforward way to obtain this. 
 2. Record each cell's nearest 5 neighbors and nearest 50 neighbors.
 3. Report the average single cell embedding values across each cell's k=5 and k=50 neighbors. cbind() these two matrices to each other. Then e.g. if your single cell embedding matrix held 30 PC's, then this final matrix will have 60 columns. 
 
@@ -106,7 +106,7 @@ embedCellNeighborhoods <- function(mat, xy, ks = c(5, 50), tissue = NULL) {
   env <- c()
   for (name in names(neighborslist)) {
     env <- cbind(env, as.matrix(neighbor_colMeans(mat, neighbors = neighborslist[[name]])))
-    newinds <- (ncol(env) - ncol(mat) + 1) : ncol(mat)
+    newinds <- (ncol(env) - ncol(mat) + 1) : ncol(env)
     colnames(env)[newinds] <- paste0(name, colnames(env)[newinds])
   }
   return(as.matrix(env))
@@ -120,12 +120,17 @@ embedCellNeighborhoods <- function(mat, xy, ks = c(5, 50), tissue = NULL) {
 #' @return A vector of color values
 colorByMatrix <- function(mat, maxquant = 0.99, na.color = "#808080", ...) {
   
-  um <- uwot::umap(as.matrix(mat), n_components = 3)
+  um <- uwot::umap(as.matrix(mat), n_components = 3, ...)
   mat <- as.matrix(mat)
   # truncate at max quantile
-  um <- apply(um, 2, function(x){replace(x, x < quantile(x, 1-maxquant, na.rm = TRUE), 1 - maxquant)})
-  um <- apply(um, 2, function(x){replace(x, x > quantile(x, maxquant, na.rm = TRUE), maxquant)})
-    # Scale each column to [0,1]
+  um <- apply(um, 2, function(x) {
+     lo <- quantile(x, maxquant, na.rm = TRUE)
+     hi <- quantile(x, 1 - maxquant, na.rm = TRUE)
+     x[x < lo] <- lo
+     x[x > hi] <- hi
+     x
+   })
+  # Scale each column to [0,1]
   scale01 <- function(x) {
     rng <- range(x, na.rm = TRUE)
     if (diff(rng) == 0) {
