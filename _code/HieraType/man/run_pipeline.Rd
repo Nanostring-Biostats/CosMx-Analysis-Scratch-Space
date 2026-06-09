@@ -11,6 +11,7 @@ run_pipeline(
   initial_prior_weights = NULL,
   celltype_call_threshold = 0.5,
   return_all_columns_postprobs = FALSE,
+  level_args = list(),
   ...
 )
 }
@@ -34,7 +35,13 @@ See \code{combine_postprob_tables()} function; these tables can be remade quickl
 \item{return_all_columns_postprobs}{Whether to return individual posterior probabilities for every celltype in the \code{post_probs} data.table.
 See \code{combine_postprob_tables()} function; these columns can be returned later if needed without needing to rerun a pipeline.}
 
-\item{...}{Other arguments to be passed to \code{fit_metagene_scores} and/or \code{cluster_metagenes} functions.}
+\item{level_args}{Named list of level-specific arguments. Names should match pipeline level names.
+Each element should be a list of arguments to override for that level.
+These override the global defaults provided via \code{...}.
+Example: \code{level_args = list(l1 = list(fit_single_positive_only = TRUE))}}
+
+\item{...}{Other arguments to be passed to \code{fit_metagene_scores} and/or \code{cluster_metagenes} functions.
+These serve as global defaults for all pipeline levels. Use \code{level_args} to override for specific levels.}
 }
 \value{
 A list containing:
@@ -46,4 +53,20 @@ A list containing:
 }
 \description{
 Run a hierarchical cell typing pipeline
+}
+\examples{
+\dontrun{
+# Basic usage with global defaults
+result <- run_pipeline(pipeline, counts, adjacency,
+                       k_components = 6)
+
+# Level-specific arguments
+result <- run_pipeline(pipeline, counts, adjacency,
+                       k_components = 6,  # default for all levels
+                       level_args = list(
+                         l1 = list(fit_single_positive_only = TRUE, k_components = 8),
+                         tcellmajor = list(k_components = 4)
+                       ))
+}
+
 }
