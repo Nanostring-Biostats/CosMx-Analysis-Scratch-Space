@@ -24,7 +24,7 @@ Here we address two related problems:
 2. How to numerically represent cells' "spatial contexts" (output: a matrix of cells x variables encoding details of cells' surroundings)
 
 The first problem has been a focus of spatial data analysis since the very beginning - 
-see e.g. Zhu et al. 2018, “Identification of spatially associated subpopulations by combining scRNA-seq and sequential fluorescence in situ hybridization data.”
+see e.g. [Zhu et al. 2018](https://pmc.ncbi.nlm.nih.gov/articles/PMC6488461/){target="_blank"}
 Numerous methods have been developed since then, and more recently papers have come out benchmarking them. 
 
 The second problem - that of encoding spatial context - is usually solved in service of domain detection, 
@@ -122,7 +122,7 @@ embedCellNeighborhoods <- function(mat, xy, ks = c(5, 50), tissue = NULL) {
 #' @return A vector of color values
 colorByMatrix <- function(mat, maxquant = 0.99, na.color = "#808080", ...) {
   
-  um <- uwot::umap(as.matrix(mat), n_components = 3, ...)
+  um <- uwot::umap(as.matrix(mat), n_components = 3, ret_extra = c("fgraph","nn"), ...)
   mat <- as.matrix(mat)
   # truncate at max quantile
   um <- apply(um, 2, function(x) {
@@ -132,6 +132,10 @@ colorByMatrix <- function(mat, maxquant = 0.99, na.color = "#808080", ...) {
      x[x > hi] <- hi
      x
    })
+  # record nearest neighbors graph:
+  umpgraph <- um$fgraph
+  dimnames(umgraph) <- list(rownames(um$nn[[1]]$idx), rownames(um$nn[[1]]$idx))
+  
   # Scale each column to [0,1]
   scale01 <- function(x) {
     rng <- range(x, na.rm = TRUE)
@@ -150,7 +154,7 @@ colorByMatrix <- function(mat, maxquant = 0.99, na.color = "#808080", ...) {
     blue  = scaled[, 3]
   )
   cols[bad] <- na.color
-  return(cols)
+  return(list(cols = cols, umpgraph = umpgraph)
 }
 
 
@@ -185,7 +189,7 @@ tot <- Matrix::rowSums(counts)
 genefreq <- scPearsonPCA::gene_frequency(Matrix::t(counts)) ## gene frequency (across all cells)
 # run PCA:
 pcaobj <- scPearsonPCA::sparse_quasipoisson_pca_seurat(
-  x = Matrix::t(counts),
+  x = Matrix::t(counts)[, hvgs],
   totalcounts = tot,
   grate = genefreq,
   scale.max = 10, ## PC's reflect clipping pearson residuals > 10 SDs above the mean pearson residual
@@ -219,15 +223,16 @@ Mostly for fun, but also as a legitimately useful view for exploratory data anal
  we can color tissues by their environment embedding. 
 We make a 3-dimensional umap projection from the embedding, then convert these 3 dimensions to RGB values. 
 Note this can take a few minutes, since it does need to compute a UMAP. 
+Note this function also returns a nearest neighbors graph from env, which could be used to get niches by leiden clustering. 
 
-``` {r echo = TRUE, eval = FALSE}
+```{r echo = TRUE, eval = FALSE}
 # color cells by their cellular neighborhood embedding:
 envcols <- colorByMatrix(mat = env, maxquant = 0.99, na.color = "#808080") 
 
 # plot the tissue:
 par(bg = "black")
 par(mar = c(0,0,0,0))
-plot(xy, pch = 16, cex = 0.1, asp = 1, col = envcols)
+plot(xy, pch = 16, cex = 0.1, asp = 1, col = envcols$cols)
 ```
 
 
