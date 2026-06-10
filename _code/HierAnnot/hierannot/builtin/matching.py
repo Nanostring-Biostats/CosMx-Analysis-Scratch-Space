@@ -11,12 +11,12 @@ _SPECIFIC_TISSUE_SYNONYMS: Dict[str, List[str]] = {
     "kidney": ["renal", "rcc", "ccrcc"],
     "liver": ["hepatic", "hcc", "cholangiocarcinoma"],
     "lung": ["pulmonary", "nsclc", "sclc"],
-    "brain": ["cerebral", "cns", "glioma", "gbm", "neural"],
+    "brain": ["cerebral", "cns", "glioma", "gbm", "neural", "hippocampus", "cortex"],
     "colon": ["colorectal", "crc", "gastric", "stomach", "gut"],
     "skin": ["dermal", "epidermal", "cutaneous", "melanoma"],
     "breast": ["mammary", "tnbc", "her2", "er_positive", "pr_positive"],
     "pancreas": ["pancreatic", "pdac"],
-    "tonsil": ["oropharyngeal", "lymphoid_tonsil"],
+    "tonsil": ["tonsillar", "oropharynx", "oropharyngeal", "headneck", "hnscc", "tonsillar_squamous", "lymphoid_tonsil"],
 }
 
 _BROAD_CONTEXT_TOKENS = {
@@ -154,3 +154,52 @@ def match_builtin_hierarchy(query: str, fallback: str = "tme_core", fuzzy_cutoff
     if any(tok in _BROAD_CONTEXT_TOKENS for tok in broad):
         return fallback
     return fallback
+
+
+_SHORT_IMMUNE_TOKENS = {"dc", "nk", "treg"}
+_IMMUNE_EXACT_PHRASES = {
+    "immune", "lymphoid", "myeloid", "macrophage", "monocyte", "neutrophil",
+    "mast cell", "plasma cell", "b cell", "t cell", "nk cell", "dendritic cell",
+    "microglia", "plasmablast", "granulocyte", "lymphocyte",
+}
+
+
+def _normalize_lineage_text(text: str) -> str:
+    q = str(text).strip().lower()
+    q = re.sub(r"[_\-/]+", " ", q)
+    q = re.sub(r"[^a-z0-9 >]+", " ", q)
+    q = re.sub(r"\s+", " ", q).strip()
+    return q
+
+
+def _tokenize_lineage_text(text: str) -> List[str]:
+    norm = _normalize_lineage_text(text)
+    if not norm:
+        return []
+    return [tok for tok in norm.split(" ") if tok]
+
+
+def is_immune_like_lineage(*texts: str) -> bool:
+    """Return True when any supplied lineage text looks immune-like.
+
+    Strategy:
+    - check case-senstive exact text for ``pDC``, ``mDC``, ``MNP``
+    - normalize into canonical phrases with word boundaries preserved
+    - check exact multiword phrases such as ``b cell`` and ``dendritic cell``
+    - check only a restricted set of short exact tokens such as ``dc``/``nk``
+    """
+    for text in texts:
+        if text in {"pDC", "mDC", "MNP"}:
+            return True
+        
+        norm = _normalize_lineage_text(text)
+        if not norm:
+            continue
+        if any(f" {phrase} " in f" {norm} " for phrase in _IMMUNE_EXACT_PHRASES):
+            return True
+        
+        tokens = set(_tokenize_lineage_text(text))
+        if any(tok in tokens for tok in _SHORT_IMMUNE_TOKENS):
+            return True
+
+    return False

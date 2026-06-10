@@ -534,23 +534,15 @@ In practice, DE-ranked markers can be influenced by tissue background compositio
 #| label: code-basic-marker-valid
 #| eval: false
 # Canonical markers from the selected hierarchy, filtered to genes present in this dataset.
-def _collect_canonical_markers(root_nodes, adata_var_names):
-    present_upper = {str(g).upper(): str(g) for g in adata_var_names}
-    seen = set()
-    canonical = []
-    stack = list(root_nodes)
-    while stack:
-        node = stack.pop(0)
-        for g in getattr(node, "positive_markers", []) or []:
-            gu = str(g).upper()
-            if gu in present_upper and gu not in seen:
-                seen.add(gu)
-                canonical.append(present_upper[gu])
-        stack.extend(getattr(node, "children", []) or [])
-    return canonical
+from hierannot import collect_positive_marker_genes
 
-canonical_roots = get_builtin_hierarchy("colon_tme")
-canonical_markers = _collect_canonical_markers(canonical_roots, adata.var_names)
+all_canonical_markers = collect_positive_marker_genes(
+    hierarchy="colon_tme",
+    return_format="list"
+)
+
+canonical_markers = [g for g in all_canonical_markers if g in adata.var_names]
+
 if len(canonical_markers) == 0:
     raise ValueError("No canonical markers from colon_tme were found in adata.var_names.")
 
@@ -1056,7 +1048,7 @@ For datasets with small RNA panels, ensure:
 
 - Review the hierarchy structure and marker gene lists to ensure they are appropriate for your dataset.
 - For rare cell types, consider providing custom marker lists to improve detection.
-- For advanced users, the default `HierAnnot` settings are a robust starting point, especially for spatial datasets. If you want to explore tunable parameters, see the docstring of [`HierAnnotPipeline.__init__()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/pipeline.py#L58){target="_blank"} and [`make_cluster_annotation_export_summary()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/workflows.py#L1137){target="_blank"} functions for descriptions of all available knobs at both scoring/routing and exporting steps.
+- For advanced users, the default `HierAnnot` settings are a robust starting point, especially for spatial datasets. If you want to explore tunable parameters, see the docstring of [`HierAnnotPipeline.__init__()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/pipeline.py#L70){target="_blank"} and [`make_cluster_annotation_export_summary()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/workflows.py#L954){target="_blank"} functions for descriptions of all available knobs at both scoring/routing and exporting steps.
 
 
 # Conclusion

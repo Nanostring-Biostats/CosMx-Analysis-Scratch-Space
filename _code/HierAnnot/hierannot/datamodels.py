@@ -87,6 +87,57 @@ class MarkerProgram:
 
 
 @dataclass
+class MalignantProgram:
+    """Flat marker program scored by the tumor/auxiliary program track.
+
+    Unlike :class:`MarkerProgram`, these programs are not routed as a hierarchy.
+    They are scored in parallel to capture tumor/transformation signals by
+    default, and can also be used in ``malignant_integration_mode="flag_only"``
+    to score auxiliary disease or state programs such as proliferation, hypoxia,
+    fibrosis, or inflammatory activation without changing normal hierarchy
+    export labels.
+
+    Required fields are ``name`` and ``positive_markers``. ``negative_markers``
+    are optional. ``metadata`` may include ``competition_group`` to make related
+    programs compete for state specificity, ``reporting_label`` to control
+    concise program labels, and ``report_on_lineages`` to restrict reportability
+    under ``program_report_block_preset="lineage_aware"``.
+    ``reporting_role`` is active reporting metadata with three recommended
+    values: ``"status"`` programs establish tumor-like identity for integration,
+    ``"state"`` programs decorate a tumor-like label when specific, and
+    ``"modifier"`` programs are reported as auxiliary flags.
+    """
+
+    name: str
+    positive_markers: List[str]
+    negative_markers: List[str] = field(default_factory=list)
+    description: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "positive_markers": list(self.positive_markers),
+            "negative_markers": list(self.negative_markers),
+            "description": self.description,
+            "tags": list(self.tags),
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MalignantProgram":
+        return cls(
+            name=data.get("name", data.get("label", "transformed")),
+            positive_markers=list(data.get("positive_markers", [])),
+            negative_markers=list(data.get("negative_markers", [])),
+            description=data.get("description"),
+            tags=list(data.get("tags", [])),
+            metadata=dict(data.get("metadata", {})),
+        )
+
+
+@dataclass
 class CompiledMarkerProgram:
     """Internal representation with canonical and effective scoring markers."""
 
@@ -183,9 +234,49 @@ class ClusterAnnotation:
 
 @dataclass
 class HierAnnotResult:
+    """Container returned by :meth:`HierAnnotPipeline.fit_score`.
+
+    Key tables
+    ----------
+    cluster_annotations
+        Normal hierarchy annotation table. This is the primary lineage/cell-type
+        call per cluster.
+    malignant_scores
+        Per-cluster, per-program flat marker-program score table. Although the
+        column names are tumor-focused, the same table is also used for
+        auxiliary flag-only program sets such as cell cycle, stress,
+        inflammation, or fibrosis.
+    malignant_annotations
+        One-row-per-cluster summary of the flat tumor/auxiliary program track.
+        In ``malignant_integration_mode="flag_only"``, normal export labels
+        are unchanged and this is the main table to inspect auxiliary status via
+        columns such as ``annot_malignant_status``,
+        ``annot_malignant_label_concise``, ``annot_malignant_status_label``,
+        ``annot_malignant_state_label``, ``annot_malignant_modifier_labels``,
+        ``annot_malignant_positive_programs``, ``annot_malignant_raw_score`` and
+        ``annot_malignant_status_score``. For tumor integration, aggregated
+        status-role evidence sets ``annot_malignant_tumor_status_pass=True``;
+        state-role programs can provide a small gated support bonus only when
+        core status evidence is already borderline, while modifier programs
+        remain diagnostic by default.
+    integrated_annotations
+        Combined normal + tumor-track interpretation. In integrate mode this
+        table records tumor-like labels and report-blocking diagnostics such as
+        ``annot_malignant_reporting_blocked`` and
+        ``annot_malignant_reporting_blocked_reason``.
+    malignant_programs
+        Flat tumor/auxiliary marker programs used to compute malignant_scores
+        and malignant_annotations. These definitions are persisted in result
+        bundles as ``malignant_programs.json`` when available so rerun/export
+        workflows remain auditable and reproducible across package versions.
+    """
+
     cluster_annotations: "object"
     level_scores: "object"
     all_scores: "object"
+    malignant_scores: "object" = None
+    malignant_annotations: "object" = None
+    integrated_annotations: "object" = None
     normalized_matrix: "object" = None
     control_gene_map: Dict[str, Dict[str, Dict[str, List[str]]]] = field(default_factory=dict)
     compiled_programs: List[CompiledMarkerProgram] = field(default_factory=list)
@@ -194,3 +285,4 @@ class HierAnnotResult:
     resolved_config: Dict[str, object] = field(default_factory=dict)
     metadata: Optional[Dict[str, Any]] = None
     hierarchy: Optional[List[MarkerProgram]] = None
+    malignant_programs: Optional[List[MalignantProgram]] = None

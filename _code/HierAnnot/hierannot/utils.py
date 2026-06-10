@@ -2,6 +2,14 @@ from __future__ import annotations
 
 import pandas as pd
 
+def _sanitize_label_text(value: object) -> str:
+    text = str(value).strip()
+    for old, new in [(" ", "_"), ("/", "_"), ("-", "_")]:
+        text = text.replace(old, new)
+    while "__" in text:
+        text = text.replace("__", "_")
+    return text.strip("_")
+
 
 def summarize_hierarchy_fit(result_or_summary):
     """

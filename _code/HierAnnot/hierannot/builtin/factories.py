@@ -197,7 +197,42 @@ def _kidney_tme() -> List[MarkerProgram]:
     return roots
 
 def _tonsil_tme() -> List[MarkerProgram]:
-    return _tme_core()
+    roots = _tme_core()
+    for i, node in enumerate(roots):
+        if node.name == "Epithelial":
+            roots[i] = _mp(
+                "Squamous epithelial",
+                ["KRT5", "KRT14", "KRT6A", "KRT16", "KRT17", "TP63", "DSG3", "IVL", "KRT1", "KRT10"],
+                ["PTPRC", "COL1A1", "PECAM1", "VWF", "MLANA"],
+                children=[
+                    _mp(
+                        "Basal squamous epithelial",
+                        ["KRT5", "KRT14", "TP63", "ITGA6", "COL17A1", "DST"],
+                        ["KRT1", "KRT10", "PTPRC"],
+                        metadata=_meta("epithelial", "tonsil", "tonsil_tme", role="major", lineage_module="tonsil_squamous"),
+                    ),
+                    _mp(
+                        "Suprabasal squamous epithelial",
+                        ["KRT1", "KRT10", "IVL", "DSG1", "DSP"],
+                        ["KRT14", "PTPRC"],
+                        metadata=_meta("epithelial", "tonsil", "tonsil_tme", role="major", lineage_module="tonsil_squamous"),
+                    ),
+                    _mp(
+                        "Keratinizing squamous epithelial",
+                        ["FLG", "LOR", "TGM1", "SPRR1B", "SPRR2A", "KRT2"],
+                        ["KRT14", "PTPRC"],
+                        metadata=_meta("epithelial", "tonsil", "tonsil_tme", role="optional", lineage_module="tonsil_squamous"),
+                    ),
+                    _mp(
+                        "Activated/stress squamous epithelial",
+                        ["KRT6A", "KRT16", "KRT17", "S100A7", "SERPINB3", "SERPINB4"],
+                        ["PTPRC", "MLANA"],
+                        metadata=_meta("epithelial", "tonsil", "tonsil_tme", role="optional", lineage_module="tonsil_squamous"),
+                    ),
+                ],
+                metadata=_meta("solid_tissue", "tonsil", "tonsil_tme", role="major", lineage_module="tonsil_squamous"),
+            )
+    return roots
 
 
 def _breast_tme() -> List[MarkerProgram]:
@@ -247,6 +282,21 @@ def _pancreas_tme() -> List[MarkerProgram]:
                 ],
                 metadata=_meta("solid_tissue", "pancreas", "pancreas_tme", role="major", lineage_module="pancreas_parenchymal"),
             )
+        elif node.name == "Fibroblast":
+            roots[i] = _mp(
+                "Fibroblast",
+                ["COL1A1", "COL1A2", "DCN", "LUM", "COL3A1"],
+                ["EPCAM", "PTPRC", "PECAM1", "KDR"],
+                children=[
+                    _mp(
+                        "Pancreatic stellate cell",
+                        ["COL1A1", "COL1A2", "COL3A1", "DCN", "LUM", "SPARC"],
+                        ["PTPRC", "PECAM1", "KDR", "EPCAM"],
+                        metadata=_meta("stromal", "pancreas", "pancreas_tme", role="optional", lineage_module="stromal"),
+                    ),
+                ],
+                metadata=_meta("solid_tissue", "pancreas", "pancreas_tme", role="major", lineage_module="stromal"),
+            )
         elif node.name == "Endothelial":
             node.negative_markers = ["COL1A1", "EPCAM", "PTPRC"]
         elif node.name == "Immune":
@@ -271,6 +321,21 @@ def _liver_tme() -> List[MarkerProgram]:
                     _mp("Cholangiocyte-like", ["KRT19", "EPCAM", "KRT8", "KRT18", "SOX9"], ["ALB"], metadata=_meta("epithelial", "liver", "liver_tme", role="major", lineage_module="liver_parenchymal")),
                 ],
                 metadata=_meta("solid_tissue", "liver", "liver_tme", role="major", lineage_module="liver_parenchymal"),
+            )
+        elif node.name == "Fibroblast":
+            roots[i] = _mp(
+                "Fibroblast",
+                ["COL1A1", "COL1A2", "DCN", "LUM", "COL3A1"],
+                ["EPCAM", "PTPRC", "PECAM1", "KDR"],
+                children=[
+                    _mp(
+                        "Hepatic stellate cell",
+                        ["RBP1", "LRAT", "RELN", "DES", "GFAP", "CYGB"],
+                        ["PTPRC", "PECAM1", "KDR", "EPCAM"],
+                        metadata=_meta("stromal", "liver", "liver_tme", role="optional", lineage_module="stromal"),
+                    ),
+                ],
+                metadata=_meta("solid_tissue", "liver", "liver_tme", role="major", lineage_module="stromal"),
             )
     return roots
 
@@ -297,157 +362,53 @@ def _skin_tme() -> List[MarkerProgram]:
         if node.name == "Epithelial":
             roots[i] = _mp(
                 "Cutaneous epithelial",
-                ["KRT5", "KRT14", "KRT15", "KRT1", "KRT10", "IVL"],
-                ["PTPRC", "COL1A1", "PECAM1", "VWF"],
+                ["KRT5", "KRT14", "KRT15", "KRT1", "KRT10", "IVL", "FLG", "LOR", "KRT6A", "KRT16", "KRT17"],
+                ["PTPRC", "COL1A1", "PECAM1", "VWF", "MLANA", "PMEL"],
                 children=[
-                    _mp("Basal keratinocyte", ["KRT5", "KRT14", "KRT15", "TP63", "DST"], ["KRT1", "KRT10"], metadata=_meta("epithelial", "skin", "skin_tme", role="major", lineage_module="skin_parenchymal")),
-                    _mp("Differentiated keratinocyte", ["KRT1", "KRT10", "KRTDAP", "IVL", "SPRR1B"], ["KRT14"], metadata=_meta("epithelial", "skin", "skin_tme", role="major", lineage_module="skin_parenchymal")),
+                    _mp(
+                        "Basal keratinocyte",
+                        ["KRT5", "KRT14", "KRT15", "TP63", "DST", "ITGA6", "COL17A1"],
+                        ["KRT1", "KRT10", "MLANA"],
+                        metadata=_meta("epithelial", "skin", "skin_tme", role="major", lineage_module="skin_parenchymal"),
+                    ),
+                    _mp(
+                        "Suprabasal keratinocyte",
+                        ["KRT1", "KRT10", "DSG1", "DSP", "IVL"],
+                        ["KRT14", "MLANA"],
+                        metadata=_meta("epithelial", "skin", "skin_tme", role="major", lineage_module="skin_parenchymal"),
+                    ),
+                    _mp(
+                        "Granular/cornified keratinocyte",
+                        ["FLG", "LOR", "TGM1", "KRT2", "SPRR1B", "SPRR2A"],
+                        ["KRT14", "MLANA"],
+                        metadata=_meta("epithelial", "skin", "skin_tme", role="optional", lineage_module="skin_parenchymal"),
+                    ),
+                    _mp(
+                        "Squamous epithelial",
+                        ["KRT5", "KRT14", "KRT6A", "KRT16", "KRT17", "TP63", "DSG3"],
+                        ["PTPRC", "MLANA"],
+                        metadata=_meta("epithelial", "skin", "skin_tme", role="major", lineage_module="skin_parenchymal"),
+                    ),
+                    _mp(
+                        "Hair follicle epithelial",
+                        ["KRT15", "KRT17", "SOX9", "KRT6A", "KRT75"],
+                        ["MLANA", "PTPRC"],
+                        metadata=_meta("epithelial", "skin", "skin_tme", role="optional", lineage_module="skin_parenchymal"),
+                    ),
+                    _mp(
+                        "Sebaceous/ductal epithelial",
+                        ["KRT7", "KRT19", "EPCAM", "MUCL1", "SCGB2A2"],
+                        ["MLANA", "PTPRC"],
+                        metadata=_meta("epithelial", "skin", "skin_tme", role="optional", lineage_module="skin_parenchymal"),
+                    ),
                 ],
                 metadata=_meta("solid_tissue", "skin", "skin_tme", role="major", lineage_module="skin_parenchymal"),
             )
+
+    roots.insert(1, _mp(
+        "Melanocyte",
+        ["MITF", "PMEL", "MLANA", "TYR", "TYRP1", "DCT", "SOX10"],
+        ["KRT14", "PTPRC", "COL1A1", "PECAM1"],
+        metadata=_meta("melanocytic", "skin", "skin_tme", role="major", lineage_module="melanocytic"),
+    ))
     return roots
-
-def _normalize_query_tokens(text: str) -> List[str]:
-    q = str(text).strip().lower()
-    q = re.sub(r"[^a-z0-9]+", " ", q)
-    q = re.sub(r"\s+", " ", q).strip()
-    return [t for t in q.split(" ") if t]
-
-
-def _canonical_tissue_to_pack(tissue: str) -> str:
-    mapping = {
-        "breast": "breast_tme",
-        "pancreas": "pancreas_tme",
-        "kidney": "kidney_tme",
-        "colon": "colon_tme",
-        "tonsil": "tonsil_tme",
-        "brain": "brain_core",
-        "liver": "liver_tme",
-        "lung": "lung_tme",
-        "skin": "skin_tme",
-    }
-    return mapping.get(tissue, "tme_core")
-
-
-def _query_specific_tissues(query: str) -> Tuple[List[str], List[str], List[str]]:
-    tokens = _normalize_query_tokens(query)
-    specific = []
-    broad = []
-    unknown = []
-    for tok in tokens:
-        matched = False
-        for canon, syns in _SPECIFIC_TISSUE_SYNONYMS.items():
-            if tok == canon or tok in syns:
-                specific.append(canon)
-                matched = True
-                break
-        if matched:
-            continue
-        if tok in _BROAD_CONTEXT_TOKENS or tok in _IMMUNE_CONTEXT_TOKENS:
-            broad.append(tok)
-        else:
-            unknown.append(tok)
-    return sorted(set(specific)), broad, unknown
-
-
-def _fuzzy_specific_tissues(tokens: List[str], cutoff: float = 0.75) -> List[str]:
-    matches = []
-    for tok in tokens:
-        if len(tok) < 4:
-            continue
-        best_tissue = None
-        best_score = 0.0
-        for canon, syns in _SPECIFIC_TISSUE_SYNONYMS.items():
-            for cand in [canon] + list(syns):
-                score = SequenceMatcher(None, tok, cand).ratio()
-                if score > best_score:
-                    best_tissue = canon
-                    best_score = score
-        if best_tissue is not None and best_score >= cutoff:
-            matches.append(best_tissue)
-    return sorted(set(matches))
-
-
-def suggest_builtin_hierarchies(query: str, top_k: int = 5, fuzzy_cutoff: float = 0.75) -> pd.DataFrame:
-    """
-    Rank built-in hierarchies for a free-text tissue description.
-
-    Matching strategy:
-    - exact tissue-token match
-    - synonym-expanded tissue match
-    - conservative fuzzy tissue match
-    - broad context only acts as a weak fallback prior
-    """
-    specific, broad, unknown = _query_specific_tissues(query)
-    fuzzy_specific = _fuzzy_specific_tissues(unknown, cutoff=fuzzy_cutoff) if not specific else []
-
-    rows = []
-    for name, spec in BUILTIN_HIERARCHIES.items():
-        score = 0.0
-        exact = 0.0
-        fuzzy = 0.0
-        context = 0.0
-
-        pack_scope = str(spec.get("tissue_scope", "")).lower()
-
-        for tissue in specific:
-            target_pack = _canonical_tissue_to_pack(tissue)
-            if name == target_pack or pack_scope == tissue:
-                exact += 3.0
-
-        for tissue in fuzzy_specific:
-            target_pack = _canonical_tissue_to_pack(tissue)
-            if name == target_pack or pack_scope == tissue:
-                fuzzy += 1.0
-
-        if not specific and not fuzzy_specific:
-            if "brain" in broad and name == "brain_core":
-                context += 1.5
-            elif any(tok in _IMMUNE_CONTEXT_TOKENS for tok in broad) and name == "immune_core":
-                context += 1.0
-            elif any(tok in _BROAD_CONTEXT_TOKENS for tok in broad) and name == "tme_core":
-                context += 1.0
-
-        score = exact + fuzzy + context
-        rows.append({
-            "name": name,
-            "score": score,
-            "exact_score": exact,
-            "fuzzy_score": fuzzy,
-            "context_score": context,
-            "category": spec["category"],
-            "tissue_scope": spec["tissue_scope"],
-            "description": spec["description"],
-        })
-
-    df = pd.DataFrame(rows).sort_values(
-        ["score", "exact_score", "fuzzy_score", "context_score"],
-        ascending=False,
-    ).reset_index(drop=True)
-    if top_k is not None:
-        df = df.head(int(top_k))
-    return df
-
-
-def match_builtin_hierarchy(query: str, fallback: str = "tme_core", fuzzy_cutoff: float = 0.75) -> str:
-    """
-    Return the best-matching built-in hierarchy.
-
-    If no specific tissue match is found, use broad-context fallback:
-    - brain-like context -> brain_core
-    - immune-only context -> immune_core
-    - otherwise -> tme_core
-    """
-    specific, broad, unknown = _query_specific_tissues(query)
-    if specific:
-        return _canonical_tissue_to_pack(specific[0])
-
-    fuzzy_specific = _fuzzy_specific_tissues(unknown, cutoff=fuzzy_cutoff)
-    if fuzzy_specific:
-        return _canonical_tissue_to_pack(fuzzy_specific[0])
-
-    if any(tok in _IMMUNE_CONTEXT_TOKENS for tok in broad):
-        return "immune_core"
-    if any(tok in _BROAD_CONTEXT_TOKENS for tok in broad):
-        return fallback
-    return fallback
