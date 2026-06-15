@@ -122,18 +122,18 @@ embedCellNeighborhoods <- function(mat, xy, ks = c(5, 50), tissue = NULL) {
 #' @return A vector of color values
 colorByMatrix <- function(mat, maxquant = 0.99, na.color = "#808080", ...) {
   
-  um <- uwot::umap(as.matrix(mat), n_components = 3, ret_extra = c("fgraph","nn"), ...)
   mat <- as.matrix(mat)
+  um <- uwot::umap(mat, n_components = 3, ret_extra = c("fgraph","nn"), ...)
   # truncate at max quantile
-  um <- apply(um, 2, function(x) {
-     lo <- quantile(x, maxquant, na.rm = TRUE)
-     hi <- quantile(x, 1 - maxquant, na.rm = TRUE)
-     x[x < lo] <- lo
-     x[x > hi] <- hi
-     x
-   })
+  um$embedding <- apply(um$embedding, 2, function(x) {
+    lo <- quantile(x, maxquant, na.rm = TRUE)
+    hi <- quantile(x, 1 - maxquant, na.rm = TRUE)
+    x[x < lo] <- lo
+    x[x > hi] <- hi
+    x
+  })
   # record nearest neighbors graph:
-  umpgraph <- um$fgraph
+  umgraph <- um$fgraph
   dimnames(umgraph) <- list(rownames(um$nn[[1]]$idx), rownames(um$nn[[1]]$idx))
   
   # Scale each column to [0,1]
@@ -144,7 +144,7 @@ colorByMatrix <- function(mat, maxquant = 0.99, na.color = "#808080", ...) {
     }
     (x - rng[1]) / diff(rng)
   }
-  scaled <- apply(um, 2, scale01)
+  scaled <- apply(um$embedding, 2, scale01)
   # Identify rows with NA
   bad <- apply(scaled, 1, function(x) any(is.na(x)))
   # Convert to RGB
@@ -154,7 +154,7 @@ colorByMatrix <- function(mat, maxquant = 0.99, na.color = "#808080", ...) {
     blue  = scaled[, 3]
   )
   cols[bad] <- na.color
-  return(list(cols = cols, umpgraph = umpgraph)
+  return(list(cols = cols, umpgraph = umpgraph))
 }
 
 
