@@ -1141,5 +1141,6 @@ class HierAnnotPipeline:
             compilation_report=self.compilation_report,
             diagnostics_summary=diagnostics_summary,
             resolved_config=resolved_config,
+            hierarchy=self.root_programs,
             malignant_programs=malignant_programs,
         )

@@ -44,7 +44,7 @@ from .plotting import (
     plot_all_available_diagnostics,
 )
 from .result_io import load_result_bundle, save_result_bundle
-from .utils import summarize_hierarchy_fit, compare_hierarchy_fit
+from .utils import summarize_hierarchy_fit, compare_hierarchy_fit, detect_tissue_type
 from .markers import (
     collect_positive_marker_genes,
     validate_marker_programs,
@@ -107,6 +107,7 @@ __all__ = [
     "plot_compare_hierarchy_fit",
     "summarize_hierarchy_fit",
     "compare_hierarchy_fit",
+    "detect_tissue_type",
     "collect_positive_marker_genes",
     "validate_marker_programs",
     "compile_marker_programs_for_panel",

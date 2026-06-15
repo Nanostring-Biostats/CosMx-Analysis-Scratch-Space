@@ -136,7 +136,8 @@ pipe = HierAnnotPipeline(
 You can find expanded example scripts under the `examples` subfolder.
 - `examples/basic_usage.py`: normal hierarchy annotation along with optional maligant integration.
 - `examples/end_to_end_anndata.py`: end-to-end workflow with `AnnData` and custom embeddings.
-- `examples/plot_diagnostics_from_bundle.py`: all individual diagnosit plots
+- `examples/plot_diagnostics_from_bundle.py`: all individual diagnostic plots
+- `examples/tissue_type_detection.py`: automatic pipeline with tissue type detection and auto-pick of normal hierarhcy and tumor program set.
 
 Various diagnostic plots could be generated from the results and are intended to answer different questions:
 
@@ -751,9 +752,7 @@ from hierannot import save_result_bundle, load_result_bundle
 
 save_result_bundle(
     result,
-    "hierannot_result_bundle",
-    hierarchy=roots,
-    resolved_config=getattr(result, "resolved_config", None),
+    path="hierannot_result_bundle",
     metadata={"dataset": "sample_01"},
     table_format="csv",  # default; use "parquet" optionally
 )

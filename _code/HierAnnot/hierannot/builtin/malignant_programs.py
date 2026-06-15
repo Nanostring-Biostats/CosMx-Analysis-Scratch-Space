@@ -9,9 +9,9 @@ except Exception:  # pragma: no cover - import-time safety for docs/builds
 
 _TUMOR_REPORT_ON_LINEAGES = [
     "Epithelial",
-    "Mammary epithelial",
     "Basal epithelial",
     "Luminal epithelial",
+    "Mammary epithelial",
     "Secretory/alveolar epithelial",
     "Intestinal epithelial",
     "Colon epithelial",
@@ -37,19 +37,13 @@ _TUMOR_REPORT_ON_LINEAGES = [
     "Airway epithelial",
     "Cutaneous epithelial",
     "Basal keratinocyte",
-    "Suprabasal keratinocyte",
-    "Granular/cornified keratinocyte",
-    "Differentiated keratinocyte",
+    "Differentiated keratinocyte/squamous epithelial",
+    "Adnexal epithelial",
     "Squamous epithelial",
-    "Basal squamous epithelial",
-    "Suprabasal squamous epithelial",
-    "Keratinizing squamous epithelial",
-    "Activated/stress squamous epithelial",
-    "Hair follicle epithelial",
-    "Sebaceous/ductal epithelial",
     "Melanocyte",
     "Tumor epithelial",
 ]
+
 
 
 _TUMOR_GENERAL = [
@@ -132,18 +126,18 @@ _TUMOR_COLON = [
 ]
 
 _SQUAMOUS_REPORT_ON_LINEAGES = [
+    # Skin hierarchy names.
     "Cutaneous epithelial",
-    "Squamous epithelial",
     "Basal keratinocyte",
-    "Suprabasal keratinocyte",
-    "Granular/cornified keratinocyte",
-    "Basal squamous epithelial",
-    "Suprabasal squamous epithelial",
-    "Keratinizing squamous epithelial",
-    "Activated/stress squamous epithelial",
-    "Hair follicle epithelial",
-    "Sebaceous/ductal epithelial",
+    "Differentiated keratinocyte/squamous epithelial",
+    "Adnexal epithelial",
+    # Tonsil/oropharyngeal and generic epithelial fallback names.
+    "Epithelial",
+    "Luminal epithelial",
+    "Basal epithelial",
+    "Squamous epithelial",
 ]
+
 
 _MELANOCYTIC_REPORT_ON_LINEAGES = ["Melanocyte"]
 

@@ -98,6 +98,190 @@ def _mural_core() -> List[MarkerProgram]:
 def _solid_tissue_core() -> List[MarkerProgram]:
     return _parenchymal_fallback_core() + _stromal_core() + _vascular_core() + _mural_core()
 
+
+def _tissue_origin_screen() -> List[MarkerProgram]:
+    """Balanced tissue-origin screening hierarchy.
+
+    This hierarchy is intended for :func:`hierannot.detect_tissue_type`, not for
+    final cell-type annotation.  It is deliberately shallow and two-layered:
+    shared TME controls absorb immune/stromal/vascular/mural clusters, while
+    tissue-informative branches compare broad lineage anchors in a common
+    competition space.  Tissue anchors avoid tumor/stress-state markers where
+    possible so the screen reflects tissue origin rather than tumor state.
+    """
+
+    def anchor(name, pos, neg, tissue_candidate, recommended_hierarchy, description):
+        meta = _meta(
+            "tissue_origin_anchor",
+            tissue_candidate,
+            "tissue_origin_screen",
+            role="major",
+            lineage_module=f"{tissue_candidate}_anchor",
+        )
+        meta.update({
+            "builtin_purpose": "tissue_origin_screen",
+            "tissue_detection_role": "anchor",
+            "tissue_candidate": tissue_candidate,
+            "recommended_hierarchy": recommended_hierarchy,
+            "contributes_to_tissue_detection": True,
+        })
+        return _mp(name, pos, neg, description=description, metadata=meta)
+
+    def shared(name, pos, neg, description):
+        meta = _meta(
+            "tissue_origin_shared_control",
+            "pan-tissue",
+            "tissue_origin_screen",
+            role="major",
+            lineage_module="shared_tme_control",
+        )
+        meta.update({
+            "builtin_purpose": "tissue_origin_screen",
+            "tissue_detection_role": "shared_control",
+            "tissue_candidate": "generic_tme",
+            "recommended_hierarchy": "tme_core",
+            "contributes_to_tissue_detection": False,
+        })
+        return _mp(name, pos, neg, description=description, metadata=meta)
+
+    shared_controls = _mp(
+        "Shared TME controls",
+        ["PTPRC", "COL1A1", "PECAM1", "VWF", "RGS5"],
+        ["EPCAM", "KRT8", "KRT18", "KRT19"],
+        children=[
+            shared(
+                "Shared immune control",
+                ["PTPRC", "CD53", "LST1", "TYROBP", "HLA-DRA", "CD3D", "MS4A1", "LYZ"],
+                ["EPCAM", "COL1A1", "PECAM1"],
+                "Shared immune/TME control branch; contributes to generic TME support but not to a specific tissue call.",
+            ),
+            shared(
+                "Shared fibroblast/stromal control",
+                ["COL1A1", "COL1A2", "COL3A1", "DCN", "LUM", "SPARC"],
+                ["EPCAM", "PTPRC", "PECAM1"],
+                "Shared stromal control branch; contributes to generic TME support but not to a specific tissue call.",
+            ),
+            shared(
+                "Shared endothelial control",
+                ["PECAM1", "VWF", "KDR", "EMCN", "CLDN5"],
+                ["EPCAM", "PTPRC", "COL1A1"],
+                "Shared endothelial control branch; contributes to generic TME support but not to a specific tissue call.",
+            ),
+            shared(
+                "Shared mural control",
+                ["RGS5", "MCAM", "CSPG4", "PDGFRB", "ACTA2", "MYH11"],
+                ["EPCAM", "PTPRC", "PECAM1"],
+                "Shared mural/pericyte control branch; contributes to generic TME support but not to a specific tissue call.",
+            ),
+        ],
+        description="Shared immune, stromal, endothelial, and mural controls for tissue-origin screening.",
+        metadata=_meta("tissue_origin_shared_control", "pan-tissue", "tissue_origin_screen", role="major", lineage_module="shared_tme_control"),
+    )
+
+    epithelial_anchors = _mp(
+        "Epithelial/parenchymal tissue anchors",
+        ["EPCAM", "KRT8", "KRT18", "KRT19", "KRT5", "KRT14"],
+        ["PTPRC", "COL1A1", "PECAM1", "VWF"],
+        children=[
+            anchor(
+                "Mammary epithelial anchor",
+                ["EPCAM", "KRT8", "KRT18", "KRT19", "MUC1", "GATA3", "FOXA1", "ESR1", "PGR"],
+                ["PTPRC", "COL1A1", "PECAM1", "VWF"],
+                "breast",
+                "breast_tme",
+                "Broad mammary epithelial anchor for breast tissue-origin screening.",
+            ),
+            anchor(
+                "Intestinal epithelial anchor",
+                ["EPCAM", "KRT20", "CDX2", "VIL1", "FABP1", "MUC2", "TFF3", "SLC26A3"],
+                ["PTPRC", "COL1A1", "PECAM1", "VWF"],
+                "colon",
+                "colon_tme",
+                "Broad intestinal epithelial anchor for colon/intestinal tissue-origin screening.",
+            ),
+            anchor(
+                "Renal parenchymal anchor",
+                ["LRP2", "CUBN", "SLC34A1", "UMOD", "AQP2", "NPHS1", "PODXL"],
+                ["PTPRC", "COL1A1", "PECAM1", "VWF"],
+                "kidney",
+                "kidney_tme",
+                "Broad renal parenchymal anchor for kidney tissue-origin screening.",
+            ),
+            anchor(
+                "Pancreatic parenchymal anchor",
+                ["PRSS1", "CPA1", "CPB1", "REG1A", "KRT19", "SOX9", "INS", "GCG"],
+                ["PTPRC", "COL1A1", "PECAM1", "VWF"],
+                "pancreas",
+                "pancreas_tme",
+                "Broad pancreatic acinar/ductal/endocrine anchor for pancreas tissue-origin screening.",
+            ),
+            anchor(
+                "Hepatic parenchymal anchor",
+                ["ALB", "APOA1", "APOH", "TTR", "HP", "CPS1", "KRT19", "KRT7"],
+                ["PTPRC", "COL1A1", "PECAM1", "VWF"],
+                "liver",
+                "liver_tme",
+                "Broad hepatocyte/cholangiocyte anchor for liver tissue-origin screening.",
+            ),
+            anchor(
+                "Pulmonary epithelial anchor",
+                ["EPCAM", "SFTPA1", "SFTPB", "SFTPC", "AGER", "SCGB1A1", "FOXJ1", "NAPSA"],
+                ["PTPRC", "COL1A1", "PECAM1", "VWF"],
+                "lung",
+                "lung_tme",
+                "Broad lung epithelial anchor for pulmonary tissue-origin screening.",
+            ),
+            anchor(
+                "Squamous/keratinocyte epithelial anchor",
+                ["KRT5", "KRT14", "TP63", "KRT1", "KRT10", "IVL", "DSG1", "FLG", "LOR"],
+                ["PTPRC", "COL1A1", "PECAM1", "VWF", "MLANA"],
+                "squamous_epithelial",
+                "skin_tme", # prefer skin over tonsil, even though it supports both without distinction.
+                "Keratinocyte/squamous epithelial anchor. This supports a squamous epithelial context. Recommend `skin_tme` over `tonsil_tme` due to higher coverage although it cannot distinguish skin from tonsil/oropharynx without sample metadata.",
+            ),
+        ],
+        description="Broad epithelial/parenchymal anchors for tissue-origin screening.",
+        metadata=_meta("tissue_origin_branch", "pan-solid-tissue", "tissue_origin_screen", role="major", lineage_module="epithelial_parenchymal_anchors"),
+    )
+
+    melanocytic_anchors = _mp(
+        "Melanocytic tissue anchors",
+        ["MITF", "PMEL", "MLANA", "TYR", "TYRP1", "DCT", "SOX10"],
+        ["PTPRC", "COL1A1", "PECAM1", "VWF", "KRT14"],
+        children=[
+            anchor(
+                "Melanocyte anchor",
+                ["MITF", "PMEL", "MLANA", "TYR", "TYRP1", "DCT", "SOX10"],
+                ["PTPRC", "COL1A1", "PECAM1", "VWF", "KRT14"],
+                "skin",
+                "skin_tme",
+                "Melanocyte anchor for skin/melanocytic tissue-origin screening.",
+            ),
+        ],
+        description="Melanocytic lineage anchor branch for tissue-origin screening.",
+        metadata=_meta("tissue_origin_branch", "skin", "tissue_origin_screen", role="major", lineage_module="melanocytic_anchor"),
+    )
+
+    neural_anchors = _mp(
+        "Neural/glial tissue anchors",
+        ["SNAP25", "SYT1", "RBFOX3", "TUBB3", "AQP4", "GFAP", "MOG", "MBP", "OLIG1"],
+        ["PTPRC", "COL1A1", "PECAM1", "EPCAM"],
+        children=[
+            anchor(
+                "Neural/glial anchor",
+                ["SNAP25", "SYT1", "RBFOX3", "TUBB3", "AQP4", "GFAP", "MOG", "MBP", "OLIG1"],
+                ["PTPRC", "COL1A1", "PECAM1", "EPCAM"],
+                "brain",
+                "brain_core",
+                "Broad neural/glial anchor for brain-like tissue-origin screening.",
+            ),
+        ],
+        description="Neural and glial lineage anchor branch for tissue-origin screening.",
+        metadata=_meta("tissue_origin_branch", "brain", "tissue_origin_screen", role="major", lineage_module="neural_glial_anchor"),
+    )
+
+    return [shared_controls, epithelial_anchors, melanocytic_anchors, neural_anchors]
+
 def _brain_core() -> List[MarkerProgram]:
     excit = _mp(
         "Excitatory neuron",
@@ -198,42 +382,24 @@ def _kidney_tme() -> List[MarkerProgram]:
 
 def _tonsil_tme() -> List[MarkerProgram]:
     roots = _tme_core()
-    for i, node in enumerate(roots):
+    for node in roots:
         if node.name == "Epithelial":
-            roots[i] = _mp(
-                "Squamous epithelial",
-                ["KRT5", "KRT14", "KRT6A", "KRT16", "KRT17", "TP63", "DSG3", "IVL", "KRT1", "KRT10"],
-                ["PTPRC", "COL1A1", "PECAM1", "VWF", "MLANA"],
-                children=[
-                    _mp(
-                        "Basal squamous epithelial",
-                        ["KRT5", "KRT14", "TP63", "ITGA6", "COL17A1", "DST"],
-                        ["KRT1", "KRT10", "PTPRC"],
-                        metadata=_meta("epithelial", "tonsil", "tonsil_tme", role="major", lineage_module="tonsil_squamous"),
-                    ),
-                    _mp(
-                        "Suprabasal squamous epithelial",
-                        ["KRT1", "KRT10", "IVL", "DSG1", "DSP"],
-                        ["KRT14", "PTPRC"],
-                        metadata=_meta("epithelial", "tonsil", "tonsil_tme", role="major", lineage_module="tonsil_squamous"),
-                    ),
-                    _mp(
-                        "Keratinizing squamous epithelial",
-                        ["FLG", "LOR", "TGM1", "SPRR1B", "SPRR2A", "KRT2"],
-                        ["KRT14", "PTPRC"],
-                        metadata=_meta("epithelial", "tonsil", "tonsil_tme", role="optional", lineage_module="tonsil_squamous"),
-                    ),
-                    _mp(
-                        "Activated/stress squamous epithelial",
-                        ["KRT6A", "KRT16", "KRT17", "S100A7", "SERPINB3", "SERPINB4"],
-                        ["PTPRC", "MLANA"],
-                        metadata=_meta("epithelial", "tonsil", "tonsil_tme", role="optional", lineage_module="tonsil_squamous"),
-                    ),
-                ],
-                metadata=_meta("solid_tissue", "tonsil", "tonsil_tme", role="major", lineage_module="tonsil_squamous"),
-            )
+            # Keep the generic epithelial parent and basic epithelial fallback subtypes
+            # from tme_core, then add a shallow tonsil/oropharyngeal squamous
+            # refinement.  This avoids forcing every epithelial cluster into a
+            # squamous label while still supporting HNSCC/tonsil contexts.
+            node.children = list(node.children) + [
+                _mp(
+                    "Squamous epithelial",
+                    ["KRT5", "KRT14", "TP63", "KRT1", "KRT10", "IVL", "DSG1", "DSG3"],
+                    ["PTPRC", "COL1A1", "PECAM1", "VWF", "MLANA", "PMEL"],
+                    description="Mucosal squamous epithelial refinement for tonsil/oropharyngeal TME annotation. ",
+                    metadata=_meta("epithelial", "tonsil", "tonsil_tme", role="major", lineage_module="tonsil_squamous"),
+                )
+            ]
+            node.description = "Generic epithelial fallback with tonsil/oropharyngeal squamous refinement."
+            node.metadata.update(_meta("solid_tissue", "tonsil", "tonsil_tme", role="major", lineage_module="parenchymal"))
     return roots
-
 
 def _breast_tme() -> List[MarkerProgram]:
     roots = _tme_core()
@@ -362,49 +528,34 @@ def _skin_tme() -> List[MarkerProgram]:
         if node.name == "Epithelial":
             roots[i] = _mp(
                 "Cutaneous epithelial",
-                ["KRT5", "KRT14", "KRT15", "KRT1", "KRT10", "IVL", "FLG", "LOR", "KRT6A", "KRT16", "KRT17"],
+                ["KRT5", "KRT14", "TP63", "KRT1", "KRT10", "IVL", "DSG1", "FLG", "LOR"],
                 ["PTPRC", "COL1A1", "PECAM1", "VWF", "MLANA", "PMEL"],
                 children=[
                     _mp(
                         "Basal keratinocyte",
-                        ["KRT5", "KRT14", "KRT15", "TP63", "DST", "ITGA6", "COL17A1"],
+                        ["KRT5", "KRT14", "TP63", "KRT15", "COL17A1", "ITGA6"],
                         ["KRT1", "KRT10", "MLANA"],
                         metadata=_meta("epithelial", "skin", "skin_tme", role="major", lineage_module="skin_parenchymal"),
                     ),
                     _mp(
-                        "Suprabasal keratinocyte",
-                        ["KRT1", "KRT10", "DSG1", "DSP", "IVL"],
-                        ["KRT14", "MLANA"],
+                        "Differentiated keratinocyte/squamous epithelial",
+                        ["KRT1", "KRT10", "IVL", "DSG1", "FLG", "LOR"],
+                        ["KRT14", "MLANA", "PTPRC"],
                         metadata=_meta("epithelial", "skin", "skin_tme", role="major", lineage_module="skin_parenchymal"),
                     ),
                     _mp(
-                        "Granular/cornified keratinocyte",
-                        ["FLG", "LOR", "TGM1", "KRT2", "SPRR1B", "SPRR2A"],
-                        ["KRT14", "MLANA"],
-                        metadata=_meta("epithelial", "skin", "skin_tme", role="optional", lineage_module="skin_parenchymal"),
-                    ),
-                    _mp(
-                        "Squamous epithelial",
-                        ["KRT5", "KRT14", "KRT6A", "KRT16", "KRT17", "TP63", "DSG3"],
-                        ["PTPRC", "MLANA"],
-                        metadata=_meta("epithelial", "skin", "skin_tme", role="major", lineage_module="skin_parenchymal"),
-                    ),
-                    _mp(
-                        "Hair follicle epithelial",
-                        ["KRT15", "KRT17", "SOX9", "KRT6A", "KRT75"],
-                        ["MLANA", "PTPRC"],
-                        metadata=_meta("epithelial", "skin", "skin_tme", role="optional", lineage_module="skin_parenchymal"),
-                    ),
-                    _mp(
-                        "Sebaceous/ductal epithelial",
-                        ["KRT7", "KRT19", "EPCAM", "MUCL1", "SCGB2A2"],
+                        "Adnexal epithelial",
+                        ["KRT15", "SOX9", "KRT19", "EPCAM", "KRT7"],
                         ["MLANA", "PTPRC"],
                         metadata=_meta("epithelial", "skin", "skin_tme", role="optional", lineage_module="skin_parenchymal"),
                     ),
                 ],
+                description="Cutaneous epithelial branch. ",
                 metadata=_meta("solid_tissue", "skin", "skin_tme", role="major", lineage_module="skin_parenchymal"),
             )
-
+    # Reuse the shared fibroblast/stromal, endothelial, mural, and immune branches
+    # from tme_core to avoid marker drift across tissue-specific built-ins.  Add
+    # only the skin-specific melanocytic branch as an additional top-level root.
     roots.insert(1, _mp(
         "Melanocyte",
         ["MITF", "PMEL", "MLANA", "TYR", "TYRP1", "DCT", "SOX10"],
