@@ -44,13 +44,19 @@ cluster_sizes = adata.obs[cluster_key].value_counts()
 tissue_summary = detect_tissue_type(
     cluster_means,
     
-    # hierarchy="tissue_origin_screen", 
-    ## default to use built-in hierarchy "tissue_origin_screen", 
-    ## optional to pass in a list of custom `MarkerProgram` that has tissue-detection metadata 
+    hierarchy="tissue_origin_screen", 
+    # default to use built-in hierarchy "tissue_origin_screen", 
+    # optional to pass in a list of custom `MarkerProgram` that has tissue-detection metadata 
+
+    compile_for_panel=True, 
+    # whether to compile the tissue-origin screen hierarchy against input gene panels, 
+    # default to True and will drop tissue-specific anchor cell types with too fewer requested
+    # marker genes (< 3 markers or < 0.4x of all ) from tissue-type candidates. 
     
     cluster_weights=cluster_sizes, 
     # default None, not to weight by cluster size; 
-    # or pd.Series or 1-column pd.DataFrame with cluster_id as index 
+    # or to weight tissue detection score by the cluster size, pass in pd.Series or 1-column 
+    # pd.DataFrame for cell number in each cluster with cluster_id as index. 
 )
 
 """
@@ -109,7 +115,7 @@ recommended_hierarchy
 
 Meaning of `tissue_detection_call` values:
 - "specific_tissue": sucessful identified a specific tissue type. 
-- "ambiguous": the second-best tissue score is at least `ambiguity_score_ratio` (default = 0.9) of the best call. 
+- "ambiguous": the second-best tissue score is at least `ambiguity_score_ratio` (default = 0.90) of the best call. 
 - "generic_tme": no specific tissue anchor has enough direct evidence but the shared TME controls are supported.
 - "insufficient_tissue_specific_evidence": neither specific anchors nor generic TME controls have enough evidence
 

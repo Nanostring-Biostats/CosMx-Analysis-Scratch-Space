@@ -220,8 +220,8 @@ def _compile_tissue_origin_hierarchy_for_panel(root_programs, gene_list, *, hier
         report["tissue_origin_anchor_usable"] = True
 
         by_name = report.set_index("name", drop=False)
-        min_anchor_markers = 4
-        min_anchor_fraction = 0.50
+        min_anchor_markers = 3
+        min_anchor_fraction = 0.40
         sparse_anchor_names = set()
         for _, row in report.iterrows():
             name = str(row.get("name"))

@@ -1,6 +1,6 @@
 # HierAnnot change log
 
-## 0.8.52
+## 0.8.53
 
 - Released June 15th, 2026
 - Refined normal hierarchies for selected tissue type: `liver_tme`, `pancreas_tme`, `skin_tme`, `tonsil_tme`.
