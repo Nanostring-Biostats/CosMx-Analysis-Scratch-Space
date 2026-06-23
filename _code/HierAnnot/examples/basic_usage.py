@@ -35,7 +35,7 @@ pipeline = HierAnnotPipeline(
     # Default = "tumor_reportable" to report tumor-like labels only on epithelial-like ans skin melanocyte final normal calls;
     # Set to "off" to disable any gating and report malignant labels for all clusters regardless of the top-level lineage/compartment;
     # or, set to "immune_like" to only report malignant labels for non-immune clusters in the integrated labels;
-    # or, set to "lineage_aware" to apply preset blocklists based on the "report_on_lineages" metadata of each maligant program;
+    # or, set to "lineage_aware" to apply preset blocklists based on the "report_on_lineages" metadata of each malignant program;
     # or, pass in a list of exact hierarchy node names that you want to block malignant annotation for their descendants (e.g. ["Immune", "Fibroblast", "Mural"]) 
 
     malignant_control_gene_exclusion_policy="current_program_only",
@@ -55,7 +55,7 @@ print(result.level_scores)
 
 print("\n=== Malignant scoring summary ===")
 print(result.malignant_annotations[[
-    # overall maligant detection
+    # overall malignant detection
     "cluster_id",
     "annot_malignant_status",
     "annot_malignant_label_concise",
@@ -118,7 +118,7 @@ rerun_result =  rerun_cluster_annotation_result_from_scores(
     malignant_status_score_threshold= 0.35,
     malignant_raw_score_threshold= 0.15,
     malignant_normal_raw_delta_threshold= 0.05, 
-    # default to None to disable the reporting criteria on raw score delta between maligant and normal tracks.
+    # default to None to disable the reporting criteria on raw score delta between malignant and normal tracks.
 
     program_report_block_preset=["Immune", "Fibroblast", "Mural", "Endothelial"], 
     # default "tumor_reportable" to report tumor-like labels only on epithelial-like and selected skin melanocyte final normal calls;

@@ -31,27 +31,138 @@ def aggregate_expression_to_cluster_means(
     warn_on_expensive_dense: bool = True,
     uppercase_features: bool = False,
 ) -> pd.DataFrame:
-    """Aggregate an expression matrix into feature x cluster profiles.
+    """Aggregate cell-level expression into feature x cluster profiles.
 
-    Orientation contract
-    --------------------
-    `expression` is interpreted as **cells x features** for all supported input
-    types, including pandas DataFrame, NumPy array, and SciPy sparse matrix.
+    Converts a cells x features expression matrix into a features x clusters profile
+    matrix by aggregating expression values within each cluster. Supports multiple
+    aggregation strategies (mean, median, trimmed mean) and optional cell filtering
+    via centrality-based selection.
+
+    This function is the core building block for deriving cluster-level transcriptomic
+    or proteomic signatures from single-cell data. It works efficiently with sparse
+    matrices and supports flexible expression sources (raw counts, normalized expression,
+    embeddings, etc.).
+
+    **Data Orientation**: The input expression matrix is always interpreted as
+    **cells × features** regardless of input type (DataFrame, NumPy array, or sparse matrix).
 
     Parameters
     ----------
-    expression
-        Cells x features expression matrix.
-    cluster_labels
-        Cluster label per cell (one label per row of `expression`).
-    feature_names, cell_names
-        Optional names used when `expression` is not a DataFrame.
-    method
-        One of: mean, median, trimmed_mean, central_cells_mean, central_cells_trimmed_mean
-    centrality_mode
-        For central-cells methods:
-        - ``centroid``: distance to cluster centroid in `centrality_matrix`
-        - ``graph_degree``: within-cluster weighted degree in `neighbor_connectivities`
+    expression : pd.DataFrame, np.ndarray, or scipy.sparse matrix
+        Cell-level expression matrix of shape (n_cells, n_features). Can be:
+        - Sparse CSR, CSC, or COO matrix (memory-efficient for large matrices)
+        - Dense NumPy array (int or float)
+        - Pandas DataFrame (index=cell names, columns=feature names)
+    cluster_labels : Sequence[str]
+        Cluster assignment for each cell (length must equal n_cells).
+        Values are coerced to strings.
+    feature_names : Sequence[str], optional
+        Feature names (e.g., gene symbols). If expression is a DataFrame, auto-extracted
+        from columns. If None, auto-generated as ``['feature_0', 'feature_1', ...]``.
+    cell_names : Sequence[str], optional
+        Cell identifiers. If expression is a DataFrame, auto-extracted from index.
+        Used for aligning with ``include_mask`` when provided. If None, auto-generated.
+    method : {'mean', 'median', 'trimmed_mean', 'central_cells_mean', 'central_cells_trimmed_mean'}, default 'mean'
+        Aggregation strategy:
+        - ``mean``: arithmetic mean of cell values per cluster (fastest, sparse-optimized)
+        - ``median``: median of cell values per cluster
+        - ``trimmed_mean``: mean after removing ``trim_fraction`` from each tail
+        - ``central_cells_mean``: mean of cells closest to cluster centroid
+        - ``central_cells_trimmed_mean``: trimmed mean of central cells
+    trim_fraction : float, default 0.1
+        Fraction of cells to exclude from each tail (lower and upper) for trimmed
+        aggregation methods. Ignored for non-trimmed methods. Must be in [0, 1).
+    include_mask : Sequence[bool], pd.Series, or np.ndarray, optional
+        Boolean mask indicating which cells to include in aggregation. If provided,
+        only cells with ``True`` contribute to cluster profiles. Useful for filtering
+        low-quality or contaminating cells. Length must equal n_cells.
+    min_cells_per_cluster : int, default 1
+        Minimum number of cells required per cluster. Clusters with fewer cells are
+        excluded from output (entire columns dropped). Useful for filtering spurious
+        or under-sampled clusters.
+    centrality_matrix : array-like, optional
+        Cell embedding or representation for computing centrality (required for
+        ``central_cells_*`` methods with ``centrality_mode='centroid'``). Should be
+        (n_cells, n_components) where n_components defines the space for centroid distances.
+    central_fraction : float, default 0.8
+        Fraction of cells per cluster to retain for ``central_cells_*`` methods.
+        Cells are ranked by distance to centroid (``centroid`` mode) or graph degree
+        (``graph_degree`` mode), and the top fraction are used. Must be in (0, 1].
+    centrality_mode : {'centroid', 'graph_degree'}, default 'centroid'
+        Strategy for selecting central cells:
+        - ``centroid``: distance to within-cluster mean in ``centrality_matrix``
+        - ``graph_degree``: weighted degree in the neighbor connectivity graph
+        Only used for ``central_cells_*`` methods.
+    neighbor_connectivities : sparse matrix, optional
+        Precomputed neighbor connectivity matrix (required for ``central_cells_*``
+        with ``centrality_mode='graph_degree'``). Should be sparse (n_cells, n_cells)
+        with symmetric weighted connections. Typically computed by Scanpy.
+    backend : {'auto', 'sparse', 'chunked', 'dense'}, default 'auto'
+        Computation backend selection (primarily for development/profiling):
+        - ``auto``: use sparse fast path for sparse matrices, chunked for dense
+        - ``sparse``: force sparse matrix multiplication (if applicable)
+        - ``chunked``: process in memory-safe chunks
+        - ``dense``: convert to dense and process directly (not recommended for large data)
+    chunk_size : int, default 50000
+        Number of cells to process per chunk for dense aggregation (``mean`` method).
+        Reduces memory overhead on very large datasets.
+    warn_on_expensive_dense : bool, default True
+        If True, issue a warning when ``method`` requires densification on a very
+        large sparse matrix (≥100M cells × features), as this may be slow or memory-intensive.
+    uppercase_features : bool, default False
+        If True, convert feature names to uppercase. Useful for standardizing gene
+        symbols. Raises an error if this produces duplicate names.
+
+    Returns
+    -------
+    pd.DataFrame
+        Aggregated expression profiles with:
+        - Index: feature names
+        - Columns: cluster labels (str dtype)
+        - Values: aggregated expression per (feature, cluster) pair
+
+    Raises
+    ------
+    ValueError
+        If expression is not 2D, cluster_labels length mismatches n_cells,
+        include_mask/centrality_matrix dimensions are incompatible, or
+        required centrality inputs are missing for ``central_cells_*`` methods.
+    KeyError
+        If specified cluster_key is not in AnnData.obs or source matrices not found.
+
+    Examples
+    --------
+    Basic mean aggregation:
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from hierannot.aggregate import aggregate_expression_to_cluster_means
+    >>> # Create example: 100 cells, 50 genes, 3 clusters
+    >>> expr = np.random.poisson(5, (100, 50))
+    >>> genes = [f"Gene_{i}" for i in range(50)]
+    >>> clusters = np.repeat(['A', 'B', 'C'], [40, 35, 25])
+    >>> profiles = aggregate_expression_to_cluster_means(expr, clusters, feature_names=genes)
+    >>> profiles.shape
+    (50, 3)
+    >>> profiles.loc['Gene_0', :]  # Gene_0 mean expression per cluster
+
+    Trimmed mean with cell filtering:
+
+    >>> # Exclude potential outliers or low-quality cells
+    >>> quality_mask = np.random.rand(100) > 0.1  # Keep 90% of cells
+    >>> profiles_filtered = aggregate_expression_to_cluster_means(
+    ...     expr, clusters, feature_names=genes, method='trimmed_mean',
+    ...     trim_fraction=0.1, include_mask=quality_mask
+    ... )
+
+    Central cells aggregation:
+
+    >>> # Use only cells closest to cluster centroid in PCA space
+    >>> pca_embedding = np.random.randn(100, 10)  # 10-D PCA embedding
+    >>> profiles_central = aggregate_expression_to_cluster_means(
+    ...     expr, clusters, feature_names=genes, method='central_cells_mean',
+    ...     centrality_matrix=pca_embedding, central_fraction=0.5
+    ... )
     """
     method = str(method)
     centrality_mode = str(centrality_mode).lower()
@@ -541,16 +652,75 @@ def cluster_anndata_on_representation(
     pca_scale: bool = False,
     do_pca: bool = True,
 ):
-    """Cluster cells from a chosen AnnData representation.
+    """Cluster cells using a selected AnnData representation via Scanpy.
 
-    Supports ``source='obsm'``, ``'layer'``, and ``'X'``. The helper is written
-    to work with Scanpy 1.10.3 and 1.11.x by relying on stable ``neighbors_key``
-    / ``key_added`` behavior and by storing custom UMAP output under a separate
-    ``obsm`` key without overwriting existing embeddings by default.
+    Performs dimensionality reduction (optional PCA/SVD), constructs a k-nearest
+    neighbor graph, and applies Leiden clustering. Results are stored in the input
+    AnnData object (or a copy) under designated obsm and obs keys.
 
-    PCA preprocessing defaults are source-aware:
-    - ``obsm``: no extra zero-centering or scaling before SVD/PCA
-    - ``X``/``layer``: zero-center before PCA, no scaling by default
+    This function is flexible with representation sources: use saved embeddings
+    (e.g., 'pca', 'scVI_latent') from ``obsm``, or re-derive from raw expression
+    matrices in ``X``, ``layer``, or ``raw``. Dimensionality reduction is applied
+    only when meaningful and skipped for pre-reduced representations.
+
+    Supports Scanpy 1.10.3+ with stable ``neighbors_key`` / ``key_added`` behavior.
+    Custom UMAP embeddings are stored under a separate obsm key by default to avoid
+    overwriting existing UMAP results.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Annotated data matrix to cluster.
+    source : {'obsm', 'layer', 'X'}, default 'obsm'
+        Data source for clustering. ``obsm`` is typically a pre-computed embedding;
+        ``X`` uses the main expression matrix; ``layer`` uses a specific layer.
+    source_key : str, optional
+        Key to access the representation. Required for ``source='obsm'`` or
+        ``source='layer'``. Ignored for ``source='X'``.
+    cluster_key : str, default 'hierannot_leiden'
+        Column name in ``adata.obs`` to store cluster assignments.
+    pca_key : str, optional
+        Key to store dimensionality-reduced representation in ``adata.obsm``.
+        If None, auto-generated based on source (e.g., ``X_rep_obsm_scVI_latent``).
+    neighbors_key : str, optional
+        Key prefix for storing neighbor graph results. If None, auto-generated
+        (e.g., ``neighbors_rep_obsm_scVI_latent``).
+    umap_key : str, optional
+        Key to store UMAP embedding in ``adata.obsm``. If None, auto-generated.
+        Only used if ``compute_umap=True``.
+    n_pcs : int, default 30
+        Number of principal components for PCA/SVD. Ignored if ``do_pca=False``.
+    n_neighbors : int, default 15
+        Number of neighbors for k-nearest neighbor graph construction.
+    leiden_resolution : float, default 1.0
+        Resolution parameter for Leiden clustering. Higher values yield more clusters.
+    random_state : int, default 0
+        Seed for reproducibility in PCA/SVD and clustering.
+    compute_umap : bool, default True
+        Whether to compute UMAP embedding alongside clustering.
+    copy : bool, default False
+        If True, work on a copy of adata. Otherwise, modify in-place.
+    pca_zero_center : bool, optional
+        Whether to center data before PCA/SVD. If None, auto-determined:
+        - ``obsm``: no centering (assumes embedding is pre-processed)
+        - ``X``/``layer``: center by default (standard PCA)
+    pca_scale : bool, default False
+        Whether to scale features to unit variance before PCA/SVD.
+        Requires scikit-learn.
+    do_pca : bool, default True
+        If True, apply PCA/SVD when ``n_pcs`` < feature count. Set False to use
+        the representation directly (e.g., when source is already low-dimensional).
+
+    Returns
+    -------
+    AnnData
+        Clustered AnnData object with:
+        - ``adata.obs[cluster_key]``: cluster assignments (str dtype)
+        - ``adata.obsm[pca_key]``: dimensionality-reduced representation
+        - ``adata.obsp[f'{neighbors_key}_distances']``: neighbor distances
+        - ``adata.obsp[f'{neighbors_key}_connectivities']``: neighbor connectivities
+        - ``adata.obsm[umap_key]``: UMAP embedding (if ``compute_umap=True``)
+        - ``adata.uns[f'{pca_key}_params']``: metadata on PCA parameters used
     """
     try:
         import scanpy as sc
@@ -636,21 +806,98 @@ def cluster_and_aggregate_anndata(
     centrality_source_key: Optional[str] = None,
     central_fraction: float = 0.8,
 ):
-    """Cluster cells from one AnnData source, then aggregate another source by cluster.
+    """Cluster cells from one representation, then aggregate another by cluster.
+
+    A convenience wrapper combining cell clustering and expression aggregation in a
+    single step. This is useful for workflows requiring cluster-level profiles from
+    a different data modality than the clustering source (e.g., cluster on low-dimensional
+    embeddings like scVI latent codes, then aggregate raw transcript counts).
+
+    Workflow:
+    1. Cluster cells using ``clustering_source`` (via ``cluster_anndata_on_representation``)
+    2. Aggregate expression matrices by cluster from ``aggregation_source``
+       (via ``aggregate_anndata_to_cluster_means``)
+
+    Both clustering and aggregation parameters are fully configurable. If clustering
+    and aggregation sources differ, ensure they align by cell (same obs dimension).
 
     Parameters
     ----------
-    clustering_source, clustering_source_key
-        Define the matrix used for clustering. Supported values are ``"obsm"``,
-        ``"layer"``, and ``"X"``. ``clustering_source_key`` is required for
-        ``"obsm"`` and ``"layer"``.
-    aggregation_source, aggregation_source_key
-        Define the matrix used for cluster-level aggregation. Supported values are
-        ``"X"``, ``"raw"``, ``"layer"``, and ``"obsm"``. ``aggregation_source_key``
-        is required for ``"layer"`` and ``"obsm"``.
-    centrality_source, centrality_source_key
-        Optional representation used only for ``central_cells_*`` aggregation.
-        If omitted for those methods, the clustering representation is used.
+    adata : AnnData
+        Annotated data matrix. Must contain both clustering and aggregation sources.
+    cluster_key : str, default 'hierannot_leiden'
+        Column name in ``adata.obs`` to store cluster assignments.
+    clustering_source : {'obsm', 'layer', 'X'}, default 'obsm'
+        Data source for clustering. Use pre-computed embeddings from ``obsm`` or
+        derive from expression matrices.
+    clustering_source_key : str, optional
+        Key for ``clustering_source``. Required if ``clustering_source`` is
+        ``'obsm'`` or ``'layer'``.
+    aggregation_source : {'X', 'raw', 'layer', 'obsm'}, default 'X'
+        Data source for aggregating cell-level values to cluster profiles.
+    aggregation_source_key : str, optional
+        Key for ``aggregation_source``. Required if ``aggregation_source`` is
+        ``'layer'`` or ``'obsm'``.
+    pca_key : str, optional
+        Key for storing dimensionality-reduced clustering representation in obsm.
+        If None, auto-generated from clustering_source.
+    neighbors_key : str, optional
+        Key prefix for neighbor graph. If None, auto-generated.
+    umap_key : str, optional
+        Key for storing UMAP embedding. If None, auto-generated. Only used if
+        ``compute_umap=True``.
+    n_pcs : int, default 30
+        Number of principal components for dimensionality reduction (clustering only).
+    n_neighbors : int, default 15
+        Number of neighbors for k-nearest neighbor graph (clustering only).
+    leiden_resolution : float, default 1.0
+        Resolution for Leiden clustering. Higher values yield more fine-grained clusters.
+    random_state : int, default 0
+        Seed for reproducibility.
+    compute_umap : bool, default True
+        Whether to compute UMAP embedding during clustering.
+    copy : bool, default False
+        If True, work on a copy of adata. Otherwise, modify in-place.
+    aggregation_method : {'mean', 'median', 'trimmed_mean', 'central_cells_mean', 'central_cells_trimmed_mean'}, default 'mean'
+        Method for aggregating expression within clusters. See
+        ``aggregate_anndata_to_cluster_means()`` for details.
+    trim_fraction : float, default 0.1
+        Fraction of cells to trim (from each tail) if using trimmed mean aggregation.
+    pca_zero_center : bool, optional
+        Whether to center before PCA in clustering. If None, auto-determined:
+        - ``obsm``: no centering (pre-processed embeddings)
+        - ``X``/``layer``: center by default
+    pca_scale : bool, default False
+        Scale features to unit variance before PCA/SVD. Requires scikit-learn.
+    do_pca : bool, default True
+        Apply dimensionality reduction when beneficial. Set False to skip for
+        already low-dimensional sources.
+    include_obs_mask : str, pd.Series, Sequence[bool], or np.ndarray, optional
+        Boolean mask to filter cells during aggregation. Can be:
+        - Column name in ``adata.obs`` (str)
+        - Pre-computed boolean array/Series
+        Only cells with True are included in cluster profiles.
+    min_cells_per_cluster : int, default 1
+        Minimum cells required per cluster. Clusters below this threshold are excluded
+        from aggregation results.
+    centrality_source : {'obsm', 'layer', 'X'}, optional
+        Representation for computing cell centrality in ``central_cells_*`` methods.
+        If None for central_cells methods, uses ``clustering_source``.
+    centrality_source_key : str, optional
+        Key for accessing centrality source. Auto-determined if None.
+    central_fraction : float, default 0.8
+        Fraction of cells (closest to centroid or highest degree) to retain for
+        ``central_cells_*`` aggregation methods. Must be in (0, 1].
+
+    Returns
+    -------
+    clustered : AnnData
+        Clustered AnnData object with cluster assignments and embeddings.
+        See ``cluster_anndata_on_representation()`` for stored fields.
+    cluster_means : pd.DataFrame
+        Feature x cluster profiles (features as rows, cluster labels as columns).
+        Values are aggregated expression measures per specified ``aggregation_method``.
+        See ``aggregate_anndata_to_cluster_means()`` for details.
     """
     resolved_rep_key = pca_key
     if resolved_rep_key is None:

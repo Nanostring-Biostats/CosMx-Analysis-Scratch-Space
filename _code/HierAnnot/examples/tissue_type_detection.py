@@ -158,13 +158,13 @@ from hierannot import (
     save_result_bundle, 
 )
 
-# convinent wrapper to get best matched hierarhcy and tumor names from tissue_summary outcome
+# convinent wrapper to get best matched hierarchy and tumor names from tissue_summary outcome
 def get_best_setup(tissue_summary):
     call = tissue_summary.iloc[0]["tissue_detection_call"]
     recommended_hierarchy = tissue_summary.iloc[0]["recommended_hierarchy"]
     detected_tissue = tissue_summary.iloc[0]["detected_tissue_type"]
 
-    # get normal hierarhcy 
+    # get normal hierarchy 
     if call == "generic_tme":
         recommended_hierarchy="tme_core"
     elif call != "specific_tissue":
@@ -197,9 +197,9 @@ df = get_best_setup(tissue_summary)
 detected_tissue= df.iloc[0]["detected_tissue_type"]
 tme_name = df.iloc[0]["recommended_hierarchy"]
 tumor_programs_name = df.iloc[0]["tumor_programs_name"]
-print(f"Tissue-type detected = {detected_tissue}, use hierarhcy = {tme_name}, tumor = {tumor_programs_name}")
+print(f"Tissue-type detected = {detected_tissue}, use hierarchy = {tme_name}, tumor = {tumor_programs_name}")
 
-# get normal hierarhcy 
+# get normal hierarchy 
 root_programs = get_builtin_hierarchy(tme_name)
 
 # also pick a matching tumor program set

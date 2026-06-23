@@ -18,7 +18,7 @@ for name, (fig, _axes) in all_plots.items():
 
 ## Plot specific diagnostics separately if you want more control over figure saving or further customization.
 
-# Part I: Standard diagnostics plots for normal hierarhcy annotation
+# Part I: Standard diagnostics plots for normal hierarchy annotation
 from hierannot import (
     plot_cluster_annotation_heatmap,
     plot_cluster_confidence,

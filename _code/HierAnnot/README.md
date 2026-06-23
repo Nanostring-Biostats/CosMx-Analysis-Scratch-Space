@@ -30,7 +30,7 @@ HierAnnot implements a hierarchical competitive marker-program workflow adapted 
     - [Extending built-ins for a new tissue hierarchy](#extending-built-ins-for-a-new-tissue-hierarchy)
     - [Saving and reloading custom hierarchies](#saving-and-reloading-custom-hierarchies)
     - [Hierarchy-fit guardrails](#hierarchy-fit-guardrails)
-- [Auxillary track annotations](#auxillary-track-annotations)
+- [Auxiliary track annotations](#auxiliary-track-annotations)
     - [Malignant scoring and tier-based reporting](#malignant-scoring-and-tier-based-reporting)
     - [Built-in and custom malignant programs](#built-in--and-custom-malignant-programs)
     - [Malignant reporting controls](#malignant-reporting-controls)
@@ -134,10 +134,10 @@ pipe = HierAnnotPipeline(
 ### Examples and diagnostic plots
 
 You can find expanded example scripts under the `examples` subfolder.
-- `examples/basic_usage.py`: normal hierarchy annotation along with optional maligant integration.
+- `examples/basic_usage.py`: normal hierarchy annotation along with optional malignant integration.
 - `examples/end_to_end_anndata.py`: end-to-end workflow with `AnnData` and custom embeddings.
 - `examples/plot_diagnostics_from_bundle.py`: all individual diagnostic plots
-- `examples/tissue_type_detection.py`: automatic pipeline with tissue type detection and auto-pick of normal hierarhcy and tumor program set.
+- `examples/tissue_type_detection.py`: automatic pipeline with tissue type detection and auto-pick of normal hierarchy and tumor program set.
 
 Various diagnostic plots could be generated from the results and are intended to answer different questions:
 
@@ -397,7 +397,7 @@ print(comparison)
 plot_compare_hierarchy_fit(comparison)
 ```
 
-## Auxillary track annotations
+## Auxiliary track annotations
 
 HierAnnot uses the normal hierarchy to capture **lineage / cell-type identity** and a separate flat program track to capture **tumor/transformation evidence** or auxiliary disease-state programs. These tracks solve different problems. The normal hierarchy is routed through a tree, while the flat program track is scored in parallel and then summarized by a tiered reporting layer.
 
@@ -499,7 +499,7 @@ cell_cycle_programs = get_builtin_marker_program_set("cell_cycle")
 stress_programs = get_builtin_marker_program_set("stress")
 ```
 
-Note that tumor-specific program sets are designed to avoid duplicating normal lineage calls where possible. For example, the `skin_tme` hierarchy should identify whether a cluster is squamous epithelial, keratinocyte-like, or melanocyte. The `tumor_skin` maligant program set then adds tumor-state context, such as squamous activation or melanocytic dedifferentiation, rather than using pure lineage markers as standalone malignant-status evidence. Similarly, lymphoma-context marker sets are provided as `immune_lymphoid_states` for subtype/state annotation in `flag_only` mode; marker enrichment alone is usually not enough to prove lymphoma malignancy without clonality, genotype, copy-number, pathology, or sample-design context.
+Note that tumor-specific program sets are designed to avoid duplicating normal lineage calls where possible. For example, the `skin_tme` hierarchy should identify whether a cluster is squamous epithelial, keratinocyte-like, or melanocyte. The `tumor_skin` malignant program set then adds tumor-state context, such as squamous activation or melanocytic dedifferentiation, rather than using pure lineage markers as standalone malignant-status evidence. Similarly, lymphoma-context marker sets are provided as `immune_lymphoid_states` for subtype/state annotation in `flag_only` mode; marker enrichment alone is usually not enough to prove lymphoma malignancy without clonality, genotype, copy-number, pathology, or sample-design context.
 
 You can inspect a flat marker-program set in a tree-like text view grouped by reporting role and competition group:
 

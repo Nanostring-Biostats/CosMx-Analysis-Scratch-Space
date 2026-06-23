@@ -13,7 +13,7 @@ toc-expand: 2
 toc-location: left
 number-sections: true
 number-depth: 4
-date: "2026-06-16"
+date: "2026-06-22"
 date-modified: last-modified
 categories:
   - cell typing
@@ -34,13 +34,81 @@ draft: false
 .table-scroll .table {
   margin-bottom: 0;
 }
+
+/* Compact layout for wide metadata tables with one long description column. */
+.table-scroll .table.compact-table th,
+.table-scroll .table.compact-table td {
+  padding: 0.25rem 0.45rem;
+  font-size: 0.88rem;
+  line-height: 1.25;
+  vertical-align: top;
+}
+
+.table-scroll .table.program-sets-table,
+.table-scroll .table.tumor-summary-table {
+  table-layout: fixed;
+}
+
+.table-scroll .table.program-sets-table th:not(:nth-child(7)),
+.table-scroll .table.program-sets-table td:not(:nth-child(7)) {
+  width: 8.5em;
+  max-width: 8.5em;
+  overflow-wrap: anywhere;
+}
+
+.table-scroll .table.program-sets-table th:nth-child(7),
+.table-scroll .table.program-sets-table td:nth-child(7) {
+  min-width: 28em;
+  width: 28em;
+  max-width: 36em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.table-scroll .table.tumor-summary-table th:not(:nth-child(5)),
+.table-scroll .table.tumor-summary-table td:not(:nth-child(5)) {
+  width: 10em;
+  max-width: 10em;
+  overflow-wrap: anywhere;
+}
+
+.table-scroll .table.tumor-summary-table th:nth-child(5),
+.table-scroll .table.tumor-summary-table td:nth-child(5) {
+  min-width: 30em;
+  width: 30em;
+  max-width: 42em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Freeze first column on horizontal scroll */
+.table-scroll table.compact-table th:first-child,
+.table-scroll table.compact-table td:first-child {
+  position: sticky;
+  left: 0;
+  background-color: white;
+  z-index: 10;
+}
+
+/* Freeze header row on vertical scroll */
+.table-scroll table.compact-table thead th {
+  position: sticky;
+  top: 0;
+  background-color: white;
+  z-index: 11;
+}
+
+/* Top-left corner cell (frozen row + frozen column) gets highest z-index */
+.table-scroll table.compact-table thead th:first-child {
+  z-index: 12;
+}
 </style>
 
 # Introduction
 
 The first `HierAnnot` [post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/auto-cluster-naming/){target="_blank"} introduced a structured way to assign normal lineage or cell-type labels to clusters. That workflow starts from a tissue-appropriate marker hierarchy and asks a lineage-routing question:
 
-> Which normal hierarchy node best explains this cluster?
+> Which node in our hierarchy of normal cell types best fits this cluster?
 
 That question is essential, but it is not always enough. In tumor and disease datasets, a cluster may have a clear normal lineage identity and also show several biological programs at the same time. For example, a colon epithelial cluster can be tumor-like, stem-like, mesenchymal-shifted, cycling, and interferon-high. A fibroblast cluster can show fibrosis or wound-response programs. An immune cluster can be cytotoxic, exhausted, or IFN-high.
 
@@ -48,32 +116,27 @@ Those are **multi-state annotation** problems. They are related to cell identity
 
 `HierAnnot` therefore separates two tasks:
 
-```text
-Normal hierarchy track
-    Assign a conservative lineage or cell-type identity.
+- **Normal hierarchy track**: Assign a conservative lineage or cell-type identity.
+- **Tumor / auxiliary program track**:  Detect and report biological state programs that can coexist with the normal identity.
 
-Tumor / auxiliary program track
-    Detect and report biological state programs that can coexist with the normal identity.
-```
 
-The tumor/auxiliary track was designed primarily for tumor-status annotation and tumor-like label integration. The same machinery can also be used in `flag_only` mode for non-tumor auxiliary programs such as cell cycle, stress, inflammation, or fibrosis.
+The tumor/auxiliary track was designed primarily for tumor-status annotation and tumor-like label integration (which integrates both lineage-based cell type annotation and descriptive tumor status annotation to final export label of a tumor-positive cluster, example shown in @tbl-intgr-annot). The same machinery can also be used in `flag_only` mode for non-tumor auxiliary programs such as cell cycle, stress, inflammation, or fibrosis.
 
-This post focuses on the tumor/auxiliary program track. I use malignant status annotation as the primary example, but the same design supports broader multi-state annotation.
+This post focuses on the tumor/auxiliary program track. I use malignant status annotation as the primary example, but the same design supports broader multi-state annotation. At the end of this workflow, `HierAnnot` would annotate clusters with labels that carry the auxiliary status description (@tbl-cluster-malig) in addition to the lineage-based cell type labels (@tbl-cluster-annot). 
 
 # The mental model: identity first, programs second
 
 The normal hierarchy track and tumor/auxiliary track solve different problems.
 
-The **normal hierarchy track** is a tree-routing problem. It uses marker enrichment, sibling competition, marker support, and branch support to decide how far to descend through a normal lineage hierarchy. The output is a normal identity label, with safeguards such as `mixed_*`, `candidate_*`, and `unknown` when the evidence is uncertain.
+The **normal hierarchy track** is a tree-routing problem. As illustrated in earlier [post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/auto-cluster-naming/){target="_blank"}, it aggregates evidences from multiple aspects (i.e. marker enrichment, sibling competition, marker support, and branch support) to decide how far to descend through a normal lineage hierarchy. The output is a normal identity label, with safeguards such as `mixed_*`, `candidate_*`, and `unknown` when the evidence is uncertain.
 
-The **tumor/auxiliary program track** is a flat program-reporting problem. It scores marker programs in parallel, then reports them through a tiered interpretation layer.
+The **tumor/auxiliary program track** is a flat program-reporting problem. It scores marker programs in parallel, then reports them through a tiered interpretation layer which decides whether the cluster has sufficient evidences for tumor identity and what descriptive annotation should be assigned to an identified tumor-positive cluster.
 
 The main intuition is:
 
-```text
-Normal hierarchy = "What is this cluster?"
-Tumor/auxiliary track = "What programs are active in this cluster?"
-```
+- Normal hierarchy = "What is this cluster?"
+- Tumor/auxiliary track = "What programs are active in this cluster?"
+
 
 For tumor annotation, the program track uses three reporting roles:
 
@@ -151,7 +214,7 @@ flowchart TD
 
 The most important rule is that tumor-like integration is driven by **combined tumor-status evidence**. State programs can support or decorate tumor-status calls, but modifier programs remain diagnostic by default.
 
-::: {.callout-note collapse="true" title="Under the hood: combined malignant-status scoring"}
+::: {#nte-combined-scoring .callout-note collapse="true" title="Under the hood: combined malignant-status scoring"}
 The detailed cluster-level tumor/auxiliary decisions are stored in `result.malignant_annotations`, with one row per cluster. Program-level scores are stored in `result.malignant_scores`, with one row per cluster-program pair. The formulas below summarize how program-level evidence is converted into cluster-level tumor-status columns.
 
 Similar to [the scoring of normal hierarchy](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/auto-cluster-naming/#raw-enrichment-score){target="_blank"}, 
@@ -238,7 +301,16 @@ If this flag is true and the tumor program is reportable in the normal-lineage c
 
 :::
 
-# Running pipeline with auxillary track
+# Running pipeline with auxiliary track
+
+::: {.callout-tip title="Just the code"}
+For a quick start with just the code, refer to the [examples scripts](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/examples){target="_blank"} under `HierAnnot/examples` subfolder of source code repository. 
+
+- `examples/basic_usage.py`: normal hierarchy annotation along with optional malignant integration.
+- `examples/end_to_end_anndata.py`: end-to-end workflow with `AnnData` and custom embeddings.
+- `examples/plot_diagnostics_from_bundle.py`: all individual diagnostic plots
+- `examples/tissue_type_detection.py`: automatic pipeline with tissue type detection and auto-pick of normal hierarhcy and tumor program set.
+:::
 
 ## Illustration dataset
 
@@ -281,10 +353,11 @@ cluster_means = aggregate_anndata_to_cluster_means(
     uppercase_genes=True,
 )
 
+# pandas.DataFrame with gene names as row index for feature x cluster average expression profiles 
 cluster_means.head()
 ```
 
-## Setup hierarhcy and auxiliary marker program set
+## Setup hierarchy and auxiliary marker program set
 
 `HierAnnot` provides several built-in marker-program sets for tumor-status annotation and auxiliary program scoring. These include broad solid-tumor programs, tissue-context tumor programs, and non-tumor auxiliary program sets for `flag_only` workflows. 
 You can inspect the available sets and their recommended usage metadata with `list_builtin_marker_program_sets()`:
@@ -299,13 +372,13 @@ print(program_sets)
 ```{r tbl-marker-sets, message=FALSE, eval = TRUE, echo=FALSE, results ='asis'}
 #| tbl-cap: "All built-in markger program sets returned by `list_builtin_marker_program_sets()`."
 df <- read.csv("assets/builtin_marker_programs.csv")
-
+# scrollable table with wider width for the 7th description column
 cat('<div class="table-scroll">')
-print(knitr::kable(df, format = "html", table.attr = 'class="table table-striped table-hover"'))
+print(knitr::kable(df, format = "html", table.attr = 'class="table table-striped table-hover compact-table program-sets-table"'))
 cat("</div>")
 ```
 
-For the colon cancer example dataset, we will use a colon tissue microenvironment hierarchy `colon_tme` and a colon-specific tumor program set `tumor_colon`.
+Each built-in marker program set is designed for different annotation purpose and `HierAnnot` allows you to pick one marker program set at a time. For the colon cancer example dataset here, we will use a colon tissue microenvironment hierarchy `colon_tme` and a colon-specific tumor program set `tumor_colon`. Please refer to package [README](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot#built-in-and-custom-malignant-programs){target="_blank"} on how to customize the marker program set (i.e. a custom list of `MalignantProgram` objects) for auxiliary track annotation.
 
 ```{python}
 #| eval: false
@@ -357,8 +430,9 @@ df <- df[, c("name",
              "n_positive_markers",
               "description")]
 
+# scrollable table with wider width for the 5th description column
 cat('<div class="table-scroll">')
-print(knitr::kable(df, format = "html", table.attr = 'class="table table-striped table-hover"'))
+print(knitr::kable(df, format = "html", table.attr = 'class="table table-striped table-hover compact-table tumor-summary-table"'))
 cat("</div>")
 ```
 
@@ -437,6 +511,8 @@ Formatted tree returned by `format_hierarchy_tree()` for built-in `colon_tme` hi
 ```
 :::
 
+Within the built-in `tumor_*` program sets, `core_transformation` is the main generic tumor-status module, which captures compact expression evidence for a **transformed**, tumor-like **epithelial** state that can be evaluated across solid-tumor data sets. `HierAnnot` treats this as **tumor-status** evidence: _if the program is sufficiently enriched and supported by detected markers, it can contribute to a tumor-like call_. More specific programs, such as EMT, cycling, stress, or tissue-specific melanocytic programs, are then used as **state** or **modifier** evidence _which do not establish tumor-like identity by themselves but add a small support bonus only when core tumor-status evidence is already borderline_. See details on program roles and tumor-status scoring in @nte-combined-scoring above.
+
 ## Choose how auxiliary-track labels interact with final labels
 
 `HierAnnot` provides different modes for controlling how auxiliary-track labels interact with the final exported annotation. These modes are not sequential optimization steps; they are alternative workflows for different analysis goals.
@@ -451,13 +527,13 @@ The main control is `malignant_integration_mode`:
 
 A second control is `program_report_block_preset`, which controls where tumor-like labels are allowed to be reported after normal hierarchy routing. In this post, we use the recommended solid-tumor default:
 
-```python
+```{python}
 #| eval: false
 program_report_block_preset="tumor_reportable"
 ```
 
 This preset allows reporting in curated tumor-reportable built-in lineages while guarding against common false positives in immune, stromal, endothelial, and mural compartments. 
-For custom hierarchies or specialized workflows, use an exact block list or `"lineage_aware"` program metadata. For the complete option reference for integration modes, report-block presets, lineage-aware metadata, and export behavior, refer to the package [README](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot#auxillary-track-annotations){target="_blank"}.
+For custom hierarchies or specialized workflows, use an exact block list or `"lineage_aware"` program metadata. For the complete option reference for integration modes, report-block presets, lineage-aware metadata, and export behavior, refer to the package [README](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot#auxiliary-track-annotations){target="_blank"}.
 
 The two sections below demonstrate the two most common workflows.
 
@@ -467,9 +543,7 @@ In `flag_only` mode, the normal hierarchy still produces the export label. The t
 
 This mode is useful when the program track is a secondary layer of interpretation:
 
-```text
-Which clusters show tumor-status, state, or modifier evidence?
-```
+**Which clusters show tumor-status, state, or modifier evidence?**
 
 without changing the final cell-type labels.
 
@@ -944,7 +1018,7 @@ marker_table.head()
 ```
 
 ```{r tbl-mrk-all, message=FALSE, eval = TRUE, echo=FALSE, results ='asis'}
-#| tbl-cap: "Marker table for `colon_tme` hierarhcy and built-in marker program sets for `tumor_colon` and `stress`."
+#| tbl-cap: "Marker table for `colon_tme` hierarchy and built-in marker program sets for `tumor_colon` and `stress`."
 df <- read.csv("assets/marker_table_colon_tumor_stress.csv")
 
 cat('<div class="table-scroll">')
@@ -996,15 +1070,13 @@ The tumor/auxiliary program track extends `HierAnnot` from lineage annotation to
 
 The normal hierarchy track answers:
 
-```text
-What is this cluster's best-supported normal identity?
-```
+**What is this cluster's best-supported normal identity?**
+
 
 The tumor/auxiliary program track answers:
 
-```text
-Which tumor-like, state, modifier, or auxiliary marker programs are active?
-```
+**Which tumor-like, state, modifier, or auxiliary marker programs are active?**
+
 
 For malignant annotation, the combined tumor-status score aggregates evidence across status programs, allows gated support from state programs, and keeps modifiers as diagnostic context. This lets `HierAnnot` report tumor-like labels when appropriate without treating every active biological program as a new cell identity.
 For non-tumor auxiliary programs, `flag_only` mode provides the same program-status summary while keeping final export labels anchored to the normal hierarchy.
