@@ -24,6 +24,18 @@ image: figures/fig-hierannot-thumbnail.png
 description: "HierAnnot is a hierarchical auto-annotation step for modern spatial transcriptomics pipelines. It turns unsupervised clusters into interpretable labels, reports uncertainty explicitly, and bridges foundation-model embeddings to biological interpretation."
 draft: false
 ---
+<style>
+.table-scroll {
+  max-width: 100%;
+  max-height: 420px;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.table-scroll .table {
+  margin-bottom: 0;
+}
+</style>
 
 # Introduction
 
@@ -45,7 +57,7 @@ In a typical workflow, cells are first embedded (e.g., via PCA or learned repres
 
 `HierAnnot` starts from a tissue-appropriate marker hierarchy, which acts as the main biological prior for annotation. The marker hierarchy is a tree-shaped catalogue of cell types organized from broad categories (e.g., "immune cell") down to specific subtypes (e.g., "CD8 T cell"). Each node in this tree carries a _marker program_: a curated list of genes that are expected to be switched _ON_ (or _OFF_) in that particular cell type. Think of a marker program as a genetic fingerprint for a cell identity: if the right genes are highly expressed, the evidence points toward that label.
 
-In practice, the package provides several ways to facilitate this step, including built-in hierarchy catalogues, direct matching helpers, and ranked suggestions. The detailed code workflow for choosing and comparing hierarchies appears in latter @sec-choose-hierarhcy. For a concrete example of a built-in hierarchy used by `HierAnnot`, see the example `colon_tme` hierarchy in @lst-colon-tme-example.
+In practice, the package provides several ways to facilitate this step, including built-in hierarchy catalogues, direct matching helpers, and ranked suggestions. The detailed code workflow for choosing and comparing hierarchies appears in latter @sec-choose-hierarchy. For a concrete example of a built-in hierarchy used by `HierAnnot`, see the example `colon_tme` hierarchy in @lst-colon-tme-example.
 
 Once a reasonable hierarchy is selected, `HierAnnot` combines multiple evidence sources to decide how far to descend and when to stop conservatively.
 
@@ -249,7 +261,7 @@ sc.tl.leiden(adata, key_added=cluster_key, resolution=1.0)
 
 ## Step 2: HierAnnot scoring and export summary
 
-See the later @sec-choose-hierarhcy for the full exploration and comparison workflow around hierarchies.
+See the later @sec-choose-hierarchy for the full exploration and comparison workflow around hierarchies.
 For a quick start, `match_builtin_hierarchy("tissue description")` is usually a strong first-pass choice before deeper hierarchy comparison. Here, the `"tissue description"` is a free-form text string describing the tissue type or biological context of your dataset (e.g., "breast tumor", "colorectal cancer", "pancreatic cancer"). You can use natural language, and the function will try to match your input to the most appropriate built-in hierarchy. This makes it easy to get started even if you are not sure of the exact hierarchy name.
 
 
@@ -271,7 +283,7 @@ from hierannot import (
 hierarchy_name = match_builtin_hierarchy("colon cancer")
 root_programs = get_builtin_hierarchy(hierarchy_name)
 
-# Aggregate raw counts across all genes by cluster for HierAnnot.
+# Aggregate raw counts across all genes by cluster into feature x cluster pandas.DataFrame for HierAnnot.
 cluster_means = aggregate_anndata_to_cluster_means(
     adata,
     cluster_key=cluster_key,
@@ -331,7 +343,10 @@ df <- df[, c("cluster_id",
             "annot_export_status",
             "annot_confidence",
             "annot_final_call_margin")]
-knitr::kable(head(df, 10))
+
+cat('<div class="table-scroll">')
+print(knitr::kable(df, format = "html", table.attr = 'class="table table-striped table-hover"'))
+cat("</div>")
 ```
 
 `HierAnnot` provides utility functions to inspect naming confidence and hierarchy fit before committing to downstream interpretation.
@@ -534,23 +549,15 @@ In practice, DE-ranked markers can be influenced by tissue background compositio
 #| label: code-basic-marker-valid
 #| eval: false
 # Canonical markers from the selected hierarchy, filtered to genes present in this dataset.
-def _collect_canonical_markers(root_nodes, adata_var_names):
-    present_upper = {str(g).upper(): str(g) for g in adata_var_names}
-    seen = set()
-    canonical = []
-    stack = list(root_nodes)
-    while stack:
-        node = stack.pop(0)
-        for g in getattr(node, "positive_markers", []) or []:
-            gu = str(g).upper()
-            if gu in present_upper and gu not in seen:
-                seen.add(gu)
-                canonical.append(present_upper[gu])
-        stack.extend(getattr(node, "children", []) or [])
-    return canonical
+from hierannot import collect_positive_marker_genes
 
-canonical_roots = get_builtin_hierarchy("colon_tme")
-canonical_markers = _collect_canonical_markers(canonical_roots, adata.var_names)
+all_canonical_markers = collect_positive_marker_genes(
+    hierarchy="colon_tme",
+    return_format="list"
+)
+
+canonical_markers = [g for g in all_canonical_markers if g in adata.var_names]
+
 if len(canonical_markers) == 0:
     raise ValueError("No canonical markers from colon_tme were found in adata.var_names.")
 
@@ -666,7 +673,7 @@ adata.obs = adata.obs.join(
 ![Spatial projection of HierAnnot labels from embedding-derived clusters, showing how embedding detail and hierarchy-based interpretation can be combined.](./figures/fig_spatial_scgpt_hierannot.png){#fig-spatial-scgpt-hierannot fig-alt="Spatial map of embedding-derived HierAnnot labels"}
 :::
 
-# Choosing A Hierarchy {#sec-choose-hierarhcy}
+# Choosing A Hierarchy {#sec-choose-hierarchy}
 
 The annotation result depends on hierarchy choice, so selecting a tissue-appropriate hierarchy is a key practical step.
 
@@ -713,7 +720,7 @@ print(format_hierarchy_tree(get_builtin_hierarchy(best)))
 ### All availables
 ```{r tbl-hierarchy-list, message=FALSE, eval = TRUE, echo=FALSE, results ='asis'}
 #| tbl-cap: "All built-in hierarchies returned by `list_builtin_hierarchies()`"
-df <- read.csv("assets/builtin_list.csv")
+df <- read.csv("assets/builtin_hierarchies.csv")
 knitr::kable(df)
 ```
 
@@ -1056,7 +1063,7 @@ For datasets with small RNA panels, ensure:
 
 - Review the hierarchy structure and marker gene lists to ensure they are appropriate for your dataset.
 - For rare cell types, consider providing custom marker lists to improve detection.
-- For advanced users, the default `HierAnnot` settings are a robust starting point, especially for spatial datasets. If you want to explore tunable parameters, see the docstring of [`HierAnnotPipeline.__init__()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/pipeline.py#L58){target="_blank"} and [`make_cluster_annotation_export_summary()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/workflows.py#L1137){target="_blank"} functions for descriptions of all available knobs at both scoring/routing and exporting steps.
+- For advanced users, the default `HierAnnot` settings are a robust starting point, especially for spatial datasets. If you want to explore tunable parameters, see the docstring of [`HierAnnotPipeline.__init__()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/pipeline.py#L70){target="_blank"} and [`make_cluster_annotation_export_summary()`](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/tree/Main/_code/HierAnnot/hierannot/workflows.py#L954){target="_blank"} functions for descriptions of all available knobs at both scoring/routing and exporting steps.
 
 
 # Conclusion

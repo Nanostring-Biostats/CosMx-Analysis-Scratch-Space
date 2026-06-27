@@ -12,6 +12,7 @@ from .matching import match_builtin_hierarchy, suggest_builtin_hierarchies
 from .factories import (
     _immune_core,
     _solid_tissue_core,
+    _tissue_origin_screen,
     _brain_core,
     _tme_core,
     _colon_tme,
@@ -27,6 +28,7 @@ from .factories import (
 BUILTIN_HIERARCHIES: Dict[str, Dict[str, object]] = {
     "immune_core": {"factory": _immune_core, "description": "Pan-tissue immune hierarchy.", "category": "immune", "tissue_scope": "pan-tissue"},
     "solid_tissue_core": {"factory": _solid_tissue_core, "description": "Major non-immune solid tissue lineages.", "category": "solid_tissue", "tissue_scope": "pan-solid-tissue"},
+    "tissue_origin_screen": {"factory": _tissue_origin_screen, "description": "Shallow tissue-origin screening hierarchy for detect_tissue_type; not intended as a final cell-type hierarchy.", "category": "tissue_detection", "tissue_scope": "pan-tissue"},
     "brain_core": {"factory": _brain_core, "description": "Core neuro hierarchy for brain-like samples.", "category": "brain", "tissue_scope": "brain"},
     "tme_core": {"factory": _tme_core, "description": "Combined solid tissue plus immune hierarchy for mixed tissue microenvironments.", "category": "tme", "tissue_scope": "pan-solid-tissue"},
     "colon_tme": {"factory": _colon_tme, "description": "Colon-flavored tissue microenvironment hierarchy.", "category": "tme", "tissue_scope": "colon"},

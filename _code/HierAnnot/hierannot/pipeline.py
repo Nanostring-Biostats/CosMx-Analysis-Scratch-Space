@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+from .constants import ANNOT_PATH_SEPARATOR
+
 from dataclasses import asdict
-from typing import Dict, List, Optional, Sequence, Set
+from typing import Dict, List, Optional, Sequence, Set, Union
 
 import numpy as np
 import pandas as pd
+
+from .builtin.malignant_programs import get_builtin_marker_program_set
+from .malignant_scoring import (
+    _format_malignant_annotations,
+    _get_competition_group,
+    _normalize_malignant_programs,
+    _score_malignant_programs,
+)
+from .malignant_reporting import _validate_program_report_block_preset
+from .integration.integrate_tracks import _integrate_normal_and_malignant_annotations
 
 from .controls import assign_expression_bins, build_gene_bin_lookup, compute_bulk_expression, sample_control_genes_for_markers
 from .datamodels import (
@@ -87,6 +99,15 @@ class HierAnnotPipeline:
         weak_raw_score_threshold: float = 0.10,
         min_branch_supported_raw_score: float = 0.0,
         min_leaf_raw_score: float = -0.2,
+        normal_strong_score_threshold: float = 0.35,
+        normal_strong_raw_threshold: float = 0.10,
+        malignant_integration_mode: str = "flag_only",
+        malignant_programs=None,
+        malignant_control_gene_exclusion_policy: Optional[ControlGeneExclusionPolicy] = "current_program_only",
+        malignant_status_score_threshold: float = 0.35,
+        malignant_raw_score_threshold: float = 0.15,
+        malignant_normal_raw_delta_threshold: Optional[float] = None,
+        program_report_block_preset: Optional[Union[str, Sequence[str]]] = "tumor_reportable",
     ) -> None:
         """
         Create a HierAnnot scoring pipeline.
@@ -132,6 +153,59 @@ class HierAnnotPipeline:
             A mildly negative value (default ``-0.2``) allows traversal through
             weak intermediate or level-1 nodes when descendant-supported branch
             evidence is strong, while still blocking strongly contradictory nodes.
+        
+
+        Malignant-track controls
+        ------------------------
+        malignant_integration_mode
+            Controls how malignant results are combined with the normal track,
+            Typical values are `"off"`, `"flag_only"`, and `"integrate"`.
+
+        malignant_programs
+            Optional flat marker-program list. If omitted and
+            `malignant_integration_mode` is not `"off"`, built-in general tumor
+            programs are used. These programs are scored in parallel rather
+            than routed as a hierarchy. Their metadata `reporting_role` controls
+            tiered reporting: `"status"` programs establish tumor-like identity,
+            `"state"` programs decorate a tumor-like label, and `"modifier"`
+            programs are auxiliary flags.
+
+        malignant_control_gene_exclusion_policy
+            Control-gene exclusion policy used only for malignant programs. The
+            default `"current_program_only"` treats flat malignant programs as
+            independent evidence tracks when sampling matched controls. Use
+            `"current_branch"` to exclude all markers in the same malignant
+            competition group, or `"all_pipeline_markers"` for the most
+            conservative exclusion on large panels. The normal hierarchy still
+            uses `control_gene_exclusion_policy`, which may be preset-derived.
+
+        normal_strong_score_threshold, normal_strong_raw_threshold
+            Integration/export confidence thresholds for the selected normal
+            hierarchy label. These are separate from the permissive routing
+            thresholds used to traverse sparse spatial data.
+
+        malignant_status_score_threshold, malignant_raw_score_threshold
+            Thresholds used to call a flat program strong. For tumor integration,
+            a reportable tumor-like label additionally requires at least one
+            strong `reporting_role="status"` program; strong state/modifier
+            programs remain visible in `result.malignant_annotations` but do
+            not establish tumor-like identity by themselves.
+
+        malignant_normal_raw_delta_threshold
+            Optional contrast threshold used during integration. When provided,
+            a tumor-like integrated label requires malignant raw enrichment to
+            exceed normal-track raw evidence by at least this amount. The default
+            ``None`` keeps the raw-delta value as a diagnostic but does not make
+            it a hard gate.
+        
+        program_report_block_preset
+            Unified report-blocking control for the flat tumor/auxiliary program
+            track. Defaults to `"tumor_reportable"`. Use `None` or `"off"` for no 
+            blocking, `"immune_like"` to block immune-like calls, `"tumor_reportable"` 
+            to report tumor-like labels only on curated epithelial/parenchymal 
+            branches in the built-in hierarchies, `"lineage_aware"` to use each 
+            selected program's `metadata["report_on_lineages"]` when present, or 
+            pass a list of exact node names/preset names.
         """
         self.root_programs = root_programs
         self.input_type = input_type
@@ -174,6 +248,19 @@ class HierAnnotPipeline:
         self.weak_raw_score_threshold = float(weak_raw_score_threshold)
         self.min_branch_supported_raw_score = float(min_branch_supported_raw_score)
         self.min_leaf_raw_score = float(min_leaf_raw_score)
+        self.malignant_integration_mode = str(malignant_integration_mode).lower()
+        if self.malignant_integration_mode not in {"off", "flag_only", "integrate"}:
+            raise ValueError(f"Unsupported malignant_integration_mode: {self.malignant_integration_mode}") 
+        self.normal_strong_score_threshold = float(normal_strong_score_threshold)
+        self.normal_strong_raw_threshold = float(normal_strong_raw_threshold)
+        self.malignant_programs = malignant_programs
+        self.malignant_control_gene_exclusion_policy = malignant_control_gene_exclusion_policy or "current_program_only"
+        self.malignant_status_score_threshold = float(malignant_status_score_threshold)
+        self.malignant_raw_score_threshold = float(malignant_raw_score_threshold)
+        self.malignant_normal_raw_delta_threshold = None if malignant_normal_raw_delta_threshold is None else float(malignant_normal_raw_delta_threshold)
+        if self.malignant_integration_mode != "off":
+            program_report_block_preset = _validate_program_report_block_preset(program_report_block_preset)
+        self.program_report_block_preset = program_report_block_preset
         self.compiled_programs = self._compile_programs()
         self.compilation_report = self._build_compilation_report()
         self._resolved_config: Optional[Dict[str, object]] = None
@@ -302,6 +389,13 @@ class HierAnnotPipeline:
         resolved["min_bulk_expr_for_control"] = self.min_bulk_expr_for_control if self.min_bulk_expr_for_control is not None else inferred.get("min_bulk_expr_for_control")
         if self.exclude_all_marker_genes_from_controls is not None:
             resolved["control_gene_exclusion_policy"] = "all_pipeline_markers" if self.exclude_all_marker_genes_from_controls else "current_program_only"
+        valid_control_policies = {"all_pipeline_markers", "current_program_only", "current_branch"}
+        if resolved["control_gene_exclusion_policy"] not in valid_control_policies:
+            raise ValueError(f"Unsupported control_gene_exclusion_policy: {resolved['control_gene_exclusion_policy']}")
+        malignant_policy = self.malignant_control_gene_exclusion_policy or "current_program_only"
+        if malignant_policy not in valid_control_policies:
+            raise ValueError(f"Unsupported malignant_control_gene_exclusion_policy: {malignant_policy}")
+        resolved["malignant_control_gene_exclusion_policy"] = malignant_policy
         resolved["ctrl_size"] = int(self.ctrl_size)
         resolved["negative_weight"] = float(self.negative_weight)
         resolved["child_marker_strategy"] = self.child_marker_strategy
@@ -349,10 +443,28 @@ class HierAnnotPipeline:
     def _program_marker_universe(self, program: CompiledMarkerProgram) -> Set[str]:
         return set(program.canonical_markers) | set(program.effective_markers) | set(program.negative_markers)
 
+    def _active_malignant_programs(self):
+        if self.malignant_integration_mode == "off":
+            return []
+        malignant_programs = self.malignant_programs
+        if malignant_programs is None:
+            malignant_programs = get_builtin_marker_program_set("tumor_general")
+        return _normalize_malignant_programs(malignant_programs)
+
+    def _malignant_marker_universe(self, malignant_programs=None) -> Set[str]:
+        programs = _normalize_malignant_programs(malignant_programs) if malignant_programs is not None else self._active_malignant_programs()
+        markers: Set[str] = set()
+        for prog in programs:
+            markers.update(str(g).strip().upper() for g in prog.positive_markers if str(g).strip())
+            markers.update(str(g).strip().upper() for g in prog.negative_markers if str(g).strip())
+        return markers
+
     def _build_exclusion_sets(self, policy: ControlGeneExclusionPolicy) -> Dict[str, Set[str]]:
         flat, ancestors, descendants, siblings = self._flatten_with_relationships()
         by_name = {p.name: p for p in flat}
         all_markers = set().union(*(self._program_marker_universe(p) for p in flat)) if flat else set()
+        if self.malignant_integration_mode != "off":
+            all_markers |= self._malignant_marker_universe()
         exclusion_sets: Dict[str, Set[str]] = {}
         for program in flat:
             if policy == "all_pipeline_markers":
@@ -369,7 +481,8 @@ class HierAnnotPipeline:
                 raise ValueError(f"Unsupported control gene exclusion policy: {policy}")
         return exclusion_sets
 
-    def _build_control_maps(self, expr: pd.DataFrame, resolved_config: Dict[str, object]):
+    def _build_control_gene_bin_context(self, expr: pd.DataFrame, resolved_config: Dict[str, object]) -> Dict[str, object]:
+        """Build expression-bin lookup shared by normal and malignant controls."""
         bulk = compute_bulk_expression(expr)
         gene_bins = assign_expression_bins(
             bulk,
@@ -380,9 +493,21 @@ class HierAnnotPipeline:
         min_bulk = resolved_config.get("min_bulk_expr_for_control")
         eligible_control_genes = set(gene_bins.index) if min_bulk is None else set(bulk[bulk >= float(min_bulk)].index)
         bin_lookup = build_gene_bin_lookup(gene_bins, eligible_genes=eligible_control_genes)
+        return {
+            "bulk_expression": bulk,
+            "gene_bins": gene_bins,
+            "eligible_control_genes": eligible_control_genes,
+            "bin_lookup": bin_lookup,
+        }
+
+    def _build_control_maps(self, expr: pd.DataFrame, resolved_config: Dict[str, object], control_gene_context: Optional[Dict[str, object]] = None):
+        context = control_gene_context or self._build_control_gene_bin_context(expr, resolved_config)
+        gene_bins = context["gene_bins"]
+        bin_lookup = context["bin_lookup"]
         rng = np.random.default_rng(self.random_state)
         flat_programs = flatten_compiled_programs(self.compiled_programs)
-        exclusion_sets = self._build_exclusion_sets(resolved_config["control_gene_exclusion_policy"])
+        policy = resolved_config["control_gene_exclusion_policy"]
+        exclusion_sets = self._build_exclusion_sets(policy)
 
         control_maps: Dict[str, Dict[str, Dict[str, object]]] = {}
         for program in flat_programs:
@@ -391,9 +516,52 @@ class HierAnnotPipeline:
             excluded = exclusion_sets.get(program.name, set())
             pos_controls, pos_meta = sample_control_genes_for_markers(pos_genes, gene_bins, bin_lookup, list(resolved_config["control_size_fallbacks"]), rng=rng, excluded_genes=excluded)
             neg_controls, neg_meta = sample_control_genes_for_markers(neg_genes, gene_bins, bin_lookup, list(resolved_config["control_size_fallbacks"]), rng=rng, excluded_genes=excluded)
-            pos_meta["exclusion_policy"] = resolved_config["control_gene_exclusion_policy"]
-            neg_meta["exclusion_policy"] = resolved_config["control_gene_exclusion_policy"]
+            pos_meta["exclusion_policy"] = policy
+            neg_meta["exclusion_policy"] = policy
             control_maps[program.name] = {"positive": {"controls": pos_controls, "metadata": pos_meta}, "negative": {"controls": neg_controls, "metadata": neg_meta}}
+        return control_maps
+
+    def _build_malignant_control_maps(self, expr: pd.DataFrame, resolved_config: Dict[str, object], malignant_programs, control_gene_context: Optional[Dict[str, object]] = None) -> Dict[str, Dict[str, Dict[str, object]]]:
+        programs = _normalize_malignant_programs(malignant_programs)
+        if not programs:
+            return {}
+
+        context = control_gene_context or self._build_control_gene_bin_context(expr, resolved_config)
+        gene_bins = context["gene_bins"]
+        bin_lookup = context["bin_lookup"]
+        rng = np.random.default_rng(self.random_state)
+
+        normal_markers = set().union(*(self._program_marker_universe(p) for p in flatten_compiled_programs(self.compiled_programs))) if self.compiled_programs else set()
+        malignant_markers_by_name: Dict[str, Set[str]] = {}
+        malignant_markers_by_group: Dict[str, Set[str]] = {}
+        for prog in programs:
+            markers = set(str(g).strip().upper() for g in prog.positive_markers if str(g).strip()) | set(str(g).strip().upper() for g in prog.negative_markers if str(g).strip())
+            malignant_markers_by_name[str(prog.name)] = markers
+            malignant_markers_by_group.setdefault(_get_competition_group(prog), set()).update(markers)
+        all_malignant_markers = set().union(*malignant_markers_by_name.values()) if malignant_markers_by_name else set()
+        all_markers = normal_markers | all_malignant_markers
+
+        policy = resolved_config.get("malignant_control_gene_exclusion_policy", "current_program_only")
+        control_maps: Dict[str, Dict[str, Dict[str, object]]] = {}
+        for prog in programs:
+            name = str(prog.name)
+            pos_genes = [str(g).strip().upper() for g in prog.positive_markers if str(g).strip()]
+            neg_genes = [str(g).strip().upper() for g in prog.negative_markers if str(g).strip()]
+            if policy == "all_pipeline_markers":
+                excluded = set(all_markers)
+            elif policy == "current_program_only":
+                excluded = set(malignant_markers_by_name.get(name, set()))
+            elif policy == "current_branch":
+                excluded = set(malignant_markers_by_group.get(_get_competition_group(prog), set()))
+            else:
+                raise ValueError(f"Unsupported malignant_control_gene_exclusion_policy: {policy}")
+            pos_controls, pos_meta = sample_control_genes_for_markers(pos_genes, gene_bins, bin_lookup, list(resolved_config["control_size_fallbacks"]), rng=rng, excluded_genes=excluded)
+            neg_controls, neg_meta = sample_control_genes_for_markers(neg_genes, gene_bins, bin_lookup, list(resolved_config["control_size_fallbacks"]), rng=rng, excluded_genes=excluded)
+            pos_meta["exclusion_policy"] = policy
+            pos_meta["malignant_competition_group"] = _get_competition_group(prog)
+            neg_meta["exclusion_policy"] = policy
+            neg_meta["malignant_competition_group"] = _get_competition_group(prog)
+            control_maps[name] = {"positive": {"controls": pos_controls, "metadata": pos_meta}, "negative": {"controls": neg_controls, "metadata": neg_meta}}
         return control_maps
 
     def _add_decision_metrics(self, all_scores: pd.DataFrame) -> pd.DataFrame:
@@ -659,6 +827,7 @@ class HierAnnotPipeline:
             {"metric": "collapse_low_expr_tail", "value": bool(resolved_config["collapse_low_expr_tail"])},
             {"metric": "n_bins", "value": int(resolved_config["n_bins"])},
             {"metric": "control_gene_exclusion_policy", "value": str(resolved_config["control_gene_exclusion_policy"])},
+            {"metric": "malignant_control_gene_exclusion_policy", "value": str(resolved_config.get("malignant_control_gene_exclusion_policy", "current_program_only"))},
             {"metric": "control_size_fallbacks", "value": list(resolved_config["control_size_fallbacks"])},
             {"metric": "branch_support_parent_weight", "value": float(self.branch_support_parent_weight)},
             {"metric": "branch_support_descendant_weight", "value": float(self.branch_child_rescue_weight)},
@@ -720,64 +889,6 @@ class HierAnnotPipeline:
                 else:
                     continue
                 df[out_col] = series.map(lambda d: d.get(key) if isinstance(d, dict) else None)
-        return df
-
-
-    def _apply_absolute_support_backoff(self, annotations_df: pd.DataFrame) -> pd.DataFrame:
-        df = annotations_df.copy()
-        if df.empty:
-            return df
-
-        min_raw = 0.0
-        for idx, row in df.iterrows():
-            decision_level = int(row.get("final_level", 0) or 0)
-            decision_label = row.get("final_label", "Unresolved")
-            decision_path = row.get("final_path", "Unresolved")
-            decision_score = float(row.get("final_score", np.nan))
-            decision_raw_score = float(row.get("final_raw_score", np.nan))
-            decision_branch_raw = float(row.get("final_branch_supported_raw_score", np.nan))
-
-            df.at[idx, "decision_label"] = decision_label
-            df.at[idx, "decision_path"] = decision_path
-            df.at[idx, "decision_level"] = decision_level
-            df.at[idx, "decision_score"] = decision_score
-            df.at[idx, "decision_raw_score"] = decision_raw_score
-            df.at[idx, "decision_branch_supported_raw_score"] = decision_branch_raw
-            df.at[idx, "backoff_applied"] = False
-            df.at[idx, "backoff_steps"] = 0
-            df.at[idx, "backoff_reason"] = ""
-
-            if decision_level <= 0:
-                continue
-
-            branch_raw = float(row.get(f"level_{decision_level}_branch_supported_raw_score", decision_branch_raw))
-            if np.isfinite(branch_raw) and branch_raw >= min_raw:
-                continue
-
-            fallback_level = None
-            for lev in range(decision_level - 1, 0, -1):
-                candidate_raw = float(row.get(f"level_{lev}_branch_supported_raw_score", np.nan))
-                if np.isfinite(candidate_raw) and candidate_raw >= min_raw:
-                    fallback_level = lev
-                    break
-
-            if fallback_level is None:
-                continue
-
-            df.at[idx, "final_level"] = int(fallback_level)
-            df.at[idx, "final_label"] = row.get(f"level_{fallback_level}_label", decision_label)
-            labels = [str(row.get(f"level_{lev}_label")) for lev in range(1, fallback_level + 1) if pd.notna(row.get(f"level_{lev}_label"))]
-            df.at[idx, "final_path"] = " > ".join(labels) if labels else str(df.at[idx, "final_label"])
-            df.at[idx, "final_score"] = float(row.get(f"level_{fallback_level}_score", np.nan))
-            df.at[idx, "final_raw_score"] = float(row.get(f"level_{fallback_level}_raw_score", np.nan))
-            df.at[idx, "final_branch_supported_raw_score"] = float(row.get(f"level_{fallback_level}_branch_supported_raw_score", np.nan))
-            df.at[idx, "final_margin"] = float(row.get(f"level_{fallback_level}_margin", np.nan))
-            df.at[idx, "confidence"] = row.get(f"level_{fallback_level}_confidence", row.get("confidence", "none"))
-            df.at[idx, "status"] = "assigned"
-            df.at[idx, "stop_reason"] = "backed_off_low_absolute_support"
-            df.at[idx, "backoff_applied"] = True
-            df.at[idx, "backoff_steps"] = int(decision_level - fallback_level)
-            df.at[idx, "backoff_reason"] = "low_absolute_support"
         return df
 
 
@@ -889,7 +1000,7 @@ class HierAnnotPipeline:
                     cur = parent_map[cur]
                 return cur
             summary["annot_best_any_level_top_branch"] = summary["annot_best_any_level_label"].astype(str).map(top_ancestor)
-            summary["annot_final_top_branch"] = summary["annot_path"].astype(str).str.split(" > ").str[0]
+            summary["annot_final_top_branch"] = summary["annot_path"].astype(str).str.split(ANNOT_PATH_SEPARATOR).str[0]
             summary["annot_branch_conflict"] = (
                 summary["annot_best_any_level_top_branch"].notna()
                 & summary["annot_final_top_branch"].notna()
@@ -908,6 +1019,7 @@ class HierAnnotPipeline:
                 overwrite=True,
             )
         return summary
+    
     def fit_score(self, expr: pd.DataFrame) -> HierAnnotResult:
         norm_expr = preprocess_expression(expr, input_type=self.input_type, scale_factor=self.scale_factor, uppercase_genes=self.uppercase_genes)
         resolved_config = self._resolve_runtime_config(norm_expr)
@@ -920,9 +1032,17 @@ class HierAnnotPipeline:
             "weak_raw_score_threshold": float(self.weak_raw_score_threshold),
             "min_branch_supported_raw_score": float(self.min_branch_supported_raw_score),
             "min_leaf_raw_score": float(self.min_leaf_raw_score),
+            "normal_strong_score_threshold": float(self.normal_strong_score_threshold),
+            "normal_strong_raw_threshold": float(self.normal_strong_raw_threshold),
+            "malignant_integration_mode": str(self.malignant_integration_mode),
+            "malignant_status_score_threshold": float(self.malignant_status_score_threshold),
+            "malignant_raw_score_threshold": float(self.malignant_raw_score_threshold),
+            "malignant_normal_raw_delta_threshold": self.malignant_normal_raw_delta_threshold,
+            "program_report_block_preset": self.program_report_block_preset,
         })
         self._resolved_config = resolved_config
-        control_maps = self._build_control_maps(norm_expr, resolved_config)
+        control_gene_context = self._build_control_gene_bin_context(norm_expr, resolved_config)
+        control_maps = self._build_control_maps(norm_expr, resolved_config, control_gene_context=control_gene_context)
         flat_programs = flatten_compiled_programs(self.compiled_programs)
         all_scores = score_programs_across_clusters(
             expr=norm_expr,
@@ -968,8 +1088,51 @@ class HierAnnotPipeline:
         diagnostics_summary = self._build_diagnostics_summary(all_scores, resolved_config)
         hierarchy_fit_summary = self._build_hierarchy_fit_summary(cluster_annotations, all_scores)
         diagnostics_summary = pd.concat([diagnostics_summary, hierarchy_fit_summary], ignore_index=True)
+
+        malignant_scores = pd.DataFrame(columns=["cluster", "label", "name", "score", "raw_score", "status_score", "decision_score"])
+        malignant_programs = None
+
+        if self.malignant_integration_mode != "off":
+            malignant_programs = self._active_malignant_programs()
+            malignant_control_maps = self._build_malignant_control_maps(norm_expr, resolved_config, malignant_programs, control_gene_context=control_gene_context)
+            malignant_scores = _score_malignant_programs(
+                norm_expr,
+                malignant_programs,
+                control_maps=malignant_control_maps,
+                min_markers_present=self.min_markers_present,
+                min_marker_fraction=self.min_marker_fraction,
+                fallback_to_canonical_if_sparse=self.fallback_to_canonical_if_sparse,
+                negative_weight=self.negative_weight,
+                detection_floor=float(resolved_config["detection_floor"]),
+                delta_clip_quantile=resolved_config.get("delta_clip_quantile"),
+                raw_weight=self.branch_routing_raw_weight,
+                weak_raw_score_threshold=self.weak_raw_score_threshold,
+            )
+
+        malignant_annotations = _format_malignant_annotations(
+            malignant_scores=malignant_scores,
+            score_threshold=self.malignant_status_score_threshold,
+            raw_score_threshold=self.malignant_raw_score_threshold,
+            margin_threshold=self.margin_threshold,
+        )
+        
+        integrated_annotations = _integrate_normal_and_malignant_annotations(
+            cluster_annotations,
+            malignant_annotations,
+            normal_strong_score_threshold=self.normal_strong_score_threshold,
+            normal_strong_raw_threshold=self.normal_strong_raw_threshold,
+            malignant_status_score_threshold=self.malignant_status_score_threshold,
+            malignant_raw_score_threshold=self.malignant_raw_score_threshold,
+            malignant_normal_raw_delta_threshold=self.malignant_normal_raw_delta_threshold,
+            malignant_integration_mode=self.malignant_integration_mode,
+            program_report_block_preset=self.program_report_block_preset,
+        )
+
         return HierAnnotResult(
             cluster_annotations=cluster_annotations,
+            malignant_scores=malignant_scores,
+            malignant_annotations=malignant_annotations,
+            integrated_annotations=integrated_annotations,
             level_scores=level_scores,
             all_scores=all_scores,
             normalized_matrix=norm_expr,
@@ -978,4 +1141,6 @@ class HierAnnotPipeline:
             compilation_report=self.compilation_report,
             diagnostics_summary=diagnostics_summary,
             resolved_config=resolved_config,
+            hierarchy=self.root_programs,
+            malignant_programs=malignant_programs,
         )

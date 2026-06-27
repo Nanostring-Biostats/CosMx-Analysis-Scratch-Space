@@ -1,13 +1,14 @@
 """Example: cluster on a custom embedding, score on raw expression, and build a join-ready annotation table."""
 
-from hierannot import HierAnnotPipeline, get_builtin_hierarchy
-from hierannot.plotting import plot_cluster_annotation_heatmap, plot_cluster_confidence
-from hierannot.workflows import (
+from hierannot import (
+    HierAnnotPipeline, 
+    get_builtin_hierarchy,
+    plot_cluster_annotation_heatmap, 
+    plot_cluster_confidence,
     cluster_and_aggregate_anndata,
     make_cluster_annotation_export_summary,
     expand_cluster_annotation_to_cells,
 )
-
 
 # Assume `adata` already exists and includes:
 # - raw counts in `adata.X` / `adata.layers[...]` or `adata.raw`

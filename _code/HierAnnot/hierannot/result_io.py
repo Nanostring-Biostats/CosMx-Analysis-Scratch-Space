@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from .datamodels import HierAnnotResult
+from .datamodels import HierAnnotResult, MalignantProgram
 from .io import hierarchy_from_dict, hierarchy_to_dict
 
 
@@ -44,11 +44,32 @@ def _read_table(path: Path) -> pd.DataFrame | None:
     raise ValueError(f"Unsupported table file format for {path}")
 
 
+def _programs_to_dicts(programs) -> list[dict[str, Any]]:
+    if programs is None:
+        return []
+    out: list[dict[str, Any]] = []
+    for program in programs:
+        if hasattr(program, "to_dict"):
+            out.append(program.to_dict())
+        elif isinstance(program, dict):
+            out.append(dict(program))
+        else:
+            raise TypeError(f"Unsupported malignant program type: {type(program)!r}")
+    return out
+
+
+def _programs_from_dicts(items) -> list[MalignantProgram]:
+    if not items:
+        return []
+    return [MalignantProgram.from_dict(item) for item in items]
+
+
 def save_result_bundle(
     result: HierAnnotResult,
     path: str | Path,
     *,
     hierarchy=None,
+    malignant_programs=None,
     resolved_config: dict[str, Any] | None = None,
     metadata: dict[str, Any] | None = None,
     table_format: str = "csv",
@@ -57,12 +78,17 @@ def save_result_bundle(
     outdir.mkdir(parents=True, exist_ok=True)
 
     _write_table(getattr(result, "cluster_annotations", None), outdir / _table_filename("cluster_annotations", table_format), table_format)
+    _write_table(getattr(result, "malignant_scores", None), outdir / _table_filename("malignant_scores", table_format), table_format)
+    _write_table(getattr(result, "malignant_annotations", None), outdir / _table_filename("malignant_annotations", table_format), table_format)
+    _write_table(getattr(result, "integrated_annotations", None), outdir / _table_filename("integrated_annotations", table_format), table_format)
     _write_table(getattr(result, "level_scores", None), outdir / _table_filename("level_scores", table_format), table_format)
     _write_table(getattr(result, "all_scores", None), outdir / _table_filename("all_scores", table_format), table_format)
     _write_table(getattr(result, "diagnostics_summary", None), outdir / _table_filename("diagnostics_summary", table_format), table_format)
 
     if hierarchy is None:
         hierarchy = getattr(result, "hierarchy", None)
+    if malignant_programs is None:
+        malignant_programs = getattr(result, "malignant_programs", None)
     if resolved_config is None:
         resolved_config = getattr(result, "resolved_config", None)
     if metadata is None:
@@ -72,6 +98,8 @@ def save_result_bundle(
         "bundle_version": 1,
         "table_format": table_format,
         "has_hierarchy": hierarchy is not None,
+        "has_malignant_programs": malignant_programs is not None,
+        "malignant_program_count": len(malignant_programs) if malignant_programs is not None else 0,
         "has_resolved_config": resolved_config is not None,
         "metadata": metadata or {},
     }
@@ -79,6 +107,9 @@ def save_result_bundle(
 
     if hierarchy is not None:
         (outdir / "hierarchy.json").write_text(json.dumps(hierarchy_to_dict(hierarchy), indent=2))
+
+    if malignant_programs is not None:
+        (outdir / "malignant_programs.json").write_text(json.dumps(_programs_to_dicts(malignant_programs), indent=2, default=str))
 
     if resolved_config is not None:
         (outdir / "resolved_config.json").write_text(json.dumps(resolved_config, indent=2, default=str))
@@ -96,7 +127,8 @@ def load_result_bundle(path: str | Path, as_dict: bool = False):
 
     By default this returns a `HierAnnotResult`-compatible object with attributes such as
     `.cluster_annotations`, `.all_scores`, `.diagnostics_summary`, optional `.metadata`,
-    and optional `.hierarchy`, so it works naturally with plotting helpers.
+    optional `.hierarchy`, and optional `.malignant_programs`, so it works
+    naturally with plotting and export helpers.
 
     Set `as_dict=True` to get the raw dictionary representation instead.
     """
@@ -113,6 +145,9 @@ def load_result_bundle(path: str | Path, as_dict: bool = False):
 
     table_names = [
         "cluster_annotations",
+        "malignant_scores",
+        "malignant_annotations",
+        "integrated_annotations",
         "level_scores",
         "all_scores",
         "diagnostics_summary",
@@ -131,8 +166,14 @@ def load_result_bundle(path: str | Path, as_dict: bool = False):
     # same way as in-memory results during downstream merges.
     if bundle.get("cluster_annotations") is not None and "cluster_id" in bundle["cluster_annotations"].columns:
         bundle["cluster_annotations"]["cluster_id"] = bundle["cluster_annotations"]["cluster_id"].astype(str)
+    if bundle.get("malignant_annotations") is not None and "cluster_id" in bundle["malignant_annotations"].columns:
+        bundle["malignant_annotations"]["cluster_id"] = bundle["malignant_annotations"]["cluster_id"].astype(str)
+    if bundle.get("integrated_annotations") is not None and "cluster_id" in bundle["integrated_annotations"].columns:
+        bundle["integrated_annotations"]["cluster_id"] = bundle["integrated_annotations"]["cluster_id"].astype(str)
     if bundle.get("all_scores") is not None and "cluster" in bundle["all_scores"].columns:
         bundle["all_scores"]["cluster"] = bundle["all_scores"]["cluster"].astype(str)
+    if bundle.get("malignant_scores") is not None and "cluster" in bundle["malignant_scores"].columns:
+        bundle["malignant_scores"]["cluster"] = bundle["malignant_scores"]["cluster"].astype(str)
     if bundle.get("level_scores") is not None and "cluster" in bundle["level_scores"].columns:
         bundle["level_scores"]["cluster"] = bundle["level_scores"]["cluster"].astype(str)
 
@@ -144,6 +185,10 @@ def load_result_bundle(path: str | Path, as_dict: bool = False):
     if resolved_config_path.exists():
         bundle["resolved_config"] = json.loads(resolved_config_path.read_text())
 
+    malignant_programs_path = indir / "malignant_programs.json"
+    if malignant_programs_path.exists():
+        bundle["malignant_programs"] = _programs_from_dicts(json.loads(malignant_programs_path.read_text()))
+
     metadata_path = indir / "metadata.json"
     if metadata_path.exists():
         bundle["metadata"] = json.loads(metadata_path.read_text())
@@ -153,6 +198,9 @@ def load_result_bundle(path: str | Path, as_dict: bool = False):
 
     return HierAnnotResult(
         cluster_annotations=bundle.get("cluster_annotations"),
+        malignant_scores=bundle.get("malignant_scores"),
+        malignant_annotations=bundle.get("malignant_annotations"),
+        integrated_annotations=bundle.get("integrated_annotations"),
         level_scores=bundle.get("level_scores"),
         all_scores=bundle.get("all_scores"),
         normalized_matrix=None,
@@ -163,4 +211,5 @@ def load_result_bundle(path: str | Path, as_dict: bool = False):
         resolved_config=bundle.get("resolved_config", {}) or {},
         metadata=bundle.get("metadata"),
         hierarchy=bundle.get("hierarchy"),
+        malignant_programs=bundle.get("malignant_programs"),
     )

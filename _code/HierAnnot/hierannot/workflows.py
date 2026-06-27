@@ -1,724 +1,24 @@
 from __future__ import annotations
 
+from .constants import ANNOT_PATH_SEPARATOR
+from .utils import _sanitize_label_text
 from .hierarchy import decide_cluster_annotation_from_scores
+from .malignant_reporting import _validate_program_report_block_preset
 
-from typing import Iterable, Mapping, Optional, Sequence, List, Dict, Set
+from typing import Iterable, Optional, Sequence, List, Dict, Set, Union
 
 import numpy as np
 import re
 import pandas as pd
 import warnings
 
-try:
-    from scipy import sparse as sp
-except Exception:  # pragma: no cover
-    sp = None
-
-
-
-def aggregate_expression_to_cluster_means(
-    expression,
-    cluster_labels: Sequence,
-    feature_names: Optional[Sequence[str]] = None,
-    cell_names: Optional[Sequence[str]] = None,
-    method: str = "mean",
-    trim_fraction: float = 0.1,
-    include_mask: Optional[Sequence[bool] | pd.Series | np.ndarray] = None,
-    min_cells_per_cluster: int = 1,
-    centrality_matrix=None,
-    central_fraction: float = 0.8,
-    centrality_mode: str = "centroid",
-    neighbor_connectivities=None,
-    backend: str = "auto",
-    chunk_size: int = 50000,
-    warn_on_expensive_dense: bool = True,
-    uppercase_features: bool = False,
-) -> pd.DataFrame:
-    """Aggregate an expression matrix into feature x cluster profiles.
-
-    Orientation contract
-    --------------------
-    `expression` is interpreted as **cells x features** for all supported input
-    types, including pandas DataFrame, NumPy array, and SciPy sparse matrix.
-
-    Parameters
-    ----------
-    expression
-        Cells x features expression matrix.
-    cluster_labels
-        Cluster label per cell (one label per row of `expression`).
-    feature_names, cell_names
-        Optional names used when `expression` is not a DataFrame.
-    method
-        One of: mean, median, trimmed_mean, central_cells_mean, central_cells_trimmed_mean
-    centrality_mode
-        For central-cells methods:
-        - ``centroid``: distance to cluster centroid in `centrality_matrix`
-        - ``graph_degree``: within-cluster weighted degree in `neighbor_connectivities`
-    """
-    method = str(method)
-    centrality_mode = str(centrality_mode).lower()
-    if backend not in {"auto", "sparse", "chunked", "dense"}:
-        raise ValueError("backend must be one of: 'auto', 'sparse', 'chunked', 'dense'")
-    if centrality_mode not in {"centroid", "graph_degree"}:
-        raise ValueError("centrality_mode must be one of: 'centroid', 'graph_degree'")
-
-    if isinstance(expression, pd.DataFrame):
-        matrix = expression.to_numpy(dtype=float)
-        if cell_names is None:
-            cell_names = expression.index.astype(str)
-        else:
-            cell_names = pd.Index(pd.Index(cell_names).astype(str))
-        if feature_names is None:
-            feature_names = expression.columns.astype(str)
-        else:
-            feature_names = pd.Index(pd.Index(feature_names).astype(str))
-    else:
-        matrix = expression
-        if getattr(matrix, "ndim", 2) != 2:
-            raise ValueError("expression must be 2D")
-        n_cells, n_features = matrix.shape
-        if feature_names is None:
-            feature_names = pd.Index([f"feature_{i}" for i in range(n_features)])
-        else:
-            feature_names = pd.Index(pd.Index(feature_names).astype(str))
-        if cell_names is None:
-            cell_names = pd.Index([str(i) for i in range(n_cells)])
-        else:
-            cell_names = pd.Index(pd.Index(cell_names).astype(str))
-
-    feature_names = pd.Index(pd.Index(feature_names).astype(str))
-    if uppercase_features:
-        feature_names = feature_names.str.upper()
-        if feature_names.has_duplicates:
-            raise ValueError("uppercase_features=True produced duplicate feature names; merge duplicates before aggregation.")
-
-    n_cells = matrix.shape[0]
-    if len(cluster_labels) != n_cells:
-        raise ValueError("Length of cluster_labels must match the number of cells/rows in expression.")
-
-    cluster_series = pd.Series(list(cluster_labels), index=np.arange(n_cells), name="cluster").astype(str)
-
-    if include_mask is None:
-        include_mask_arr = np.ones(n_cells, dtype=bool)
-    elif isinstance(include_mask, pd.Series):
-        if len(include_mask) == n_cells:
-            include_mask_arr = include_mask.astype(bool).to_numpy()
-        else:
-            include_mask_arr = include_mask.reindex(cell_names).astype(bool).to_numpy()
-    else:
-        include_mask_arr = np.asarray(include_mask, dtype=bool)
-        if include_mask_arr.shape[0] != n_cells:
-            raise ValueError("Length of include_mask must match the number of cells in expression.")
-
-    positions = np.flatnonzero(include_mask_arr)
-    if len(positions) == 0:
-        return pd.DataFrame(index=feature_names)
-
-    matrix = _subset_matrix_rows(matrix, positions)
-    cluster_series = cluster_series.loc[positions]
-
-    cluster_series, categories, _, keep_mask = _factorize_valid_clusters(cluster_series, min_cells_per_cluster)
-    if len(categories) == 0:
-        return pd.DataFrame(index=feature_names)
-
-    keep_positions = np.flatnonzero(keep_mask.to_numpy())
-    matrix = _subset_matrix_rows(matrix, keep_positions)
-    cluster_series = cluster_series.reset_index(drop=True)
-    cluster_codes = pd.Categorical(cluster_series, categories=categories, ordered=True).codes
-
-    if method in {"central_cells_mean", "central_cells_trimmed_mean"}:
-        if centrality_mode == "centroid":
-            if centrality_matrix is None:
-                raise ValueError("centrality_matrix is required for central_cells_* when centrality_mode='centroid'.")
-            cent = _subset_matrix_rows(centrality_matrix, positions)
-            cent = _subset_matrix_rows(cent, keep_positions)
-            selected_pos = _select_central_cell_positions(cent, cluster_series.reset_index(drop=True), central_fraction)
-        else:
-            if neighbor_connectivities is None:
-                raise ValueError("neighbor_connectivities is required for central_cells_* when centrality_mode='graph_degree'.")
-            conn = neighbor_connectivities
-            if sp is not None and sp.issparse(conn):
-                conn = conn.tocsr()[positions][:, positions]
-                conn = conn[keep_positions][:, keep_positions]
-            else:
-                conn = np.asarray(conn)[np.ix_(positions, positions)]
-                conn = conn[np.ix_(keep_positions, keep_positions)]
-            selected_pos = _select_central_cell_positions_graph(conn, cluster_series.reset_index(drop=True), central_fraction)
-
-        matrix = _subset_matrix_rows(matrix, selected_pos)
-        cluster_series = cluster_series.reset_index(drop=True).iloc[selected_pos]
-        cluster_codes = pd.Categorical(cluster_series, categories=categories, ordered=True).codes
-
-    n_cells2, n_features2 = matrix.shape
-    if warn_on_expensive_dense:
-        _warn_if_expensive_dense_method(method, n_cells=n_cells2, n_features=n_features2, source="expression")
-
-    if method in {"mean", "central_cells_mean"}:
-        out, _ = _aggregate_mean_matrix(matrix, cluster_codes=cluster_codes, n_clusters=len(categories), chunk_size=chunk_size)
-        return pd.DataFrame(out.T.astype(float), index=feature_names, columns=categories.astype(str))
-
-    values = _to_dense_rows(matrix)
-    cluster_series = cluster_series.reset_index(drop=True)
-
-    def _trimmed_mean_nd(arr: np.ndarray, frac: float) -> np.ndarray:
-        if arr.shape[0] <= 2 or frac <= 0:
-            return arr.mean(axis=0)
-        k = int(np.floor(arr.shape[0] * frac))
-        if k <= 0 or (2 * k) >= arr.shape[0]:
-            return arr.mean(axis=0)
-        arr = np.sort(arr, axis=0)[k:arr.shape[0] - k, :]
-        return arr.mean(axis=0)
-
-    out_cols = []
-    out_data = []
-    for cluster_id, idx in cluster_series.groupby(cluster_series, sort=False).groups.items():
-        pos = np.asarray(idx, dtype=int)
-        arr = np.asarray(values[pos], dtype=float)
-        if method == "median":
-            agg = np.median(arr, axis=0)
-        elif method in {"trimmed_mean", "central_cells_trimmed_mean"}:
-            agg = _trimmed_mean_nd(arr, trim_fraction)
-        else:
-            raise ValueError("method must be one of: mean, median, trimmed_mean, central_cells_mean, central_cells_trimmed_mean")
-        out_cols.append(str(cluster_id))
-        out_data.append(agg)
-    out = np.vstack(out_data).T if out_data else np.zeros((len(feature_names), 0))
-    return pd.DataFrame(out, index=feature_names, columns=out_cols)
-def _to_dense_2d(x):
-    if hasattr(x, "toarray"):
-        return x.toarray()
-    return np.asarray(x)
-
-
-
-
-
-def _resolve_adata_matrix_source(
-    adata,
-    source: str,
-    key: Optional[str] = None,
-    uppercase_features: bool = False,
-):
-    """Return (cells x features matrix, feature names, cell names) without densifying by default."""
-    source_norm = str(source).lower()
-    cell_names = pd.Index(adata.obs_names.astype(str))
-
-    if source_norm == "raw":
-        if getattr(adata, "raw", None) is None:
-            raise ValueError("source='raw' but adata.raw is None.")
-        matrix = adata.raw.X
-        features = pd.Index(adata.raw.var_names.astype(str))
-    elif source_norm == "x":
-        matrix = adata.X
-        features = pd.Index(adata.var_names.astype(str))
-    elif source_norm == "layer":
-        if key is None:
-            raise ValueError("source='layer' requires key to be set to a layer name.")
-        if key not in adata.layers:
-            raise KeyError(f"layer '{key}' not found in adata.layers")
-        matrix = adata.layers[key]
-        features = pd.Index(adata.var_names.astype(str))
-    elif source_norm == "obsm":
-        if key is None:
-            raise ValueError("source='obsm' requires key to be set to an obsm key.")
-        if key not in adata.obsm:
-            raise KeyError(f"obsm key '{key}' not found in adata.obsm")
-        matrix = adata.obsm[key]
-        if hasattr(matrix, "shape") and len(matrix.shape) != 2:
-            raise ValueError("adata.obsm[key] must be a 2D matrix.")
-        if isinstance(matrix, pd.DataFrame):
-            features = pd.Index(matrix.columns.astype(str))
-            matrix = matrix.to_numpy()
-        elif f"{key}_feature_names" in adata.uns:
-            features = pd.Index(pd.Index(adata.uns[f"{key}_feature_names"]).astype(str))
-        else:
-            n_features = int(matrix.shape[1])
-            features = pd.Index([f"{_sanitize_label_text(key) or 'feature'}_{i}" for i in range(n_features)])
-    else:
-        raise ValueError("source must be one of: 'X', 'raw', 'layer', 'obsm'")
-
-    features = features.astype(str)
-    if uppercase_features:
-        features = features.str.upper()
-        if features.has_duplicates:
-            raise ValueError("uppercase_features=True produced duplicate feature names for AnnData source; use a preprocessing step to merge duplicates first.")
-    return matrix, features, cell_names
-
-
-def _subset_matrix_rows(matrix, row_idx):
-    if sp is not None and sp.issparse(matrix):
-        return matrix[row_idx]
-    return np.asarray(matrix)[row_idx]
-
-
-def _to_dense_rows(matrix):
-    if sp is not None and sp.issparse(matrix):
-        return matrix.toarray()
-    return np.asarray(matrix)
-
-
-def _factorize_valid_clusters(cluster_series: pd.Series, min_cells_per_cluster: int):
-    counts = cluster_series.astype(str).value_counts(sort=False)
-    valid = counts[counts >= int(min_cells_per_cluster)].index.astype(str)
-    keep = cluster_series.astype(str).isin(valid)
-    cluster_series = cluster_series.astype(str).loc[keep]
-    categories = pd.Index(cluster_series.unique().astype(str))
-    codes = pd.Categorical(cluster_series, categories=categories, ordered=True).codes
-    return cluster_series, categories, codes, keep
-
-
-def _select_central_cell_positions(centrality_matrix, cluster_series: pd.Series, central_fraction: float):
-    if not (0 < float(central_fraction) <= 1.0):
-        raise ValueError("central_fraction must be in the interval (0, 1].")
-    selected_positions = []
-    for cluster_id, idx in cluster_series.groupby(cluster_series, sort=False).groups.items():
-        pos = np.asarray(idx, dtype=int)
-        rep = _subset_matrix_rows(centrality_matrix, pos)
-        rep = _to_dense_rows(rep)
-        if rep.shape[0] == 0:
-            continue
-        if rep.shape[0] == 1:
-            keep_pos = pos
-        else:
-            centroid = rep.mean(axis=0)
-            distances = np.linalg.norm(rep - centroid[None, :], axis=1)
-            n_keep = max(1, int(np.ceil(len(pos) * float(central_fraction))))
-            order = np.argsort(distances, kind="mergesort")[:n_keep]
-            keep_pos = pos[order]
-        selected_positions.extend(keep_pos.tolist())
-    return np.asarray(selected_positions, dtype=int)
-
-
-
-
-def _resolve_neighbors_connectivities(adata, neighbors_key: Optional[str] = None):
-    """Return a sparse connectivity matrix aligned to adata.obs_names."""
-    if sp is None:
-        raise ImportError("Graph-based central cell selection requires scipy.sparse.")
-    candidates = []
-    if neighbors_key:
-        candidates.extend([
-            f"{neighbors_key}_connectivities",
-            neighbors_key,
-        ])
-    candidates.append("connectivities")
-    for key in candidates:
-        if key in getattr(adata, "obsp", {}):
-            conn = adata.obsp[key]
-            if conn.shape[0] != adata.n_obs or conn.shape[1] != adata.n_obs:
-                raise ValueError(f"Neighbor graph '{key}' shape does not match adata.n_obs.")
-            return conn
-    raise KeyError(
-        "Could not find a neighbor connectivity matrix in adata.obsp. "
-        "Provide neighbors_key matching a stored connectivities key."
-    )
-
-
-def _select_central_cell_positions_graph(connectivities, cluster_series: pd.Series, central_fraction: float):
-    """Select central cells using within-cluster weighted degree on a precomputed neighbor graph."""
-    if sp is None or not sp.issparse(connectivities):
-        if sp is None:
-            raise ImportError("Graph-based central cell selection requires scipy.sparse.")
-        connectivities = sp.csr_matrix(connectivities)
-    else:
-        connectivities = connectivities.tocsr()
-
-    if not (0 < float(central_fraction) <= 1.0):
-        raise ValueError("central_fraction must be in the interval (0, 1].")
-
-    selected_positions = []
-    for _, idx in cluster_series.groupby(cluster_series, sort=False).groups.items():
-        pos = np.asarray(idx, dtype=int)
-        if pos.size == 0:
-            continue
-        if pos.size == 1:
-            selected_positions.extend(pos.tolist())
-            continue
-        sub = connectivities[pos][:, pos]
-        degree = np.asarray(sub.sum(axis=1)).ravel()
-        n_keep = max(1, int(np.ceil(len(pos) * float(central_fraction))))
-        order = np.argsort(-degree, kind="mergesort")[:n_keep]
-        keep_pos = pos[order]
-        selected_positions.extend(keep_pos.tolist())
-    return np.asarray(selected_positions, dtype=int)
-
-def _aggregate_mean_matrix(matrix, cluster_codes: np.ndarray, n_clusters: int, chunk_size: int = 50000):
-    n_cells, n_features = matrix.shape
-    counts = np.bincount(cluster_codes, minlength=n_clusters).astype(float)
-
-    if sp is not None and sp.issparse(matrix):
-        matrix = matrix.tocsr()
-        membership = sp.csr_matrix(
-            (np.ones(n_cells, dtype=np.float32), (cluster_codes, np.arange(n_cells))),
-            shape=(n_clusters, n_cells),
-        )
-        sums = membership @ matrix
-        out = sums.toarray().astype(float, copy=False)
-    else:
-        out = np.zeros((n_clusters, n_features), dtype=float)
-        for start in range(0, n_cells, int(chunk_size)):
-            stop = min(n_cells, start + int(chunk_size))
-            block = np.asarray(matrix[start:stop], dtype=float)
-            block_codes = cluster_codes[start:stop]
-            np.add.at(out, block_codes, block)
-    nonzero = counts > 0
-    out[nonzero] = out[nonzero] / counts[nonzero, None]
-    return out, counts
-
-
-def _warn_if_expensive_dense_method(method: str, n_cells: int, n_features: int, source: str):
-    method = str(method)
-    if method not in {"median", "trimmed_mean", "central_cells_trimmed_mean"}:
-        return
-    size = int(n_cells) * int(n_features)
-    if size >= 100_000_000:
-        warnings.warn(
-            f"{method} aggregation on a large matrix ({n_cells} cells x {n_features} features from source={source!r}) "
-            "may be slow and memory-intensive because it cannot use the sparse mean fast path. "
-            "Consider method='mean' or 'central_cells_mean' for very large sparse datasets.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-
-def _sanitize_label_text(value: object) -> str:
-    text = str(value).strip()
-    for old, new in [(" ", "_"), ("/", "_"), ("-", "_")]:
-        text = text.replace(old, new)
-    while "__" in text:
-        text = text.replace("__", "_")
-    return text.strip("_")
-
-
-
-
-def aggregate_anndata_to_cluster_means(
-    adata,
-    cluster_key: str,
-    source: str = "X",
-    source_key: Optional[str] = None,
-    uppercase_genes: bool = True,
-    method: str = "mean",
-    trim_fraction: float = 0.1,
-    include_obs_mask: Optional[str | pd.Series | Sequence[bool] | np.ndarray] = None,
-    min_cells_per_cluster: int = 1,
-    centrality_source: Optional[str] = None,
-    centrality_source_key: Optional[str] = None,
-    central_fraction: float = 0.8,
-    centrality_mode: str = "centroid",
-    neighbors_key: Optional[str] = None,
-    backend: str = "auto",
-    chunk_size: int = 50000,
-    warn_on_expensive_dense: bool = True,
-) -> pd.DataFrame:
-    """Aggregate an AnnData object to feature x cluster profiles.
-
-    This is a convenience wrapper around `aggregate_expression_to_cluster_means()`
-    that resolves matrices, masks, and optional neighbor graphs from AnnData.
-    """
-    if cluster_key not in adata.obs:
-        raise KeyError(f"cluster_key '{cluster_key}' not found in adata.obs")
-
-    source_norm = str(source).lower()
-    matrix, features, cell_names = _resolve_adata_matrix_source(
-        adata,
-        source=source,
-        key=source_key,
-        uppercase_features=uppercase_genes if source_norm != "obsm" else False,
-    )
-
-    if include_obs_mask is None:
-        resolved_include_mask = None
-    elif isinstance(include_obs_mask, str):
-        if include_obs_mask not in adata.obs:
-            raise KeyError(f"include_obs_mask column '{include_obs_mask}' not found in adata.obs")
-        resolved_include_mask = adata.obs[include_obs_mask].astype(bool).to_numpy()
-    else:
-        resolved_include_mask = include_obs_mask
-
-    resolved_centrality = None
-    resolved_graph = None
-    if method in {"central_cells_mean", "central_cells_trimmed_mean"}:
-        if centrality_mode == "centroid":
-            if centrality_source is None:
-                raise ValueError("centrality_source is required for central_cells_* when centrality_mode='centroid'.")
-            resolved_centrality, _, _ = _resolve_adata_matrix_source(
-                adata,
-                source=centrality_source,
-                key=centrality_source_key,
-                uppercase_features=False,
-            )
-        else:
-            resolved_graph = _resolve_neighbors_connectivities(adata, neighbors_key=neighbors_key)
-
-    return aggregate_expression_to_cluster_means(
-        matrix,
-        adata.obs[cluster_key].astype(str).tolist(),
-        feature_names=features,
-        cell_names=cell_names,
-        method=method,
-        trim_fraction=trim_fraction,
-        include_mask=resolved_include_mask,
-        min_cells_per_cluster=min_cells_per_cluster,
-        centrality_matrix=resolved_centrality,
-        central_fraction=central_fraction,
-        centrality_mode=centrality_mode,
-        neighbor_connectivities=resolved_graph,
-        backend=backend,
-        chunk_size=chunk_size,
-        warn_on_expensive_dense=warn_on_expensive_dense,
-        uppercase_features=False,
-    )
-
-def _prepare_clustering_representation(
-    adata,
-    source: str = "obsm",
-    source_key: Optional[str] = None,
-    n_components: int = 30,
-    random_state: int = 0,
-    pca_zero_center: Optional[bool] = None,
-    pca_scale: bool = False,
-    do_pca: bool = True,
-):
-    """Prepare a clustering representation from AnnData.
-
-    Returns a tuple of ``(representation, source_label, resolved_zero_center)`` where
-    ``representation`` is a cell x feature numpy array suitable for ``scanpy.pp.neighbors``
-    via ``use_rep``.
-
-    PCA/SVD preprocessing is controlled by ``do_pca``:
-    - ``do_pca=True``: attempt PCA/SVD, but skip it when ``n_components`` is not meaningful
-    - ``do_pca=False``: use the selected representation directly
-
-    Default centering behavior remains source-aware when PCA is used:
-    - ``obsm`` inputs: no extra centering before dimensionality reduction
-    - ``X``/``layer`` inputs: zero-center before PCA by default
-    """
-    source_norm = str(source).lower()
-    rep_matrix, _, _ = _resolve_adata_matrix_source(adata, source=source_norm, key=source_key, uppercase_features=False)
-    embedding = _to_dense_rows(rep_matrix).astype(float)
-    if embedding.ndim != 2:
-        raise ValueError("Selected clustering source must resolve to a 2D cell x feature matrix.")
-
-    resolved_zero_center = pca_zero_center
-    if resolved_zero_center is None:
-        resolved_zero_center = source_norm != "obsm"
-
-    source_label = source_norm if source_norm == "x" else f"{source_norm}_{source_key}"
-
-    if embedding.shape[1] == 0:
-        raise ValueError("Selected clustering source has zero features.")
-
-    requested_components = int(n_components)
-    n_components = max(1, min(requested_components, embedding.shape[1], embedding.shape[0]))
-
-    if pca_scale:
-        try:
-            from sklearn.preprocessing import StandardScaler
-        except Exception as exc:  # pragma: no cover - optional dependency
-            raise ImportError("PCA scaling requires scikit-learn. Install HierAnnot with preprocessing extras.") from exc
-        scaler = StandardScaler(with_mean=bool(resolved_zero_center), with_std=True)
-        embedding = scaler.fit_transform(embedding)
-
-    if not bool(do_pca):
-        return embedding, source_label, bool(resolved_zero_center)
-
-    if requested_components >= embedding.shape[1]:
-        # No real dimensionality reduction to perform; keep the representation as-is.
-        return embedding, source_label, bool(resolved_zero_center)
-
-    if resolved_zero_center:
-        try:
-            from sklearn.decomposition import PCA
-        except Exception as exc:  # pragma: no cover - optional dependency
-            raise ImportError("PCA-based clustering requires scikit-learn. Install HierAnnot with preprocessing extras.") from exc
-        reducer = PCA(n_components=n_components, random_state=random_state)
-        representation = reducer.fit_transform(embedding)
-    else:
-        try:
-            from sklearn.decomposition import TruncatedSVD
-        except Exception as exc:  # pragma: no cover - optional dependency
-            raise ImportError("SVD-based clustering requires scikit-learn. Install HierAnnot with preprocessing extras.") from exc
-        reducer = TruncatedSVD(n_components=n_components, random_state=random_state)
-        representation = reducer.fit_transform(embedding)
-
-    return representation, source_label, bool(resolved_zero_center)
-
-
-def cluster_anndata_on_representation(
-    adata,
-    source: str = "obsm",
-    source_key: Optional[str] = None,
-    cluster_key: str = "hierannot_leiden",
-    pca_key: Optional[str] = None,
-    neighbors_key: Optional[str] = None,
-    umap_key: Optional[str] = None,
-    n_pcs: int = 30,
-    n_neighbors: int = 15,
-    leiden_resolution: float = 1.0,
-    random_state: int = 0,
-    compute_umap: bool = True,
-    copy: bool = False,
-    pca_zero_center: Optional[bool] = None,
-    pca_scale: bool = False,
-    do_pca: bool = True,
-):
-    """Cluster cells from a chosen AnnData representation.
-
-    Supports ``source='obsm'``, ``'layer'``, and ``'X'``. The helper is written
-    to work with Scanpy 1.10.3 and 1.11.x by relying on stable ``neighbors_key``
-    / ``key_added`` behavior and by storing custom UMAP output under a separate
-    ``obsm`` key without overwriting existing embeddings by default.
-
-    PCA preprocessing defaults are source-aware:
-    - ``obsm``: no extra zero-centering or scaling before SVD/PCA
-    - ``X``/``layer``: zero-center before PCA, no scaling by default
-    """
-    try:
-        import scanpy as sc
-    except Exception as exc:  # pragma: no cover - optional dependency
-        raise ImportError("cluster_anndata_on_representation requires scanpy. Install HierAnnot with preprocessing extras.") from exc
-
-    target = adata.copy() if copy else adata
-    representation, source_label, resolved_zero_center = _prepare_clustering_representation(
-        target,
-        source=source,
-        source_key=source_key,
-        n_components=n_pcs,
-        random_state=random_state,
-        pca_zero_center=pca_zero_center,
-        pca_scale=pca_scale,
-        do_pca=do_pca,
-    )
-
-    safe_stem = _sanitize_label_text(source_label) or "representation"
-    rep_key = pca_key or f"X_rep_{safe_stem}"
-    neighbors_key = neighbors_key or f"neighbors_{safe_stem}"
-    umap_key = umap_key or f"X_umap_{safe_stem}"
-
-    target.obsm[rep_key] = representation
-    if not hasattr(target, "uns") or target.uns is None:
-        target.uns = {}
-    target.uns[f"{rep_key}_params"] = {
-        "source": str(source).lower(),
-        "source_key": source_key,
-        "n_components": int(max(1, min(int(n_pcs), representation.shape[1], representation.shape[0]))),
-        "pca_zero_center": bool(resolved_zero_center),
-        "pca_scale": bool(pca_scale),
-    }
-
-    sc.pp.neighbors(
-        target,
-        use_rep=rep_key,
-        n_neighbors=n_neighbors,
-        random_state=random_state,
-        key_added=neighbors_key,
-    )
-    sc.tl.leiden(
-        target,
-        key_added=cluster_key,
-        resolution=leiden_resolution,
-        random_state=random_state,
-        neighbors_key=neighbors_key,
-    )
-    if compute_umap:
-        old_x_umap = target.obsm.pop("X_umap", None)
-        sc.tl.umap(target, neighbors_key=neighbors_key)
-        if umap_key != "X_umap":
-            target.obsm[umap_key] = target.obsm.pop("X_umap")
-            if old_x_umap is not None:
-                target.obsm["X_umap"] = old_x_umap
-    return target
-
-
-def cluster_and_aggregate_anndata(
-    adata,
-    cluster_key: str = "hierannot_leiden",
-    clustering_source: str = "obsm",
-    clustering_source_key: Optional[str] = None,
-    aggregation_source: str = "X",
-    aggregation_source_key: Optional[str] = None,
-    pca_key: Optional[str] = None,
-    neighbors_key: Optional[str] = None,
-    umap_key: Optional[str] = None,
-    n_pcs: int = 30,
-    n_neighbors: int = 15,
-    leiden_resolution: float = 1.0,
-    random_state: int = 0,
-    compute_umap: bool = True,
-    copy: bool = False,
-    aggregation_method: str = "mean",
-    trim_fraction: float = 0.1,
-    pca_zero_center: Optional[bool] = None,
-    pca_scale: bool = False,
-    do_pca: bool = True,
-    include_obs_mask: Optional[str | pd.Series | Sequence[bool] | np.ndarray] = None,
-    min_cells_per_cluster: int = 1,
-    centrality_source: Optional[str] = None,
-    centrality_source_key: Optional[str] = None,
-    central_fraction: float = 0.8,
-):
-    """Cluster cells from one AnnData source, then aggregate another source by cluster.
-
-    Parameters
-    ----------
-    clustering_source, clustering_source_key
-        Define the matrix used for clustering. Supported values are ``"obsm"``,
-        ``"layer"``, and ``"X"``. ``clustering_source_key`` is required for
-        ``"obsm"`` and ``"layer"``.
-    aggregation_source, aggregation_source_key
-        Define the matrix used for cluster-level aggregation. Supported values are
-        ``"X"``, ``"raw"``, ``"layer"``, and ``"obsm"``. ``aggregation_source_key``
-        is required for ``"layer"`` and ``"obsm"``.
-    centrality_source, centrality_source_key
-        Optional representation used only for ``central_cells_*`` aggregation.
-        If omitted for those methods, the clustering representation is used.
-    """
-    resolved_rep_key = pca_key
-    if resolved_rep_key is None:
-        source_label = str(clustering_source).lower() if str(clustering_source).lower() == "x" else f"{str(clustering_source).lower()}_{clustering_source_key}"
-        safe_stem = _sanitize_label_text(source_label) or "representation"
-        resolved_rep_key = f"X_rep_{safe_stem}"
-
-    clustered = cluster_anndata_on_representation(
-        adata=adata,
-        cluster_key=cluster_key,
-        pca_key=pca_key,
-        neighbors_key=neighbors_key,
-        umap_key=umap_key,
-        n_pcs=n_pcs,
-        n_neighbors=n_neighbors,
-        leiden_resolution=leiden_resolution,
-        random_state=random_state,
-        compute_umap=compute_umap,
-        copy=copy,
-        source=clustering_source,
-        source_key=clustering_source_key,
-        pca_zero_center=pca_zero_center,
-        pca_scale=pca_scale,
-        do_pca=do_pca,
-    )
-
-    if centrality_source is None and aggregation_method in {"central_cells_mean", "central_cells_trimmed_mean"}:
-        centrality_source = "obsm"
-        centrality_source_key = resolved_rep_key
-
-    cluster_means = aggregate_anndata_to_cluster_means(
-        clustered,
-        cluster_key=cluster_key,
-        source=aggregation_source,
-        source_key=aggregation_source_key,
-        method=aggregation_method,
-        trim_fraction=trim_fraction,
-        include_obs_mask=include_obs_mask,
-        min_cells_per_cluster=min_cells_per_cluster,
-        centrality_source=centrality_source,
-        centrality_source_key=centrality_source_key,
-        central_fraction=central_fraction,
-    )
-    return clustered, cluster_means
-
-
+def _select_annotation_summary_source(result, source: str = "normal") -> pd.DataFrame:
+    source = str(source)
+    if source == "integrated":
+        summary = getattr(result, "integrated_annotations", None)
+        if summary is not None and len(summary) > 0:
+            return summary.copy()
+    return result.cluster_annotations.copy()
 
 
 def _build_per_level_summary(result) -> pd.DataFrame:
@@ -730,8 +30,9 @@ def _build_per_level_summary(result) -> pd.DataFrame:
     df = level_scores.copy()
     df["cluster"] = df["cluster"].astype(str)
     score_col = "decision_score" if "decision_score" in df.columns else "score"
-    best_idx = df.groupby(["cluster", "level"], sort=False)[score_col].idxmax()
-    best = df.loc[best_idx].copy()
+    best_idx = df.groupby(["cluster", "level"], sort=False)[score_col].idxmax().dropna()
+    best_idx = best_idx.astype(int) if len(best_idx) else best_idx
+    best = df.loc[best_idx].copy() if len(best_idx) else pd.DataFrame(columns=df.columns)
 
     wide = pd.DataFrame({"cluster_id": sorted(df["cluster"].unique(), key=lambda x: x)})
     level_values = sorted(best["level"].dropna().unique())
@@ -769,16 +70,28 @@ def _build_per_level_summary(result) -> pd.DataFrame:
     return wide
 
 
-
-
-
 def _normalize_confidence_levels(levels: Optional[Iterable[str]]) -> set[str]:
     if levels is None:
         return {"low", "none"}
     return {str(x).strip().lower() for x in levels}
 
 
-
+def _rerun_malignant_summary_from_scores(
+    result,
+    malignant_status_score_threshold: float = 0.35,
+    malignant_raw_score_threshold: float = 0.15,
+    malignant_margin_threshold: float = 0.15,
+):
+    malignant_scores = getattr(result, "malignant_scores", None)
+    if malignant_scores is None or len(malignant_scores) == 0:
+        return None
+    from .malignant_scoring import _format_malignant_annotations
+    return _format_malignant_annotations(
+        malignant_scores=malignant_scores,
+        score_threshold=float(malignant_status_score_threshold),
+        raw_score_threshold=float(malignant_raw_score_threshold),
+        margin_threshold=float(malignant_margin_threshold),
+    )
 
 def _rerun_decision_summary_from_scores(
     result,
@@ -1054,6 +367,510 @@ def _compute_final_call_competition(summary: pd.DataFrame, result) -> pd.DataFra
     )
 
 
+def _attach_malignant_columns(summary: pd.DataFrame, malignant_summary: Optional[pd.DataFrame]) -> pd.DataFrame:
+    """Attach malignant annotation columns onto ``summary`` without touching integrated columns."""
+    out = summary.copy()
+    if malignant_summary is None or len(malignant_summary) == 0:
+        return out
+    extra = malignant_summary.copy()
+    key = "cluster_id"
+    if key not in out.columns or key not in extra.columns:
+        return out
+    out[key] = out[key].astype(str)
+    extra[key] = extra[key].astype(str)
+    wanted = [c for c in extra.columns if c != key and c.startswith("annot_malignant_")]
+    if not wanted:
+        return out
+    overlap = [c for c in wanted if c in out.columns]
+    if overlap:
+        out = out.drop(columns=overlap)
+    out = out.merge(extra[[key] + wanted], on=key, how="left")
+    return out
+
+
+def _resolve_normal_summary_for_export(
+    result,
+    *,
+    rerun_decision: bool,
+    score_threshold: float,
+    margin_threshold: float,
+    branch_child_rescue_weight: float,
+    level1_branch_child_rescue_weight: float,
+    branch_routing_raw_weight: float,
+    weak_raw_score_threshold: float,
+    min_branch_supported_raw_score: float,
+    min_leaf_raw_score: float,
+) -> Optional[pd.DataFrame]:
+    """Return the normal-summary source for export, optionally rerouting from stored scores."""
+    if rerun_decision:
+        return _rerun_decision_summary_from_scores(
+            result,
+            score_threshold=score_threshold,
+            margin_threshold=margin_threshold,
+            branch_support_parent_weight=(1.0 - float(branch_child_rescue_weight)),
+            branch_support_descendant_weight=float(branch_child_rescue_weight),
+            level1_branch_support_parent_weight=(1.0 - float(level1_branch_child_rescue_weight)),
+            level1_branch_support_descendant_weight=float(level1_branch_child_rescue_weight),
+            branch_routing_raw_weight=branch_routing_raw_weight,
+            weak_raw_score_threshold=weak_raw_score_threshold,
+            min_branch_supported_raw_score=float(min_branch_supported_raw_score),
+            min_leaf_raw_score=float(min_leaf_raw_score),
+        )
+    cluster_summary = _select_annotation_summary_source(result, source="normal")
+    per_level_summary = _build_per_level_summary(result)
+    if per_level_summary is not None and len(per_level_summary) > 0:
+        if "cluster_id" in cluster_summary.columns and "cluster_id" in per_level_summary.columns:
+            per_level_summary = per_level_summary.drop(columns=["cluster_id"])
+        return cluster_summary.join(per_level_summary, how="left")
+    return cluster_summary.copy()
+
+
+def _cached_dataframe(obj, attr: str) -> Optional[pd.DataFrame]:
+    """Return a defensive copy of a cached result table when it exists."""
+    df = getattr(obj, attr, None)
+    if isinstance(df, pd.DataFrame) and len(df) > 0:
+        return df.copy()
+    return None
+
+
+def _merge_cached_summary_with_normal(cached_summary: pd.DataFrame, normal_summary: Optional[pd.DataFrame]) -> pd.DataFrame:
+    """Keep cached integrated columns authoritative while adding normal-only extras."""
+    out = cached_summary.copy()
+    if normal_summary is None or len(normal_summary) == 0:
+        return out
+    if "cluster_id" not in out.columns or "cluster_id" not in normal_summary.columns:
+        return out
+    out["cluster_id"] = out["cluster_id"].astype(str)
+    normal_extra = normal_summary.copy()
+    normal_extra["cluster_id"] = normal_extra["cluster_id"].astype(str)
+    extra_cols = [c for c in normal_extra.columns if c != "cluster_id" and c not in out.columns]
+    if extra_cols:
+        out = out.merge(normal_extra[["cluster_id"] + extra_cols], on="cluster_id", how="left")
+    return out
+
+
+def _resolve_malignant_summary_for_export(
+    result,
+    *,
+    rerun_decision: bool,
+    malignant_integration_mode: str,
+    malignant_status_score_threshold: float,
+    malignant_raw_score_threshold: float,
+    malignant_margin_threshold: float = 0.15,
+) -> Optional[pd.DataFrame]:
+    """Return malignant annotations for export.
+
+    By default this uses the malignant annotations cached by the fitted pipeline.
+    Threshold-aware malignant reformatting is only performed when
+    ``rerun_decision=True``.
+    """
+    if str(malignant_integration_mode).lower() == "off":
+        return None
+    if not rerun_decision:
+        cached = _cached_dataframe(result, "malignant_annotations")
+        if cached is not None:
+            return cached
+        integrated = _cached_dataframe(result, "integrated_annotations")
+        if integrated is not None and "cluster_id" in integrated.columns:
+            malignant_cols = [c for c in integrated.columns if c == "cluster_id" or c.startswith("annot_malignant_")]
+            if len(malignant_cols) > 1:
+                return integrated[malignant_cols].copy()
+        return None
+    return _rerun_malignant_summary_from_scores(
+        result,
+        malignant_status_score_threshold=float(malignant_status_score_threshold),
+        malignant_raw_score_threshold=float(malignant_raw_score_threshold),
+        malignant_margin_threshold=float(malignant_margin_threshold),
+    )
+
+
+def _resolve_base_summary_for_export(
+    result,
+    *,
+    rerun_decision: bool,
+    score_threshold: float,
+    margin_threshold: float,
+    branch_child_rescue_weight: float,
+    level1_branch_child_rescue_weight: float,
+    branch_routing_raw_weight: float,
+    weak_raw_score_threshold: float,
+    min_branch_supported_raw_score: float,
+    min_leaf_raw_score: float,
+    normal_strong_score_threshold: float,
+    normal_strong_raw_threshold: float,
+    malignant_integration_mode: str,
+    malignant_status_score_threshold: float,
+    malignant_raw_score_threshold: float,
+    malignant_normal_raw_delta_threshold: Optional[float],
+    program_report_block_preset=None,
+):
+    """Resolve the base summary used for export.
+
+    With the default ``rerun_decision=False``, export uses the normal,
+    malignant, and integrated annotation tables cached in ``result``. Passing
+    threshold arguments to the export helper does not recompute malignant or
+    integrated decisions in that mode. Set ``rerun_decision=True`` to rebuild
+    normal routing, malignant status formatting, and normal/malignant
+    integration from the stored score tables.
+    """
+    normal_summary = _resolve_normal_summary_for_export(
+        result,
+        rerun_decision=rerun_decision,
+        score_threshold=score_threshold,
+        margin_threshold=margin_threshold,
+        branch_child_rescue_weight=branch_child_rescue_weight,
+        level1_branch_child_rescue_weight=level1_branch_child_rescue_weight,
+        branch_routing_raw_weight=branch_routing_raw_weight,
+        weak_raw_score_threshold=weak_raw_score_threshold,
+        min_branch_supported_raw_score=min_branch_supported_raw_score,
+        min_leaf_raw_score=min_leaf_raw_score,
+    )
+    malignant_summary = _resolve_malignant_summary_for_export(
+        result,
+        rerun_decision=rerun_decision,
+        malignant_integration_mode=malignant_integration_mode,
+        malignant_status_score_threshold=malignant_status_score_threshold,
+        malignant_raw_score_threshold=malignant_raw_score_threshold,
+        malignant_margin_threshold=margin_threshold,
+    )
+
+    if normal_summary is None:
+        return None, None, None
+
+    if str(malignant_integration_mode).lower() == "off":
+        return normal_summary.copy(), normal_summary, malignant_summary
+
+    if not rerun_decision:
+        cached_integrated = _cached_dataframe(result, "integrated_annotations")
+        if cached_integrated is not None:
+            summary = _merge_cached_summary_with_normal(cached_integrated, normal_summary)
+            if malignant_summary is not None:
+                summary = _attach_malignant_columns(summary, malignant_summary)
+            return summary, normal_summary, malignant_summary
+
+        summary = normal_summary.copy()
+        if malignant_summary is not None:
+            summary = _attach_malignant_columns(summary, malignant_summary)
+        return summary, normal_summary, malignant_summary
+
+    from .integration.integrate_tracks import _integrate_normal_and_malignant_annotations
+    summary = _integrate_normal_and_malignant_annotations(
+        normal_summary.copy(),
+        malignant_summary,
+        normal_strong_score_threshold=float(normal_strong_score_threshold),
+        normal_strong_raw_threshold=float(normal_strong_raw_threshold),
+        malignant_status_score_threshold=float(malignant_status_score_threshold),
+        malignant_raw_score_threshold=float(malignant_raw_score_threshold),
+        malignant_normal_raw_delta_threshold=(None if malignant_normal_raw_delta_threshold is None else float(malignant_normal_raw_delta_threshold)),
+        malignant_integration_mode=str(malignant_integration_mode),
+        program_report_block_preset=program_report_block_preset,
+    )
+    summary = _attach_malignant_columns(summary, malignant_summary)
+    return summary, normal_summary, malignant_summary
+
+
+def _attach_export_diagnostics(summary: pd.DataFrame, result) -> pd.DataFrame:
+    """Attach export-time diagnostics that depend on cached score tables but do not mutate ``result``."""
+    out = _compute_final_call_competition(summary, result)
+    out = _attach_best_any_level_raw_score(out, result)
+    return out
+
+
+def _reorder_export_summary_columns(summary: pd.DataFrame, malignant_integration_mode: str) -> pd.DataFrame:
+    front_cols = [
+        "cluster_id",
+        "annot_export_label",
+        "annot_export_label_with_cluster",
+        "annot_export_status",
+        "annot_export_reason",
+        "annot_export_malignant_flag",
+        "annot_export_tumor_like_label",
+    ]
+    if str(malignant_integration_mode).lower() != "off":
+        front_cols.extend([
+            "annot_malignant_name",
+            "annot_malignant_label",
+            "annot_malignant_label_concise",
+            "annot_malignant_status",
+            "annot_malignant_reason",
+            "annot_integrated_label",
+            "annot_integrated_status",
+            "annot_integrated_reason",
+            "annot_integrated_source",
+        ])
+    ordered_front = [c for c in front_cols if c in summary.columns]
+    remaining = [c for c in summary.columns if c not in ordered_front]
+    return summary[ordered_front + remaining]
+
+
+def _apply_export_view(summary: pd.DataFrame, malignant_integration_mode: str, export_view: str) -> pd.DataFrame:
+    """Return either a compact export table or the full diagnostic table."""
+    ordered = _reorder_export_summary_columns(summary, malignant_integration_mode)
+    view = str(export_view or "compact").strip().lower()
+    if view in {"diagnostic", "diagnostics", "full", "all"}:
+        return ordered
+    if view == "minimal":
+        cols = [
+            "cluster_id",
+            "annot_export_label",
+            "annot_export_label_with_cluster",
+            "annot_export_status",
+            "annot_export_reason",
+            "annot_export_malignant_flag",
+        ]
+        return ordered[[c for c in cols if c in ordered.columns]]
+    if view != "compact":
+        raise ValueError("export_view must be one of 'compact', 'minimal', or 'diagnostic'")
+    compact_cols = [
+        "cluster_id",
+        "annot_export_label",
+        "annot_export_label_with_cluster",
+        "annot_export_status",
+        "annot_export_reason",
+        "annot_export_malignant_flag",
+        "annot_export_tumor_like_label",
+        "annot_label",
+        "annot_label_with_cluster",
+        "annot_status",
+        "annot_stop_reason",
+        "annot_path",
+        "annot_level",
+        "annot_confidence",
+        "annot_score",
+        "annot_raw_score",
+        "annot_branch_supported_raw_score",
+        "annot_margin",
+        "annot_final_call_margin",
+        "annot_second_best_call",
+        "annot_second_best_call_score",
+        "annot_unresolved_candidate_label",
+        "annot_unresolved_candidate_score",
+        "annot_unresolved_candidate_raw_score",
+    ]
+    if str(malignant_integration_mode).lower() != "off":
+        compact_cols.extend([
+            "annot_integrated_label",
+            "annot_integrated_status",
+            "annot_integrated_reason",
+            "annot_integrated_source",
+            "annot_integrated_normal_state",
+            "annot_integrated_malignant_state",
+            "annot_malignant_name",
+            "annot_malignant_label",
+            "annot_malignant_label_concise",
+            "annot_malignant_status",
+            "annot_malignant_reason",
+            "annot_malignant_status_score",
+            "annot_malignant_raw_score",
+            "annot_malignant_decision_score",
+            "annot_malignant_specificity_score",
+            "annot_malignant_margin",
+            "annot_malignant_normal_raw_delta",
+            "annot_malignant_normal_raw_delta_pass",
+            "annot_malignant_reporting_blocked",
+        ])
+    cols = [c for c in compact_cols if c in ordered.columns]
+    # Keep per-level summary columns in compact output because they are commonly
+    # joined back to spatial/single-cell metadata and used for downstream checks.
+    per_level_cols = [c for c in ordered.columns if re.match(r"annot_l\d+_", c) and c not in cols]
+    # Keep any additional export-prefixed columns added in future releases.
+    extra_export_cols = [c for c in ordered.columns if c.startswith("annot_export_") and c not in cols]
+    return ordered[cols + per_level_cols + extra_export_cols]
+
+
+def _build_tumor_like_export_labels(
+    summary: pd.DataFrame,
+    normal_label: pd.Series,
+    *,
+    tumor_like_prefix: str = "tumor_like",
+) -> pd.Series:
+    """Build concise tumor-like labels while preserving the requested normal-label suffix."""
+    prefix = str(tumor_like_prefix).strip() or "tumor_like"
+    idx = summary.index
+    state = pd.Series("", index=idx, dtype=object)
+    for col in ["annot_malignant_label_concise", "annot_malignant_label", "annot_malignant_name"]:
+        if col in summary.columns:
+            vals = summary[col].astype(str).replace({"nan": "", "None": "", "none": ""})
+            state = state.where(state.astype(str).str.len() > 0, vals)
+    normal = normal_label.astype(str).replace({"": "unknown", "nan": "unknown", "None": "unknown", "none": "unknown"})
+    generic = state.astype(str).str.strip().str.lower().isin({"", "nan", "none", "malignant", "unspecified", "tumor_like"})
+    out = prefix + "_" + state.astype(str).str.strip() + "." + normal
+    out.loc[generic] = prefix + "." + normal.loc[generic]
+    return out
+
+
+
+
+def _resolve_export_malignant_integration_mode(result, malignant_integration_mode, *, rerun_decision: bool = False) -> str:
+    """Resolve export-time malignant integration mode.
+
+    When ``rerun_decision=False``, the fitted pipeline configuration stored in
+    ``result.resolved_config`` is authoritative whenever available. This keeps
+    export summaries from silently recomputing malignant integration under new
+    arguments. When ``rerun_decision=True``, explicit arguments are used, with
+    the fitted configuration as the fallback for ``None``/``"auto"``.
+    """
+    cfg = dict(getattr(result, "resolved_config", {}) or {})
+    cfg_mode = cfg.get("malignant_integration_mode")
+    raw_mode = malignant_integration_mode
+    raw_mode_is_auto = raw_mode is None or str(raw_mode).strip().lower() in {"auto", "inherit", "from_result"}
+
+    if not rerun_decision and cfg_mode is not None:
+        if not raw_mode_is_auto and str(raw_mode).strip().lower() != str(cfg_mode).strip().lower():
+            warnings.warn(
+                "malignant_integration_mode was supplied to export but rerun_decision=False; "
+                "using result.resolved_config['malignant_integration_mode'] instead. "
+                "Set rerun_decision=True to recompute integration under new controls.",
+                UserWarning,
+            )
+        mode = cfg_mode
+    elif raw_mode_is_auto:
+        mode = cfg_mode
+        if mode is None:
+            integrated = getattr(result, "integrated_annotations", None)
+            if isinstance(integrated, pd.DataFrame) and not integrated.empty:
+                if "annot_integrated_status" in integrated.columns:
+                    statuses = integrated["annot_integrated_status"].astype(str).str.lower()
+                    if statuses.eq("tumor_like").any():
+                        mode = "integrate"
+                if mode is None and "annot_integrated_label" in integrated.columns:
+                    labels = integrated["annot_integrated_label"].astype(str).str.lower()
+                    if labels.str.startswith("tumor_like").any():
+                        mode = "integrate"
+        if mode is None:
+            malignant_scores = getattr(result, "malignant_scores", None)
+            malignant_annotations = getattr(result, "malignant_annotations", None)
+            has_malignant = (malignant_scores is not None and len(malignant_scores) > 0) or (isinstance(malignant_annotations, pd.DataFrame) and len(malignant_annotations) > 0)
+            mode = "flag_only" if has_malignant else "off"
+    else:
+        mode = raw_mode
+
+    mode = str(mode).strip().lower()
+    if mode not in {"off", "flag_only", "integrate"}:
+        raise ValueError(f"Unsupported malignant_integration_mode: {mode}")
+    return mode
+
+
+def _resolve_export_label_source(export_label_source: str, malignant_integration_mode: str) -> str:
+    """Resolve how tumor-like integrated calls should affect annot_export_label.
+
+    ``auto`` is intentionally kept as its own mode: in integrate mode it uses a
+    hybrid export policy where resolved normal labels become tumor-like integrated
+    labels, mixed/candidate normal safeguards stay primary, and unknown normal
+    labels fall back to ``tumor_like_*.unknown``.
+    """
+    source = str(export_label_source or "auto").strip().lower()
+    aliases = {
+        "normal": "normal_priority",
+        "normal-priority": "normal_priority",
+        "normal_priority": "normal_priority",
+        "normal_primary": "normal_priority",
+        "integrated": "integrated",
+        "integrated_label": "integrated",
+        "integration": "integrated",
+        "auto": "auto",
+    }
+    if source not in aliases:
+        raise ValueError("export_label_source must be one of 'auto', 'normal_priority', or 'integrated'")
+    return aliases[source]
+
+def rerun_cluster_annotation_result_from_scores(
+    result,
+    *,
+    score_threshold: float = 0.05,
+    margin_threshold: float = 0.02,
+    branch_child_rescue_weight: float = 0.35,
+    level1_branch_child_rescue_weight: float = 0.40,
+    branch_routing_raw_weight: float = 0.60,
+    weak_raw_score_threshold: float = 0.10,
+    min_branch_supported_raw_score: float = 0.0,
+    min_leaf_raw_score: float = -0.2,
+    normal_strong_score_threshold: float = 0.35,
+    normal_strong_raw_threshold: float = 0.10,
+    malignant_integration_mode: str = "flag_only",
+    malignant_status_score_threshold: float = 0.35,
+    malignant_raw_score_threshold: float = 0.15,
+    malignant_normal_raw_delta_threshold: Optional[float] = None,
+    program_report_block_preset: Optional[Union[str, Sequence[str]]] = "tumor_reportable",
+):
+    """Create a new result object by rerouting existing score tables under new cutoffs.
+
+    This function is non-mutating: the input ``result`` is not modified. A new
+    ``HierAnnotResult`` is returned so callers can inspect or save a rerouted
+    version of the analysis.
+    """
+    malignant_integration_mode = str(malignant_integration_mode).lower()
+    if malignant_integration_mode not in {"off", "flag_only", "integrate"}:
+        raise ValueError(f"Unsupported malignant_integration_mode: {malignant_integration_mode}")
+    if malignant_integration_mode != "off":
+        malignant_scores = getattr(result, "malignant_scores", None)
+        if malignant_scores is None or len(malignant_scores) == 0:
+            raise ValueError("Malignant integration requested but no malignant_scores found in result")
+        program_report_block_preset = _validate_program_report_block_preset(program_report_block_preset)
+
+    from .datamodels import HierAnnotResult
+
+    summary, normal_summary, malignant_summary = _resolve_base_summary_for_export(
+        result,
+        rerun_decision=True,
+        score_threshold=score_threshold,
+        margin_threshold=margin_threshold,
+        branch_child_rescue_weight=branch_child_rescue_weight,
+        level1_branch_child_rescue_weight=level1_branch_child_rescue_weight,
+        branch_routing_raw_weight=branch_routing_raw_weight,
+        weak_raw_score_threshold=weak_raw_score_threshold,
+        min_branch_supported_raw_score=min_branch_supported_raw_score,
+        min_leaf_raw_score=min_leaf_raw_score,
+        normal_strong_score_threshold=normal_strong_score_threshold,
+        normal_strong_raw_threshold=normal_strong_raw_threshold,
+        malignant_integration_mode=malignant_integration_mode,
+        malignant_status_score_threshold=malignant_status_score_threshold,
+        malignant_raw_score_threshold=malignant_raw_score_threshold,
+        malignant_normal_raw_delta_threshold=malignant_normal_raw_delta_threshold,
+        program_report_block_preset=program_report_block_preset,
+    )
+    if normal_summary is None:
+        raise ValueError("Unable to rerun annotations from the provided result object")
+
+    resolved_config = dict(getattr(result, "resolved_config", {}) or {})
+    resolved_config.update({
+        "score_threshold": float(score_threshold),
+        "margin_threshold": float(margin_threshold),
+        "branch_child_rescue_weight": float(branch_child_rescue_weight),
+        "level1_branch_child_rescue_weight": float(level1_branch_child_rescue_weight),
+        "branch_routing_raw_weight": float(branch_routing_raw_weight),
+        "weak_raw_score_threshold": float(weak_raw_score_threshold),
+        "min_branch_supported_raw_score": float(min_branch_supported_raw_score),
+        "min_leaf_raw_score": float(min_leaf_raw_score),
+        "normal_strong_score_threshold": float(normal_strong_score_threshold),
+        "normal_strong_raw_threshold": float(normal_strong_raw_threshold),
+        "malignant_integration_mode": str(malignant_integration_mode),
+        "malignant_status_score_threshold": float(malignant_status_score_threshold),
+        "malignant_raw_score_threshold": float(malignant_raw_score_threshold),
+        "malignant_normal_raw_delta_threshold": (None if malignant_normal_raw_delta_threshold is None else float(malignant_normal_raw_delta_threshold)),
+        "program_report_block_preset": program_report_block_preset,
+    })
+    metadata = dict(getattr(result, "metadata", {}) or {})
+    metadata["derived_from_rerun"] = True
+
+    return HierAnnotResult(
+        cluster_annotations=normal_summary.copy(),
+        level_scores=getattr(result, "level_scores", None).copy() if getattr(result, "level_scores", None) is not None else None,
+        all_scores=getattr(result, "all_scores", None).copy() if getattr(result, "all_scores", None) is not None else None,
+        malignant_scores=getattr(result, "malignant_scores", None).copy() if getattr(result, "malignant_scores", None) is not None else None,
+        malignant_annotations=malignant_summary.copy(),
+        integrated_annotations=summary.copy(),
+        normalized_matrix=getattr(result, "normalized_matrix", None),
+        control_gene_map=dict(getattr(result, "control_gene_map", {}) or {}),
+        compiled_programs=list(getattr(result, "compiled_programs", []) or []),
+        compilation_report=getattr(result, "compilation_report", None),
+        diagnostics_summary=getattr(result, "diagnostics_summary", None),
+        resolved_config=resolved_config,
+        metadata=metadata,
+        hierarchy=getattr(result, "hierarchy", None),
+        malignant_programs=list(getattr(result, "malignant_programs", []) or []) or None,
+    )
+
 def _attach_best_any_level_raw_score(summary: pd.DataFrame, result) -> pd.DataFrame:
     """Attach annot_best_any_level_raw_score from result.all_scores when possible."""
     if summary is None or summary.empty:
@@ -1137,6 +954,7 @@ def _build_export_labels(
 def make_cluster_annotation_export_summary(
     result,
     label_with_cluster: bool = True,
+    export_view: str = "compact",
     unknown_on_low_confidence: bool = True,
     unknown_confidence_levels=("low", "none"),
     unknown_on_branch_conflict: bool = False,
@@ -1155,6 +973,14 @@ def make_cluster_annotation_export_summary(
     unknown_score_column: str = "annot_score",
     unknown_margin_column: str = "annot_final_call_margin",
     rescue_unknown_with_blocked_candidates: bool = True,
+    normal_strong_score_threshold: float = 0.35,
+    normal_strong_raw_threshold: float = 0.10,
+    malignant_integration_mode: Optional[str] = None,
+    export_label_source: str = "auto",
+    malignant_status_score_threshold: float = 0.35,
+    malignant_raw_score_threshold: float = 0.15,
+    malignant_normal_raw_delta_threshold: Optional[float] = None,
+    program_report_block_preset: Optional[Union[str, Sequence[str]]] = "tumor_reportable",
     rerun_decision: bool = False,
     score_threshold: float = 0.05,
     margin_threshold: float = 0.02,
@@ -1171,12 +997,26 @@ def make_cluster_annotation_export_summary(
     This is the main public workflow helper for turning `result.cluster_annotations`
     into a flat cluster-level table with export labels, export status, optional
     rerun-based decision refresh, and extra diagnostics.
+    
+    This function is non-mutating. It returns a derived export table but does
+    not update the input ``result``. With the default ``rerun_decision=False``,
+    it uses the normal, malignant, and integrated annotation decisions cached in
+    the fitted result and applies export-only masking/label formatting on top.
+    When ``rerun_decision=True``, the function reroutes the normal hierarchy
+    from cached score tables, reformats malignant annotations, recomputes
+    normal/malignant integration under the supplied controls, and then applies
+    export logic on top of that derived summary.
 
     Parameters controlling export masking
     ------------------------------------
     label_with_cluster
         If True, also create `annot_export_label_with_cluster` by appending the
         cluster id to the export label.
+
+    export_view
+        Controls output width. `"compact"` returns join-ready labels plus key
+        normal, malignant, and integrated diagnostics; `"diagnostic"` returns
+        the full derived table; `"minimal"` returns only the core export columns.
 
     unknown_on_low_confidence
         If True, mark clusters as unknown when `annot_low_evidence` is True.
@@ -1246,12 +1086,65 @@ def make_cluster_annotation_export_summary(
         Prefix used for short blocked-candidate labels such as
         `candidate_plasma_cell`.
 
+    Parameters controlling integration confidence
+    ---------------------------------------------
+    normal_strong_score_threshold, normal_strong_raw_threshold
+        Integration/export confidence thresholds for the selected normal-track
+        hierarchy label. They do not affect normal hierarchy routing.
+
+    malignant_status_score_threshold, malignant_raw_score_threshold
+        Integration/export confidence thresholds for flat program support. For
+        tumor integration, only strong `reporting_role="status"` programs
+        establish tumor-like identity; strong state/modifier programs remain
+        visible in `result.malignant_annotations` but do not integrate by
+        themselves.
+
+    Parameters controlling malignant integration
+    -------------------------------------------
+    malignant_integration_mode
+        Controls how malignant results are combined with the normal track,
+        for example `"flag_only"`, `"off"` or `"integrate"`. The default
+        ``None`` inherits the mode recorded in ``result.resolved_config`` when
+        available, so export summaries follow the mode used by
+        ``HierAnnotPipeline.fit_score`` unless explicitly overridden.
+
+    export_label_source
+        Controls whether tumor-like integrated calls overwrite the primary
+        `annot_export_label`. The default `"auto"` is hybrid: in integrate mode,
+        resolved normal labels become tumor-like integrated labels, mixed and
+        rescued-candidate normal labels stay primary, and unknown normal labels
+        fall back to `tumor_like_*.unknown`. Use `"normal_priority"` to keep
+        normal/mixed/candidate labels primary whenever available while carrying
+        tumor-like labels in `annot_export_tumor_like_label`; use
+        `"integrated"` to force reportable tumor-like calls to become the
+        primary export label even for mixed/candidate rows.
+
+    malignant_normal_raw_delta_threshold
+        Optional integration-time contrast threshold. When provided and
+        `rerun_decision=True`, tumor-like integration additionally requires
+        malignant raw enrichment to exceed normal-track raw evidence by at least
+        this amount. With the default `rerun_decision=False`, the cached
+        pipeline-time raw-delta decision is respected instead of recomputed.
+
+    program_report_block_preset
+        Controls which normal-track nodes or program-lineage combinations are
+        blocked from tumor-like reporting when `rerun_decision=True`. With the
+        default `rerun_decision=False`, the cached pipeline-time blocking
+        decision is respected. Defaults to `"tumor_reportable"` when decisions are rerun. 
+        Use `None` or `"off"` for no blocklist, `"immune_like"`, `"tumor_reportable"`, 
+        `"lineage_aware"`, or a list of exact node/preset names. The `"tumor_reportable"` 
+        preset is curated for built-in hierarchies; use an explicit node list for 
+        custom hierarchy names.
+    
     Parameters controlling rerun
     ---------------------------
     rerun_decision
-        If False, use the existing decision stored in `result.cluster_annotations`.
-        If True, rerun hierarchical decision logic using the thresholds and
-        routing weights passed to this function.
+        If False, use the existing normal, malignant, and integrated decisions
+        stored in the result object. Thresholds and blocklist controls passed to
+        the export helper are not used to recompute malignant integration in this
+        mode. If True, rerun hierarchical decision logic and recompute malignant
+        integration using the thresholds and routing weights passed to this
+        function.
 
     score_threshold, margin_threshold
         Decision thresholds used only when `rerun_decision=True`.
@@ -1271,39 +1164,62 @@ def make_cluster_annotation_export_summary(
         branch-supported rescue and `min_branch_supported_raw_score`. The
         default `-0.2` allows routing to continue through mildly weak parent
         nodes when child-supported branch evidence is strong.
+
+    Notes
+    -----
+    Export masking is applied on top of the stored or rerun integration table.
+    With the default `export_label_source="auto"`,
+    `malignant_integration_mode="integrate"` promotes tumor-like labels for
+    resolved normal calls, preserves mixed and rescued-candidate labels as the
+    primary export label, and uses `tumor_like_*.unknown` only when the normal
+    side has no usable label. Tumor-like labels are always retained in
+    `annot_export_tumor_like_label` when malignant evidence is reportable.
     """
-    
-    summary = None
-    if rerun_decision:
-        summary = _rerun_decision_summary_from_scores(
-            result,
-            score_threshold=score_threshold,
-            margin_threshold=margin_threshold,
-            branch_support_parent_weight=(1.0 - float(branch_child_rescue_weight)),
-            branch_support_descendant_weight=float(branch_child_rescue_weight),
-            level1_branch_support_parent_weight=(1.0 - float(level1_branch_child_rescue_weight)),
-            level1_branch_support_descendant_weight=float(level1_branch_child_rescue_weight),
-            branch_routing_raw_weight=branch_routing_raw_weight,
-            weak_raw_score_threshold=weak_raw_score_threshold,
-            min_branch_supported_raw_score=float(min_branch_supported_raw_score),
-            min_leaf_raw_score=float(min_leaf_raw_score),
+    malignant_integration_mode = _resolve_export_malignant_integration_mode(result, malignant_integration_mode, rerun_decision=rerun_decision)
+    export_label_source = _resolve_export_label_source(export_label_source, malignant_integration_mode)
+    if malignant_integration_mode != "off":
+        malignant_scores = getattr(result, "malignant_scores", None)
+        malignant_annotations = getattr(result, "malignant_annotations", None)
+        integrated_annotations = getattr(result, "integrated_annotations", None)
+        has_malignant_tables = (
+            (malignant_scores is not None and len(malignant_scores) > 0)
+            or (isinstance(malignant_annotations, pd.DataFrame) and len(malignant_annotations) > 0)
+            or (isinstance(integrated_annotations, pd.DataFrame) and len(integrated_annotations) > 0 and any(c.startswith("annot_malignant_") for c in integrated_annotations.columns))
         )
+        if not has_malignant_tables:
+            warnings.warn("malignant_integration_mode is not 'off' but no cached malignant annotations or scores are present in the result")
+        if rerun_decision:
+            program_report_block_preset = _validate_program_report_block_preset(program_report_block_preset)
+
+    summary, normal_summary, malignant_summary = _resolve_base_summary_for_export(
+        result,
+        rerun_decision=rerun_decision,
+        score_threshold=score_threshold,
+        margin_threshold=margin_threshold,
+        branch_child_rescue_weight=branch_child_rescue_weight,
+        level1_branch_child_rescue_weight=level1_branch_child_rescue_weight,
+        branch_routing_raw_weight=branch_routing_raw_weight,
+        weak_raw_score_threshold=weak_raw_score_threshold,
+        min_branch_supported_raw_score=min_branch_supported_raw_score,
+        min_leaf_raw_score=min_leaf_raw_score,
+        normal_strong_score_threshold=normal_strong_score_threshold,
+        normal_strong_raw_threshold=normal_strong_raw_threshold,
+        malignant_integration_mode=malignant_integration_mode,
+        malignant_status_score_threshold=malignant_status_score_threshold,
+        malignant_raw_score_threshold=malignant_raw_score_threshold,
+        malignant_normal_raw_delta_threshold=malignant_normal_raw_delta_threshold,
+        program_report_block_preset=program_report_block_preset,
+    )
     if summary is None:
-        cluster_summary = result.cluster_annotations.copy()
-        per_level_summary = _build_per_level_summary(result)
-        if per_level_summary is not None and len(per_level_summary) > 0:
-            if "cluster_id" in cluster_summary.columns and "cluster_id" in per_level_summary.columns:
-                per_level_summary = per_level_summary.drop(columns=["cluster_id"])
-            summary = cluster_summary.join(per_level_summary, how="left")
-        else:
-            summary = cluster_summary
+        raise ValueError("Unable to resolve a cluster annotation summary from the provided result")
 
-    summary = _compute_final_call_competition(summary, result)
-    summary = _attach_best_any_level_raw_score(summary, result)
+    summary = _attach_export_diagnostics(summary, result)
+    use_integrated_source = malignant_integration_mode != "off"
 
+    label_source_column = "annot_label" if "annot_label" in summary.columns else "annot_integrated_label"
     export_labels = _build_export_labels(
         summary,
-        label_source_column="annot_label",
+        label_source_column=label_source_column,
         label_with_cluster_source_column="annot_label_with_cluster",
         unknown_on_low_confidence=unknown_on_low_confidence,
         unknown_confidence_levels=unknown_confidence_levels,
@@ -1317,6 +1233,23 @@ def make_cluster_annotation_export_summary(
     export_status = pd.Series("resolved", index=summary.index, dtype=object)
     export_reason = pd.Series("", index=summary.index, dtype=object)
 
+    malignant_state = (
+        summary["annot_integrated_malignant_state"].astype(str).str.lower()
+        if "annot_integrated_malignant_state" in summary.columns
+        else (summary["annot_malignant_status"].astype(str).str.lower() if "annot_malignant_status" in summary.columns else pd.Series("none", index=summary.index))
+    )
+    blocked = summary["annot_malignant_reporting_blocked"].fillna(False).astype(bool) if "annot_malignant_reporting_blocked" in summary.columns else pd.Series(False, index=summary.index)
+    raw_delta_pass = summary["annot_malignant_normal_raw_delta_pass"].fillna(False).astype(bool) if "annot_malignant_normal_raw_delta_pass" in summary.columns else pd.Series(True, index=summary.index)
+    integrated_status = summary["annot_integrated_status"].astype(str).str.lower() if "annot_integrated_status" in summary.columns else pd.Series("", index=summary.index)
+    integrated_label = summary["annot_integrated_label"].astype(str) if "annot_integrated_label" in summary.columns else pd.Series("", index=summary.index)
+
+    cached_tumor_like_mask = integrated_status.eq("tumor_like") | integrated_label.str.lower().str.startswith("tumor_like")
+    cached_reportable_mask = malignant_state.eq("strong") & ~blocked & raw_delta_pass
+    malignant_reportable_mask = use_integrated_source & (cached_tumor_like_mask | cached_reportable_mask)
+    tumor_like_integrated_mask = use_integrated_source & (str(malignant_integration_mode).lower() == "integrate") & (cached_tumor_like_mask | cached_reportable_mask)
+    export_labels["annot_export_malignant_flag"] = malignant_reportable_mask.astype(bool)
+    export_labels["annot_export_tumor_like_label"] = pd.Series(np.nan, index=summary.index, dtype=object)
+
     unknown_mask = pd.Series(False, index=summary.index)
     if unknown_on_low_confidence and "annot_low_evidence" in summary.columns:
         unknown_mask = unknown_mask | summary["annot_low_evidence"].fillna(False).astype(bool)
@@ -1325,48 +1258,37 @@ def make_cluster_annotation_export_summary(
     if unknown_on_low_absolute_support and "annot_low_absolute_support" in summary.columns:
         unknown_mask = unknown_mask | summary["annot_low_absolute_support"].fillna(False).astype(bool)
     if unknown_branch_raw_threshold is not None and "annot_branch_supported_raw_score" in summary.columns:
-        unknown_mask = unknown_mask | (
-            pd.to_numeric(summary["annot_branch_supported_raw_score"], errors="coerce") < float(unknown_branch_raw_threshold)
-        ).fillna(False)
+        unknown_mask = unknown_mask | pd.to_numeric(summary["annot_branch_supported_raw_score"], errors="coerce").lt(float(unknown_branch_raw_threshold)).fillna(False)
     if unknown_min_score is not None and unknown_score_column in summary.columns:
-        unknown_mask = unknown_mask | (
-            pd.to_numeric(summary[unknown_score_column], errors="coerce") < float(unknown_min_score)
-        ).fillna(False)
+        unknown_mask = unknown_mask | pd.to_numeric(summary[unknown_score_column], errors="coerce").lt(float(unknown_min_score)).fillna(False)
     if unknown_max_margin is not None and unknown_margin_column in summary.columns:
-        unknown_mask = unknown_mask | (
-            pd.to_numeric(summary[unknown_margin_column], errors="coerce") < float(unknown_max_margin)
-        ).fillna(False)
+        unknown_mask = unknown_mask | pd.to_numeric(summary[unknown_margin_column], errors="coerce").lt(float(unknown_max_margin)).fillna(False)
 
     mixed_mask = pd.Series(False, index=summary.index)
-    required_mixed_cols = {
-        "annot_final_call_margin",
-        "annot_score",
-        "annot_second_best_call_score",
-        "annot_second_best_call",
-    }
+    required_mixed_cols = {"annot_final_call_margin", "annot_score", "annot_second_best_call_score", "annot_second_best_call"}
     if mixed_on_parent_mixing and required_mixed_cols.issubset(set(summary.columns)):
         final_margin = pd.to_numeric(summary["annot_final_call_margin"], errors="coerce")
         final_score = pd.to_numeric(summary["annot_score"], errors="coerce")
         second_score = pd.to_numeric(summary["annot_second_best_call_score"], errors="coerce")
         final_top = summary["annot_final_top_branch"].astype(str) if "annot_final_top_branch" in summary.columns else pd.Series("", index=summary.index)
-        second_top = summary["annot_second_best_call"].astype(str).str.split(" > ").str[0]
+        second_top = summary["annot_second_best_call"].astype(str).str.split(ANNOT_PATH_SEPARATOR).str[0]
         effective_margin_threshold = float(margin_threshold)
         mixed_mask = (
             final_margin.notna()
-            & (final_margin <= effective_margin_threshold)
+            & final_margin.le(effective_margin_threshold)
             & final_score.notna()
             & second_score.notna()
-            & (final_score >= float(mixed_min_score))
-            & (second_score >= float(mixed_min_score))
-            & (final_top != second_top)
+            & final_score.ge(float(mixed_min_score))
+            & second_score.ge(float(mixed_min_score))
+            & final_top.ne(second_top)
         )
         if "annot_parent_mixing" in summary.columns:
             mixed_mask = mixed_mask | summary["annot_parent_mixing"].fillna(False).astype(bool)
 
     # resolved by default; mixed can apply, but unknown explicitly overrides mixed at the end
     if mixed_mask.any():
-        primary = summary.get("annot_label").astype(str).map(_sanitize_label_text).str.lower()
-        secondary = summary.get("annot_second_best_call").astype(str).map(_sanitize_label_text).str.lower()
+        primary = summary["annot_label"].astype(str).map(_sanitize_label_text).str.lower()
+        secondary = summary["annot_second_best_call"].astype(str).map(_sanitize_label_text).str.lower()
         mixed_label = mixed_label_prefix + "_" + primary + mixed_branch_separator + secondary
         export_status.loc[mixed_mask] = "mixed"
         export_reason.loc[mixed_mask] = "final_call_competition"
@@ -1378,17 +1300,12 @@ def make_cluster_annotation_export_summary(
     export_status.loc[unknown_mask] = "unknown"
     export_reason.loc[unknown_mask] = "unknown_rule"
     export_labels.loc[unknown_mask, "annot_export_label"] = unknown_label
-
     if "annot_export_label_with_cluster" in export_labels.columns:
         cid = summary["cluster_id"].astype(str) if "cluster_id" in summary.columns else summary.index.astype(str)
         export_labels.loc[unknown_mask, "annot_export_label_with_cluster"] = unknown_label + "_" + cid[unknown_mask]
 
     # Surface blocked strong candidates only for true unresolved-at-root cases.
-    required_candidate_cols = {
-        "annot_best_any_level_label",
-        "annot_best_any_level_score",
-        "annot_best_any_level_raw_score",
-    }
+    required_candidate_cols = {"annot_best_any_level_label", "annot_best_any_level_score", "annot_best_any_level_raw_score"}
     if required_candidate_cols.issubset(set(summary.columns)):
         best_any_label = summary["annot_best_any_level_label"].astype(str)
         best_any_score = pd.to_numeric(summary["annot_best_any_level_score"], errors="coerce")
@@ -1399,19 +1316,16 @@ def make_cluster_annotation_export_summary(
 
         root_unresolved_mask = (
             (annot_level.isna() | annot_level.le(0))
-            & (
-                annot_label.eq("unresolved")
-                | annot_status.isin(["unresolved", "stopped_at_parent"])
-            )
-        ) 
+            & (annot_label.eq("unresolved") | annot_status.isin(["unresolved", "stopped_at_parent"]))
+        )
 
-        # v0.7.55 allow candidate to rescue unknown ones (resovled but weak)
+        # allow candidate to rescue unknown ones (resovled but weak)
         if rescue_unknown_with_blocked_candidates:
             root_unresolved_mask = root_unresolved_mask | unknown_mask
 
         # Record candidate information for all root-unresolved rows, but only rewrite
         # export labels when the candidate thresholds are satisfied.
-        export_labels["annot_unresolved_candidate_label"] = np.nan
+        export_labels["annot_unresolved_candidate_label"] = pd.Series(np.nan, index=export_labels.index, dtype=object)
         export_labels["annot_unresolved_candidate_score"] = np.nan
         export_labels["annot_unresolved_candidate_raw_score"] = np.nan
 
@@ -1428,7 +1342,6 @@ def make_cluster_annotation_export_summary(
             & best_any_score.ge(float(unresolved_candidate_min_score)).fillna(False)
             & best_any_raw.ge(float(unresolved_candidate_min_raw_score)).fillna(False)
         )
-
         if candidate_mask.any():
             cand_label = best_any_label.map(_sanitize_label_text).str.lower()
             short_label = str(unresolved_candidate_label_prefix) + "_" + cand_label
@@ -1436,8 +1349,43 @@ def make_cluster_annotation_export_summary(
             if "annot_export_label_with_cluster" in export_labels.columns:
                 cid = summary["cluster_id"].astype(str) if "cluster_id" in summary.columns else summary.index.astype(str)
                 export_labels.loc[candidate_mask, "annot_export_label_with_cluster"] = short_label[candidate_mask] + "_" + cid[candidate_mask]
+            export_status.loc[candidate_mask] = "candidate"
             export_reason.loc[candidate_mask] = "blocked_strong_candidate"
-           
+
+    # Build tumor-like export labels after normal export logic so their normal
+    # suffix reflects mixed-label and candidate-rescue decisions.
+    if malignant_reportable_mask.any():
+        suffix = export_labels["annot_export_label"].astype(str).replace({"": unknown_label, "nan": unknown_label, "None": unknown_label, "none": unknown_label})
+        tumor_export_labels = _build_tumor_like_export_labels(summary, suffix)
+        export_labels.loc[malignant_reportable_mask, "annot_export_tumor_like_label"] = tumor_export_labels[malignant_reportable_mask]
+    else:
+        tumor_export_labels = pd.Series(np.nan, index=summary.index, dtype=object)
+
+    if use_integrated_source and str(malignant_integration_mode).lower() == "integrate":
+        current_label = export_labels["annot_export_label"].astype(str).str.lower()
+        current_status = export_status.astype(str).str.lower()
+        unknown_value = str(unknown_label).lower()
+        unknown_export_mask = current_status.eq("unknown") | current_label.eq(unknown_value)
+        resolved_export_mask = current_status.eq("resolved") & ~unknown_export_mask
+
+        if export_label_source == "integrated":
+            tumor_export_mask = tumor_like_integrated_mask
+        elif export_label_source == "normal_priority":
+            tumor_export_mask = tumor_like_integrated_mask & unknown_export_mask
+        else:  # auto: integrated for resolved calls, normal safeguards for mixed/candidate, malignant fallback for unknown
+            tumor_export_mask = tumor_like_integrated_mask & (resolved_export_mask | unknown_export_mask)
+
+        if tumor_export_mask.any():
+            export_labels.loc[tumor_export_mask, "annot_export_label"] = tumor_export_labels[tumor_export_mask]
+            if "annot_export_label_with_cluster" in export_labels.columns:
+                cid = summary["cluster_id"].astype(str) if "cluster_id" in summary.columns else summary.index.astype(str)
+                export_labels.loc[tumor_export_mask, "annot_export_label_with_cluster"] = tumor_export_labels[tumor_export_mask].map(_sanitize_label_text) + "_" + cid[tumor_export_mask]
+            export_status.loc[tumor_export_mask] = "tumor_like"
+            fallback_mask = tumor_export_mask & unknown_export_mask
+            integrated_mask = tumor_export_mask & ~unknown_export_mask
+            export_reason.loc[integrated_mask] = "malignant_integrated_label"
+            export_reason.loc[fallback_mask] = "malignant_fallback_unknown_normal"
+
     if not label_with_cluster and "annot_export_label_with_cluster" in export_labels.columns:
         export_labels = export_labels.drop(columns=["annot_export_label_with_cluster"])
 
@@ -1447,8 +1395,7 @@ def make_cluster_annotation_export_summary(
     if overlap:
         summary = summary.drop(columns=overlap)
     summary = summary.join(export_labels, how="left")
-    return summary
-
+    return _apply_export_view(summary, malignant_integration_mode, export_view)
 
 def expand_cluster_annotation_to_cells(
     cluster_assignments,
