@@ -181,12 +181,12 @@ cluster_metagenes <- function(metagenes = NULL
   llmat <- do.call(cbind, ll_scores)
 
   # Numerically stable posterior computation: subtract row max before exp
-  row_max <- apply(llmat, 1, max)
+  row_max <- matrixStats::rowMaxs(llmat)
   ppmat <- exp(llmat - row_max)
   ppmat <- ppmat / rowSums(ppmat)
 
   # Handle any remaining NA/Inf rows (e.g., all -Inf log-likelihoods)
-  isna <- apply(ppmat, 1, function(x) sum(is.na(x) | is.infinite(x)))
+  isna <- rowSums(is.na(ppmat) | is.infinite(ppmat))
   if(sum(isna > 0) > 0){
     whichisna <- which(isna > 0)
     maxll <- apply(llmat[whichisna,,drop=FALSE], 1, which.max)
@@ -196,7 +196,7 @@ cluster_metagenes <- function(metagenes = NULL
     }
   }
   if(!is.null(prior_prob_level)){
-    ppmat <- (Matrix::Diagonal(x=prior_prob_level,names=TRUE) %*% ppmat)
+    ppmat <- ppmat * as.numeric(prior_prob_level)
   }
 
   post_probs <- data.table::data.table(as.matrix(ppmat))

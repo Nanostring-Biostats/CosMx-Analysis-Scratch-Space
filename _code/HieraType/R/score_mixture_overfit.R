@@ -17,14 +17,13 @@ score_mixture_overfit <- function(model, scores, prior_prob_level = NULL, denom_
   })
   
   ### e-step 
-  llmat <- do.call(cbind, ll)  
-  ppmatdenom <- apply(llmat, 1, matrixStats::logSumExp)
+  llmat <- do.call(cbind, ll)
+  ppmatdenom <- matrixStats::rowLogSumExps(llmat)
   if(denom_only){
-    return(ppmatdenom) 
+    return(ppmatdenom)
   }
-  ppmatnum <- exp(llmat)
-  ppmat <- Matrix::Diagonal(x=1/exp(ppmatdenom),names=TRUE)%*% ppmatnum  
-  isna <- apply(ppmat, 1, function(x) sum(is.na(x) | is.infinite(x)))
+  ppmat <- exp(llmat - ppmatdenom)
+  isna <- rowSums(is.na(ppmat) | is.infinite(ppmat))
   if(sum(isna > 0) > 0){
     whichisna <- which(isna > 0)
     maxll <- apply(llmat[whichisna,,drop=FALSE], 1, which.max)
@@ -34,7 +33,7 @@ score_mixture_overfit <- function(model, scores, prior_prob_level = NULL, denom_
     }
   } 
   if(!is.null(prior_prob_level)){
-    ppmat <- (Matrix::Diagonal(x=prior_prob_level,names=TRUE) %*% ppmat)
+    ppmat <- ppmat * as.numeric(prior_prob_level)
   } 
  
   post_probs <- data.table::data.table(as.matrix(ppmat))
