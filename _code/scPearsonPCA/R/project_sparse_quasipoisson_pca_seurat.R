@@ -38,7 +38,7 @@ project_sparse_quasipoisson_pca_seurat <- function(x
   stopifnot(!is.null(names(grate)))
   stopifnot(all(names(grate) %in% rownames(x))) 
   x <- x[names(grate),] 
-  grate <- check_grate(x, grate)
+  grate <- check_grate(x, grate, totalcounts)
   
   ### diagonal matrix (1/(phi*estimated gene frequency))
   root_grate_phi_diag <- Matrix::Diagonal(x = sqrt(1/(grate * phi)))
