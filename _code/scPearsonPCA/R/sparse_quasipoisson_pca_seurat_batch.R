@@ -80,7 +80,7 @@ sparse_quasipoisson_pca_seurat_batch <- function(x
   totalcounts <- check_totalcounts(x, totalcounts)
   
   ### expression rates by batch (\hat{p})
-  grate <- check_grate_batch(x, grate, batch_mat)
+  grate <- check_grate_batch(x, grate, batch_mat, totalcounts)
   
   if (.Platform$OS.type == "windows" && ncores > 1L) {
     warning("mclapply() runs serially on Windows; mc.cores ignored.")

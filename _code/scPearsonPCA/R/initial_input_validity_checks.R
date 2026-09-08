@@ -55,11 +55,11 @@ check_phi <- function(x, phi){
 }
 
 
-check_grate <- function(x, grate){
+check_grate <- function(x, grate, totalcounts){
   
   if(is.null(grate)){
-    grate <- Matrix::rowSums(x) 
-    grate <- grate / sum(grate) 
+    ### gene frequency relative to totalcounts, so subset counts matrices don't bias grate upward
+    grate <- Matrix::rowSums(x) / sum(totalcounts) 
   }
   if(length(grate) != nrow(x)){
     stop(paste0("Mismatch between number of genes specified in gene frequency 'grate'\n"
@@ -80,12 +80,12 @@ check_grate <- function(x, grate){
 }
 
 
-check_grate_batch <- function(x, grate, batch_mat){
+check_grate_batch <- function(x, grate, batch_mat, totalcounts){
   
   if(is.null(grate)){
-    ### expression rates by batch (\hat{p})
-    grate <- x %*% batch_mat %*% Matrix::Diagonal(x=1/Matrix::colSums(batch_mat), names = colnames(batch_mat))
-    grate <- grate %*% Matrix::Diagonal(x = 1/Matrix::colSums(grate),names=colnames(batch_mat))
+    ### expression rates by batch (\hat{p}), relative to per-batch totalcounts so subset counts matrices don't bias grate upward
+    batch_totalcounts <- as.vector(totalcounts %*% batch_mat)
+    grate <- x %*% batch_mat %*% Matrix::Diagonal(x = 1/batch_totalcounts, names = colnames(batch_mat))
   }
   stopifnot("For batch PCA, 'grate' should be a genes x batches matrix of frequencies" = inherits(grate, "Matrix"))
   stopifnot(ncol(grate)==ncol(batch_mat))
