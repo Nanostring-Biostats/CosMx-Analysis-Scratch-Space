@@ -2,7 +2,7 @@
 % Please edit documentation in R/residual_sum_of_squares.R
 \name{residual_projection_sum_of_squares}
 \alias{residual_projection_sum_of_squares}
-\title{Compute each cell's sum of squares after projecting Pearson residuals onto the first PCs}
+\title{Compute each cell's sum of squares in, and orthogonal to, the space of the first PCs}
 \usage{
 residual_projection_sum_of_squares(x, pcaobj, npcs = NULL, totalcounts = NULL)
 }
@@ -17,11 +17,16 @@ residual_projection_sum_of_squares(x, pcaobj, npcs = NULL, totalcounts = NULL)
 subset (of, say, highly variable) genes to be used in PCA.}
 }
 \value{
-A named numeric vector (one value per cell) of summed squared PC scores across the first \code{npcs} PCs.
+A list of 2 named numeric vectors (one value per cell each): \code{projection_sum_of_squares}
+(summed squared PC scores across the first \code{npcs} PCs) and \code{orthogonal_sum_of_squares} (the
+remaining sum of squares outside the span of those PCs).
 }
 \description{
 Given a PCA result from \code{sparse_quasipoisson_pca_seurat()}, computes for each cell the squared norm
 of the orthogonal projection of its (centered/scaled/clipped) Pearson residual vector onto the first
-\code{npcs} principal component directions. Equivalent to \code{rowSums(cell.embeddings[, 1:npcs]^2)}, but
-computed directly WITHOUT ever forming the (dense) Pearson residuals matrix or the full cell embeddings.
+\code{npcs} principal component directions ("in-space"), as well as the squared norm of what's left over
+after removing that projection ("orthogonal"). The two add up to the total sum of squares of the
+(centered/scaled/clipped) Pearson residual vector. The in-space value is equivalent to
+\code{rowSums(cell.embeddings[, 1:npcs]^2)}, but both values are computed directly WITHOUT ever forming
+the (dense) Pearson residuals matrix or the full cell embeddings.
 }

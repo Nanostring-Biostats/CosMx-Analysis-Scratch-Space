@@ -56,14 +56,17 @@ residual_sum_of_squares <- function(x
 }
 
 
-#' Compute each cell's sum of squares after projecting Pearson residuals onto the first PCs
+#' Compute each cell's sum of squares in, and orthogonal to, the space of the first PCs
 #' 
 #' @description
 #' 
 #' Given a PCA result from `sparse_quasipoisson_pca_seurat()`, computes for each cell the squared norm
 #' of the orthogonal projection of its (centered/scaled/clipped) Pearson residual vector onto the first
-#' `npcs` principal component directions. Equivalent to `rowSums(cell.embeddings[, 1:npcs]^2)`, but
-#' computed directly WITHOUT ever forming the (dense) Pearson residuals matrix or the full cell embeddings.
+#' `npcs` principal component directions ("in-space"), as well as the squared norm of what's left over
+#' after removing that projection ("orthogonal"). The two add up to the total sum of squares of the
+#' (centered/scaled/clipped) Pearson residual vector. The in-space value is equivalent to
+#' `rowSums(cell.embeddings[, 1:npcs]^2)`, but both values are computed directly WITHOUT ever forming
+#' the (dense) Pearson residuals matrix or the full cell embeddings.
 #'
 #' @param x A sparse genes x cells counts matrix (same genes used to fit `pcaobj`, or a superset)
 #' @param pcaobj a PCA result list, as returned by `sparse_quasipoisson_pca_seurat()`
@@ -71,7 +74,9 @@ residual_sum_of_squares <- function(x
 #' @param totalcounts  The total UMI counts across all gene targets in each cell.  This can be pre-computed by the user and passed in cases where the counts matrix `x` contains only a 
 #' subset (of, say, highly variable) genes to be used in PCA. 
 #'
-#' @return A named numeric vector (one value per cell) of summed squared PC scores across the first `npcs` PCs.
+#' @return A list of 2 named numeric vectors (one value per cell each): `projection_sum_of_squares`
+#' (summed squared PC scores across the first `npcs` PCs) and `orthogonal_sum_of_squares` (the
+#' remaining sum of squares outside the span of those PCs).
 #'
 #' @export  
 residual_projection_sum_of_squares <- function(x
@@ -136,7 +141,43 @@ residual_projection_sum_of_squares <- function(x
     scores <- scores - as.vector(Matrix::crossprod(root_loadings, mean.pearson_residual))
   }
   
-  rss <- Matrix::colSums(as.matrix(scores)^2)
-  names(rss) <- colnames(x)
-  return(rss) 
+  projection_rss <- Matrix::colSums(as.matrix(scores)^2)
+  names(projection_rss) <- colnames(x)
+  
+  ### total sum of squares of the SAME (centered/scaled/clipped) residual r'_gc = U_gc - A_g*b_c - M_g,
+  ### using the identical building blocks as 'scores' above but without projecting onto 'root_loadings' first
+  if(do.scale){
+    inv_sd_diag <- Matrix::Diagonal(x = 1 / sd.pearson_residual)
+    dimnames(inv_sd_diag) <- list(genes, genes)
+    U <- inv_sd_diag %*% ytilde ## sparse, same nnz as ytilde
+    A <- sqrt(grate / phi) / sd.pearson_residual
+    M <- if(do.center) mean.pearson_residual / sd.pearson_residual else rep(0, length(genes))
+  } else {
+    U <- ytilde
+    A <- sqrt(grate / phi)
+    M <- if(do.center) mean.pearson_residual else rep(0, length(genes))
+  }
+  names(A) <- names(M) <- genes
+  A_row <- Matrix::Matrix(data = A, nrow = 1, dimnames = list(c(), genes))
+  M_row <- Matrix::Matrix(data = M, nrow = 1, dimnames = list(c(), genes))
+  
+  U_sq <- U
+  U_sq@x <- U_sq@x^2
+  
+  b <- sqrt(totalcounts)
+  term1 <- Matrix::colSums(U_sq)
+  term2 <- as.vector(A_row %*% U)
+  term3 <- as.vector(M_row %*% U)
+  term4 <- sum(A^2)
+  term5 <- sum(A * M)
+  term6 <- sum(M^2)
+  
+  total_rss <- term1 - 2 * b * term2 - 2 * term3 + b^2 * term4 + 2 * b * term5 + term6
+  names(total_rss) <- colnames(x)
+  
+  ### valid by Pythagoras since 'feature.loadings' columns are orthonormal (they come from RSpectra::svds)
+  orthogonal_rss <- total_rss - projection_rss
+  
+  return(list(projection_sum_of_squares = projection_rss
+             ,orthogonal_sum_of_squares = orthogonal_rss)) 
 }
