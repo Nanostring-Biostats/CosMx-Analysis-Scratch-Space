@@ -34,20 +34,20 @@ Here we share relevant insights from this exercise.
 
 ### Links:
 
-The full manuscript: [(Williams et al 2026)](xxxxxxxxxxxxxxx),
-Code and data on Zenodo: [Zenodo](xxxxxxxxxxxxxxxxxxxxxxxx). 
+The full manuscript: [(Williams et al 2026)](https://www.nature.com/articles/s41598-026-69141-x),
+Code and data on Zenodo: [Zenodo](https://zenodo.org/records/18943070). 
 
 
 # Lesson 1: best practice workflows worked, and customization improved on them
 
 As with any project, we began with QC, dimension reduction, and cell typing. 
 For these steps we relied on the standard tools recommended throughout the scratch space and 
- demonstrated in our [basic analysis vignette](xxxxxxx) and [analysis Guide](xxxxxxxxxxx):
+ demonstrated in our [basic analysis vignette](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis-updated/01_preprocessing.html) and [analysis Guide](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/guides/the-wtx-guide/):
 
-- [FOV QC]()
-- Dimension reduction with [scPearsonPCA]() followed by Louvain or Leiden clustering
-- Immune cell typing with [HieraType](xxxxxxxxxxxx)
-- Niche / spatial domain detection with our [implementation of the Novae algorithm retrained on CosMx](xxxxxxxxxxx)
+- [FOV QC](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/)
+- Dimension reduction with [scPearsonPCA](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/pearsonpca/) followed by Louvain or Leiden clustering
+- Immune cell typing with [HieraType](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth/)
+- Niche / spatial domain detection with our implementation of the Novae algorithm retrained on CosMx
 - Pathway scoring with the REACTOME database and the AUCell algorithm
 
 As we've seen in other studies, these methods produced a nuanced and satisfying cell typing result,
@@ -62,7 +62,7 @@ knitr::include_graphics("./figures/hieratype_res.png")
 
 We also found it useful to lightly extend the standard workflow.
 Namely, to better understand the cancer's diversity, we performed a second-stage subclustering of cancer cells. 
- To avoid bias from segmentation errors, this subclustering exercise used cancer-relevant genes identified by the [smiDE package's overlapratiometric function](xxxxxxxxxxxxxx). 
+ To avoid bias from segmentation errors, this subclustering exercise used cancer-relevant genes identified by the [smiDE package's overlapratiometric function](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/smiDE/R/pre_de_contamination_screen.R). 
  
 Beyond enabling targeted analyses that followed, these preliminary analyses produced some useful results. 
 Our final figures includes descriptions of the expression profiles of certain cell clusters:
@@ -98,7 +98,7 @@ knitr::include_graphics("./figures/tcelllocations.png")
 The above results were revealing, but they only gave us a high-level summary of the sample. 
 As we sought to more fully understand this tumor, we found ourselves turning again and again to differential expression.
 More specifically, we invariably found that our biological questions were best framed as differential expression problems. 
-The approaches we took could all have been taken from [our overview of differential expression tools](xxxxxxxxxxxxxx). 
+The approaches we took could all have been taken from [our overview of differential expression tools](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis-updated/03_DE.html). 
 We review them here to demonstrate the versatility of differential expression as a tool of biological inquiry and the expansiveness of the results it provides. 
 
 ### Contrasting cancer cells across regions of interest
@@ -131,9 +131,9 @@ This cancer was highly T-cell infiltrated. To understand how it kept the immune 
  we used DE to compare cytotoxic CD8 cell profiles across 3 spatial contexts defined by Novae niches: niches from the "exterior stroma" surrounding the tumor, niches from the "interior stroma" interdigitating the tumor, and niches from the dense "tumor bed". 
 
 Importantly, to avoid artifacts from segmentation errors, we again used smiDE's overlapratiometric function to 
- remove the most at-risk genes, resulting in _________ genes deemed safe for DE in this T-cell population. 
+ remove the most at-risk genes, resulting in 8954 genes deemed safe for DE in this T-cell population. 
 
-This DE exercise across 3 categories produced ________ genes meeting adjusted p-value cutoffs:
+This DE exercise across 3 categories produced 435 genes meeting adjusted p-value cutoffs:
 
 ```{r}
 #| eval: true
@@ -218,7 +218,7 @@ A single, tissue-wide DE analysis, then, might miss stresses that only impacted 
 be subject to oblique spatial confounding. 
 
 To overcome these concerns, we set up what's best described as *spatially-stratified DE*: we split the tissue into 100 distinct regions, then ran DE separately within each region. 
-(This basic approach is detailed in our [DE post](xxxxxxxxxx) as "patchDE"; we are currently developing several improvements to this first attempt at spatially stratified DE.)
+(This basic approach is detailed in our [DE post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis-updated/03_DE.html) as "patchDE"; we are currently developing several improvements to this first attempt at spatially stratified DE.)
 
 Our patches looked like this:
 
