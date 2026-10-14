@@ -1,5 +1,5 @@
 ---
-title: "Deep analysis of whole transcriptome data from a HER2+ breast cancer"
+title: "Deep analysis of spatial whole transcriptome data from a HER2+ breast cancer"
 author:
   - name: Patrick Danaher
     orcid: 0000-0002-2844-5883
@@ -13,10 +13,11 @@ toc-expand: 2
 toc-location: left
 number-sections: true
 number-depth: 4
-date: "2026-09-26"
+date: "2026-10-14"
 categories:
   - differential expression
-image: figures/IF.png
+  - exploratory analysis
+image: figures/thumbnail.png
 description: "Highlights and lessons from a recently published analysis of a WTX dataset."
 draft: false
 format:
@@ -26,26 +27,28 @@ format:
 
 # Introduction
 
-We recently published an intensive analysis of an early WTX dataset in which we sought to assess the depth of insight that could be wrung from a single sample.
+We recently published an intensive analysis of an early CosMx (R) WTX dataset in which we sought to assess the depth of insight that could be wrung from a single sample.
 We believe the resulting analyses hold useful lessons and serve as a template for other spatial projects. 
 Here we share relevant insights from this exercise. 
 
 Relevant links:
 
 - The full manuscript: [(Williams et al 2026)](https://www.nature.com/articles/s41598-026-69141-x)
-- Code and data on Zenodo: [Zenodo](https://zenodo.org/records/18943070). 
+- Code and data: [Zenodo](https://zenodo.org/records/18943070); [github](https://nanostring-biostats.github.io/CosMxWTx_BreastCancerAnalysis/)
+
 
 
 # Best practice workflows worked, and customization improved on them
 
 As with any project, we began with QC, dimension reduction, and cell typing. 
 For these steps we relied on the standard tools recommended throughout the scratch space and 
- demonstrated in our [basic analysis vignette](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis-updated/01_preprocessing.html) and [analysis Guide](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/guides/the-wtx-guide/):
+ demonstrated in our [basic analysis vignette](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis-updated/01_preprocessing.html) and [analysis guide](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/guides/the-wtx-guide/):
 
-- [FOV QC](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/)
-- Dimension reduction with [scPearsonPCA](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/pearsonpca/) followed by Louvain or Leiden clustering
+- Removing cells with low counts or extremely high areas
+- [FOV QC](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/fov-qc/) (no FOVs were flagged in this study)
+- Dimension reduction (we now recommend [scPearsonPCA](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/pearsonpca/)), followed by Louvain or Leiden clustering
 - Immune cell typing with [HieraType](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/immune-cell-typing-smooth/)
-- Niche / spatial domain detection with our implementation of the Novae algorithm retrained on CosMx
+- Niche / spatial domain detection the Novae algorithm. (A CosMx-retrained Novae algorithm is available on AtoMx.)
 - Pathway scoring with the REACTOME database and the AUCell algorithm
 
 As we've seen in other studies, these methods produced a nuanced and satisfying cell typing result,
@@ -59,8 +62,11 @@ knitr::include_graphics("./figures/hieratype_res.png")
 ```
 
 We also found it useful to lightly extend the standard workflow.
-Namely, to better understand the cancer's diversity, we performed a second-stage subclustering of cancer cells. 
- To avoid bias from segmentation errors, this subclustering exercise used cancer-relevant genes identified by the [smiDE package's overlapratiometric function](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/smiDE/R/pre_de_contamination_screen.R). 
+Namely, to better understand the cancer's diversity, we performed a second-stage subclustering of cancer cells,
+re-running HVG selection, PCA and clustering within cancer cells. 
+(Another recommendation beyond the paper's methods: to avoid bias from segmentation errors, subclustering exercises liek this should use cancer-relevant genes identified by the [smiDE package's overlapratiometric function](https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space/blob/Main/_code/smiDE/R/pre_de_contamination_screen.R).)
+
+ 
  
 Beyond enabling targeted analyses that followed, these preliminary analyses produced some useful results. 
 Our final figures includes descriptions of the expression profiles of certain cell clusters:
@@ -69,7 +75,7 @@ Our final figures includes descriptions of the expression profiles of certain ce
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/tumormarkers.png")
+knitr::include_graphics("./figures/tumormarkers.png", out.width = "140%")
 ```
 
 ...and of pathway enrichment in niches:
@@ -78,7 +84,7 @@ knitr::include_graphics("./figures/tumormarkers.png")
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/nichepathways.png")
+knitr::include_graphics("./figures/nichepathways.png", out.width = "140%")
 ```
 
 ...and of the concentrations of T-cell subpopulations in different niches:
@@ -87,17 +93,17 @@ knitr::include_graphics("./figures/nichepathways.png")
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/tcelllocations.png")
+knitr::include_graphics("./figures/tcelllocations.png", out.width = "140%")
 ```
 
 
 # Differential expression was the analytical workhorse
 
 The above results were revealing, but they only gave us a high-level summary of the sample. 
-As we sought to more fully understand this tumor, we found ourselves turning again and again to differential expression.
-More specifically, we invariably found that our biological questions were best framed as differential expression problems. 
-The approaches we took could all have been taken from [our overview of differential expression tools](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis-updated/03_DE.html). 
-We review them here to demonstrate the versatility of differential expression as a tool of biological inquiry and the expansiveness of the results it provides. 
+As we sought to more fully understand this tumor, we found ourselves turning again and again to differential expression (DE).
+More specifically, we invariably found that our biological questions were best framed as DE problems. 
+The approaches we took could all have been taken from [our overview of DE tools](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis-updated/03_DE.html). 
+We review them here to demonstrate the versatility of DE as a tool of biological inquiry and the expansiveness of the results it provides. 
 
 ### Contrasting cancer cells across regions of interest
 
@@ -108,7 +114,7 @@ The tumor's immunofluorescence image showed two morphologically distinct lobes, 
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/lobes.png")
+knitr::include_graphics("./figures/lobes.png", out.width = "125%")
 ```
 
 To understand the functional difference between these lobes, we ran DE comparing tumor cells in 
@@ -119,7 +125,7 @@ An overwhelming abundance of significant single-gene results was made intelligib
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/lobeDE.png")
+knitr::include_graphics("./figures/lobeDE.png", out.width = "125%")
 ```
 
 
@@ -127,8 +133,17 @@ knitr::include_graphics("./figures/lobeDE.png")
 
 This cancer was highly T-cell infiltrated. To understand how it kept the immune response in check, 
  we used DE to compare cytotoxic CD8 cell profiles across 3 spatial contexts defined by Novae niches: niches from the "exterior stroma" surrounding the tumor, niches from the "interior stroma" interdigitating the tumor, and niches from the dense "tumor bed". 
+ 
+T-cell locations and spatial contexts looked like this:
 
-Importantly, to avoid artifacts from segmentation errors, we again used smiDE's overlapratiometric function to 
+```{r}
+#| eval: true
+#| echo: false
+
+knitr::include_graphics("./figures/Tcellxy.png", out.width = "140%")
+```
+
+Importantly, to avoid artifacts from segmentation errors, we again used smiDE's `overlapratiometric` function to 
  remove the most at-risk genes, resulting in 8954 genes deemed safe for DE in this T-cell population. 
 
 This DE exercise across 3 categories produced 435 genes meeting adjusted p-value cutoffs:
@@ -137,13 +152,13 @@ This DE exercise across 3 categories produced 435 genes meeting adjusted p-value
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/TcellDE.png")
+knitr::include_graphics("./figures/TcellDE.png", out.width = "140%")
 ```
 
-Alongside several intriguing results (e.g. GIMAP4), we found expected biology, including a tendency for 
- cytotoxic CD8 cells to have increased PDCD1 expression as they infiltrate further into the tumor. 
-This PDCD1 result is worth calling out because this is a challenging genes, with low expression, only ~0.1 counts/cell in CD8 cells. 
-Despite this challenging signal, the statistics of DE we able to detect its known spatial behavior with high statistical significance. This lesson generalizes: there are many trends that, while not easily discernable though simple spatial plots, are confidently resolvable though statistics like DE. The large numbers of cells in most spatial analyses help here, conferring ample statistical power to detect even small signals.
+Alongside several intriguing results (e.g. *GIMAP4*), we found expected biology, including a tendency for 
+ cytotoxic CD8 cells to have increased *PDCD1* expression as they infiltrate further into the tumor. 
+This PDCD1 result is worth calling out because this is a challenging gene, with low expression, only ~0.1 counts/cell in CD8 cells. 
+Despite this challenging signal, the statistics of DE were able to detect its known spatial behavior with high statistical significance. This lesson generalizes: there are many trends that, while not easily discernible though simple spatial plots, are confidently resolvable though statistics like DE. The large numbers of cells in most spatial analyses help here, conferring ample statistical power to detect even small signals.
 
 ### Watching tumor expression change with distance to vasculature
 
@@ -156,13 +171,13 @@ Specifically, we called all groups of spatially contiguous endothelial cells "va
 We then ran DE against this continuous variable. 
 To guard against confounding and to obtain more nuanced results, we ran DE separately for each cancer subcluster. 
 
-As expected, the angiogenesis gene VEGFA rose sharply as cancer cells fell further from vessels:
+As expected, the angiogenesis gene *VEGFA* rose sharply as cancer cells fell further from vessels:
 
 ```{r}
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/angiogenesis1.png")
+knitr::include_graphics("./figures/angiogenesis1.png", out.width = "120%")
 ```
 
 Beyond this reassuring result, we found extensive changes throughout the cancer subclusters' transcriptomes:
@@ -171,7 +186,7 @@ Beyond this reassuring result, we found extensive changes throughout the cancer 
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/angiogenesis2.png")
+knitr::include_graphics("./figures/angiogenesis2.png", out.width = "120%")
 ```
 
 Note the richness of these results: beyond a single volcano plot, we have continuous trends for every gene, and
@@ -179,7 +194,7 @@ Note the richness of these results: beyond a single volcano plot, we have contin
 
 ### Expanding our scope: asking how every cell type responds to a spatial variable
 
-Cancer cells classically employ glycolysis, which impacts nearby cells both through the associated update of nutrients and through its metabolic byproducts. 
+Cancer cells classically employ glycolysis, which impacts nearby cells both through the associated uptake of nutrients and through its metabolic byproducts. 
 This dataset gave us an opportunity to examine these impacts with new resolution. 
 First, we scored every cell's exposure to glycolysis by summing the glycolysis pathway scores of its nearest cancer cells:
 
@@ -187,19 +202,19 @@ First, we scored every cell's exposure to glycolysis by summing the glycolysis p
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/glycolysis.png")
+knitr::include_graphics("./figures/glycolysis.png", out.width = "160%")
 ```
 
 Then, we ran DE against this continuous variable *for every cell type*, producing a matrix of DE results of
  thousands of genes against dozens of cell types. 
-(Again using the overlapratiometric to screen problematic genes, each cell type's DE was limited to a distinct gene set.) 
+(Again using the `overlapratiometric` to screen problematic genes, each cell type's DE was limited to a distinct gene set.) 
 A number of genes with similar results across multiple cell types emerged:
 
 ```{r}
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/glycolysis2.png")
+knitr::include_graphics("./figures/glycolysis2.png", out.width = "140%")
 ```
 
 Again, running a similar DE exercise with variations - here by stratifying across cell types - we get higher-dimension results than a simple volcano plot, and new insights emerge when we compare DE results across settings.
@@ -216,7 +231,7 @@ A single, tissue-wide DE analysis, then, might miss stresses that only impacted 
 be subject to oblique spatial confounding. 
 
 To overcome these concerns, we set up what's best described as *spatially-stratified DE*: we split the tissue into 100 distinct regions, then ran DE separately within each region. 
-(This basic approach is detailed in our [DE post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/vignette-basic-analysis-updated/03_DE.html) as "patchDE"; we are currently developing several improvements to this first attempt at spatially stratified DE.)
+(This basic approach is detailed in our [DE post](https://nanostring-biostats.github.io/CosMx-Analysis-Scratch-Space/posts/DE-guide/#experimental-approach-stratifying-de-across-tissue-patches) as "patchDE"; we are currently developing several improvements to this first attempt at spatially stratified DE.)
 
 Our patches looked like this:
 
@@ -224,7 +239,7 @@ Our patches looked like this:
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/patches.png")
+knitr::include_graphics("./figures/patches.png", out.width = "140%")
 ```
 
 (Blue regions are "low-proliferation"; in each patch, we compare these to the tan / typical regions.) 
@@ -235,7 +250,7 @@ And we're once again presented with a matrix of DE results. In the below, each e
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/patchheatmap.png")
+knitr::include_graphics("./figures/patchheatmap.png", out.width = "125%")
 ```
 
 In this case, the dimension and completeness of the grid makes some follow-on analyses easy. 
@@ -248,12 +263,17 @@ Plotting this metagene in space, we can see where it marks low-proliferation nei
 #| eval: true
 #| echo: false
 
-knitr::include_graphics("./figures/hypoxia.png")
+knitr::include_graphics("./figures/hypoxia.png", out.width = "125%")
 ```
 
-# Conclusion
+# Discussion
 
-The generalizable lesson of this work is this: the best practice pre-processing workflow, followed by a series of carefully crafted DE analyses, produce abundant and understandable results. 
+The generalizable lesson of this work is this: the best practice pre-processing workflow, followed by a series of carefully crafted DE analyses, produced abundant and understandable results. 
+Our basic workflow would apply in a straightforward way to other datasets; we recommend the reproducible code as a template to be followed.
+
+We also note that this was a rich dataset; we explored only a tiny fraction of the questions we considered, yet still performed ~2 million hypothesis tests. 
+How to recording and index all the relevant trends and insights from datasets like this remains an open challenge.
+
 
 
 
