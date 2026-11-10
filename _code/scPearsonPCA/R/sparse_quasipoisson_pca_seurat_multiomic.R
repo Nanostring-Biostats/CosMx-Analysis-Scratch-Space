@@ -68,7 +68,7 @@ sparse_quasipoisson_pca_seurat_multiomic <- function(x
   nn <- ncol(x)
   phi <- check_phi(x, quasi_poisson_variance_inflation)
   totalcounts <- check_totalcounts(x, totalcounts)
-  grate <- check_grate(x, grate)
+  grate <- check_grate(x, grate, totalcounts)
   
   if (.Platform$OS.type == "windows" && ncores > 1L) {
     warning("mclapply() runs serially on Windows; mc.cores ignored.")
