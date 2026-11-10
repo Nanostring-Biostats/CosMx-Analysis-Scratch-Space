@@ -65,12 +65,11 @@ em_mvn_mixture <- function(scores
         ) + log(p[k])
       })
       ### e-step 
-      llmat <- do.call(cbind, ll)  
-      ppmatdenom <- apply(llmat, 1, matrixStats::logSumExp)
-      ppmatnum <- exp(llmat)
-      ppmat <- Matrix::Diagonal(x=1/exp(ppmatdenom),names=TRUE)%*% ppmatnum  
+      llmat <- do.call(cbind, ll)
+      ppmatdenom <- matrixStats::rowLogSumExps(llmat)
+      ppmat <- exp(llmat - ppmatdenom)
       if(!is.null(prior_prob_level)){
-        ppmat <- (Matrix::Diagonal(x=prior_prob_level,names=TRUE) %*% ppmat)
+        ppmat <- ppmat * as.numeric(prior_prob_level)
       }
     }
     
@@ -90,9 +89,9 @@ em_mvn_mixture <- function(scores
                        ,intercepts = intercepts[[k]]
                        ) 
       mu[k,] <- muk 
-      scoresc <- scale(scores, center = muk,scale=FALSE)
-      sigk <- (Matrix::t(scoresc) %*% Matrix::Diagonal(x=ppmat[,k]) %*% scoresc)
-      sigk <- sigk/(sum(ppmat[,k]))
+      scoresc <- scale(scores, center = muk, scale=FALSE)
+      wt <- sqrt(as.numeric(ppmat[,k]))
+      sigk <- crossprod(scoresc * wt) / sum(ppmat[,k])
       initsigma[[k]] <- as.matrix(sigk)
     } 
   
@@ -119,11 +118,10 @@ em_mvn_mixture <- function(scores
     })
     
     ### e-step 
-    llmat <- do.call(cbind, ll)  
-    ppmatdenom <- apply(llmat, 1, matrixStats::logSumExp)
-    ppmatnum <- exp(llmat)
-    ppmat <- Matrix::Diagonal(x=1/exp(ppmatdenom),names=TRUE)%*% ppmatnum  
-    isna <- apply(ppmat, 1, function(x) sum(is.na(x) | is.infinite(x)))
+    llmat <- do.call(cbind, ll)
+    ppmatdenom <- matrixStats::rowLogSumExps(llmat)
+    ppmat <- exp(llmat - ppmatdenom)
+    isna <- rowSums(is.na(ppmat) | is.infinite(ppmat))
     if(sum(isna > 0) > 0){
       whichisna <- which(isna > 0)
       maxll <- apply(llmat[whichisna,,drop=FALSE], 1, which.max)
@@ -133,7 +131,7 @@ em_mvn_mixture <- function(scores
       }
     } 
     if(!is.null(prior_prob_level)){
-      ppmat <- (Matrix::Diagonal(x=prior_prob_level,names=TRUE) %*% ppmat)
+      ppmat <- ppmat * as.numeric(prior_prob_level)
       llvec[iter] <- sum(ppmatdenom + log(prior_prob_level))
     } else {
       llvec[iter] <- sum(ppmatdenom)

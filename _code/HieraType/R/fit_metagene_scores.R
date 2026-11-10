@@ -202,7 +202,43 @@ fit_metagene_scores <- function(
     }
   }
  
-  #### Loop over cell type classes to get NNLS fits and scores 
+  sqrt_weights <- if(!is.null(prior_level_weights)) sqrt(prior_level_weights) else NULL
+
+  #### Precompute Pearson residuals for all unique index markers
+  all_index_markers <- unique(unlist(lapply(markerslist, "[[", "index_marker")))
+  yresp_all_mat <- do.call(cbind, lapply(all_index_markers, function(gn){
+    yr <- as.numeric(counts_matrix[, gn])
+    if(!grepl("_protein$", gn) && pearson.response){
+      if(is.null(batch_variable)){
+        muhat <- gene_wise_frequency[gn] * totalcounts
+      } else {
+        muhat <- as.numeric(Matrix::Diagonal(x = totalcounts, names = TRUE) %*% (Matrix::t(batch_mat) %*% grate[, gn]))
+      }
+      if(pearson.family == "poisson"){
+        yr <- (yr - muhat) / sqrt(pmax(muhat, .Machine$double.eps))
+      } else if(pearson.family == "nonzero_bernoulli"){
+        nzprob <- 1 - dpois(0, lambda = muhat)
+        nzprob_var <- pmax(nzprob * (1 - nzprob), .Machine$double.eps)
+        yr <- ((yr > 0) - nzprob) / sqrt(nzprob_var)
+      }
+      if(pearson.scale.max < Inf){
+        thr <- pearson.scale.max * sd(yr) + mean(yr)
+        yr[yr > thr] <- thr
+      }
+    }
+    scale(yr)
+  }))
+  colnames(yresp_all_mat) <- all_index_markers
+
+  #### Precompute lag responses for all unique index markers at once
+  Wy_all <- NULL
+  if(lag_response && !is.null(adjacency_matrix)){
+    message(paste0("precomputing lag responses (all markers): ", Sys.time()))
+    Wy_all <- adjacency_matrix %*% yresp_all_mat
+    colnames(Wy_all) <- paste0("lag.y.", all_index_markers)
+  }
+
+  #### Loop over cell type classes to get NNLS fits and scores
   for(jj in 1:length(markerslist)){
     ctclass <- names(markerslist)[jj]
     message(paste0("Modeling ", ctclass, ". ",  Sys.time()))
@@ -216,44 +252,14 @@ fit_metagene_scores <- function(
        predictors <- c(predictors, offclass)
        signs <- c(signs, offclass_signs)
     }
-    yrespmat <- vector(mode = 'list',length=length(index_markers)) 
-    
-    for(index_marker in index_markers){
-      yresp <- counts_matrix[,index_marker]
-      if(!grepl("_protein$", index_marker)){
-        if(pearson.response){
-          ### summary statistics for normalization and 
-          ### (optional) pearson standardization of response variable used for fitting metagene
-          if(is.null(batch_variable)){
-              muhat <- gene_wise_frequency[index_marker] * totalcounts
-          } else {
-            muhat <- (Matrix::Diagonal(x = totalcounts, names = TRUE) %*% (Matrix::t(batch_mat) %*% grate[,index_marker]))[,1]
-          }
-          if(pearson.family == "poisson"){
-            yresp <- (yresp -  muhat) / sqrt(pmax(muhat, .Machine$double.eps))
-          } else if (pearson.family == "nonzero_bernoulli"){
-            nzprob <- 1-dpois(0, lambda = muhat)
-            nzprob_var <- pmax(nzprob * (1-nzprob), .Machine$double.eps)
-            yresp <- ((yresp > 0) - nzprob) / sqrt(nzprob_var)
-          }
-          if(pearson.scale.max < Inf){
-            yresp[yresp > pearson.scale.max*sd(yresp) + mean(yresp)] <- pearson.scale.max*sd(yresp) + mean(yresp)
-          }
-        }
-      } 
-      yrespmat[[index_marker]] <- scale(yresp)
-    }
-    yrespmat <- do.call(cbind, yrespmat)
-    colnames(yrespmat) <- index_markers
+    yrespmat <- yresp_all_mat[, index_markers, drop=FALSE]
    
-    Xsigned <- Xall[,predictors] %*%  Matrix::Diagonal(x = signs, names = predictors)
-    
+    Xsigned <- Xall[, predictors] %*% Matrix::Diagonal(x = signs, names = predictors)
+
     if(!is.null(adjacency_matrix)){
       if(lag_predictors){
         message(paste0("lagging predictors: ", Sys.time()))
-        #WXmat <- adjacency_matrix %*% Xsigned
-        #WXmat <- adjacency_matrix %*% Xsigned
-        WXmat <- WXall[,predictors] %*% Matrix::Diagonal(x = signs, names = predictors)
+        WXmat <- WXall[, predictors] %*% Matrix::Diagonal(x = signs, names = predictors)
         colnames(WXmat) <- paste0("lag.", colnames(WXmat))
         Xsigned <- cbind(Xsigned, WXmat)
         signs <- c(signs, signs)
@@ -261,34 +267,36 @@ fit_metagene_scores <- function(
       }
     }
    
-    if(lag_response){
-      message(paste0("lagging response: ", Sys.time()))
-      
-      Wy <- adjacency_matrix %*% yrespmat
-      colnames(Wy) <- paste0("lag.y.", colnames(yrespmat))
+    if(!is.null(Wy_all)){
+      Wy <- Wy_all[, paste0("lag.y.", index_markers), drop=FALSE]
       Xsigned <- cbind(Wy, Xsigned)
-      signs <- c(rep(1,ncol(Wy)), signs)
-      rm(Wy)
-    }  
+      signs <- c(rep(1, ncol(Wy)), signs)
+    }
     
     message(paste0("cross-prod calcualtions: ", Sys.time()))
     
     if(!is.null(training_ids)){
+      Xfit <- Xsigned[training_ids, ]
+      yfit <- yrespmat[training_ids, , drop=FALSE]
       if(!is.null(prior_level_weights)){
-        a <- Matrix::crossprod(Matrix::Diagonal(x=sqrt(prior_level_weights[training_ids])) %*% Xsigned[training_ids,])
-        b <- Matrix::crossprod(Matrix::Diagonal(x=prior_level_weights[training_ids]) %*% Xsigned[training_ids] , yrespmat[training_ids,,drop=FALSE])
+        wt_tr <- prior_level_weights[training_ids]
+        a <- Matrix::crossprod(Xfit * sqrt(wt_tr))
+        b <- Matrix::crossprod(Xfit, yfit * wt_tr)
       } else {
-        a <- Matrix::crossprod(Xsigned[training_ids,])
-        b <- Matrix::crossprod(Xsigned[training_ids,], yrespmat[training_ids,,drop=FALSE])
+        a <- Matrix::crossprod(Xfit)
+        b <- Matrix::crossprod(Xfit, yfit)
       }
     } else {
-      if(!is.null(prior_level_weights)){
-        a <- Matrix::crossprod(Matrix::Diagonal(x=sqrt(prior_level_weights)) %*% Xsigned)
-        b <- Matrix::crossprod(Matrix::Diagonal(x=prior_level_weights) %*% Xsigned , yrespmat)
-      } else {
-        a <- Matrix::crossprod(Xsigned)
-        b <- Matrix::crossprod(Xsigned, yrespmat)
-      }
+      # C++ chunked crossprod: BLAS speed at bounded O(chunk*p) peak memory.
+      # Coerce to CsparseMatrix (dgCMatrix) in case cbind with dense Wy yielded dgeMatrix.
+      Xsp <- if(inherits(Xsigned, "CsparseMatrix")) Xsigned else as(Xsigned, "CsparseMatrix")
+      w_vec <- if(!is.null(prior_level_weights)) prior_level_weights else numeric(0)
+      result <- chunked_weighted_crossprod(Xsp, as.matrix(yrespmat), w_vec, 10000L)
+      a <- result$a
+      b <- result$b
+      dimnames(a) <- list(colnames(Xsigned), colnames(Xsigned))
+      dimnames(b) <- list(colnames(Xsigned), colnames(yrespmat))
+      rm(Xsp, result)
     }
     gc()
     unconstrained <- FALSE 
