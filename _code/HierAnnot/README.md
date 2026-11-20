@@ -742,6 +742,16 @@ You can restrict cluster-profile aggregation to a subset of cells using `include
 
 Use `make_cluster_annotation_export_summary()` to tune unknown/mixed/export labeling at the cluster level before expanding back to cells. The default `export_view="compact"` returns the join-ready label columns plus the most useful normal, malignant, and integrated diagnostics; use `export_view="diagnostic"` to return the full derived table. One could also run it with `rerun_decision=True` and new weights/thresholds to tune the decision routing in addition to the export logic if requested. Then use `expand_cluster_annotation_to_cells()` to build a join-ready per-cell table.
 
+To flag immune clusters from the final export labels, use `score_immune_export_labels()`. It returns `1.0` for full immune labels, `candidate_<immune>` labels, and mixed labels whose components are all immune (e.g. `mixed_b_cell.treg`); `0.5` for mixed labels with only some immune components (e.g. `mixed_fibroblast.plasma_cell`); and `0.0` otherwise. Tumor-like labels are scored by their normal-label suffix. Pass `extra_immune_terms=[...]` for immune names from custom hierarchies that the built-in matcher does not recognize.
+
+```python
+from hierannot import score_immune_export_labels
+
+cluster_export["annot_export_immune_score"] = score_immune_export_labels(cluster_export)
+# also works on cluster-suffixed labels (e.g. "Macrophage_4"); a trailing "_<digits>" is stripped
+score_immune_export_labels(cluster_export, label_column="annot_export_label_with_cluster")
+```
+
 ### Saving and reloading a result bundle
 
 You can persist the main score tables, hierarchy, and resolved config without

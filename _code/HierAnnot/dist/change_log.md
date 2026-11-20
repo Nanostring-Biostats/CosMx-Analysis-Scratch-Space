@@ -1,5 +1,10 @@
 # HierAnnot change log
 
+## 0.8.54
+
+- Released Nov 20th, 2026
+- Enabled flag immune clusters from the final export labels with `score_immune_export_labels()`
+
 ## 0.8.53
 
 - Released June 15th, 2026

@@ -61,6 +61,7 @@ from .workflows import (
     make_cluster_annotation_export_summary,
     rerun_cluster_annotation_result_from_scores,
     expand_cluster_annotation_to_cells,
+    score_immune_export_labels,
 )
 from .malignant_reporting import resolve_program_report_block_preset
 
@@ -96,6 +97,7 @@ __all__ = [
     "make_cluster_annotation_export_summary",
     "rerun_cluster_annotation_result_from_scores",
     "expand_cluster_annotation_to_cells",
+    "score_immune_export_labels",
 
     "plot_all_available_diagnostics",
     "plot_cluster_annotation_heatmap",

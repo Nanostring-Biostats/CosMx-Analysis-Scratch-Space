@@ -1485,3 +1485,117 @@ def expand_cluster_annotation_to_cells(
 
     return expanded
 
+
+
+def _is_immune_export_term(term: str, extra_terms: Set[str]) -> bool:
+    from .builtin.matching import is_immune_like_lineage
+
+    term = str(term).strip()
+    if not term:
+        return False
+    if _sanitize_label_text(term).lower() in extra_terms:
+        return True
+    return is_immune_like_lineage(term)
+
+
+_CLUSTER_SUFFIX_RE = re.compile(r"_\d+$")
+
+
+def _strip_cluster_suffix(labels: pd.Series) -> pd.Series:
+    return labels.map(lambda x: _CLUSTER_SUFFIX_RE.sub("", x.strip()) if isinstance(x, str) else x)
+
+
+def score_immune_export_labels(
+    labels,
+    *,
+    extra_immune_terms: Optional[Iterable[str]] = None,
+    label_column: str = "annot_export_label",
+    strip_cluster_suffix: bool = True,
+    mixed_label_prefix: str = "mixed",
+    mixed_branch_separator: str = ".",
+    unresolved_candidate_label_prefix: str = "candidate",
+    tumor_like_prefix: str = "tumor_like",
+    unknown_label: str = "unknown",
+) -> pd.Series:
+    """Score how strongly each final export label belongs to the immune lineage.
+
+    Scores:
+
+    - ``1.0``: a full immune label (e.g. ``Macrophage``, ``Immune``), an
+      unresolved candidate immune label (e.g. ``candidate_plasma_cell``), or a
+      mixed label whose components are all immune (e.g. ``mixed_b_cell.treg``).
+    - ``0.5``: a mixed label where only some components are immune
+      (e.g. ``mixed_fibroblast.plasma_cell``).
+    - ``0.0``: non-immune, ``unknown``, or missing labels.
+
+    Tumor-like labels (``tumor_like[_<state>].<normal label>``) are scored by
+    their normal-label suffix, which may itself be a mixed or candidate label.
+
+    Immune terms are recognized with :func:`hierannot.is_immune_like_lineage`.
+    Use ``extra_immune_terms`` to add immune names from custom hierarchies
+    (e.g. ``["Kupffer cell", "Eosinophil"]``); they are matched against the
+    sanitized, lower-cased label text.
+
+    Labels from ``annot_export_label_with_cluster`` (e.g. ``Macrophage_4``,
+    ``mixed_b_cell.treg_17``) are supported: a trailing ``_<digits>`` cluster
+    suffix is removed before scoring.
+
+    Parameters
+    ----------
+    labels
+        Export labels as a Series/list/array, or a DataFrame from
+        :func:`make_cluster_annotation_export_summary` containing ``label_column``.
+    extra_immune_terms
+        Additional label names to treat as immune.
+    label_column
+        Column used when ``labels`` is a DataFrame. Use
+        ``"annot_export_label_with_cluster"`` to score the cluster-suffixed labels.
+    strip_cluster_suffix
+        Remove a trailing ``_<digits>`` cluster suffix before scoring.
+    mixed_label_prefix, mixed_branch_separator, unresolved_candidate_label_prefix, unknown_label
+        Should match the values passed to :func:`make_cluster_annotation_export_summary`.
+    tumor_like_prefix
+        Prefix used for tumor-like export labels.
+
+    Returns
+    -------
+    pd.Series
+        Float scores named ``annot_export_immune_score``, aligned to the input index.
+    """
+    if isinstance(labels, pd.DataFrame):
+        if label_column not in labels.columns:
+            raise KeyError(f"Column {label_column!r} not found in labels DataFrame.")
+        labels = labels[label_column]
+    if not isinstance(labels, pd.Series):
+        labels = pd.Series(list(labels) if not isinstance(labels, str) else [labels])
+    if strip_cluster_suffix:
+        labels = _strip_cluster_suffix(labels)
+
+    extra = {_sanitize_label_text(t).lower() for t in (extra_immune_terms or [])}
+    mixed_prefix = f"{mixed_label_prefix}_".lower()
+    cand_prefix = f"{unresolved_candidate_label_prefix}_".lower()
+    tumor_prefix = str(tumor_like_prefix).lower()
+    unknown_value = str(unknown_label).strip().lower()
+
+    def score(label) -> float:
+        if label is None or (isinstance(label, float) and np.isnan(label)):
+            return 0.0
+        text = str(label).strip()
+        lower = text.lower()
+        if lower.startswith(tumor_prefix) and "." in text:
+            text = text.split(".", 1)[1].strip()
+            lower = text.lower()
+        if lower in {"", "nan", "none", unknown_value}:
+            return 0.0
+        if lower.startswith(mixed_prefix):
+            parts = [p for p in text[len(mixed_prefix):].split(mixed_branch_separator) if p.strip()]
+            hits = [_is_immune_export_term(p, extra) for p in parts]
+            if parts and all(hits):
+                return 1.0
+            return 0.5 if any(hits) else 0.0
+        if lower.startswith(cand_prefix):
+            text = text[len(cand_prefix):]
+        return 1.0 if _is_immune_export_term(text, extra) else 0.0
+
+    unique_scores = {lab: score(lab) for lab in pd.unique(labels)}
+    return labels.map(unique_scores).astype(float).rename("annot_export_immune_score")
